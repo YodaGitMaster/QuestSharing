@@ -33,6 +33,15 @@ ERR_QUEST_PUSH_TIMER_EXPIRED_S = "%s did not respond."
 LE_PARTY_CATEGORY_INSTANCE = 2
 
 UIParent = {}
+UISpecialFrames = {}
+OPTIONS_ADDED = {}
+TOOLTIP = {}
+GameTooltip = {
+    SetOwner = function() end,
+    SetText = function(_, t) TOOLTIP.text = t end,
+    Show = function() TOOLTIP.shown = true end,
+    Hide = function() TOOLTIP.shown = false end,
+}
 function GetTime() return NOW end
 
 ADDON_SENT, PREFIXES = {}, {}
@@ -153,6 +162,10 @@ function MODERN_API()
     }
     function QuestLogPushQuest() PUSHED[#PUSHED + 1] = SELECTED end
     function GetQuestLink(id) return LINK(BYID(id)) end
+    Settings = {
+        RegisterCanvasLayoutCategory = function(f, name) return { frame = f, name = name } end,
+        RegisterAddOnCategory = function(cat) OPTIONS_ADDED[#OPTIONS_ADDED + 1] = cat end,
+    }
     C_ChatInfo = {
         RegisterAddonMessagePrefix = function(p) PREFIXES[p] = true; return true end,
         SendAddonMessage = function(prefix, text, channel) ADDON_SENT[#ADDON_SENT + 1] = { prefix = prefix, text = text, channel = channel } end,
@@ -204,6 +217,7 @@ function CLASSIC_API()
     end
     function QuestLogPushQuest() PUSHED[#PUSHED + 1] = QUESTS[SELECTED].id end
     function GetQuestLink(i) return LINK(QUESTS[i]) end
+    function InterfaceOptions_AddCategory(f) OPTIONS_ADDED[#OPTIONS_ADDED + 1] = f end
     function RegisterAddonMessagePrefix(p) PREFIXES[p] = true end                 -- returns nothing, like the old API
     function SendAddonMessage(prefix, text, channel) ADDON_SENT[#ADDON_SENT + 1] = { prefix = prefix, text = text, channel = channel } end
 end
@@ -250,7 +264,7 @@ end
 class Game:
     """One Lua world with the mock API and the real addon loaded into it."""
 
-    def __init__(self, style="modern", pre=""):
+    def __init__(self, style="modern", pre="", fresh=False):
         self.lua = LuaRuntime(unpack_returned_tuples=True)
         self.lua.execute(MOCK)
         self.lua.execute("DEFAULT_QUESTS()")
@@ -258,7 +272,7 @@ class Game:
         self.lua.execute("TRACKER_MODERN()" if style == "modern" else "TRACKER_CLASSIC()")
         if pre:
             self.lua.execute(pre)
-        self.style = style
+        self.style, self.fresh = style, fresh
         self.load()
 
     def load(self):
@@ -314,7 +328,10 @@ class Game:
         self.lua.eval('function(t) SlashCmdList["QUESTSHARING"](t) end')(text)
 
     def start(self):
-        """World entered, not grouped yet."""
+        """World entered, not grouped yet. Unless fresh=True the saved settings start with the tracker and the
+        panel off, as in the first versions, so the older tests keep testing what they were written for."""
+        if not self.fresh:
+            self.run("QuestSharingDB = { near = false, panel = false, dbVersion = 2 }")
         self.fire("ADDON_LOADED", "QuestSharing")
         self.fire("PLAYER_ENTERING_WORLD")
 

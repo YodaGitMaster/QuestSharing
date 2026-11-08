@@ -35,7 +35,7 @@ A World of Warcraft addon for playing quests together.
    [Wolves Among Us]` on their screen when it is their quest.
 
 5. **Shows who shares what.** A star and the names next to shared quests in the game's quest log, and a
-   small movable panel `/qs panel`:
+   small movable panel (shown while you are in a party, drag it to move it; `/qs panel` hides it):
 
    ```
    Party: Anna (addon), Bob
@@ -43,7 +43,7 @@ A World of Warcraft addon for playing quests together.
    * Report to Goldshire (done): Anna done
    ```
 
-6. **Keeps your quest tracker on what is near you (optional, off by default).** `/qs near on` fills the
+6. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. It fills the
    tracker (the list on the right) with the quests closest to you and **re-checks every 2 seconds as you
    move**, so the list follows you instead of changing only when you cross into another zone.
    - **Distance mode** (needs a client that can tell how far a quest is) ranks quests by distance. A quest
@@ -56,6 +56,27 @@ A World of Warcraft addon for playing quests together.
      If you change the tracker yourself it pauses for 5 minutes (`/qs near resume` to continue). It waits
      during combat and inside instances.
    - Note this fills the tracker list. It does not touch the single highlighted "waypoint" quest.
+
+## Settings window
+**Everything is switched on by default.** To change anything, type `/qs settings` (or click **Settings** on
+the quests-in-common panel, or open *Game Menu > Options > AddOns > Quest Sharing*). Every line is one
+click:
+
+```
+[ON]  Share my quests when I join a party or someone joins
+[ON]  Share a quest when I accept it (in a party)
+      Which quests to share: this zone only          (click to change)
+      Seconds between shared quests: 4               (left click +, right click -, Shift = 5 at a time)
+[ON]  Announce quests in common in party chat
+[OFF] Sync quest lists with other Quest Sharing users
+...
+      Reset everything to the defaults (all on)
+```
+On/off lines switch with a click; lines with a choice cycle through the choices (right click goes back);
+number lines count up with the left button and down with the right one. Hover a line for a short
+explanation. The same things can be done with `/qs` commands, and a change in either place shows up in the
+other at once. Settings saved by an earlier version get the new defaults (tracker and panel on); every
+other choice you made is kept.
 
 ## Install
 1. Copy the folder `QuestSharing` (the one containing `QuestSharing.toc`, not this README's folder) into
@@ -82,11 +103,13 @@ A World of Warcraft addon for playing quests together.
 | `/qs sync on\|off` | exchange exact quest lists with other Quest Sharing users (default on) |
 | `/qs announce on\|off` | say in party chat when a quest we share is done (default on) |
 | `/qs markers on\|off` | star and names next to shared quests in the quest log (default on) |
-| `/qs panel [on\|off]` | show / hide the "quests in common" panel; drag it to move it |
-| `/qs near [on\|off]` | keep the quest tracker filled with the quests closest to you (default off) |
+| `/qs panel [on\|off]` | show the "quests in common" panel while in a party (default on); drag it to move it |
+| `/qs near [on\|off]` | keep the quest tracker filled with the quests closest to you (default on) |
 | `/qs near N` | how many quests it keeps (default 5) |
 | `/qs near mode auto\|distance\|zone` | `auto` uses distance if your client can measure it, otherwise your zone |
 | `/qs near now` / `resume` | refresh now / end a pause early |
+| `/qs settings` | open the settings window |
+| `/qs reset` | put every setting back to its default (everything on) |
 | `/qs probe` | show what this game client supports |
 
 ## How it knows
@@ -105,7 +128,7 @@ strings (so it works in any language) and shows them to you.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 169 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 205 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -139,8 +162,9 @@ python tests/test_questsharing.py     # 63 tests: sharing, replies, announcement
 python tests/test_features.py         # 50 tests: sync, completion, panel, quest-log markers
 python tests/test_triggers.py         # 34 tests: when it shares (once per join / new member / new quest), no nagging
 python tests/test_tracker.py          # 22 tests: the tracker follows you (distance and zone modes)
+python tests/test_settings.py         # 36 tests: everything on by default, migration, the settings window
 ```
-Expected: `63/63`, `50/50`, `34/34` and `22/22 passed`.
+Expected: `63/63`, `50/50`, `34/34`, `22/22` and `36/36 passed`.
 
 ## Files
 | File | Purpose |
@@ -152,5 +176,6 @@ Expected: `63/63`, `50/50`, `34/34` and `22/22 passed`.
 | `QuestSharing/Progress.lua` | notices finished quests, announces them, sends changes to synced players |
 | `QuestSharing/Panel.lua` | the "quests in common" panel and the quest-log markers |
 | `QuestSharing/Track.lua` | keeps the quest tracker on the quests nearest to you (distance or zone mode) |
+| `QuestSharing/Settings.lua` | the settings window (plain clickable lines, no game UI templates) and the options entry |
 | `QuestSharing/Status.lua` | the status message, tracker / link hooks, `/qs probe` |
 | `tests/` | the Lua 5.1 test harness with a WoW API mock, and the two test files |
