@@ -103,7 +103,7 @@ def test_the_panel_shows_only_while_in_a_party(style):
     g.join_party(["Anna"])
     g.advance(2)
     panel, rows, legend, notes = g.eval("NS._panel()")
-    assert panel.shown is True and "Anna" in legend[1].name.text and notes.text.startswith("No quests in common yet.")
+    assert panel.shown is True and "Anna" in legend[1].name.text and rows[1].shown is True, "my nearest quests, one column for Anna"
     g.leave_party()
     g.advance(2)
     assert panel_shown(g) is False

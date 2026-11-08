@@ -1,6 +1,10 @@
 # Changelog
 
 ## 0.2.0
+- **The Party quests window is a grid:** *Quest | member 1 | member 2 ...*, with a check (has it), a gold check (has it
+  and finished it), an X (does not have it) or a ? (the game cannot tell: out of range, offline) under each member.
+  It always shows **your 5 nearest quests**, re-sorted every few seconds as you move; a quest only moves up when it is
+  clearly closer, so the rows do not flicker. Post all posts the quests someone in the party has.
 - **Playing together:** "Picked up [quest] - Anna has it too. Want to do it together?" when you take a quest someone in
   the party has (one message per quest giver, once per quest, never for shared quests or ones just named in chat).
   **Where the quest items were**: for collect / use objectives the spot of your last progress is added to your done and
