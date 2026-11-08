@@ -29,27 +29,79 @@ end
 
 -- one field of one record: kind = "quest" | "npc" | "object" | "item"
 local NEW = { quest = "QuestDB", npc = "NpcDB", object = "ObjectDB", item = "ItemDB" }
+local LIB = { quest = { "Quest" }, npc = { "Npc", "NPC" }, object = { "Object" }, item = { "Item" } }   -- LibQuestieDB.<x>.Get
 local OLD = { quest = "QueryQuestSingle", npc = "QueryNPCSingle", object = "QueryObjectSingle", item = "QueryItemSingle" }
+
+local function getFrom(db, id, key)
+    if type(db) ~= "table" then return nil end
+    if type(db.Get) == "function" then
+        local v = call(db.Get, id, key)
+        if v ~= nil then return v end
+    end
+    if type(db[key]) == "function" then return call(db[key], id) end
+end
+
+local function libTable(kind)
+    if type(LibQuestieDB) ~= "table" then return nil end
+    for _, n in ipairs(LIB[kind]) do if type(LibQuestieDB[n]) == "table" then return LibQuestieDB[n] end end
+end
+
 local function field(kind, id, key)
     if not id then return nil end
-    local db = _G[NEW[kind]]
-    if type(db) == "table" then
-        if type(db.Get) == "function" then
-            local v = call(db.Get, id, key)
-            if v ~= nil then return v end
-        end
-        if type(db[key]) == "function" then
-            local v = call(db[key], id)
-            if v ~= nil then return v end
-        end
-    end
+    local v = getFrom(_G[NEW[kind]], id, key)
+    if v == nil then v = getFrom(libTable(kind), id, key) end
+    if v ~= nil then return v end
     local mod = legacy()
     if mod then return call(mod[OLD[kind]], id, key) end
 end
 
-function Q.available()
-    if type(QuestDB) == "table" and (type(QuestDB.Get) == "function" or type(QuestDB.name) == "function") then return true end
-    return legacy() ~= nil
+-- which way in works here: "QuestieDB" (Questie 12), "LibQuestieDB", "Questie" (older) or nil
+function Q.source()
+    local q = _G.QuestDB
+    if type(q) == "table" and (type(q.Get) == "function" or type(q.name) == "function") then return "QuestieDB" end
+    local lib = libTable("quest")
+    if lib and type(lib.Get) == "function" then return "LibQuestieDB" end
+    if legacy() then return "Questie" end
+    return nil
+end
+
+function Q.available() return Q.source() ~= nil end
+
+local function loaded(name)
+    local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+    if not f then return nil end
+    local ok, v = pcall(f, name)
+    return ok and v and true or false
+end
+
+-- /qs questie: is Questie here, which way do we read it, is it ready, and a real lookup from your own quest log
+function Q.report()
+    local out = {}
+    local qOn, dbOn = loaded("Questie"), loaded("QuestieDB")
+    out[#out + 1] = "Questie addon: " .. (qOn and "loaded" or (qOn == false and "NOT loaded (installed and ticked at the character screen?)" or "?"))
+        .. (dbOn and " | QuestieDB (its database): loaded" or "")
+    local src = Q.source()
+    if not src then
+        if QuestieLoader and Questie and Questie.started == false then
+            out[#out + 1] = "Questie is still starting (or failed to start): try again in a minute"
+        else
+            out[#out + 1] = "no Questie database found: \"tell them where to get it\" cannot work"
+        end
+        return out, false
+    end
+    local how = { QuestieDB = "QuestieDB (Questie 12 and newer)", LibQuestieDB = "LibQuestieDB", Questie = "Questie's own database (older Questie)" }
+    out[#out + 1] = "reading: " .. how[src] .. ((Questie and Questie.API and Questie.API.isReady == false) and " - Questie is not fully ready yet" or "")
+    local tried, found = 0, 0
+    for _, e in ipairs(C.entries()) do
+        if tried >= 3 then break end
+        tried = tried + 1
+        local where = Q.whereText(e.questID)
+        if where then found = found + 1 end
+        out[#out + 1] = C.link(e) .. " " .. (where or "- Questie has no start for this quest")
+    end
+    if tried == 0 then out[#out + 1] = "(no quests in your log to look up)" end
+    out[#out + 1] = (found > 0) and "Questie works with Quest Sharing." or (tried > 0 and "Questie answered nothing for these quests - send me this report." or "")
+    return out, found > 0
 end
 
 local function zoneName(areaId)

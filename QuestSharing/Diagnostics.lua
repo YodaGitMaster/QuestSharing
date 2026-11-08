@@ -197,7 +197,8 @@ function ns.doctorLines()
     add(ns.pingSupported and ns.pingSupported(), "pings: " .. ((ns.pingSupported and ns.pingSupported())
         and ("the game's ping system is here, ping key " .. tostring(ns.pingKeyName and ns.pingKeyName() or "not set - /qs pingkey <KEY>"))
         or "this client has no ping system for addons to use"))
-    add(ns.questie and ns.questie.available(), "Questie: " .. ((ns.questie and ns.questie.available()) and "found - \"where to get it\" works" or "not found - \"where to get it\" needs it"))
+    local src = ns.questie and ns.questie.source()
+    add(src ~= nil, "Questie: " .. (src and ("found (" .. src .. ") - \"where to get it\" works; /qs questie tests it") or "not found - \"where to get it\" needs it; /qs questie says why"))
     local errs = d.errors or {}
     out[#out + 1] = (#errs == 0) and "[OK] no errors recorded" or ("[--] " .. #errs .. " error(s) recorded - see below")
     local flags = {}
