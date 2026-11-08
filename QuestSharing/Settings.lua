@@ -65,7 +65,7 @@ ns.settingRows = {
     { tab = "quick", kind = "choice", key = "quickMode", label = "The quick chat key", values = { "hold", "toggle" },
       names = { hold = "hold, point, release", toggle = "press to open, click a message" } },
     { tab = "quick", kind = "choice", key = "quickChannel", label = "Quick chat says it to", values = { "auto", "say", "party", "whisper" },
-      names = { auto = "my target (whisper), else party, else nearby", say = "everybody nearby", party = "the party only", whisper = "the player I target" } },
+      names = { auto = "the party if I am in one, else my target (whisper), else nearby", say = "everybody nearby", party = "the party only", whisper = "the player I target" } },
     { tab = "quick", kind = "action", label = "Which key opens the ring? (set it with /qs key V)", action = function() ns.setQuickKey("") end },
     -- Social
     { tab = "social", kind = "bool", key = "friends", label = "(beta) Add people I group with to my friends list",

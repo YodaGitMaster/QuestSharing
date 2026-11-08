@@ -72,8 +72,8 @@ A World of Warcraft addon for playing quests together.
    **release the key** or **click** it. By default the ring has:
    *Hello - Team up? - What I need - Same quests? - Thanks - Wait - Follow me - Invite*.
 
-   **Where it goes.** If you have a **player targeted** it is a **whisper to them** (so `{name}` is their name).
-   Otherwise it goes to your party, or to everybody nearby (`/say`) if you are not in one.
+   **Where it goes.** In a **party** it goes to the party (`/p`; `/i` in a dungeon group). Not in a party: a **player
+   you target** gets a **whisper** (`/w`, and `{name}` is their name), and with nobody targeted it is `/s`.
    `/qs quick channel auto|say|party|whisper` changes that.
 
    **Why `/say` needs a click.** The game only lets an addon say things to everybody nearby (`/say`, `/yell`,
