@@ -1,0 +1,14 @@
+## Interface: 16001
+## Title: Quest Sharing
+## Notes: Shares your quests with a new party, says which ones you have in common, and posts friendly quest progress to chat when you click a tracked quest.
+## Author: YodaGitMaster
+## Version: 0.1
+## SavedVariables: QuestSharingDB
+
+Compat.lua
+Core.lua
+Share.lua
+Sync.lua
+Progress.lua
+Panel.lua
+Status.lua
