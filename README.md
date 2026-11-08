@@ -71,12 +71,17 @@ A World of Warcraft addon for playing quests together.
    release the key** to say it. A quick tap opens the wheel and keeps it open so you can click a slot
    instead; Esc or a right click closes it. By default the wheel says:
 
-   > Hey {name}! o/ - Want to quest together here? ({here}) - I need to: {need} - We have these quests in common: {common} - Thanks! - Wait for me, one sec! - Follow me! - Ready when you are!
+   > Hey {name}! o/ - Want to quest together here? ({here}) - I need to: {need} - {shared} - Thanks! - Wait for me, one sec! - Follow me! - Ready when you are!
 
    Messages are filled in when you send them: `{name}` is the friendly player you target (or "there"),
    `{here}` your subzone or zone, `{need}` what you still have to do in this area (your unfinished
-   objectives, nearest quest first where the client can measure distance), `{common}` the quests you and
-   your party share, `{quest}` the nearest unfinished quest, `{zone}` the zone. It goes to the party when
+   objectives, nearest quest first where the client can measure distance), `{mine}` links to your
+   unfinished quests of this area, `{common}` the quests you and your party share, `{quest}` the nearest
+   unfinished quest, `{zone}` the zone, and `{shared}`, a whole sentence that fits the moment.
+   **`{shared}` knows you cannot see a stranger's quests**, so with someone who is not in your party it asks a
+   question that links yours (they can click a link and tell you): *"Are you doing any of these quests here?
+   [Wolves Among Us], [A Personal Quest] Want to do them together?"*. Once you are in a party it says *"We have
+   these quests in common: ..."*, or *"No quest in common yet - I'm on ... Any of these yours?"*. It goes to the party when
    you are in one, otherwise to everybody nearby (`/qs quick channel auto|say|party|whisper`; `whisper`
    sends it to your target).
    **Arrange them as you please:** `/qs quick` lists them; `/qs quick add <text>`, `edit N <text>`,
@@ -158,7 +163,7 @@ strings (so it works in any language) and shows them to you.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 297 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 310 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -203,9 +208,9 @@ python tests/test_triggers.py         # 34 tests: when it shares (once per join 
 python tests/test_tracker.py          # 22 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 36 tests: everything on by default, migration, the settings window
 python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
-python tests/test_quick.py            # 50 tests: the quick chat wheel, placeholders, editing, key binding
+python tests/test_quick.py            # 63 tests: the quick chat wheel, placeholders, editing, key binding
 ```
-Expected: `63/63`, `50/50`, `34/34`, `22/22`, `36/36`, `42/42` and `50/50 passed`.
+Expected: `63/63`, `50/50`, `34/34`, `22/22`, `36/36`, `42/42` and `63/63 passed`.
 
 ## Files
 | File | Purpose |
