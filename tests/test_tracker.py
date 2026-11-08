@@ -201,7 +201,7 @@ def classic_following():
 
 
 def pauses(g):
-    return g.printed().count("|cff55ccffQuestSharing:|r tracker follows you: paused for 10 seconds because you changed the tracker (/qs near resume to continue)")
+    return g.printed().count("|cff55ccffQuest Sharing:|r tracker follows you: paused for 10 seconds because you changed the tracker (/qs near resume to continue)")
 
 
 def test_a_manual_change_is_noticed_without_any_event():

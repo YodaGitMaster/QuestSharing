@@ -146,6 +146,7 @@ local function handle(sender, text)
         peer.quests[id] = rec
         local e = C.findEntry(id)
         if e and ns.db.verbose then ns.print(string.format("%s finished the objectives of %s", peer.name, C.link(e))) end
+        if e and ns.goodNews then ns.goodNews() end
         changed()
     end
 end

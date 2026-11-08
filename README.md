@@ -2,6 +2,20 @@
 
 A World of Warcraft addon for playing quests together.
 
+## Your first party, in four steps
+1. **Install it** (see [Install](#install)) and log in. A short welcome in chat tells you it is ready; everything is
+   switched on.
+2. **Give the quick chat ring a key:** left-click the map button > *General* > **Quick chat key**, click, press the key
+   (for example `V`, or `E` if you do not strafe with it).
+3. **Group up.** Your quests of this area are offered to the newcomers (once each), the party hears which quests you
+   have in common, and the **Party quests** window shows who has what, with class icons.
+4. **Talk with one key:** hold it, point at *Hello*, *What I need*, *Same quests?*... and let go. **Click quests** in
+   the tracker or the Party quests window to post your progress, several at once.
+
+Hover the map button any time for a quick status (party, tracker, your key, problems). `/qs doctor` checks your setup.
+
+## What it does
+
 1. **Shares your quests, once, at three moments only:**
    - when you **join or form a party** (your quests in the current area),
    - when a **new member joins** (only what that person has not been offered yet),
@@ -41,22 +55,27 @@ A World of Warcraft addon for playing quests together.
    [Wolves Among Us]` on their screen when it is their quest.
 
 5. **Shows who shares what.** A star and the names next to shared quests in the game's quest log, and a small
-   movable **Party quests** window (shown while you are in a party; drag it to move it; `/qs panel` hides it).
-   It is built to be read at a glance:
+   movable **Party quests** window (shown while you are in a party, on the left of the screen the first time; drag it
+   anywhere and it stays there). It is built to be read at a glance:
 
    ```
-   Party quests                                   Settings
-   [mage] Anna  [priest] Bob  [warrior] Cy
+   Party quests (2 in common)          [Share] [Post all] [-]   Settings
+   [mage] Anna QS   [priest] Bob   [warrior] Cy
    [mage][  ][warrior]  Wolves Among Us                3/8 +1
    [   ][  ][warrior]   Report to Goldshire (green)      done
    ```
 
-   - The top line shows your party, one **class icon** and name each.
-   - Each row is **one shared quest**: the **class icons of the members who have it** come first (a small green
-     check on an icon means that member finished it), then the quest name (green when you are done), and **your own
-     progress** on the right (`3/8`, `3/8 +1` when more goals are open, or `done`).
-   - **Hover** a row to see everybody's progress; **click** a row and **your status for that quest goes into the chat box**, exactly like a click on
-     the game's tracker (click more rows to add them).
+   - The top line is your party: a **class icon** and the name **in class colour**; **QS** means that player runs
+     Quest Sharing too (so their progress is exact).
+   - Each row is **one shared quest**: the class icons of the members who have it (a green check = they finished it),
+     the quest name (green when you are done) and **your own progress** on the right (`3/8`, `3/8 +1` when more goals
+     are open, or `done`). Rows are striped so a line is easy to follow.
+   - **Hover** a row for everybody's progress; **click** it and your status goes into the chat box, exactly like a
+     click on the game's tracker (click more rows to add them).
+   - **Share** offers your quests of this area to the party now. **Post all** puts your progress on every shared quest
+     in the chat box in one message (and says so if not everything fits). **-** folds the window to its title.
+   - It **hides during combat** and comes back afterwards, its **size** can be changed (70-150 %), and *Settings >
+     Party window > Move back* finds it if you lost it.
    - More than 12 shared quests: the rest is summed up as "+N more".
 
 6. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. It fills the
@@ -100,6 +119,11 @@ A World of Warcraft addon for playing quests together.
    The setting *Auto messages go to* (or `/qs quick channel auto|say|party|whisper`) changes only the messages left on
    Auto.
    `/qs quick channel auto|say|party|whisper` changes that.
+
+   **You see where it goes before you send it.** Every dot on the ring has the colour of the chat it goes to, the
+   game's own chat colours: **party blue**, **whisper pink**, **say white**, **yell red**, gold for the invite. The
+   middle of the ring shows the message and, under it, "to the party", "whispered to Lia" or "to everybody nearby
+   (/s)". *Settings > Quick chat > Ring size*: small, normal or large.
 
    **Why `/say` needs a click.** The game only lets an addon say things to everybody nearby (`/say`, `/yell`,
    `/emote`) as the direct result of a key *press* or a mouse *click*, never from a key *release*; that is what
@@ -148,21 +172,30 @@ A World of Warcraft addon for playing quests together.
 
 ## Settings window
 **Everything is switched on by default** (except the friends beta and the game-settings helper). To change
-anything, type `/qs settings` (or use the minimap button, or click **Settings** on the quests-in-common panel, or
-open *Game Menu > Options > AddOns > Quest Sharing*). It has five tabs:
+anything, left-click the map button, type `/qs settings`, click **Settings** on the Party quests window, or open
+*Game Menu > Options > AddOns > Quest Sharing*. Each tab is about one thing you do, opens with a one-line
+explanation, and groups its settings in short sections:
 
 | Tab | What is on it |
 |---|---|
-| **General** | the master switch, the minimap button, the panel, accept/decline messages, reset |
-| **Sharing** | when quests are shared and to whom, announcements, clicking a tracked quest, sync, quest-log markers |
-| **Tracker** | the tracker that follows you (how many quests, distance or zone, how long it waits after you change it yourself), the world pin, quest icons over creatures, the game-settings helper |
-| **Quick chat** | the ring on/off, hold or toggle, where it goes, and the **editor for your messages** |
-| **Social** | the friends beta |
+| **General** | *Getting started*: your **quick chat key** (click, then press the key), **Show the ring**, **Check my setup**. *Basics*: the master switch, the map button, accept/decline lines, a soft sound for good news, reset |
+| **Sharing** | *When I join a party*, *Party chat*, *Clicking a quest*, *Behind the scenes* (sync, quest-log markers) |
+| **Party window** | show it in a party, hide it in combat, its size, move it back |
+| **Tracker** | *The quest list on the right* (follows you, how many, distance or zone, the pause) and *Finding objectives* (the world pin, quest icons over creatures, the game-settings helper) |
+| **Quick chat** | the ring, its key, hold or toggle, its size, where Auto messages go, and the **message editor** |
+| **Social** | the friends beta, and *Add my party to my friends now* |
 
-Every line is one click: on/off lines switch, choice lines cycle through the choices (right click goes back), number
-lines count up with the left button and down with the right one (Shift = 5 at a time). Hover a line for a short
-explanation. The same things can be done with `/qs` commands, and a change in either place shows up in the other at
-once. Settings saved by an earlier version get the new defaults; every other choice you made is kept.
+Every line is one click: a **check box** switches, a **choice** (`< value >`) moves to the next one (right click goes
+back), a **number** (`- 10 +`) counts up with the left button and down with the right one (Shift = bigger steps), and
+**buttons** do what they say. The grey line under a setting says what it does; with the master switch off the other
+lines are greyed. The same things can be done with `/qs` commands, and a change in either place shows up in the other
+at once. Settings saved by an earlier version get the new defaults; every other choice you made is kept.
+
+**The map button's tooltip** shows how things are right now: your party and how many quests you share, whether the
+tracker follows you, your quick chat key (or that it is not set) and how many problems were recorded.
+
+**Good news has a sound** (switch it off under General): a soft ping when someone accepts a quest you shared or a
+party member running Quest Sharing finishes one you share. Never during combat.
 
 ## Install
 **Easiest:** download `QuestSharing-<version>.zip` from the GitHub *Releases* page, unzip it and drop the
@@ -232,7 +265,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 453 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 509 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -276,7 +309,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 ```
 pip install lupa
 python tests/test_questsharing.py     # 68 tests: sharing, replies, announcements, tracker clicks, commands
-python tests/test_features.py         # 62 tests: sync, completion, the party quests window, quest-log markers
+python tests/test_features.py         # 76 tests: sync, completion, the Party quests window, quest-log markers
 python tests/test_triggers.py         # 34 tests: when it shares (once per join / new member / new quest), no nagging
 python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 42 tests: everything on by default, migration, the tabbed settings window
@@ -284,8 +317,9 @@ python tests/test_friends.py          # 42 tests: the friends beta (manual and a
 python tests/test_quick.py            # 119 tests: the quick chat ring, placeholders, editing, key binding, performance
 python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
 python tests/test_highlight.py        # 22 tests: quest icons over creatures, the world pin, the game-settings helper
+python tests/test_look.py             # 42 tests: the settings window layout, the key capture, welcome, sounds, ring colours
 ```
-Expected: every line ends in `passed` with all tests green (453 in total).
+Expected: every line ends in `passed` with all tests green (509 in total).
 
 ## Files
 | File | Purpose |
@@ -303,6 +337,7 @@ Expected: every line ends in `passed` with all tests green (453 in total).
 | `build_release.py`, `CHANGELOG.md` | builds `dist/QuestSharing-<version>.zip` and the release notes |
 | `QuestSharing/Quick.lua`, `QuestSharing/Bindings.xml` | the quick chat ring, its placeholders, the message commands and the key binding |
 | `QuestSharing/Friends.lua` | (beta) adds party members to your friends list, with safeguards |
-| `QuestSharing/Settings.lua` | the tabbed settings window with the message editor (plain clickable controls, no game UI templates) and the options entry |
+| `QuestSharing/Style.lua` | one look for every window (dialog and on-screen frames, buttons, check boxes, chat colours) and the good-news sound |
+| `QuestSharing/Settings.lua` | the tabbed settings window (sections, check boxes, key capture) with the message editor, and the options entry |
 | `QuestSharing/Status.lua` | the status message, tracker / link hooks, `/qs probe` |
 | `tests/` | the Lua 5.1 test harness with a WoW API mock, and the two test files |

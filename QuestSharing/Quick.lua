@@ -31,7 +31,10 @@ BINDING_NAME_QUESTSHARING_QUICKCHAT = "Quick chat wheel (hold, point, release or
 local ACTION = "QUESTSHARING_QUICKCHAT"
 
 local MAX_ITEMS, LABEL_MAX = 8, 14
-local RADIUS, DEAD = 118, 30         -- ring radius and the empty middle, in UI units
+local DEAD = 30                      -- the empty middle of the ring, in UI units
+local SIZES = { small = 96, normal = 118, large = 142 }       -- ring radius for the "Ring size" setting
+local RADIUS = SIZES.normal
+local function ringRadius() return SIZES[ns.db.quickSize or "normal"] or SIZES.normal end
 local TAP = 0.25                     -- a release sooner than this is a "tap": the ring stays open
 local CIRCLE = "Interface\\Minimap\\UI-Minimap-Background"
 
@@ -342,20 +345,46 @@ local function middleText(i)
     return q.cache[i]
 end
 
+-- where slot i would go right now: "PARTY", "WHISPER", "SAY", "YELL", "INSTANCE_CHAT", "RAID", "INVITE" (or nil)
+local function destination(i)
+    local item = items()[i]
+    if not item then return nil end
+    if isInvite(item.text) then return "INVITE" end
+    local channel, target = channelFor(item)
+    return channel, target
+end
+
+local DEST_TEXT = { PARTY = "to the party", INSTANCE_CHAT = "to the group", RAID = "to the raid", SAY = "to everybody nearby (/s)",
+                    YELL = "yelled to everybody around (/y)", INVITE = "invites your target to the party" }
+
 local function paintSlot(i)
     local s, item = slots[i], items()[i]
     if not s then return end
     if not item then s.button:Hide(); return end
     local hot = (q.hover == i)
     s.button:Show()
+    -- the dot has the colour of the chat it goes to (party blue, whisper pink, say white, yell red), so you see it at a glance
+    local c = ns.style.CHAT[q.dest and q.dest[i] or ""] or { 0.6, 0.6, 0.65 }
+    local size = hot and 32 or 24
+    s.node:SetWidth(size)
+    s.node:SetHeight(size)
+    if hot then s.node:SetVertexColor(c[1], c[2], c[3], 1) else s.node:SetVertexColor(c[1] * 0.8, c[2] * 0.8, c[3] * 0.8, 0.85) end
     s.label:SetText((hot and "|cffffd100" or "|cffffffff") .. item.label .. "|r")
-    if hot then s.node:SetVertexColor(1, 0.82, 0, 1) else s.node:SetVertexColor(0.5, 0.5, 0.55, 1) end
+end
+
+local function destinationLine(i)
+    local channel, target = destination(i)
+    if not channel then return "" end
+    local c = ns.style.CHAT[channel] or { 1, 1, 1 }
+    local text = DEST_TEXT[channel] or ""
+    if channel == "WHISPER" then text = "whispered to " .. tostring(target) end
+    return ns.style.hex(c[1], c[2], c[3]) .. text .. "|r"
 end
 
 local function paintMiddle()
     if not centerText then return end
     if q.hover then
-        centerText:SetText("|cffffd100" .. shorten(middleText(q.hover), 120) .. "|r")
+        centerText:SetText("|cffffd100" .. shorten(middleText(q.hover), 120) .. "|r\n" .. destinationLine(q.hover))
         if q.sticky then hintText:SetText("click it (or press the key again) to say it")
         elseif needsClick(q.hover) then hintText:SetText("release: keeps it open - click to say it")
         else hintText:SetText("release or click to send") end
@@ -427,6 +456,8 @@ end
 
 -- put the ring on the screen, around (cx, cy) but never off the edge
 local function layout()
+    RADIUS = ringRadius()
+    centerText:SetWidth(2 * (RADIUS - 46))
     local n = #items()
     local w, h = UIParent:GetWidth() or 1920, UIParent:GetHeight() or 1080
     local margin = RADIUS + 70
@@ -464,6 +495,8 @@ function ns.quickOpen(atCenter)
     if #items() == 0 then return ns.print("quick chat has no messages: /qs settings > Quick chat, or /qs quick add <text>") end
     if atCenter then q.cx, q.cy = (UIParent:GetWidth() or 1920) / 2, (UIParent:GetHeight() or 1080) / 2 else q.cx, q.cy = cursor() end
     q.open, q.openedAt, q.hover, q.sticky, q.cache, q.lastDx, q.lastDy = true, GetTime(), nil, atCenter and true or false, {}, nil, nil
+    q.dest = {}
+    for i = 1, #items() do q.dest[i] = destination(i) end
     layout()
     for i = 1, MAX_ITEMS do paintSlot(i) end
     paintMiddle()
@@ -517,6 +550,13 @@ function QuestSharing_QuickDown() ns.quickKey("down") end
 function QuestSharing_QuickUp() ns.quickKey("up") end
 
 -- Choosing the key ------------------------------------------------------------------------------------------------
+-- the key that opens the ring, as the game names it ("E", "ALT-Q"), or nil
+function ns.quickKeyName()
+    if not GetBindingKey then return nil end
+    local k = GetBindingKey(ACTION)
+    return k
+end
+
 function ns.setQuickKey(key)
     if InCombatLockdown and InCombatLockdown() then return ns.print("key bindings cannot be changed in combat") end
     if not (SetBinding and GetBindingKey) then return ns.print("this client does not let an addon set a key; use Options > Key Bindings") end

@@ -1,5 +1,6 @@
 -- MinimapButton.lua: a small button on the minimap.
---   left click: open the settings window     right click: show / hide the "quests in common" panel
+--   left click: open the settings window     right click: show / hide the Party quests window
+--   the tooltip shows how things are right now (party, tracker, quick chat key, problems)
 --   drag it around the minimap edge to move it       /qs minimap off  hides it
 local ADDON, ns = ...
 local C = ns.compat
@@ -52,7 +53,8 @@ local function build()
         if GameTooltip then
             pcall(function()
                 GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-                GameTooltip:SetText("Quest Sharing\\nLeft click: settings\\nRight click: quests-in-common panel\\nDrag: move this button", 1, 1, 1, 1, true)
+                GameTooltip:SetText("Quest Sharing", 1, 0.82, 0)
+                for _, line in ipairs(ns.minimapLines()) do GameTooltip:AddLine(line, 1, 1, 1) end
                 GameTooltip:Show()
             end)
         end
@@ -64,6 +66,31 @@ local function build()
     ns.hooks = ns.hooks or {}
     ns.hooks.minimap = true
     return b
+end
+
+-- what the tooltip of the button says: how things are right now, then what the clicks do
+function ns.minimapLines()
+    local S, d = ns.style, ns.db
+    local lines = {}
+    if not d.enabled then
+        lines[#lines + 1] = S.RED .. "Switched off|r (left click to switch it on in the settings)"
+    else
+        local data = ns.panelData and ns.panelData()
+        if data then
+            lines[#lines + 1] = string.format("Party: %d %s, %s%d quest%s in common|r", #data.members,
+                #data.members == 1 and "member" or "members", S.GREEN, #data.quests, #data.quests == 1 and "" or "s")
+        else
+            lines[#lines + 1] = S.GREY .. "Not in a party|r"
+        end
+        lines[#lines + 1] = "Tracker: " .. (d.near and (S.GREEN .. "follows you|r") or (S.GREY .. "off|r"))
+        local key = ns.quickKeyName and ns.quickKeyName()
+        lines[#lines + 1] = "Quick chat key: " .. (key and (S.GOLD .. key .. "|r") or (S.RED .. "not set|r - Settings > General"))
+        local errors = d.errors and #d.errors or 0
+        if errors > 0 then lines[#lines + 1] = S.RED .. errors .. " problem(s) recorded|r - /qs errors" end
+    end
+    lines[#lines + 1] = " "
+    lines[#lines + 1] = S.GREY .. "Left click: settings   Right click: Party quests   Drag: move|r"
+    return lines
 end
 
 function ns.syncMinimapButton()

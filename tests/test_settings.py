@@ -103,7 +103,7 @@ def test_the_panel_shows_only_while_in_a_party(style):
     g.join_party(["Anna"])
     g.advance(2)
     panel, rows, legend, notes = g.eval("NS._panel()")
-    assert panel.shown is True and legend[1].name.text == "Anna" and notes.text == "No quests in common yet."
+    assert panel.shown is True and "Anna" in legend[1].name.text and notes.text.startswith("No quests in common yet.")
     g.leave_party()
     g.advance(2)
     assert panel_shown(g) is False
@@ -207,8 +207,18 @@ def test_slash_reset_does_the_same(style):
     assert g.eval("NS.db.link") is True
 
 
+def visible_rows(W):
+    return [W.rows[n] for n in range(1, 19) if W.rows[n].frame.shown]
+
+
 def visible_texts(W):
-    return [W.rows[n].text.text for n in range(1, 15) if W.rows[n].frame.shown]
+    return [r.text.text for r in visible_rows(W)]
+
+
+def row_on(W, label):
+    """Is the check box of the visible row with this label ticked?"""
+    r = next(r for r in visible_rows(W) if label in r.text.text)
+    return r.box.shown and r.tick.shown
 
 
 def test_the_window_opens_closes_and_follows_commands(style):
@@ -217,9 +227,9 @@ def test_the_window_opens_closes_and_follows_commands(style):
     g.slash("settings")
     W = window(g)
     assert W.win.shown is True and W.tab == "general"
-    assert any("Quest Sharing enabled" in t and "[ON]" in t for t in visible_texts(W))
+    assert row_on(W, "Quest Sharing enabled") is True
     g.slash("minimap off")                                # a command changes it: the window shows it at once
-    assert any("Minimap button" in t and "[OFF]" in t for t in visible_texts(W))
+    assert row_on(W, "Minimap button") is False
     g.slash("config")
     assert W.win.shown is False
     g.slash("options")
@@ -232,7 +242,7 @@ def test_every_setting_is_on_exactly_one_tab(style):
     n = int(g.eval("#NS.settingRows"))
     tabs = [g.eval("NS.settingRows[%d].tab" % i) for i in range(1, n + 1)]
     ids = [g.eval("NS.settingTabs[%d].id" % i) for i in range(1, int(g.eval("#NS.settingTabs")) + 1)]
-    assert ids == ["general", "sharing", "tracker", "quick", "social"]
+    assert ids == ["general", "sharing", "party", "tracker", "quick", "social"]
     assert all(t in ids for t in tabs)
     assert all(tabs.count(t) >= 1 for t in ids), "no empty tab"
     keys = [g.eval("NS.settingRows[%d].key" % i) for i in range(1, n + 1) if g.eval("NS.settingRows[%d].key" % i)]
@@ -267,11 +277,11 @@ def test_clicking_a_row_in_the_window_frame_works(style):
     g.slash("settings")
     W = window(g)
     g.eval("NS.settingsTab")("sharing")
-    n = next(i for i in range(1, 15) if W.rows[i].frame.shown and "Sync quest lists" in W.rows[i].text.text)
+    n = next(i for i in range(1, 19) if W.rows[i].frame.shown and "Sync quest lists" in W.rows[i].text.text)
     g.eval("function(f, b) f.scripts.OnMouseUp(f, b) end")(W.rows[n].frame, "LeftButton")
-    assert g.eval("NS.db.sync") is False and "[OFF]" in W.rows[n].text.text
+    assert g.eval("NS.db.sync") is False and W.rows[n].tick.shown is False
     g.eval("NS.settingsTab")("tracker")
-    n = next(i for i in range(1, 15) if W.rows[i].frame.shown and "Tracker follows me" in W.rows[i].text.text)
+    n = next(i for i in range(1, 19) if W.rows[i].frame.shown and "Tracker follows me" in W.rows[i].text.text)
     g.eval("function(f) f.scripts.OnEnter(f) end")(W.rows[n].frame)
     assert "puts your old list back" in g.eval("TOOLTIP.text")
 

@@ -93,13 +93,46 @@ function ns.sharePanelQuest(e)
     return ns.shareStatus(e)
 end
 
+-- Post my progress for every shared quest at once (the "Post all" button): one message, as much as fits
+function ns.postAllProgress()
+    local data = ns.panelData()
+    if not data then ns.print("you are not in a party"); return 0 end
+    if #data.quests == 0 then ns.print("no quests in common yet"); return 0 end
+    local mode, added = ns.db.mode, 0
+    if mode == "box" and ChatFrame_OpenChat then
+        for _, qd in ipairs(data.quests) do
+            if ns.addToChatBox(ns.statusMessage(qd.e, true), C.link(qd.e)) then added = added + 1
+            else break end
+        end
+    else
+        local parts, len = {}, 0
+        for _, qd in ipairs(data.quests) do
+            local m = ns.statusMessage(qd.e, mode ~= "send")
+            if len + #m + 3 > 255 then break end
+            parts[#parts + 1] = m
+            len = len + #m + 3
+        end
+        added = #parts
+        ns.deliver(table.concat(parts, " + "))
+    end
+    if added < #data.quests then
+        ns.print(string.format("%d of %d quests fit in one message; send it, then click Post all again for the rest",
+            added, #data.quests))
+    end
+    return added
+end
+
 -- The panel frame -------------------------------------------------------------------------------------
--- title + settings link | one icon per party member | one row per shared quest: [who has it] quest name   my progress
+-- header: title, how many in common, Share / Post all / collapse, Settings
+-- the party: a class icon and the name in class colour each ("QS" = also runs Quest Sharing)
+-- one row per shared quest: [who has it] quest name   my progress
+local S = ns.style
 local panel, legend, qrows, notes
 local MAX_QUESTS, MAX_MEMBERS = 12, 4
 local ROW_H, ICON, WIDTH = 22, 18, 400
 local CLASS_ICONS = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
 local UNKNOWN_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+local START = { "LEFT", 20, 120 }                  -- where it first appears: on the left, out of the way
 
 local function setClassIcon(tex, class)
     local c = CLASS_ICON_TCOORDS and class and CLASS_ICON_TCOORDS[class]
@@ -116,8 +149,9 @@ local function rowTooltip(row)
     if not (GameTooltip and GameTooltip.AddLine and row.entry) then return end
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
     GameTooltip:SetText(row.entry.title)
+    GameTooltip:AddLine("Me: " .. (ns.panelMine(row.entry) ~= "" and ns.panelMine(row.entry) or "in progress"))
     for _, w in ipairs(row.who or {}) do GameTooltip:AddLine(w.m.name .. ": " .. w.text) end
-    GameTooltip:AddLine("Click: add how I am doing to the chat box (click more quests to add them too)")
+    GameTooltip:AddLine(S.GREY .. "Click: add how I am doing to the chat box (click more quests to add them too)|r")
     GameTooltip:Show()
 end
 
@@ -127,6 +161,10 @@ local function buildRow(f, i)
     row:SetHeight(ROW_H)
     row:RegisterForClicks("LeftButtonUp")
     row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+    if i % 2 == 0 then                                            -- soft stripes: easier to follow a row with the eye
+        local stripe = S.fill(row, "BACKGROUND", 1, 1, 1, 0.04)
+        stripe:SetAllPoints(row)
+    end
     row.icons, row.checks = {}, {}
     for j = 1, MAX_MEMBERS do
         local t = row:CreateTexture(nil, "ARTWORK")
@@ -135,8 +173,8 @@ local function buildRow(f, i)
         row.icons[j] = t
         local c = row:CreateTexture(nil, "OVERLAY")
         c:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
-        c:SetWidth(10)
-        c:SetHeight(10)
+        c:SetWidth(12)
+        c:SetHeight(12)
         row.checks[j] = c
     end
     row.title = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -150,51 +188,61 @@ local function buildRow(f, i)
     end)
     row:SetScript("OnEnter", rowTooltip)
     row:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
-    row:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -50 - (i - 1) * ROW_H)
     return row
+end
+
+function ns.applyPanelScale()
+    if panel and panel.SetScale then panel:SetScale((ns.db.panelScale or 100) / 100) end
+end
+
+function ns.resetPanelPosition(quiet)
+    ns.db.panelPos = nil
+    if panel then
+        panel:ClearAllPoints()
+        panel:SetPoint(START[1], UIParent, START[1], START[2], START[3])
+    end
+    if not quiet then ns.print("the Party quests window is back on the left of the screen") end
+end
+
+local function headerButton(f, text, w, onClick, tip)
+    local b = S.button(f, text, w, onClick, tip)
+    b:SetHeight(18)
+    return b
 end
 
 local function ensurePanel()
     if panel then return panel end
     if not (CreateFrame and UIParent) then return nil end
-    local ok, f = pcall(CreateFrame, "Frame", "QuestSharingPanel", UIParent, "BackdropTemplate")
-    if not (ok and f) then ok, f = pcall(CreateFrame, "Frame", "QuestSharingPanel", UIParent) end
-    if not (ok and f) then return nil end
-    f:SetWidth(WIDTH)
-    f:SetHeight(60)
-    local pos = ns.db.panelPos
+    local f = S.window("QuestSharingPanel", WIDTH, 60, "Party quests", "hud")
+    if not f then return nil end
     -- first time: on the left, out of the way (not in the middle of the screen); afterwards where you dragged it
-    if pos then f:SetPoint(pos[1], UIParent, pos[1], pos[2], pos[3]) else f:SetPoint("LEFT", UIParent, "LEFT", 20, 120) end
-    pcall(function()
-        f:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-                        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12,
-                        insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-        f:SetBackdropColor(0, 0, 0, 0.85)
-    end)
-    f:SetFrameStrata("MEDIUM")
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
+    local pos = ns.db.panelPos
+    if pos then f:SetPoint(pos[1], UIParent, pos[1], pos[2], pos[3]) else f:SetPoint(START[1], UIParent, START[1], START[2], START[3]) end
+    f.onMoved = function(self)
         local point, _, _, x, y = self:GetPoint()
         ns.db.panelPos = { point, x, y }
-    end)
-    f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -8)
-    f.title:SetText("Party quests")
+    end
+    f.count = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.count:SetPoint("LEFT", f.title, "RIGHT", 6, 0)
     -- a small "Settings" link in the corner
     local link = CreateFrame("Frame", nil, f)
-    link:SetWidth(60)
+    link:SetWidth(50)
     link:SetHeight(14)
-    link:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -8)
+    link:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -9)
     link:EnableMouse(true)
-    link:SetScript("OnMouseUp", function() if ns.toggleSettings then ns.toggleSettings() end end)
+    link:SetScript("OnMouseUp", function() if ns.toggleSettings then ns.toggleSettings(true, "party") end end)
     local linkText = link:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     linkText:SetPoint("RIGHT", link, "RIGHT", 0, 0)
     linkText:SetText("|cff55ccffSettings|r")
     f.settingsLink = link
+    f.collapse = headerButton(f, "-", 18, function() ns.togglePanelCollapsed() end, "Fold the window to its title (click again to open it)")
+    f.collapse:SetPoint("TOPRIGHT", f, "TOPRIGHT", -62, -7)
+    f.post = headerButton(f, "Post all", 62, function() ns.postAllProgress() end,
+        "Put my progress on every shared quest in the chat box, in one message")
+    f.post:SetPoint("RIGHT", f.collapse, "LEFT", -4, 0)
+    f.share = headerButton(f, "Share", 48, function() ns.startShare("manual") end,
+        "Offer my quests of this area to the party now (once per person)")
+    f.share:SetPoint("RIGHT", f.post, "LEFT", -4, 0)
     legend = {}                                                   -- the party: an icon and a name each
     for i = 1, MAX_MEMBERS do
         local icon = f:CreateTexture(nil, "ARTWORK")
@@ -209,6 +257,7 @@ local function ensurePanel()
     notes = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")      -- "No quests in common yet." / "+3 more"
     notes:SetJustifyH("LEFT")
     panel = f
+    ns.applyPanelScale()
     return f
 end
 
@@ -216,36 +265,46 @@ function ns._panel() return panel, qrows, legend, notes end        -- for the te
 
 local function shorten(name, n) return (#name > n) and (string.sub(name, 1, n - 1) .. ".") or name end
 
+function ns.togglePanelCollapsed()
+    ns.db.panelCollapsed = not ns.db.panelCollapsed
+    ns.refreshPanel()
+end
+
 function ns.refreshPanel()
     if not (panel and panel:IsShown()) then return end
     local data = ns.panelData()
     local members = data and data.members or {}
+    local quests = data and data.quests or {}
+    local folded = ns.db.panelCollapsed and true or false
+    panel.count:SetText(data and (S.GREY .. "(" .. #quests .. " in common)|r") or "")
+    panel.collapse:SetLabel(folded and "+" or "-")
     local x = 10
     for i = 1, MAX_MEMBERS do
         local m, l = members[i], legend[i]
-        if m then
+        if m and not folded then
             setClassIcon(l.icon, m.class)
             l.icon:ClearAllPoints()
-            l.icon:SetPoint("TOPLEFT", panel, "TOPLEFT", x, -28)
+            l.icon:SetPoint("TOPLEFT", panel, "TOPLEFT", x, -30)
             l.name:ClearAllPoints()
             l.name:SetPoint("LEFT", l.icon, "RIGHT", 3, 0)
-            l.name:SetText(shorten(m.name, 10))
+            l.name:SetText(S.classHex(m.class) .. shorten(m.name, 10) .. "|r" .. (m.addon and (" " .. S.GREEN .. "QS|r") or ""))
             l.icon:Show()
             l.name:Show()
-            x = x + 16 + 3 + 6 * math.min(#m.name, 10) + 12
+            x = x + 16 + 3 + 6 * math.min(#m.name, 10) + (m.addon and 18 or 0) + 12
         else
             l.icon:Hide()
             l.name:Hide()
         end
     end
     local shown = 0
-    local quests = data and data.quests or {}
     local left = 8 + math.max(#members, 1) * (ICON + 2) + 4                 -- where the quest names start
     for i = 1, MAX_QUESTS do
-        local row, qd = qrows[i], quests[i]
+        local row, qd = qrows[i], (not folded) and quests[i] or nil
         if qd then
             shown = shown + 1
             row.questID, row.entry, row.who = qd.e.questID, qd.e, qd.who
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -52 - (i - 1) * ROW_H)
             local byUnit = {}
             for _, w in ipairs(qd.who) do byUnit[w.m.unit] = w end
             for j = 1, MAX_MEMBERS do
@@ -257,7 +316,7 @@ function ns.refreshPanel()
                     icon:SetPoint("LEFT", row, "LEFT", 2 + (j - 1) * (ICON + 2), 0)
                     icon:Show()
                     check:ClearAllPoints()
-                    check:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 3, -3)
+                    check:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 4, -4)
                     if w.done then check:Show() else check:Hide() end
                 else
                     icon:Hide()
@@ -268,17 +327,23 @@ function ns.refreshPanel()
             row.title:SetPoint("LEFT", row, "LEFT", left - 8, 0)
             row.title:SetWidth(WIDTH - 16 - (left - 8) - 62)
             row.title:SetText((qd.e.complete and "|cff55ff55" or "") .. qd.e.title .. (qd.e.complete and "|r" or ""))
-            row.mine:SetText(ns.panelMine(qd.e))
+            local mine = ns.panelMine(qd.e)
+            row.mine:SetText(mine == "done" and (S.GREEN .. "done|r") or mine)
             row:Show()
         else
             row.questID, row.entry, row.who = nil, nil, nil
             row:Hide()
         end
     end
+    if folded then
+        notes:Hide()
+        panel:SetHeight(30)
+        return
+    end
     local height = 52 + shown * ROW_H
     local note
     if not data then note = "You are not in a party."
-    elseif #quests == 0 then note = "No quests in common yet."
+    elseif #quests == 0 then note = "No quests in common yet.  " .. S.GREY .. "Share offers yours to the party.|r"
     elseif #quests > MAX_QUESTS then note = string.format("+%d more - see the quest log", #quests - MAX_QUESTS) end
     if note then
         notes:ClearAllPoints()
@@ -308,9 +373,11 @@ function ns.showPanel(show)
     if show then f:Show(); ns.refreshPanel(); ns.after(5, tick) else f:Hide() end
 end
 
--- the setting means "show the panel while I am in a party"
+local function inCombat() return (InCombatLockdown and InCombatLockdown()) or (UnitAffectingCombat and UnitAffectingCombat("player")) end
+
+-- the setting means "show the panel while I am in a party" (and, with panelCombat, "but not during a fight")
 function ns.syncPanelVisibility()
-    if ns.db.panel and C.inGroup() then
+    if ns.db.panel and C.inGroup() and not (ns.db.panelCombat and inCombat()) then
         ns.showPanel(true)
     elseif panel and panel:IsShown() then
         panel:Hide()
@@ -320,6 +387,8 @@ end
 ns.on("PLAYER_ENTERING_WORLD", function() ns.after(1, ns.syncPanelVisibility) end)
 ns.on("GROUP_ROSTER_UPDATE", function() ns.after(1, function() ns.syncPanelVisibility(); ns.refreshPanel() end) end)
 ns.on("GROUP_JOINED", function() ns.after(1, ns.syncPanelVisibility) end)
+ns.on("PLAYER_REGEN_DISABLED", function() if ns.db.panelCombat and panel and panel:IsShown() then panel:Hide() end end)
+ns.on("PLAYER_REGEN_ENABLED", function() ns.after(0.5, ns.syncPanelVisibility) end)
 
 -- Quest log markers -------------------------------------------------------------------------------------
 local function marked(text) return text and string.find(text, "UI-RaidTargetingIcon_1", 1, true) end

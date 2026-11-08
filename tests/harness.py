@@ -40,10 +40,14 @@ GameTooltip = {
     SetOwner = function() TOOLTIP.lines = {} end,
     SetText = function(_, t) TOOLTIP.text = t end,
     AddLine = function(_, t) TOOLTIP.lines = TOOLTIP.lines or {}; TOOLTIP.lines[#TOOLTIP.lines + 1] = t end,
+    AddDoubleLine = function(_, a, b) TOOLTIP.lines = TOOLTIP.lines or {}; TOOLTIP.lines[#TOOLTIP.lines + 1] = a .. " " .. b end,
     Show = function() TOOLTIP.shown = true end,
     Hide = function() TOOLTIP.shown = false end,
 }
 CLASSES = {}
+RAID_CLASS_COLORS = { MAGE = { r = 0.25, g = 0.78, b = 0.92 }, PRIEST = { r = 1, g = 1, b = 1 }, WARRIOR = { r = 0.78, g = 0.61, b = 0.43 } }
+SOUNDKIT, SOUNDS = { MAP_PING = 3175 }, {}
+function PlaySound(id, channel) SOUNDS[#SOUNDS + 1] = id; return true end
 CLASS_ICON_TCOORDS = { WARRIOR = { 0, 0.25, 0, 0.25 }, MAGE = { 0.25, 0.5, 0, 0.25 }, PRIEST = { 0.5, 0.75, 0.25, 0.5 } }
 function UnitClass(unit)
     local n = UnitName(unit)
@@ -76,11 +80,16 @@ local function newObject()
     function o:GetPoint() return unpack(self.point) end
     function o:SetHeight(h) self.height = h end
     function o:SetWidth(w) self.width = w end
+    function o:SetVertexColor(r, g, b, a) self.vertex = { r, g, b, a } end
+    function o:SetScale(v) self.scale = v end
+    function o:GetScale() return self.scale or 1 end
+    function o:EnableKeyboard(v) self.keyboard = v end
+    function o:SetNormalTexture(t) self.normal = t end
     for _, name in ipairs({ "SetBackdrop", "SetBackdropColor", "SetFrameStrata", "SetMovable", "EnableMouse",
                             "RegisterForDrag", "SetJustifyH", "StartMoving", "StopMovingOrSizing", "SetAllPoints",
                             "ClearAllPoints", "SetFontObject", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "SetFocus",
-                            "SetMultiLine", "HighlightText", "SetFrameLevel", "RegisterForClicks", "SetHighlightTexture", "SetVertexColor",
-                            "SetAlpha", "SetColorTexture", "SetDesaturated", "SetNormalFontObject", "SetJustifyV", "SetWordWrap",
+                            "SetMultiLine", "HighlightText", "SetFrameLevel", "RegisterForClicks", "SetHighlightTexture",
+                            "SetAlpha", "SetColorTexture", "SetDesaturated", "SetNormalFontObject", "SetClampedToScreen", "SetPushedTexture", "SetPropagateKeyboardInput", "SetTextInsets", "SetJustifyV", "SetWordWrap",
                             }) do
         o[name] = function() end
     end
@@ -525,7 +534,7 @@ class Game:
         """World entered, not grouped yet. Unless fresh=True the saved settings start with the tracker and the
         panel off, as in the first versions, so the older tests keep testing what they were written for."""
         if not self.fresh:
-            self.run("QuestSharingDB = { near = false, panel = false, dbVersion = 2 }")
+            self.run('QuestSharingDB = { near = false, panel = false, dbVersion = 2, welcomed = "0.2.0" }')
         self.fire("ADDON_LOADED", "QuestSharing")
         self.fire("PLAYER_ENTERING_WORLD")
 

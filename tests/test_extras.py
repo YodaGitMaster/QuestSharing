@@ -250,7 +250,15 @@ def test_the_minimap_tooltip(style):
     g = game(style)
     b = g.eval("NS._minimapButton()")
     g.eval("function(b) b.scripts.OnEnter(b) end")(b)
-    assert "Left click: settings" in g.eval("TOOLTIP.text")
+    lines = "\n".join(g.eval("TOOLTIP.lines").values())
+    assert g.eval("TOOLTIP.text") == "Quest Sharing" and "Left click: settings" in lines
+    assert "Not in a party" in lines and "Quick chat key:" in lines and "not set" in lines
+    assert "\\n" not in lines, "no stray backslash-n"
+    g.join_party(["Anna"])
+    g.run('ON_QUEST["party1"] = {[100] = true}')
+    g.eval("function(b) b.scripts.OnEnter(b) end")(b)
+    lines = "\n".join(g.eval("TOOLTIP.lines").values())
+    assert "Party: 1 member, |cff55ff551 quest in common" in lines
 
 
 # ---- release zip -------------------------------------------------------------------------------------------------------
