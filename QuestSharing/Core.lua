@@ -11,7 +11,6 @@ ns.defaults = {
     gap = 4,            -- seconds between two shared quests inside one round (so the party is not flooded with popups)
     settle = 5,         -- seconds to wait after the party forms before sharing
     chat = true,        -- announce quests in common in party chat
-    verbose = true,     -- print accepted / declined results to your own chat window
     click = true,       -- clicking a tracked quest fills the chat box with a status message
     link = true,        -- shift-clicking a quest link in the chat box also appends the status
     mode = "box",       -- what a click does: "box" (fill the chat box), "send" (send now), "print" (only show it to you)
@@ -255,7 +254,7 @@ local help = {
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", verbose = "verbose",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"

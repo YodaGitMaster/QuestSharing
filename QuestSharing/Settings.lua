@@ -34,8 +34,6 @@ ns.settingRows = {
     { tab = "general", kind = "bool", key = "enabled", label = "Quest Sharing enabled", desc = "The master switch for everything below." },
     { tab = "general", kind = "bool", key = "minimap", label = "Minimap button",
       desc = "Left click: this window. Right click: the Party quests window. Drag it around the map." },
-    { tab = "general", kind = "bool", key = "verbose", label = "Show me who accepted / declined my shared quests",
-      desc = "Only you see these lines." },
     { tab = "general", kind = "bool", key = "sound", label = "A soft sound for good news",
       desc = "When someone accepts a quest you shared, or a party member finishes one you share. Never in combat." },
     { tab = "general", kind = "action", label = "Reset everything to the defaults", button = "Reset",

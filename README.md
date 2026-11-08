@@ -30,7 +30,8 @@ Hover the map button any time for a quick status (party, tracker, your key, prob
 
    > Hey Anna! Looks like we have these quests in common: [Wolves Among Us], [Report to Goldshire] Let's do them together :)
 
-   It also shows you, privately, who accepted, declined or already finished each quest you shared.
+   Afterwards you get **one short line** (only you see it), and only when something was shared:
+   `shared 2 quests with the party: Anna took 1, 1 declined`.
 
 2. **Puts your progress in the chat box when you click a quest** in the game's tracker (the list on the right) or a
    row of the Party quests window. **Click more quests and they are added**, not replaced, so you send them all with
@@ -49,6 +50,18 @@ Hover the map button any time for a quick status (party, tracker, your key, prob
 3. **Talks to other Quest Sharing users (sync).** Party members who also run the addon exchange their
    exact quest lists and objective progress in the background. For them "who has what" is exact instead
    of guessed, and no popup is needed to find out. Players without the addon still work (see below).
+
+   **When several of you run it, they take turns instead of all talking at once:**
+   - **One popup per quest.** A quest one of you offered is not offered again by the others (their addons are told
+     at once), and each addon looks again right before offering. Accepting a quest someone shared does not make
+     your addon offer it around again.
+   - **One "in common" message.** The addons go in alphabetical order of the players' names, a moment apart; each
+     leaves out the quests somebody already named in party chat in the last two minutes, and says nothing if
+     nothing is left.
+   - **One "done" per quest.** When you finish a quest together (the last kill counts for everybody), only the first
+     one says it.
+   - **Your own chat stays quiet**: no line per answer, no line when a round starts; one line when something was
+     shared; "the tracker paused" is explained once per session.
 
 4. **Announces when a shared quest is done.** When all objectives of a quest that a party member also
    has are finished, it says so in party chat. Synced players also see `Anna finished the objectives of
@@ -178,7 +191,7 @@ explanation, and groups its settings in short sections:
 
 | Tab | What is on it |
 |---|---|
-| **General** | *Getting started*: your **quick chat key** (click, then press the key), **Show the ring**, **Check my setup**. *Basics*: the master switch, the map button, accept/decline lines, a soft sound for good news, reset |
+| **General** | *Getting started*: your **quick chat key** (click, then press the key), **Show the ring**, **Check my setup**. *Basics*: the master switch, the map button, a soft sound for good news, reset |
 | **Sharing** | *When I join a party*, *Party chat*, *Clicking a quest*, *Behind the scenes* (sync, quest-log markers) |
 | **Party window** | show it in a party, hide it in combat, its size, move it back |
 | **Tracker** | *The quest list on the right* (follows you, how many, distance or zone, the pause) and *Finding objectives* (the world pin, quest icons over creatures, the game-settings helper) |
@@ -265,7 +278,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 509 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 539 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -318,8 +331,9 @@ python tests/test_quick.py            # 119 tests: the quick chat ring, placehol
 python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
 python tests/test_highlight.py        # 22 tests: quest icons over creatures, the world pin, the game-settings helper
 python tests/test_look.py             # 42 tests: the settings window layout, the key capture, welcome, sounds, ring colours
+python tests/test_together.py         # 30 tests: several Quest Sharing users in one party, fewer messages
 ```
-Expected: every line ends in `passed` with all tests green (509 in total).
+Expected: every line ends in `passed` with all tests green (539 in total).
 
 ## Files
 | File | Purpose |

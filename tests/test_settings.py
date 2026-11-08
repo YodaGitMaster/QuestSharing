@@ -6,7 +6,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from harness import Game  # noqa: E402
 
 STYLES = ("modern", "classic")
-BOOLS = ["enabled", "auto", "shareNew", "chat", "announce", "verbose", "click", "link", "sync", "markers", "panel", "near"]
+BOOLS = ["enabled", "auto", "shareNew", "chat", "announce", "click", "link", "sync", "markers", "panel", "near"]
 
 
 def fresh(style, pre="", loaded=True):

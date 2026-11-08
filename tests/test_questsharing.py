@@ -135,11 +135,13 @@ def test_accepted_declined_and_the_other_replies(style):
     for line in ("Anna has accepted your quest.", "Bob has declined your quest.", "Cy has already completed that quest.",
                  "Dee is busy.", "Eve's quest log is full.", "Anna has come online."):
         g.reply(line)
-    text = "\n".join(g.printed())
-    for want in ("Anna accepted", "Bob declined", "Cy has already done", "Dee is busy", "Eve has a full quest log"):
-        assert want in text, (want, text)
-    assert "come online" not in text
+    assert (g.eval("NS.known[100].anna"), g.eval("NS.known[100].bob"), g.eval("NS.known[100].cy"), g.eval("NS.known[100].dee")) == \
+        ("accepted", "declined", "done", "busy"), "every answer is understood"
+    assert not any(w in "\n".join(g.printed()) for w in ("Anna accepted", "Bob declined", "come online")), \
+        "no line per answer: that was a lot of chat"
     g.advance(60)
+    text = "\n".join(g.printed())
+    assert "shared 2 quests with the party: Anna took 1, 1 declined, 2 could not take it right now" in text, text
     assert g.sent() == [], "accepted / declined are not 'in common'"
     assert tuple(g.eval("NS.partyHas")(entry(g, 100)).values()) == ("Anna",), "who accepted now has the quest"
 

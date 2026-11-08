@@ -133,10 +133,10 @@ def test_sync_updates_removals_and_completions_from_a_peer(style):
     g.run("PRINTED = {}")
     g.peer("Anna", "C|100")
     assert g.eval("NS.peers.anna.quests[100].complete") is True
-    assert any("Anna finished the objectives of" in m and "Wolves Among Us" in m for m in g.printed())
-    g.run("PRINTED = {}")
-    g.peer("Anna", "C|300")                                                # a quest I do not have: no message
-    assert g.printed() == []
+    assert g.printed() == [], "no chat line: the Party quests window shows her check mark"
+    assert len(g.eval("SOUNDS")) == 1, "a soft sound instead"
+    g.peer("Anna", "C|300")                                                # a quest I do not have: nothing at all
+    assert g.printed() == [] and len(g.eval("SOUNDS")) == 1
 
 
 def test_sharing_skips_what_synced_players_have_and_announces_it(style):
