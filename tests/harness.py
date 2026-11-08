@@ -111,9 +111,10 @@ function GetBuildInfo() return "1.60.1", "70862", "Nov 6 2026", 16001 end
 function IsInGroup(cat) if cat == 2 then return INSTANCE_GROUP end return #GROUP.members > 0 end
 function IsInRaid() return RAID end
 function GetNumSubgroupMembers() return #GROUP.members end
+REALMS = {}
 function UnitName(unit)
     local i = tonumber(string.match(unit, "^party(%d)$") or "")
-    if i then return GROUP.members[i] end
+    if i then return GROUP.members[i], REALMS[GROUP.members[i]] end
     if unit == "player" then return "Me" end
 end
 function GetRealZoneText() return ZONE end
@@ -198,6 +199,55 @@ function TRACKER_CLASSIC()                       -- no distance information on t
     function RemoveQuestWatch(i) WATCHED[QUESTS[i].id] = nil; WATCH_LOG[#WATCH_LOG + 1] = "-" .. QUESTS[i].id end
 end
 
+-- The friends list ----------------------------------------------------------------------------------------
+FRIENDS, IGNORED, FRIEND_CALLS, FRIEND_OVERRIDE, FRIEND_EXTRA = {}, {}, {}, {}, 0
+FRIEND_REPLY = "auto"              -- "auto": the game answers at once, "hold": the test sends the answers
+MAX_FRIENDS = 100
+ERR_FRIEND_ADDED_S = "%s added to friends."
+ERR_FRIEND_ALREADY_S = "%s is already your friend."
+ERR_FRIEND_NOT_FOUND = "Player not found."
+ERR_FRIEND_LIST_FULL = "Your friends list is full."
+ERR_FRIEND_SELF = "You cannot add yourself as a friend."
+ERR_FRIEND_WRONG_FACTION = "You cannot add players from the opposing faction."
+ERR_FRIEND_ERROR = "Unknown friend response from server."
+ERR_FRIEND_ONLINE_SS = "|Hplayer:%s|h[%s]|h has come online."
+
+local function shortname(n) return string.lower(string.match(n, "^([^-]+)")) end
+function FRIEND_COUNT() local n = FRIEND_EXTRA; for _ in pairs(FRIENDS) do n = n + 1 end return n end
+
+local function doAddFriend(name, note)
+    FRIEND_CALLS[#FRIEND_CALLS + 1] = { name = name, note = note, at = NOW }
+    if FRIEND_REPLY == "hold" then return end
+    local k, ov = shortname(name), FRIEND_OVERRIDE[shortname(name)]
+    local function say(t) FIRE("CHAT_MSG_SYSTEM", t) end
+    if ov == "notfound" then say(ERR_FRIEND_NOT_FOUND)
+    elseif ov == "faction" then say(ERR_FRIEND_WRONG_FACTION)
+    elseif FRIEND_COUNT() >= MAX_FRIENDS then say(ERR_FRIEND_LIST_FULL)
+    elseif FRIENDS[k] then say(string.format(ERR_FRIEND_ALREADY_S, name))
+    else FRIENDS[k] = true; say(string.format(ERR_FRIEND_ADDED_S, name)) end
+end
+
+function FRIENDS_MODERN()
+    C_FriendList = {
+        AddFriend = doAddFriend,
+        GetNumFriends = FRIEND_COUNT,
+        GetFriendInfo = function(name) if FRIENDS[shortname(name)] then return { name = name } end end,
+        IsIgnored = function(name) return IGNORED[shortname(name)] and true or false end,
+    }
+end
+
+function FRIENDS_CLASSIC()                       -- the classic list is read by position, not by name
+    AddFriend = doAddFriend
+    GetNumFriends = FRIEND_COUNT
+    function GetFriendInfo(i)
+        local names = {}
+        for k in pairs(FRIENDS) do names[#names + 1] = k end
+        table.sort(names)
+        return names[i]
+    end
+    IsIgnored = function(name) return IGNORED[shortname(name)] and true or false end
+end
+
 function CLASSIC_API()
     function GetNumQuestLogEntries() return #QUESTS end
     function GetQuestLogTitle(i)
@@ -270,6 +320,7 @@ class Game:
         self.lua.execute("DEFAULT_QUESTS()")
         self.lua.execute("MODERN_API()" if style == "modern" else "CLASSIC_API()")
         self.lua.execute("TRACKER_MODERN()" if style == "modern" else "TRACKER_CLASSIC()")
+        self.lua.execute("FRIENDS_MODERN()" if style == "modern" else "FRIENDS_CLASSIC()")
         if pre:
             self.lua.execute(pre)
         self.style, self.fresh = style, fresh
@@ -312,6 +363,12 @@ class Game:
 
     def watch_log(self):
         return list(self.lua.eval("WATCH_LOG").values())
+
+    def friends(self):
+        return sorted(self.lua.eval("(function() local t = {} for k in pairs(FRIENDS) do t[#t+1] = k end return t end)()").values())
+
+    def friend_calls(self):
+        return [(c["name"], c["note"], c["at"]) for c in self.lua.eval("FRIEND_CALLS").values()]
 
     def set_dist(self, **kw):
         """set_dist(q100=400, q101=900): squared distances in yards; None removes the entry."""

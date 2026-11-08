@@ -33,6 +33,8 @@ ns.settingRows = {
     { kind = "bool", key = "panel", label = "Show the \"quests in common\" panel while in a party" },
     { kind = "bool", key = "near", label = "Tracker follows me (shows the nearest quests)",
       tip = "Fills the quest tracker with the quests closest to you. Switching it off puts your old list back." },
+    { kind = "bool", key = "friends", label = "(beta) Add people I group with to my friends list",
+      tip = "Automatic. Off by default. Skips friends, ignored players and random-dungeon groups; /qs friends adds your party now." },
     { kind = "number", key = "nearCount", label = "Quests the tracker keeps", min = 1, max = function() return C.maxWatch() end },
     { kind = "choice", key = "nearMode", label = "Tracker mode", values = { "auto", "distance", "zone" },
       names = { auto = "automatic", distance = "by distance", zone = "by zone" } },
