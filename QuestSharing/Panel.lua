@@ -69,7 +69,8 @@ function ns.memberStatus(m, e)
     end
     local st = ns.known[e.questID] and ns.known[e.questID][k]
     if st == "has" or st == "accepted" then return "has" end
-    if st == "declined" or st == "done" then return "no" end          -- declined it, or did it long ago
+    if st == "done" or st == "full" or st == "other" then return "cant" end   -- did it before, log full, not eligible
+    if st == "declined" then return "no" end
     if UnitIsConnected and UnitIsConnected(m.unit) == false then return "unknown" end
     if UnitIsVisible and not UnitIsVisible(m.unit) then return "unknown" end
     local on = C.unitOnQuest(m.unit, e)
@@ -77,7 +78,8 @@ function ns.memberStatus(m, e)
     return "unknown"
 end
 
-local STATUS_TEXT = { done = "done", has = "has it", no = "does not have it", unknown = "cannot tell (out of range or offline)" }
+local STATUS_TEXT = { done = "done", has = "has it", no = "does not have it", unknown = "cannot tell (out of range or offline)",
+                      cant = "cannot take it (did it before, quest log full, or not eligible)" }
 
 -- My nearest quests, at most `n`, nearest first. To keep the rows calm while you walk, a quest only moves above another
 -- one (or onto the list) when it is clearly closer: about 20 % (0.64 on squared distances). Without distances (some
@@ -119,17 +121,26 @@ function ns.nearestQuests(entries, n)
     return out
 end
 
--- The grid of the window: { members, rows = { { e = entry, cells = { status per member }, who } } } (nil: no party)
-local GRID_ROWS = 5
+-- The grid of the window: { members, rows = { { e = entry, cells = { status per member }, who } }, near = 5 } (nil: no
+-- party). The first rows are my nearest quests; after them come the rest of my quests in this zone (scroll down).
+local GRID_ROWS = 5           -- rows on screen
+local NEAREST = 5
 function ns.panelGrid(entries)
     local members = C.members()
     if #members == 0 then return nil end
+    entries = entries or C.entries()
     for _, m in ipairs(members) do
         if UnitClass then local _, file = UnitClass(m.unit); m.class = file end
         m.addon = ns.peers[key(m.name)] and true or false
     end
     local grid = { members = members, rows = {}, shared = 0 }
-    for _, e in ipairs(ns.nearestQuests(entries or C.entries(), GRID_ROWS)) do
+    local list, inList = ns.nearestQuests(entries, NEAREST), {}
+    grid.near = #list
+    for _, e in ipairs(list) do inList[e.questID] = true end
+    for _, e in ipairs(entries) do                                      -- then the rest of this zone
+        if not inList[e.questID] and C.inArea(e) then list[#list + 1] = e end
+    end
+    for _, e in ipairs(list) do
         local row = { e = e, cells = {}, who = {} }
         local any = false
         for j, m in ipairs(members) do
@@ -141,6 +152,10 @@ function ns.panelGrid(entries)
             if st == "has" or st == "done" then any = true end
         end
         if any then grid.shared = grid.shared + 1 end
+        -- everybody who has it is done (and so am I): time to hand it in together
+        local done, busy = 0, 0
+        for _, st in ipairs(row.cells) do if st == "done" then done = done + 1 elseif st == "has" then busy = busy + 1 end end
+        row.allDone = e.complete and done > 0 and busy == 0
         grid.rows[#grid.rows + 1] = row
     end
     return grid
@@ -229,7 +244,8 @@ local MIN_W = 410
 local CLASS_ICONS = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
 local UNKNOWN_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local CELL_ICON = { has = "Interface\\RaidFrame\\ReadyCheck-Ready", done = "Interface\\RaidFrame\\ReadyCheck-Ready",
-                    no = "Interface\\RaidFrame\\ReadyCheck-NotReady", unknown = "Interface\\RaidFrame\\ReadyCheck-Waiting" }
+                    no = "Interface\\RaidFrame\\ReadyCheck-NotReady", unknown = "Interface\\RaidFrame\\ReadyCheck-Waiting",
+                    cant = "Interface\\Buttons\\UI-MinusButton-Up" }
 local START = { "LEFT", 20, 120 }                  -- where it first appears: on the left, out of the way
 
 local function setClassIcon(tex, class)
@@ -249,14 +265,16 @@ local function rowTooltip(row)
     GameTooltip:SetText(row.entry.title)
     GameTooltip:AddLine("Me: " .. (ns.panelMine(row.entry) ~= "" and ns.panelMine(row.entry) or "in progress"))
     for _, w in ipairs(row.who or {}) do GameTooltip:AddLine(w.m.name .. ": " .. w.text) end
-    GameTooltip:AddLine(S.GREY .. "Click: add how I am doing to the chat box (click more quests to add them too)|r")
+    if row.allDone then GameTooltip:AddLine(S.GREEN .. "Everyone who has it is done - time to turn it in!|r") end
+    GameTooltip:AddLine(S.GREY .. "Left click: offer it to whoever does not have it|r")
+    GameTooltip:AddLine(S.GREY .. "Right click: tell the party how I am doing and ask them|r")
     GameTooltip:Show()
 end
 
 local function buildRow(f, i)
     local row = CreateFrame("Button", nil, f)
     row:SetHeight(ROW_H)
-    row:RegisterForClicks("LeftButtonUp")
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
     if i % 2 == 0 then                                            -- soft stripes: easier to follow a row with the eye
         local stripe = S.fill(row, "BACKGROUND", 1, 1, 1, 0.04)
@@ -278,8 +296,10 @@ local function buildRow(f, i)
         t:SetPoint("CENTER", row, "LEFT", QUEST_W + (j - 0.5) * COL_W, 0)
         row.cells[j] = t
     end
-    row:SetScript("OnClick", function(self)
-        if self.questID then ns.sharePanelQuest(C.findEntry(self.questID)) end
+    row:SetScript("OnClick", function(self, button)
+        if not self.questID then return end
+        local e = C.findEntry(self.questID)
+        if button == "RightButton" then ns.askParty(e) else ns.offerQuest(e) end
     end)
     row:SetScript("OnEnter", rowTooltip)
     row:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
@@ -363,6 +383,9 @@ local function ensurePanel()
     for i = 1, GRID_ROWS do qrows[i] = buildRow(f, i) end
     notes = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")      -- "You are not in a party." / "No quests"
     notes:SetJustifyH("LEFT")
+    -- the mouse wheel scrolls from the nearest quests down to the rest of the zone
+    f:EnableMouseWheel(true)
+    f:SetScript("OnMouseWheel", function(_, delta) ns.scrollPanel(delta > 0 and -1 or 1) end)
     panel = f
     ns.applyPanelScale()
     return f
@@ -372,6 +395,12 @@ function ns._panel() return panel, qrows, cols, notes end        -- for the test
 
 local function shorten(name, n) return (#name > n) and (string.sub(name, 1, n - 1) .. ".") or name end
 
+local offset = 0                 -- how far the list is scrolled down
+function ns.scrollPanel(step)
+    offset = offset + step
+    ns.refreshPanel()
+end
+
 function ns.togglePanelCollapsed()
     ns.db.panelCollapsed = not ns.db.panelCollapsed
     ns.refreshPanel()
@@ -380,7 +409,7 @@ end
 local function paintCell(t, st)
     t:SetTexture(CELL_ICON[st] or CELL_ICON.unknown)
     if st == "done" then t:SetVertexColor(1, 0.82, 0, 1)                       -- gold: has it and finished it
-    elseif st == "unknown" then t:SetVertexColor(0.7, 0.7, 0.7, 0.8)
+    elseif st == "unknown" or st == "cant" then t:SetVertexColor(0.6, 0.6, 0.6, 0.8)
     else t:SetVertexColor(1, 1, 1, 1) end
     t:Show()
 end
@@ -393,7 +422,8 @@ function ns.refreshPanel()
     local folded = ns.db.panelCollapsed and true or false
     local width = math.max(MIN_W, 16 + QUEST_W + math.min(#members, MAX_MEMBERS) * COL_W)
     panel:SetWidth(width)
-    panel.count:SetText(grid and (S.GREY .. "(" .. grid.shared .. " of " .. #rows .. " shared)|r") or "")
+    offset = math.max(0, math.min(offset, #rows - GRID_ROWS))
+    panel.count:SetText(grid and (S.GREY .. "(" .. grid.shared .. " shared, " .. #rows .. " here)|r") or "")
     panel.collapse:SetLabel(folded and "+" or "-")
     if folded then panel.questHead:Hide(); panel.headLine:Hide() else panel.questHead:Show(); panel.headLine:Show() end
     for j = 1, MAX_MEMBERS do
@@ -410,7 +440,7 @@ function ns.refreshPanel()
     end
     local shownRows = 0
     for i = 1, GRID_ROWS do
-        local row, data = qrows[i], (not folded) and rows[i] or nil
+        local row, data = qrows[i], (not folded) and rows[i + offset] or nil
         if data then
             shownRows = shownRows + 1
             row.questID, row.entry, row.who = data.e.questID, data.e, data.who
@@ -418,7 +448,8 @@ function ns.refreshPanel()
             local done = data.e.complete
             row.title:SetText((done and "|cff55ff55" or "|cffffffff") .. data.e.title .. "|r")
             local mine = ns.panelMine(data.e)
-            row.mine:SetText(mine == "done" and (S.GREEN .. "done|r") or (S.GREY .. mine .. "|r"))
+            if data.allDone then row.mine:SetText(S.GOLD .. "turn in!|r")
+            else row.mine:SetText(mine == "done" and (S.GREEN .. "done|r") or (S.GREY .. mine .. "|r")) end
             for j = 1, MAX_MEMBERS do
                 local st = members[j] and data.cells[j]
                 if st then paintCell(row.cells[j], st) else row.cells[j]:Hide() end
@@ -436,8 +467,13 @@ function ns.refreshPanel()
     end
     local height = 52 + shownRows * ROW_H
     local note
-    if not grid then note = "You are not in a party."
+    if C.inRaid() then note = "Quests can only be shared in a 5-player party, not in a raid."
+    elseif not grid then note = "You are not in a party."
     elseif #rows == 0 then note = "You have no quests right now."
+    elseif #rows > GRID_ROWS then
+        local below = #rows - GRID_ROWS - offset
+        note = below > 0 and (S.GREY .. "scroll down: " .. below .. " more in " .. C.zone() .. "|r")
+                          or (S.GREY .. "scroll up for the nearest quests|r")
     elseif grid.shared == 0 then note = "Nobody in the party has these quests yet.  " .. S.GREY .. "Share offers them.|r" end
     if note then
         notes:ClearAllPoints()

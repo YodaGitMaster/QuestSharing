@@ -362,7 +362,8 @@ def test_saved_messages_from_before_routes_get_them_for_the_greetings(style):
     g.run('NS.db.quickItems = { { label = "Hello", text = "Hey {name}! o/" }, { label = "Mine", text = "Hi all" }, "Want to quest together here? ({here})" }')
     g.run("NS.quickItems()")
     assert g.eval("NS.db.quickItems[1].channel") == "nearby" and g.eval("NS.db.quickItems[2].channel") is None
-    assert g.eval("NS.db.quickItems[3].channel") == "nearby", "an old plain-text default too"
+    assert g.eval("NS.db.quickItems[3].channel") == "say", "the old group-up line becomes the new one, in /s"
+    assert g.eval("NS.db.quickItems[3].text") == "Doing {quest} here - anyone want to group up?"
 
 
 def test_the_editor_shows_and_sets_the_channel_of_the_selected_message(style):

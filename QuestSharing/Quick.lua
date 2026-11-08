@@ -41,7 +41,7 @@ local CIRCLE = "Interface\\Minimap\\UI-Minimap-Background"
 -- The messages ------------------------------------------------------------------------------------------------
 local DEFAULT_ITEMS = {
     { label = "Hello",         text = "Hey {name}! o/",                           channel = "nearby" },
-    { label = "Team up?",      text = "Want to quest together here? ({here})",    channel = "nearby" },
+    { label = "Team up?",      text = "Doing {quest} here - anyone want to group up?", channel = "say" },
     { label = "What I need",   text = "I need to: {need}" },
     { label = "Same quests?",  text = "{shared}" },
     { label = "Thanks",        text = "Thanks!" },
@@ -78,6 +78,10 @@ local function normalise(list)
             list[i] = { label = DEFAULT_LABEL[v] or autoLabel(v), text = v }
         end
         local it = list[i]
+        if type(it) == "table" and it.text == "Want to quest together here? ({here})" then          -- the old group-up line
+            it.text = "Doing {quest} here - anyone want to group up?"
+            if it.channel == nil or it.channel == "nearby" then it.channel = "say" end
+        end
         if type(it) == "table" and it.channel == nil and DEFAULT_ROUTE[it.text] then it.channel = DEFAULT_ROUTE[it.text] end   -- saved before routes existed
     end
     return list

@@ -172,14 +172,18 @@ evaluatePin = function(entries, force)
             return
         end
     end
-    local best, bestD
+    -- in a party, the quest you do TOGETHER comes first: the nearest one somebody else also has; otherwise the nearest
+    local best, bestD, shared, sharedD
+    local grouped = C.inGroup()
     for _, e in ipairs(entries) do
         local dist = distOf(e)
         if dist then
             if e.questID == cur and state.pinned == cur then dist = dist * STICKY end      -- hysteresis
             if not best or dist < bestD or (dist == bestD and e.questID < best.questID) then best, bestD = e, dist end
+            if grouped and #ns.partyHas(e) > 0 and (not shared or dist < sharedD) then shared, sharedD = e, dist end
         end
     end
+    if shared then best, bestD = shared, sharedD end
     if not best or best.questID == cur then
         state.pinSeen = nil
         if best then state.pinned = cur end

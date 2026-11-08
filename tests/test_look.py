@@ -54,7 +54,7 @@ def test_every_tab_has_a_short_intro_and_sections(style):
     headers = [plain(r.text.text) for r in rows(W) if r.line.shown]
     assert headers == ["When I join a party", "Party chat", "Behind the scenes"]
     g.eval("NS.settingsTab")("party")
-    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["The Party quests window", "Clicking a quest"]
+    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["The Party quests window", "Clicking a quest", "Showing where we are"]
 
 
 def test_rows_are_laid_out_top_to_bottom_without_overlapping_and_fit_in_the_window(style):

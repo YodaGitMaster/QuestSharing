@@ -6,7 +6,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from harness import Game  # noqa: E402
 
 STYLES = ("modern", "classic")
-BOOLS = ["enabled", "auto", "shareNew", "chat", "announce", "click", "link", "sync", "markers", "panel", "near"]
+BOOLS = ["enabled", "auto", "shareNew", "click", "link", "sync", "markers", "panel", "near", "selfMark", "mapPins", "teamWaypoint"]
+QUIET = ["chat", "announce", "pickup"]          # the automatic party chat: off until you switch it on
 
 
 def fresh(style, pre="", loaded=True):
@@ -50,7 +51,7 @@ def test_every_switch_is_on_in_a_new_install(style):
         assert g.eval(f"NS.db.{key}") is True, key
     assert (g.eval("NS.db.area"), g.eval("NS.db.gap"), g.eval("NS.db.mode"), g.eval("NS.db.nearCount"),
             g.eval("NS.db.nearMode")) == ("zone", 4, "box", 5, "auto")
-    assert g.eval("QuestSharingDB.dbVersion") == 2
+    assert g.eval("QuestSharingDB.dbVersion") == 3
 
 
 def test_the_window_has_a_row_for_every_switch(style):
@@ -66,14 +67,26 @@ def test_settings_saved_by_earlier_versions_are_switched_on_but_choices_are_kept
     g.fire("ADDON_LOADED", "QuestSharing")
     assert g.eval("NS.db.near") is True and g.eval("NS.db.panel") is True, "the two new defaults arrive"
     assert g.eval("NS.db.gap") == 7 and g.eval("NS.db.auto") is False, "the player's other choices stay"
-    assert g.eval("QuestSharingDB.dbVersion") == 2
+    assert g.eval("QuestSharingDB.dbVersion") == 3
+
+
+def test_the_automatic_party_chat_is_off_in_a_new_install_and_after_the_update(style):
+    g = fresh(style)
+    for key in QUIET:
+        assert g.eval(f"NS.db.{key}") is False, key
+    g2 = fresh(style, loaded=False)
+    g2.run("QuestSharingDB = { dbVersion = 2, chat = true, announce = true, pickup = true, gap = 7 }")
+    g2.fire("ADDON_LOADED", "QuestSharing")
+    assert [g2.eval(f"NS.db.{k}") for k in QUIET] == [False, False, False], "switched off once by the update"
+    assert g2.eval("NS.db.gap") == 7
 
 
 def test_a_choice_made_in_the_current_version_is_never_overridden(style):
     g = fresh(style, loaded=False)
-    g.run("QuestSharingDB = { near = false, panel = false, dbVersion = 2 }")
+    g.run("QuestSharingDB = { near = false, panel = false, chat = true, dbVersion = 3 }")
     g.fire("ADDON_LOADED", "QuestSharing")
     assert g.eval("NS.db.near") is False and g.eval("NS.db.panel") is False
+    assert g.eval("NS.db.chat") is True, "switched the chat back on yourself: it stays on"
 
 
 def test_the_tracker_follows_you_from_the_start_and_off_restores_your_list():
@@ -120,11 +133,11 @@ def test_the_panel_setting_off_keeps_it_hidden(style):
 # ---- the window -----------------------------------------------------------------------------------------------
 def test_rows_show_on_and_off_and_a_click_switches_them(style):
     g = fresh(style)
-    assert "[ON]" in row_text(g, "chat") and "Announce quests in common" in row_text(g, "chat")
+    assert "[OFF]" in row_text(g, "chat") and "Announce quests in common" in row_text(g, "chat")
     click(g, "chat")
-    assert g.eval("NS.db.chat") is False and "[OFF]" in row_text(g, "chat")
+    assert g.eval("NS.db.chat") is True and "[ON]" in row_text(g, "chat")
     click(g, "chat")
-    assert g.eval("NS.db.chat") is True
+    assert g.eval("NS.db.chat") is False
 
 
 def test_choice_rows_cycle_with_left_and_right_clicks(style):

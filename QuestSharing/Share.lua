@@ -174,11 +174,8 @@ local function step()
     local still = e and decide(e, C.members(), run.force) == "push"
     if e and C.pushable(e) and still then
         run.current = e.questID
-        lastPush = { id = e.questID, at = GetTime() }
-        C.push(e)
+        ns.pushOne(e)
         run.pushed = run.pushed + 1
-        ns.markOffered(e.questID)
-        if ns.syncUpdate then ns.syncUpdate("O|" .. e.questID) end      -- the others will not offer it again
         delay = ns.db.gap
     else
         run.skipped = run.skipped + 1
@@ -233,6 +230,33 @@ finish = function()
         if not C.inGroup() then return end
         announce(inCommon(r))
     end)
+end
+
+-- push one quest to the party now, and tell the other Quest Sharing users so they do not offer it again
+function ns.pushOne(e)
+    lastPush = { id = e.questID, at = GetTime() }
+    C.push(e)
+    ns.markOffered(e.questID)
+    if ns.syncUpdate then ns.syncUpdate("O|" .. e.questID) end
+end
+
+-- A click on a quest in the Party quests window: offer it to whoever does not have it (a click is your decision, so it
+-- is offered even to someone who declined it before)
+function ns.offerQuest(e)
+    if not e then return false end
+    if not C.inGroup() then ns.print("you are not in a party"); return false end
+    if C.inRaid() then ns.print("quests can only be shared in a 5-player party, not in a raid"); return false end
+    if not C.pushable(e) then ns.print(C.link(e) .. " cannot be shared: the game does not allow it for this quest"); return false end
+    if run then ns.print("quests are being shared right now - try again in a few seconds"); return false end
+    local lacking = {}
+    for _, m in ipairs(C.members()) do
+        local st = ns.memberStatus and ns.memberStatus(m, e) or "unknown"
+        if st ~= "has" and st ~= "done" then lacking[#lacking + 1] = m.name end
+    end
+    if #lacking == 0 then ns.print("everybody in the party has " .. C.link(e)); return false end
+    ns.pushOne(e)
+    ns.print("offered " .. C.link(e) .. " to " .. joinNames(lacking))
+    return true
 end
 
 function ns.stopShare(reason)

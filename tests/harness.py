@@ -89,7 +89,7 @@ local function newObject()
                             "RegisterForDrag", "SetJustifyH", "StartMoving", "StopMovingOrSizing", "SetAllPoints",
                             "ClearAllPoints", "SetFontObject", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "SetFocus",
                             "SetMultiLine", "HighlightText", "SetFrameLevel", "RegisterForClicks", "SetHighlightTexture",
-                            "SetAlpha", "SetColorTexture", "SetDesaturated", "SetNormalFontObject", "SetClampedToScreen", "SetPushedTexture", "SetPropagateKeyboardInput", "SetTextInsets", "SetJustifyV", "SetWordWrap",
+                            "SetAlpha", "SetColorTexture", "SetDesaturated", "SetNormalFontObject", "EnableMouseWheel", "SetClampedToScreen", "SetPushedTexture", "SetPropagateKeyboardInput", "SetTextInsets", "SetJustifyV", "SetWordWrap",
                             }) do
         o[name] = function() end
     end
@@ -133,10 +133,17 @@ function UnitIsPlayer(u)
     if u == "questnpc" then return QUESTNPC ~= nil and QUESTNPC.player == true end
     return u == "target" and TARGET ~= nil and TARGET.player == true
 end
+RAID_ICONS, IN_INSTANCE = {}, false
+function SetRaidTarget(unit, i) RAID_ICONS[unit] = (i ~= 0) and i or nil end
+function GetRaidTargetIndex(unit) return RAID_ICONS[unit] end
+function IsInInstance() return IN_INSTANCE, IN_INSTANCE and "party" or "none" end
+WAYPOINT = nil
+UiMapPoint = { CreateFromCoordinates = function(map, x, y) return { map = map, x = x, y = y } end }
 -- where the player stands (0..1 on the zone map), nil inside a dungeon
 POS, MAP_ID = { x = 0.423, y = 0.618 }, 1429
 C_Map = { GetBestMapForUnit = function() return MAP_ID end,
-          GetPlayerMapPosition = function() if POS then return { x = POS.x, y = POS.y } end end }
+          GetPlayerMapPosition = function() if POS then return { x = POS.x, y = POS.y } end end,
+          SetUserWaypoint = function(p) WAYPOINT = p end }
 function UnitIsUnit(a, b) return a == b end
 function GetSubZoneText() return SUBZONE end
 BINDINGS, SAVED_BINDINGS = {}, 0
@@ -545,7 +552,7 @@ class Game:
         """World entered, not grouped yet. Unless fresh=True the saved settings start with the tracker and the
         panel off, as in the first versions, so the older tests keep testing what they were written for."""
         if not self.fresh:
-            self.run('QuestSharingDB = { near = false, panel = false, dbVersion = 2, welcomed = "0.2.0" }')
+            self.run('QuestSharingDB = { near = false, panel = false, dbVersion = 3, welcomed = "0.2.0", chat = true, announce = true, pickup = true }')
         self.fire("ADDON_LOADED", "QuestSharing")
         self.fire("PLAYER_ENTERING_WORLD")
 

@@ -14,7 +14,7 @@ local ON, OFF = "|cff55ff55[ON] |r", "|cffff5555[OFF]|r"
 ns.settingTabs = {
     { id = "general", title = "General",      intro = "Start here: set your quick chat key, check that everything works." },
     { id = "sharing", title = "Sharing",      intro = "What happens when you group up, and what a click on a quest does." },
-    { id = "party",   title = "Party",        intro = "The Party quests window, and what a click on a quest posts." },
+    { id = "party",   title = "Party",        intro = "The Party quests window, what a click posts, and showing each other where you are." },
     { id = "tracker", title = "Tracker",      intro = "Keep the quests near you in sight, and find the creatures you need." },
     { id = "quick",   title = "Quick chat",   intro = "Hold your key, point at a message, let go. Pick a message below to edit it." },
     { id = "social",  title = "Social",       intro = "Keep in touch with the people you quest with." },
@@ -63,8 +63,8 @@ ns.settingRows = {
     { tab = "sharing", kind = "bool", key = "markers", label = "Mark shared quests in the quest log", desc = "A star and the names." },
     -- Party
     { tab = "party", kind = "header", label = "The Party quests window" },
-    { tab = "party", kind = "bool", key = "panel", label = "Show the \"quests in common\" panel while in a party",
-      desc = "Class icons of who has each quest, and your own progress. Click a row to post your progress." },
+    { tab = "party", kind = "bool", key = "panel", label = "Show the Party quests window while in a party",
+      desc = "Your nearest quests (scroll for the rest of the zone) and who has them. Left click: offer it. Right click: tell the party." },
     { tab = "party", kind = "bool", key = "panelCombat", label = "Hide it during combat", desc = "It comes back when the fight is over." },
     { tab = "party", kind = "number", key = "panelScale", label = "Size (%)", min = 70, max = 150, step = 10 },
     { tab = "party", kind = "action", label = "Put it back where it started", button = "Move back",
@@ -75,6 +75,13 @@ ns.settingRows = {
     { tab = "party", kind = "choice", key = "mode", label = "Clicking a quest...", values = { "box", "send", "print" },
       names = { box = "fills the chat box (press Enter)", send = "sends it at once", print = "shows it only to me" } },
     { tab = "party", kind = "bool", key = "link", label = "Shift-click quest links add the status" },
+    { tab = "party", kind = "header", label = "Showing where we are" },
+    { tab = "party", kind = "bool", key = "selfMark", label = "The star over my head while in a party",
+      desc = "So the party sees you. Not in dungeons; if someone uses the star on a target, it is left there." },
+    { tab = "party", kind = "bool", key = "mapPins", label = "Quest Sharing users on my world map",
+      desc = "A class icon where each of them is, and your position to them." },
+    { tab = "party", kind = "bool", key = "teamWaypoint", label = "A map pin where a teammate found the quest items",
+      desc = "When they tell the party where the items were, for a quest you still work on." },
     -- Tracker
     { tab = "tracker", kind = "header", label = "The quest list on the right" },
     { tab = "tracker", kind = "bool", key = "near", label = "Tracker follows me (shows the nearest quests)",

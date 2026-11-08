@@ -214,6 +214,16 @@ function C.playerPos()
     return map, x, y
 end
 
+-- Put the game's own map pin (the user waypoint) at map, x, y (0..1). False on a client without it.
+function C.setWaypoint(map, x, y)
+    if not (C_Map and C_Map.SetUserWaypoint and UiMapPoint and UiMapPoint.CreateFromCoordinates) then return false end
+    if C_Map.CanSetUserWaypointOnMap then
+        local ok, can = pcall(C_Map.CanSetUserWaypointOnMap, map)
+        if ok and can == false then return false end
+    end
+    return (pcall(function() C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(map, x, y)) end))
+end
+
 -- Area ----------------------------------------------------------------------------------------
 function C.zone()
     return (GetRealZoneText and GetRealZoneText()) or (GetZoneText and GetZoneText()) or ""
