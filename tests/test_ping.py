@@ -37,16 +37,33 @@ def pings(g):
 
 
 # ---- the nearest quest creature ------------------------------------------------------------------------------------
-def test_a_quest_creature_within_reach_comes_first_then_the_one_in_front_of_you(style):
+def test_nearest_is_your_target_then_the_soft_target_then_mouseover_then_within_reach(style):
     g = game(style)
-    g.run('ADD_CREATURE("nameplate1", "Kobold Vermin", true, 300, 300, true)')     # near, off to the side
-    g.run('ADD_CREATURE("nameplate2", "Kobold Worker", true, 960, 540, false)')    # far, right in front
-    g.run('ADD_CREATURE("nameplate3", "Harvest Golem", false, 960, 540, true)')    # not for a quest
-    assert g.eval("NS.nearestQuestCreature()") == "Kobold Vermin"
-    g.run('ADD_CREATURE("nameplate4", "Kobold Miner", true, 950, 530, true)')      # near and in front
-    assert g.eval("NS.nearestQuestCreature()") == "Kobold Miner"
+    g.run('ADD_CREATURE("nameplate1", "Kobold Vermin", true, 0, 0, false)')        # far, not looked at
+    assert g.eval("NS.nearestQuestCreature()") == "Kobold Vermin", "any quest creature in sight, if nothing better"
+    g.run('ADD_CREATURE("nameplate2", "Kobold Worker", true, 0, 0, true)')         # within ~28 yards
+    assert g.eval("NS.nearestQuestCreature()") == "Kobold Worker"
+    g.run('ADD_CREATURE("nameplate3", "Kobold Miner", true, 0, 0, false); MOUSEOVER = "nameplate3"')
+    assert g.eval("NS.nearestQuestCreature()") == "Kobold Miner", "the one under your mouse"
+    g.run('ADD_CREATURE("nameplate4", "Kobold Tunneler", true, 0, 0, false); SOFTENEMY = "nameplate4"')
+    assert g.eval("NS.nearestQuestCreature()") == "Kobold Tunneler", "the one in front of you"
+    g.run('TARGET = { name = "Kobold Geomancer", player = false, hostile = true, dead = false, related = true }')
+    assert g.eval("NS.nearestQuestCreature()") == "Kobold Geomancer", "your target first"
+    g.run('ADD_CREATURE("nameplate5", "Harvest Golem", false, 0, 0, true); TARGET.related = false')
+    assert g.eval("NS.nearestQuestCreature()") == "Kobold Tunneler", "a target that is not for a quest does not count"
     g.run("CREATURES.nameplate4.dead = true")
-    assert g.eval("NS.nearestQuestCreature()") == "Kobold Vermin", "dead ones do not count"
+    assert g.eval("NS.nearestQuestCreature()") == "Kobold Miner", "dead ones do not count"
+
+
+def test_nameplates_are_never_measured(style):
+    g = game(style)
+    g.run("""local p = ADD_CREATURE("nameplate1", "Kobold Vermin", true, 0, 0, true)
+             p.GetCenter = function() error("Can't measure restricted regions") end""")
+    assert g.eval("NS.nearestQuestCreature()") == "Kobold Vermin"
+    g.fire("PLAYER_REGEN_DISABLED")
+    g.fire("PLAYER_REGEN_ENABLED")
+    g.advance(2)
+    assert len(g.eval("NS.db.errors") or {}) == 0
 
 
 def test_the_button_is_loaded_with_the_nearest_one_outside_combat(style):

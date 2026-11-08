@@ -76,6 +76,8 @@ local function newObject()
     function o:SetTexture(path) self.texture = path end
     function o:SetTexCoord(...) self.coords = { ... } end
     function o:GetWidth() return self.width or 100 end
+    function o:GetRight() return self.right or 1500 end
+    function o:GetTop() return self.top or 700 end
     function o:GetHeight() return self.height or 20 end
     function o:SetPoint(p, rel, rp, x, y) self.point = { p, rel, rp, x or 0, y or 0 } end
     function o:GetPoint() return unpack(self.point) end
@@ -133,6 +135,8 @@ ChatFontNormal = {}
 TARGET, SUBZONE = nil, ""
 function UnitExists(u)
     if u == "questnpc" then return QUESTNPC ~= nil end
+    if u == "softenemy" or u == "mouseover" then local a = (u == "softenemy") and SOFTENEMY or MOUSEOVER; return a ~= nil and CREATURES[a] ~= nil end
+    if CREATURES and CREATURES[u] then return true end
     return u == "target" and TARGET ~= nil
 end
 function UnitIsPlayer(u)
@@ -218,6 +222,7 @@ function UnitName(unit)
     if unit == "player" then return "Me" end
     if unit == "target" and TARGET then return TARGET.name end
     if unit == "questnpc" and QUESTNPC then return QUESTNPC.name end
+    if unit == "softenemy" and SOFTENEMY then unit = SOFTENEMY elseif unit == "mouseover" and MOUSEOVER then unit = MOUSEOVER end
     if CREATURES and CREATURES[unit] then return CREATURES[unit].name end
 end
 function GetRealZoneText() return ZONE end
@@ -371,6 +376,8 @@ function HIGHLIGHT_MODERN()
     }
     C_QuestLog.UnitIsRelatedToActiveQuest = function(unit)
         if RELATED_ERROR then error("attempt to compare a secret value") end
+        if unit == "softenemy" then unit = SOFTENEMY or "" elseif unit == "mouseover" then unit = MOUSEOVER or "" end
+        if unit == "target" then return TARGET ~= nil and TARGET.related == true end
         return RELATED[unit] == true
     end
     C_Ping = { IsPingSystemEnabled = function() return PING_ENABLED ~= false end }
@@ -434,12 +441,20 @@ end
 function PRESS(b) SECURE_CLICK(b, true); SECURE_CLICK(b, false) end
 -- creatures on nameplates: a name, hostile, alive or dead, how far from the middle of the screen
 CREATURES = {}
-function UnitCanAttack(a, u) return CREATURES[u] ~= nil and CREATURES[u].dead ~= nil end
+-- "softenemy" (what the game soft-targets in front of you) and "mouseover" point at one of the creatures
+SOFTENEMY, MOUSEOVER = nil, nil
+local function alias(u) if u == "softenemy" then return SOFTENEMY elseif u == "mouseover" then return MOUSEOVER end return u end
+function UnitCanAttack(a, u)
+    if u == "target" then return TARGET ~= nil and TARGET.hostile == true end
+    u = alias(u)
+    return u ~= nil and CREATURES[u] ~= nil and CREATURES[u].dead ~= nil
+end
 function UnitIsDead(u)
     if u == "target" then return TARGET ~= nil and TARGET.dead == true end
-    return CREATURES[u] ~= nil and CREATURES[u].dead == true
+    u = alias(u)
+    return u ~= nil and CREATURES[u] ~= nil and CREATURES[u].dead == true
 end
-function CheckInteractDistance(u, i) return CREATURES[u] ~= nil and CREATURES[u].near == true end
+function CheckInteractDistance(u, i) u = alias(u); return u ~= nil and CREATURES[u] ~= nil and CREATURES[u].near == true end
 function ADD_CREATURE(unit, name, related, x, y, near)
     local p = ADD_PLATE(unit, related)
     CREATURES[unit] = { name = name, dead = false, near = near }

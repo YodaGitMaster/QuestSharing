@@ -26,19 +26,27 @@ local function tokenOf(plate)
     return plate.unitToken or plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
 end
 
+-- One icon per nameplate frame, kept in OUR table: nothing is ever written onto the game's nameplate (that would taint
+-- it: "Lua Taint: QuestSharing"). The icon is our own frame (a child of UIParent), only placed over the nameplate, so
+-- showing / hiding it is never a restricted action, also in combat.
+local markers = setmetatable({}, { __mode = "k" })
+function ns.markerFor(plate) return plate and markers[plate] end            -- for the tests
+
 local function marker(plate)
-    if plate.QuestSharingMarker then return plate.QuestSharingMarker end
-    ns.trying("marking a creature's nameplate", "markers")
-    local f = CreateFrame("Frame", nil, plate)
+    if markers[plate] then return markers[plate] end
+    if InCombatLockdown and InCombatLockdown() then return nil end      -- placing it over a nameplate: outside combat
+    ns.trying("placing a quest icon over a nameplate", "markers")
+    local f = CreateFrame("Frame", nil, UIParent)
     f:SetWidth(SIZE)
     f:SetHeight(SIZE)
     f:SetFrameStrata("HIGH")
-    f:SetPoint("BOTTOM", plate.UnitFrame or plate, "TOP", 0, 2)
+    if not pcall(f.SetPoint, f, "BOTTOM", plate.UnitFrame or plate, "TOP", 0, 2) then return nil end
     local t = f:CreateTexture(nil, "OVERLAY")
     t:SetAllPoints(f)
     t:SetTexture(TEXTURE)
     f.texture = t
-    plate.QuestSharingMarker = f
+    f:Hide()
+    markers[plate] = f
     return f
 end
 
@@ -47,9 +55,10 @@ local function update(plate)
     local unit = tokenOf(plate)
     local show = ns.db.markMobs and unit and isObjective(unit)
     if show then
-        marker(plate):Show()
-    elseif plate.QuestSharingMarker then
-        plate.QuestSharingMarker:Hide()
+        local m = marker(plate)
+        if m then m:Show() end
+    elseif markers[plate] then
+        markers[plate]:Hide()
     end
 end
 
@@ -69,7 +78,7 @@ end)
 ns.on("NAME_PLATE_UNIT_REMOVED", function(_, unit)
     if not C.canMarkMobs() then return end
     local ok, plate = pcall(C_NamePlate.GetNamePlateForUnit, unit)
-    if ok and plate and plate.QuestSharingMarker then plate.QuestSharingMarker:Hide() end
+    if ok and plate and markers[plate] then markers[plate]:Hide() end
 end)
 
 -- a creature stops being an objective when the quest progresses: look again a moment after the quest log changes
@@ -87,6 +96,7 @@ local function tick()
     ns.after(2, tick)                                   -- a safety net for anything the events miss
 end
 ns.on("PLAYER_ENTERING_WORLD", function() ns.after(2, tick) end)
+ns.on("PLAYER_REGEN_ENABLED", function() ns.after(1, ns.refreshMarkers) end)        -- nameplates that came during the fight
 
 -- Game settings helper ------------------------------------------------------------------------------------------
 -- nameplateShowEnemies   enemy nameplates must be on for the markers to show at all
