@@ -18,6 +18,9 @@ ns.defaults = {
     announce = true,    -- say in party chat when a quest we share has all its objectives done
     markers = true,     -- mark quests your party shares in the quest log
     panel = false,      -- show the "quests in common" panel
+    near = false,       -- keep the quest tracker filled with the quests closest to you
+    nearCount = 5,      -- how many quests the tracker keeps while "near" is on
+    nearMode = "auto",  -- "auto" (distance if the client can measure it, else zone), "distance" or "zone"
 }
 ns.db = {}
 for k, v in pairs(ns.defaults) do ns.db[k] = v end        -- until the saved variables are loaded
@@ -132,9 +135,9 @@ end
 local function status()
     local d = ns.db
     local function f(v) return v and "on" or "off" end
-    ns.print(string.format("%s | auto-share %s | area %s | gap %ds | chat %s | click %s | link %s | mode %s | new-quest %s | sync %s | announce %s | markers %s | panel %s",
+    ns.print(string.format("%s | auto-share %s | area %s | gap %ds | chat %s | click %s | link %s | mode %s | new-quest %s | sync %s | announce %s | markers %s | panel %s | near %s",
         d.enabled and "ON" or "OFF", f(d.auto), d.area, d.gap, f(d.chat), f(d.click), f(d.link), d.mode,
-        f(d.shareNew), f(d.sync), f(d.announce), f(d.markers), f(d.panel)))
+        f(d.shareNew), f(d.sync), f(d.announce), f(d.markers), f(d.panel), f(d.near)))
 end
 
 local help = {
@@ -153,6 +156,8 @@ local help = {
     "/qs announce on|off  say in party chat when a quest we share has all its objectives done",
     "/qs markers on|off   mark shared quests in the quest log",
     "/qs panel [on|off]   show / hide the \"quests in common\" panel (drag it to move it)",
+    "/qs near [on|off]    keep the tracker (right-hand list) filled with the quests closest to you",
+    "/qs near N           how many quests it keeps  |  /qs near mode auto|distance|zone  |  now  |  resume",
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
@@ -177,6 +182,7 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     elseif cmd == "announce" then d.announce = onoff(arg, d.announce); status()
     elseif cmd == "markers" then d.markers = onoff(arg, d.markers); status(); if ns.refreshQuestLog then ns.refreshQuestLog() end
     elseif cmd == "panel" then d.panel = onoff(arg, d.panel); if ns.showPanel then ns.showPanel(d.panel) end; status()
+    elseif cmd == "near" then ns.nearCommand(arg); if arg == "" or arg == "on" or arg == "off" then status() end
     elseif cmd == "probe" then ns.probe()
     elseif cmd == "" or cmd == "status" then status()
     else

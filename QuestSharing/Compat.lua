@@ -203,3 +203,49 @@ function C.sendAddon(prefix, text, channel)
     if not send then return false end
     return (pcall(send, prefix, text, channel))
 end
+
+-- The quest tracker (the list on the right) and distances ---------------------------------------------
+function C.canWatch()
+    return ((C.modern and C_QuestLog.AddQuestWatch) or AddQuestWatch) and true or false
+end
+
+-- set of questIDs currently shown in the tracker
+function C.watchedSet()
+    local set = {}
+    for _, e in ipairs(C.entries()) do
+        local watched
+        if C.modern and C_QuestLog.GetQuestWatchType then
+            watched = (C_QuestLog.GetQuestWatchType(e.questID) ~= nil)       -- nil = not tracked (0 / 1 = automatic / manual)
+        elseif IsQuestWatched then
+            watched = IsQuestWatched(e.index) and true or false
+        end
+        if watched then set[e.questID] = true end
+    end
+    return set
+end
+
+function C.setWatched(e, on)
+    if C.modern and C_QuestLog.AddQuestWatch then
+        if on then C_QuestLog.AddQuestWatch(e.questID) else C_QuestLog.RemoveQuestWatch(e.questID) end
+    elseif AddQuestWatch then
+        if on then AddQuestWatch(e.index) else RemoveQuestWatch(e.index) end
+    end
+end
+
+-- how many quests the tracker can hold
+function C.maxWatch()
+    return (Constants and Constants.QuestWatchConsts and Constants.QuestWatchConsts.MAX_QUEST_WATCHES)
+        or MAX_WATCHABLE_QUESTS or 25
+end
+
+-- Does this client tell us how far away a quest is?
+function C.hasDistance()
+    return (C_QuestLog and C_QuestLog.GetDistanceSqToQuest) and true or false
+end
+
+-- squared distance in yards to the quest's next objective / turn-in, or nil when unknown or on
+-- another continent
+function C.distanceSq(e)
+    local ok, d, onContinent = pcall(C_QuestLog.GetDistanceSqToQuest, e.questID)
+    if ok and d and onContinent ~= false then return d end
+end

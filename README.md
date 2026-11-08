@@ -43,6 +43,20 @@ A World of Warcraft addon for playing quests together.
    * Report to Goldshire (done): Anna done
    ```
 
+6. **Keeps your quest tracker on what is near you (optional, off by default).** `/qs near on` fills the
+   tracker (the list on the right) with the quests closest to you and **re-checks every 2 seconds as you
+   move**, so the list follows you instead of changing only when you cross into another zone.
+   - **Distance mode** (needs a client that can tell how far a quest is) ranks quests by distance. A quest
+     already in your tracker keeps its place unless another one is clearly closer, and a change must be
+     seen twice in a row (about 4 seconds), so a short detour never reshuffles the list.
+   - **Zone mode** (works on every client) tracks the quests of the zone you are standing in and swaps them
+     when you change zone.
+   - `/qs near N` sets how many quests it keeps (default 5, limited by the tracker's maximum).
+   - It manages the whole tracker list while it is on, and **`/qs near off` puts your old list back**.
+     If you change the tracker yourself it pauses for 5 minutes (`/qs near resume` to continue). It waits
+     during combat and inside instances.
+   - Note this fills the tracker list. It does not touch the single highlighted "waypoint" quest.
+
 ## Install
 1. Copy the folder `QuestSharing` (the one containing `QuestSharing.toc`, not this README's folder) into
    the game's `Interface\AddOns` folder, so you have `...\AddOns\QuestSharing\QuestSharing.toc`.
@@ -69,6 +83,10 @@ A World of Warcraft addon for playing quests together.
 | `/qs announce on\|off` | say in party chat when a quest we share is done (default on) |
 | `/qs markers on\|off` | star and names next to shared quests in the quest log (default on) |
 | `/qs panel [on\|off]` | show / hide the "quests in common" panel; drag it to move it |
+| `/qs near [on\|off]` | keep the quest tracker filled with the quests closest to you (default off) |
+| `/qs near N` | how many quests it keeps (default 5) |
+| `/qs near mode auto\|distance\|zone` | `auto` uses distance if your client can measure it, otherwise your zone |
+| `/qs near now` / `resume` | refresh now / end a pause early |
 | `/qs probe` | show what this game client supports |
 
 ## How it knows
@@ -87,7 +105,7 @@ strings (so it works in any language) and shows them to you.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 147 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 169 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -95,6 +113,11 @@ strings (so it works in any language) and shows them to you.
   the classic ones). If your client is different, `/qs probe` says `NO` for that hook. Shift-clicking a quest
   link into the chat box and the panel (`/qs panel`) work on any client. On the modern quest log the markers
   appear the next time the game redraws the list (open/close it or scroll).
+- **Tracker by distance needs a client that reports quest distances.** WoW's modern interface does
+  (`C_QuestLog.GetDistanceSqToQuest`); the classic one gives addons no quest locations at all, which is why
+  addons like Questie carry their own database. On such a client `/qs near` falls back to zone mode.
+  `/qs probe` shows `distance to quests: yes/NO` and which mode is in use. Quests whose next step is on
+  another continent are ignored.
 - **Sync only works between players who both run Quest Sharing.** Everyone else is handled by the
   share-and-read-the-reply method. Messages are small, spaced 0.4 s apart, and only go to your party.
 - **Sharing pops up a window on each member's screen** for every quest they don't have; that is how WoW
@@ -115,8 +138,9 @@ pip install lupa
 python tests/test_questsharing.py     # 63 tests: sharing, replies, announcements, tracker clicks, commands
 python tests/test_features.py         # 50 tests: sync, completion, panel, quest-log markers
 python tests/test_triggers.py         # 34 tests: when it shares (once per join / new member / new quest), no nagging
+python tests/test_tracker.py          # 22 tests: the tracker follows you (distance and zone modes)
 ```
-Expected: `63/63`, `50/50` and `34/34 passed`.
+Expected: `63/63`, `50/50`, `34/34` and `22/22 passed`.
 
 ## Files
 | File | Purpose |
@@ -127,5 +151,6 @@ Expected: `63/63`, `50/50` and `34/34 passed`.
 | `QuestSharing/Sync.lua` | addon-to-addon protocol: hello, full quest list, updates (see the header of the file) |
 | `QuestSharing/Progress.lua` | notices finished quests, announces them, sends changes to synced players |
 | `QuestSharing/Panel.lua` | the "quests in common" panel and the quest-log markers |
+| `QuestSharing/Track.lua` | keeps the quest tracker on the quests nearest to you (distance or zone mode) |
 | `QuestSharing/Status.lua` | the status message, tracker / link hooks, `/qs probe` |
 | `tests/` | the Lua 5.1 test harness with a WoW API mock, and the two test files |
