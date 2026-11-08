@@ -224,10 +224,82 @@ def test_without_a_ping_system_nothing_breaks():
     assert len(g.eval("NS.db.errors") or {}) == 0
 
 
+def test_a_client_that_shows_pings_only_through_its_key_bindings_still_works():
+    g = Game("classic", 'BINDING_HEADER_PING_SYSTEM = "Ping System"; BINDING_NAME_PINGATTACK = "Ping: Attack"')
+    g.start()
+    g.advance(3)
+    assert g.eval("NS.pingSupported()") is True and g.eval("NS.pingButton()") is not None
+    g.run("PRINTED = {}")
+    g.slash("ping")
+    assert "[OK] the game's ping system: here (seen through its key bindings)" in "\n".join(g.printed())
+
+
 def test_the_doctor_names_the_ping_key(style):
     g = game(style)
     g.slash("pingkey G")
     assert "[OK] pings: the game's ping system is here, ping key G" in "\n".join(g.eval("NS.doctorLines()").values())
+
+
+# ---- telling quest creatures apart without the game's answer -------------------------------------------------------------
+def test_without_the_games_answer_the_quest_log_names_the_creatures():
+    g = Game("classic")                                          # no UnitIsRelatedToActiveQuest on this client
+    g.start()
+    assert g.eval("NS.compat.questMobNames()").wolf is True, "from 'Wolf slain: 3/8'"
+    g.run('TARGET = { name = "Wolf", player = false, hostile = true, dead = false }')
+    assert g.eval("NS.compat.isQuestCreature('target')") is True
+    g.run('TARGET = { name = "Harvest Golem", player = false, hostile = true, dead = false }')
+    assert g.eval("NS.compat.isQuestCreature('target')") is False
+
+
+def test_the_names_work_in_another_language():
+    g = Game("classic", 'QUEST_MONSTERS_KILLED = "%s getötet: %d/%d"')
+    g.run("""local q = BYID(100); q.objectives[1].text = "Wolf getötet: 3/8" """)
+    g.start()
+    assert g.eval("NS.compat.questMobNames()").wolf is True
+
+
+def test_questie_adds_the_creatures_that_drop_your_quest_items():
+    pre = """
+    QUESTIE_Q = { [100] = { objectives = { nil, nil, { { 750 } } } } }
+    QUESTIE_N = { [99] = { name = "Prowler" } }
+    QUESTIE_I = { [750] = { npcDrops = { 99 } } }
+    QuestDB = { Get = function(id, k) local r = QUESTIE_Q[id]; return r and r[k] end }
+    NpcDB = { Get = function(id, k) local r = QUESTIE_N[id]; return r and r[k] end }
+    ItemDB = { Get = function(id, k) local r = QUESTIE_I[id]; return r and r[k] end }"""
+    g = Game("classic", pre)
+    g.start()
+    assert g.eval("NS.compat.questMobNames()").prowler is True, "Prowlers drop the pelts: they count too"
+
+
+# ---- objects: collect one, then the next press shows another ------------------------------------------------------------
+def test_after_you_collect_the_object_the_next_press_points_at_another(style):
+    g = game(style)
+    g.advance(1.5)                                               # no quest creature: the button points at objects
+    g.run('SOFTINTERACT = "Kobold Crate"')
+    press(g)
+    g.run('SOFTINTERACT = "Another Crate"')
+    press(g)
+    assert pings(g) == ["look:Kobold Crate"], "not collected yet: wait"
+    g.run("local q = BYID(100); q.objectives[2].numFulfilled = 1; q.objectives[2].text = 'Wolf Pelt: 1/4'")   # picked one up
+    g.fire("QUEST_LOG_UPDATE")
+    g.advance(2)
+    press(g)
+    assert pings(g) == ["look:Kobold Crate", "look:Another Crate"], "collected: the next one"
+
+
+def test_after_each_fight_a_new_ping_is_allowed(style):
+    g = game(style)
+    g.run('ADD_CREATURE("nameplate1", "Kobold Vermin", true, 0, 0, true)')
+    g.advance(1.5)
+    press(g)
+    g.run("IN_COMBAT = true")
+    g.fire("PLAYER_REGEN_DISABLED")
+    g.advance(2)
+    g.run("IN_COMBAT = false")
+    g.fire("PLAYER_REGEN_ENABLED")
+    g.advance(1.5)
+    press(g)
+    assert len(pings(g)) == 2, "the fight is over: ping again, even before 10 seconds"
 
 
 # ---- a press is never a mystery ---------------------------------------------------------------------------------------------
@@ -280,7 +352,8 @@ def test_slash_ping_on_a_client_without_pings():
     g.run("PRINTED = {}")
     g.slash("ping")
     text = "\n".join(g.printed())
-    assert "[--] the game's ping system: NOT on this client" in text and "[--] telling quest creatures apart: NO" in text
+    assert "[--] the game's ping system: NOT on this client" in text
+    assert "[OK] telling quest creatures apart: by name, from your quest log" in text, "Wolf slain: 3/8 names the wolves"
 
 
 if __name__ == "__main__":

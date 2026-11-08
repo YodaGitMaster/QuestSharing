@@ -14,6 +14,13 @@
   ("the game did not send the ping: ..."), and **`/qs ping`** checks every step: the game's ping system, pings switched
   on, the ping key, telling quest creatures apart, enemy nameplates, the nearest quest creature now, what the next
   press does. A press with nothing loaded is no longer reported as "held back".
+- **Pings, as agreed:** the enemy you need gets Attack, the object you need gets "look here"; at most one ping every
+  10 seconds and a new one after each fight; with several things to collect, the next press waits until you picked
+  one up (your quest counter goes up) and then points at the next.
+- **Quest creatures are recognised on more clients:** without the game's "is this unit part of a quest" call, the
+  addon uses the creature names in your quest log ("Kobold Vermin slain: 3/8", in your language) and, with Questie,
+  the creatures to kill and the ones that drop your quest items. This makes the ping key and the quest icons over
+  creatures work there. The ping system is also recognised by its key bindings, not only by `C_Ping`.
 - A test now compiles every file under Lua 5.1.
 
 ## 0.3.1

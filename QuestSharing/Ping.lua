@@ -7,9 +7,10 @@
 --     click. So the addon prepares a hidden secure button (outside combat it keeps loading "/targetexact <nearest quest
 --     creature>" + "/ping [@target] attack" into it) and your key clicks that button.
 --   * During combat secure buttons cannot be changed: it keeps the creature it loaded last.
---   * Anti-spam: a new ping only once the creature you pinged last is dead or no longer your target. A small secure
---     snippet checks that, so it also works during combat. Outside combat the ping also unlocks after the time chosen
---     in the settings (5 / 10 / 15 seconds). Shift + the key pings anyway.
+--   * Anti-spam: at most one ping every 10 seconds (the time is a setting), and a new one after each fight. A creature
+--     you pinged: the next ping once it is dead (a small secure snippet checks that, also in combat, where the game
+--     gives secure code no clock). A quest object you pinged: the next one once you picked it up / used it (your
+--     quest counter goes up), so you collect one, then the next press shows you another. Shift + the key pings anyway.
 --   * The game gives addons no distance to enemies, and nameplates may not be measured (restricted regions). So
 --     "nearest" is: your target if it is a quest creature, then the creature the game soft-targets in front of you, then
 --     your mouseover, then one within about 28 yards, then any quest creature in sight.
@@ -38,11 +39,17 @@ local btn
 local state = { count = 0, lastAt = -1000, macro = nil, kind = nil, name = nil, saidAt = -1000 }
 ns.ping = state
 
+-- the game's ping system is here when its API, its own helper or its key bindings are (clients differ in what they show)
+local function pingSystemSeen()
+    return C_Ping ~= nil or _G.PingUtil ~= nil or _G.BINDING_HEADER_PING_SYSTEM ~= nil or _G.BINDING_NAME_PINGATTACK ~= nil
+end
+ns.pingSystemSeen = pingSystemSeen
+
 function ns.pingSupported()
-    if not (C_Ping and SecureHandlerWrapScript and SetBindingClick) then return false end
-    if C_Ping.IsPingSystemEnabled then
+    if not (pingSystemSeen() and SecureHandlerWrapScript and SetBindingClick) then return false end
+    if C_Ping and C_Ping.IsPingSystemEnabled then
         local ok, on = pcall(C_Ping.IsPingSystemEnabled)
-        return ok and on and true or false
+        if ok and on == false then return false end
     end
     return true
 end
@@ -56,14 +63,12 @@ end
 
 local function questCreature(unit)
     if not (unit and UnitExists and UnitExists(unit)) then return nil end
-    local okR, related = pcall(C_QuestLog.UnitIsRelatedToActiveQuest, unit)
-    if not (okR and related == true) then return nil end
+    if not C.isQuestCreature(unit) then return nil end
     if not (UnitCanAttack and UnitCanAttack("player", unit)) or (UnitIsDead and UnitIsDead(unit)) then return nil end
     return UnitName(unit)
 end
 
 function ns.nearestQuestCreature()
-    if not (C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest) then return nil end
     for _, u in ipairs({ "target", "softenemy", "mouseover" }) do        -- what you are already looking at comes first
         local name = questCreature(u)
         if name then return name end
@@ -127,7 +132,7 @@ local function afterClick(self, _, down)
     if state.kind == "none" or not state.kind then
         say("nothing to ping: no quest creature in sight (enemy nameplates on?) - /qs ping checks everything")
     elseif count ~= state.count then
-        state.count, state.lastAt = count, GetTime()
+        state.count, state.lastAt, state.lastPinged = count, GetTime(), state.kind
         if state.kind == "unit" then say("ping: " .. tostring(state.name) .. " (attack)")
         elseif state.kind == "object" then say("ping: the quest object in front of you, if there is one (look here)")
         else say("nothing to ping: no quest creature in sight (enemy nameplates on?) - /qs ping checks everything") end
@@ -142,6 +147,11 @@ local function afterClick(self, _, down)
 end
 
 -- the game tells why a ping failed ("pings are disabled", "too many pings"...): pass it on
+-- you picked up / used a quest object: the next press may point at the next one
+function ns.onPickProgress()
+    if state.kind == "object" or state.lastPinged == "object" then resetGate() end
+end
+
 ns.on("PING_SYSTEM_ERROR", function(_, err)
     state.lastError = tostring(err)
     ns.print("the game did not send the ping: " .. tostring(err))
@@ -151,9 +161,9 @@ end)
 function ns.pingReport()
     local out = {}
     local function line(ok, text) out[#out + 1] = (ok and "[OK] " or "[--] ") .. text end
-    local hasPing = C_Ping ~= nil
-    local enabled = hasPing and (not C_Ping.IsPingSystemEnabled or select(2, pcall(C_Ping.IsPingSystemEnabled)) == true)
-    line(hasPing, "the game's ping system: " .. (hasPing and "here" or "NOT on this client - pings cannot work"))
+    local hasPing = pingSystemSeen()
+    local enabled = hasPing and not (C_Ping and C_Ping.IsPingSystemEnabled and select(2, pcall(C_Ping.IsPingSystemEnabled)) == false)
+    line(hasPing, "the game's ping system: " .. (hasPing and ("here" .. (C_Ping and "" or " (seen through its key bindings)")) or "NOT on this client - pings cannot work"))
     if hasPing then line(enabled, "pings switched on in the game: " .. (enabled and "yes" or "NO (game options > pings, or the party leader turned them off)")) end
     line(SecureHandlerWrapScript ~= nil and SetBindingClick ~= nil, "secure buttons and click bindings: " .. ((SecureHandlerWrapScript and SetBindingClick) and "yes" or "NO"))
     line(ns.db.ping and not ns.isBlocked("ping"), "the ping feature: " .. (ns.isBlocked("ping") and "switched off after the game refused it (/reload)" or (ns.db.ping and "on" or "off (/qs ping on)")))
@@ -161,7 +171,11 @@ function ns.pingReport()
     local key = ns.pingKeyName()
     line(key ~= nil, "ping key: " .. (key or "NOT SET - Settings > Pings & items > Ping key, or /qs pingkey G"))
     local api = C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest
-    line(api ~= nil, "telling quest creatures apart: " .. (api and "yes" or "NO - this client cannot tell which creatures your quests need"))
+    local names = 0
+    for _ in pairs(C.questMobNames()) do names = names + 1 end
+    line(api ~= nil or names > 0, "telling quest creatures apart: " .. (api and "yes (the game says)" or
+        (names > 0 and ("by name, from your quest log" .. ((ns.questie and ns.questie.available()) and " and Questie" or "") .. ": " .. names .. " creature(s)")
+         or "NO - no creature names in your quest log (Questie would help)")))
     line(ns.enemyNameplatesOn and ns.enemyNameplatesOn(), "enemy nameplates: " .. ((ns.enemyNameplatesOn and ns.enemyNameplatesOn()) and "on" or "OFF - press V (the addon finds quest creatures through them)"))
     local name = ns.nearestQuestCreature()
     line(name ~= nil, "nearest quest creature right now: " .. (name or "none in sight"))
