@@ -328,18 +328,24 @@ def test_a_finished_quest_is_green_and_a_member_who_finished_gets_a_check(style)
     assert row.checks[1].shown is True
 
 
-def test_clicking_a_row_tells_the_party_how_i_am_doing(style):
-    g = quiet_party(style, ("Anna",), on_quest={"party1": [100]})
+def test_clicking_rows_adds_my_status_to_the_chat_box_like_the_tracker(style):
+    g = quiet_party(style, ("Anna",), on_quest={"party1": [100, 101]})
     panel, rows, legend, notes = panel_of(g)
-    g.eval("function(r) r.scripts.OnClick(r, 'LeftButton') end")(rows[1])
-    msgs = g.sent()
-    assert len(msgs) == 1 and msgs[0][1] == "PARTY", msgs
-    assert "Wolves Among Us" in msgs[0][0] and "Wolf slain 3/8" in msgs[0][0] and "Anna has it too" in msgs[0][0]
-    g.eval("function(r) r.scripts.OnClick(r, 'LeftButton') end")(rows[1])
-    assert len(g.sent()) == 1, "a double click does not say it twice"
-    g.advance(2)
-    g.eval("function(r) r.scripts.OnClick(r, 'LeftButton') end")(rows[1])
-    assert len(g.sent()) == 2
+    click = g.eval("function(r) r.scripts.OnClick(r, 'LeftButton') end")
+    click(rows[1])
+    assert g.sent() == [], "nothing is sent behind your back: it waits in the chat box"
+    opened = g.opened()
+    assert len(opened) == 1 and opened[0].startswith("/p ") and "{rt1}" not in opened[0]
+    assert "Wolves Among Us" in opened[0] and "Wolf slain 3/8" in opened[0] and "Anna has it too" in opened[0]
+    click(rows[2])
+    text = g.eval("EDITBOX.text")
+    assert " + " in text and "Wolves Among Us" in text and "Report to Goldshire" in text, "added, not replaced"
+    click(rows[1])
+    assert g.eval("EDITBOX.text") == text, "a quest already in the box is not added again"
+    g.slash("mode send")
+    g.run("CLOSE_CHAT()")
+    click(rows[1])
+    assert len(g.sent()) == 1 and g.sent()[0][1] == "PARTY", "the same setting as the tracker click"
 
 
 def test_a_finished_quest_does_not_add_who_else_has_it(style):

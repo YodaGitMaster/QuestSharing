@@ -269,10 +269,54 @@ def test_tracker_click_without_a_party_has_no_channel():
     assert g.opened() == [f"{LINK101} - I'm done with this one, ready to turn in!"]
 
 
-def test_tracker_click_adds_the_icon_when_the_party_has_the_quest():
+def test_tracker_click_puts_no_icon_code_in_the_chat_box():
     g = party_game("modern", on_quest={"party1": [100]}, pre=MODERN_TRACKER)
     click_modern(g, 100)
-    assert g.opened() == [f"/p {{rt1}} {LINK100} - {LEFT100} (Anna has it too!)"]
+    assert g.opened() == [f"/p {LINK100} - {LEFT100} (Anna has it too!)"], "no raw {rt1} in the box"
+    g.run("CLOSE_CHAT()")
+    g.slash("mode send")
+    click_modern(g, 100)                                                # sent at once, the game draws the star
+    assert g.sent() == [(f"{{rt1}} {LINK100} - {LEFT100} (Anna has it too!)", "PARTY")]
+
+
+def test_clicking_more_quests_adds_them_to_the_chat_box():
+    g = party_game("modern", pre=MODERN_TRACKER)
+    click_modern(g, 100)
+    click_modern(g, 101)
+    assert g.opened() == [f"/p {LINK100} - {LEFT100}"], "the box is opened once"
+    assert g.eval("EDITBOX.text") == f"{LINK100} - {LEFT100} + {LINK101} - I'm done with this one, ready to turn in!"
+    assert g.eval("EDITBOX.chat") == "/p", "still for the party"
+
+
+def test_the_same_quest_is_not_added_twice():
+    g = party_game("modern", pre=MODERN_TRACKER)
+    click_modern(g, 100)
+    click_modern(g, 100)
+    assert g.eval("EDITBOX.text") == f"{LINK100} - {LEFT100}"
+    assert "already in the chat box" in "\n".join(g.printed())
+
+
+def test_what_you_typed_is_kept_and_the_status_goes_after_it():
+    g = party_game("modern", pre=MODERN_TRACKER)
+    g.run('ACTIVE_BOX = EDITBOX; EDITBOX.text = "brb, my progress:"')
+    click_modern(g, 100)
+    assert g.eval("EDITBOX.text") == f"brb, my progress: + {LINK100} - {LEFT100}" and g.opened() == []
+
+
+def test_after_sending_or_closing_the_box_the_next_click_starts_fresh():
+    g = party_game("modern", pre=MODERN_TRACKER)
+    click_modern(g, 100)
+    g.run("CLOSE_CHAT()")                                                # Enter or Esc
+    click_modern(g, 101)
+    assert g.eval("EDITBOX.text") == f"{LINK101} - I'm done with this one, ready to turn in!" and len(g.opened()) == 2
+
+
+def test_a_full_chat_box_is_not_overfilled():
+    g = party_game("modern", pre=MODERN_TRACKER)
+    g.run('ACTIVE_BOX = EDITBOX; EDITBOX.text = string.rep("x", 200)')
+    click_modern(g, 100)
+    assert g.eval("EDITBOX.text") == "x" * 200, "it would not fit in one message: nothing is cut or lost"
+    assert "chat box is full" in "\n".join(g.printed())
 
 
 def test_tracker_click_is_ignored_for_other_buttons_modifiers_and_when_off():
@@ -336,7 +380,7 @@ def test_shift_click_link_gets_the_status_appended(style):
     assert g.eval("EDITBOX.text") == f"{link} - {LEFT100}"
     g.run('EDITBOX.text = ""; ON_QUEST["party1"] = {[100] = true}')
     g.eval("ChatEdit_InsertLink")(link)
-    assert g.eval("EDITBOX.text") == f"{link} - {LEFT100} (Anna has it too!) {{rt1}}"
+    assert g.eval("EDITBOX.text") == f"{link} - {LEFT100} (Anna has it too!)", "no raw {rt1} in the box"
     g.run('EDITBOX.text = ""')
     g.eval("ChatEdit_InsertLink")("|cff1eff00|Hitem:2589::::::::1:::::::|h[Linen Cloth]|h|r")
     assert g.eval("EDITBOX.text") == "|cff1eff00|Hitem:2589::::::::1:::::::|h[Linen Cloth]|h|r", "items are left alone"

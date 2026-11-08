@@ -35,10 +35,12 @@ local function haveSuffix(names)
     return " (" .. table.concat(names, ", ") .. " have it too!)"
 end
 
--- icon + quest link + status + who else has it; always fits in one chat message
-function ns.statusMessage(e)
+-- icon + quest link + status + who else has it; always fits in one chat message.
+-- forBox: for the chat box, without the {rt1} code (the game only turns it into a star once sent; in the box it is
+-- just odd text)
+function ns.statusMessage(e, forBox)
     local names = ns.partyHas(e)
-    local icon = (#names > 0) and (ICON .. " ") or ""
+    local icon = (#names > 0 and not forBox) and (ICON .. " ") or ""
     local link = C.link(e)
     local text, done = ns.statusText(e)
     local suffix = done and "" or haveSuffix(names)          -- "Anna has it too!" is no news once you are finished
@@ -62,6 +64,42 @@ function ns.deliver(msg)
     end
 end
 
+-- Put a status in the chat box. If the box is already open with text (an earlier quest, or something you typed), the
+-- new one is ADDED after it instead of replacing it, so you can click several quests and send them as one message.
+local SEP = " + "
+function ns.addToChatBox(msg, link)
+    local box = ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()
+    local old = (box and box.GetText and box:GetText()) or ""
+    if box and box.SetText and old ~= "" then
+        if link and string.find(old, link, 1, true) then
+            ns.print("that quest is already in the chat box")
+            return false
+        end
+        local new = old .. SEP .. msg
+        if #new > 255 then
+            ns.print("the chat box is full (255 letters): press Enter to send it, then click the next quest")
+            return false
+        end
+        box:SetText(new)
+        return true
+    end
+    if not ChatFrame_OpenChat then return false end
+    ChatFrame_OpenChat((C.inGroup() and C.slashFor(C.channel()) or "") .. msg)
+    return true
+end
+
+-- What a click on a quest does (the game's tracker and our Party quests window): by default it goes into the chat box
+local lastShare = { id = nil, at = -10 }
+function ns.shareStatus(e)
+    if not e then return false end
+    local mode = ns.db.mode
+    if mode == "box" and ChatFrame_OpenChat then return ns.addToChatBox(ns.statusMessage(e, true), C.link(e)) end
+    if mode == "send" and lastShare.id == e.questID and GetTime() - lastShare.at < 1 then return false end   -- a double click
+    lastShare.id, lastShare.at = e.questID, GetTime()
+    ns.deliver(ns.statusMessage(e))
+    return true
+end
+
 local function modifierDown()
     return (IsShiftKeyDown and IsShiftKeyDown()) or (IsControlKeyDown and IsControlKeyDown())
         or (IsAltKeyDown and IsAltKeyDown())
@@ -73,7 +111,7 @@ local function questClicked(questID, index, button)
     if button and button ~= "LeftButton" then return end
     if modifierDown() then return end            -- shift-click inserts a link: the link hook handles that
     local e = C.findEntry(questID, index)
-    if e then ns.deliver(ns.statusMessage(e)) end
+    if e then ns.shareStatus(e) end
 end
 
 -- Hooks ---------------------------------------------------------------------------------------------
@@ -103,7 +141,8 @@ local function install()
             local e = C.findEntry(tonumber(id))
             if not e then return end
             local names = ns.partyHas(e)
-            box:Insert(" - " .. ns.statusText(e) .. haveSuffix(names) .. ((#names > 0) and (" " .. ICON) or ""))
+            local text, done = ns.statusText(e)
+            box:Insert(" - " .. text .. (done and "" or haveSuffix(names)))
         end)
     end
 end
