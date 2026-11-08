@@ -1,6 +1,12 @@
 # Changelog
 
 ## 0.2.0
+- **Playing together:** "Picked up [quest] - Anna has it too. Want to do it together?" when you take a quest someone in
+  the party has (one message per quest giver, once per quest, never for shared quests or ones just named in chat).
+  **Where the quest items were**: for collect / use objectives the spot of your last progress is added to your done and
+  progress messages while someone in the party still needs it. A **budget** for automatic party messages (4 a minute)
+  and at most two lines for "in common". Settings > Sharing > Party chat; `/qs pickup`, `/qs coords`. The "Party
+  window" tab is now "Party" and also holds the quest-click settings.
 - **Fewer messages, and several Quest Sharing users in one party work together.** A quest one of you offered is
   not offered again by the others (an `O|` sync message), and every offer is checked again right before it goes out;
   accepting a shared quest no longer makes your addon offer it around and announce it. The "in common" message and

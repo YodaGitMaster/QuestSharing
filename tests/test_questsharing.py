@@ -246,9 +246,10 @@ def test_many_quests_in_common_are_split_into_short_messages_sent_two_seconds_ap
         while len(seen) < len(g.sent()):
             seen.append(tenth / 10)
     sent = g.sent()
-    assert len(sent) >= 3 and all(len(m) <= 255 for m, _ in sent), [len(m) for m, _ in sent]
+    assert len(sent) == 2 and all(len(m) <= 255 for m, _ in sent), [len(m) for m, _ in sent]
     assert all(m.startswith("Hey Anna!") for m, _ in sent)
-    assert sum(m.count("|Hquest:") for m, _ in sent) == 12, "every quest is announced exactly once"
+    linked = sum(m.count("|Hquest:") for m, _ in sent)
+    assert 4 <= linked < 12 and f"and {12 - linked} more" in sent[1][0], "two lines at most, the rest is counted"
     gaps = [round(b - a, 1) for a, b in zip(seen, seen[1:])]
     assert all(gap >= 1.9 for gap in gaps), gaps
 

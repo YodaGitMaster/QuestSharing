@@ -72,14 +72,14 @@ function C.objectives(e)
         for _, o in ipairs(C_QuestLog.GetQuestObjectives(e.questID) or {}) do
             local name, have, need = C.parseObjective(o.text)
             out[#out + 1] = { text = o.text or "", name = name, finished = o.finished and true or false,
-                              have = o.numFulfilled or have, need = o.numRequired or need }
+                              have = o.numFulfilled or have, need = o.numRequired or need, type = o.type }
         end
     else
         for j = 1, (GetNumQuestLeaderBoards(e.index) or 0) do
-            local text, _, done = GetQuestLogLeaderBoard(j, e.index)
+            local text, kind, done = GetQuestLogLeaderBoard(j, e.index)
             local name, have, need = C.parseObjective(text)
             out[#out + 1] = { text = text or "", name = name, finished = done and true or false,
-                              have = have, need = need }
+                              have = have, need = need, type = kind }
         end
     end
     return out
@@ -199,6 +199,19 @@ function C.safeCut(s, max, tail)
     if pipes and #pipes % 2 == 1 then head = string.sub(head, 1, -2) end
     head = string.gsub(head, "%s+$", "")
     return head .. tail
+end
+
+-- Where the player stands: map, x, y (0..1), or nil (inside a dungeon, or a client without the map calls)
+function C.playerPos()
+    if not (C_Map and C_Map.GetBestMapForUnit and C_Map.GetPlayerMapPosition) then return nil end
+    local ok, map = pcall(C_Map.GetBestMapForUnit, "player")
+    if not (ok and map) then return nil end
+    local ok2, pos = pcall(C_Map.GetPlayerMapPosition, map, "player")
+    if not (ok2 and pos) then return nil end
+    local x, y
+    if pos.GetXY then x, y = pos:GetXY() else x, y = pos.x, pos.y end
+    if not (x and y) or (x == 0 and y == 0) then return nil end
+    return map, x, y
 end
 
 -- Area ----------------------------------------------------------------------------------------

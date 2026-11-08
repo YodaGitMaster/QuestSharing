@@ -125,8 +125,18 @@ ChatFontNormal = {}
 
 -- targets, sub-zone, key bindings
 TARGET, SUBZONE = nil, ""
-function UnitExists(u) return u == "target" and TARGET ~= nil end
-function UnitIsPlayer(u) return u == "target" and TARGET ~= nil and TARGET.player == true end
+function UnitExists(u)
+    if u == "questnpc" then return QUESTNPC ~= nil end
+    return u == "target" and TARGET ~= nil
+end
+function UnitIsPlayer(u)
+    if u == "questnpc" then return QUESTNPC ~= nil and QUESTNPC.player == true end
+    return u == "target" and TARGET ~= nil and TARGET.player == true
+end
+-- where the player stands (0..1 on the zone map), nil inside a dungeon
+POS, MAP_ID = { x = 0.423, y = 0.618 }, 1429
+C_Map = { GetBestMapForUnit = function() return MAP_ID end,
+          GetPlayerMapPosition = function() if POS then return { x = POS.x, y = POS.y } end end }
 function UnitIsUnit(a, b) return a == b end
 function GetSubZoneText() return SUBZONE end
 BINDINGS, SAVED_BINDINGS = {}, 0
@@ -194,6 +204,7 @@ function UnitName(unit)
     if i then return GROUP.members[i], REALMS[GROUP.members[i]] end
     if unit == "player" then return "Me" end
     if unit == "target" and TARGET then return TARGET.name end
+    if unit == "questnpc" and QUESTNPC then return QUESTNPC.name end
 end
 function GetRealZoneText() return ZONE end
 
@@ -215,8 +226,8 @@ function DEFAULT_QUESTS()
     QUESTS = {
         { header = "Elwynn Forest" },
         { id = 100, title = "Wolves Among Us", level = 3, objectives = {
-            { text = "Wolf slain: 3/8", finished = false, numFulfilled = 3, numRequired = 8 },
-            { text = "Wolf Pelt: 0/4", finished = false, numFulfilled = 0, numRequired = 4 } } },
+            { text = "Wolf slain: 3/8", finished = false, numFulfilled = 3, numRequired = 8, type = "monster" },
+            { text = "Wolf Pelt: 0/4", finished = false, numFulfilled = 0, numRequired = 4, type = "item" } } },
         { id = 101, title = "Report to Goldshire", level = 2, complete = true, objectives = {
             { text = "Speak with Marshal Dughan", finished = true } } },
         { id = 102, title = "A Personal Quest", level = 2, pushable = false, objectives = {} },
@@ -387,7 +398,7 @@ function CLASSIC_API()
         return q.title, q.level, nil, false, false, q.complete and 1 or nil, nil, q.id
     end
     function GetNumQuestLeaderBoards(i) return #(QUESTS[i].objectives or {}) end
-    function GetQuestLogLeaderBoard(j, i) local o = QUESTS[i].objectives[j]; return o.text, "monster", o.finished end
+    function GetQuestLogLeaderBoard(j, i) local o = QUESTS[i].objectives[j]; return o.text, o.type or "monster", o.finished end
     function SelectQuestLogEntry(i) SELECTED = i end
     function GetQuestLogSelection() return SELECTED end
     function GetQuestLogPushable() local q = QUESTS[SELECTED]; return q ~= nil and q.pushable ~= false end

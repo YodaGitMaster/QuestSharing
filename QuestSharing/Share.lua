@@ -138,10 +138,17 @@ local function joinNames(list)
     return table.concat(list, ", ", 1, #list - 1) .. " and " .. list[#list]
 end
 
+-- at most two lines, whatever the number of quests: the rest is "and 6 more"
+local MAX_LINES = 2
 local function announce(links, names)
     if #links == 0 then return end
     local prefix = string.format(ns.pick(GREETINGS), joinNames(names)) .. " "
     local messages = ns.chunk(links, prefix, ", ", 225)
+    if #messages > MAX_LINES then
+        local kept = 0
+        for i = 1, MAX_LINES do local _, n = string.gsub(messages[i], "|Hquest:", ""); kept = kept + n end
+        messages = { messages[1], messages[2] .. " and " .. (#links - kept) .. " more" }
+    end
     local tail = ns.pick(TAILS)
     local last = #messages
     if #messages[last] + #tail <= 255 then messages[last] = messages[last] .. tail end

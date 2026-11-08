@@ -218,7 +218,8 @@ def test_finishing_a_shared_quest_is_announced_to_the_party(style):
     objectives_done(g, 100, "Wolf slain: 8/8", "Wolf Pelt: 4/4")
     g.fire("QUEST_LOG_UPDATE")
     g.advance(2)
-    assert g.sent() == [(f"{{rt1}} {LINK100} - I'm done with this one, ready to turn in!", "PARTY")]
+    assert g.sent() == [(f"{{rt1}} {LINK100} - I'm done with this one, ready to turn in! - Wolf Pelt: 42.3, 61.8 in Elwynn Forest", "PARTY")], \
+        "Anna still needs the pelts: where I found them comes along"
     g.fire("QUEST_LOG_UPDATE")                                              # the log keeps firing: said only once
     g.advance(2)
     assert len(g.sent()) == 1

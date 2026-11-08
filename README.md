@@ -63,11 +63,25 @@ Hover the map button any time for a quick status (party, tracker, your key, prob
    - **Your own chat stays quiet**: no line per answer, no line when a round starts; one line when something was
      shared; "the tracker paused" is explained once per session.
 
-4. **Announces when a shared quest is done.** When all objectives of a quest that a party member also
+4. **Helps the party play the same quests together, without spam:**
+   - **"Picked up [Boar Tusks] - Anna has it too. Want to do it together?"** when you take a quest from a quest giver
+     and someone in the party already has it. Quests from one quest giver go into one message; each quest is said once
+     per party; never for a quest somebody shared with you (they know), never for one somebody just named in chat.
+   - **Where the quest items were.** For objectives you collect or use (items, objects, things to click), the addon
+     remembers where your last progress happened and adds it to the messages you send anyway, but only while someone
+     in the party still needs it: `[Wolves Among Us] - still need: Wolf slain 3/8, Wolf Pelt 2/4 (Anna has it too!) -
+     Wolf Pelt: 42.3, 61.8 in Elwynn Forest`. Not for kills, not inside dungeons (no map spot there).
+   - **A budget for automatic messages:** at most 4 a minute for the whole addon, and the "in common" message never
+     takes more than two lines (the rest is "and 6 more"). What you send yourself (quest clicks, the ring) is never
+     limited.
+
+   `/qs pickup on|off`, `/qs coords on|off`, or *Settings > Sharing > Party chat*.
+
+5. **Announces when a shared quest is done.** When all objectives of a quest that a party member also
    has are finished, it says so in party chat. Synced players also see `Anna finished the objectives of
    [Wolves Among Us]` on their screen when it is their quest.
 
-5. **Shows who shares what.** A star and the names next to shared quests in the game's quest log, and a small
+6. **Shows who shares what.** A star and the names next to shared quests in the game's quest log, and a small
    movable **Party quests** window (shown while you are in a party, on the left of the screen the first time; drag it
    anywhere and it stays there). It is built to be read at a glance:
 
@@ -91,7 +105,7 @@ Hover the map button any time for a quick status (party, tracker, your key, prob
      Party window > Move back* finds it if you lost it.
    - More than 12 shared quests: the rest is summed up as "+N more".
 
-6. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. It fills the
+7. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. It fills the
    tracker (the list on the right) with the quests closest to you and **re-checks every 2 seconds as you
    move**, so the list follows you instead of changing only when you cross into another zone.
    - **Distance mode** (needs a client that can tell how far a quest is) ranks quests by distance. A quest
@@ -105,7 +119,7 @@ Hover the map button any time for a quick status (party, tracker, your key, prob
      during combat and inside instances.
    - Note this fills the tracker list. It does not touch the single highlighted "waypoint" quest.
 
-7. **(Beta) Adds the people you group with to your friends list.** `/qs friends` adds everybody in your
+8. **(Beta) Adds the people you group with to your friends list.** `/qs friends` adds everybody in your
    party now. `/qs friends on` also does it automatically when a party forms or someone joins; this is
    **off by default** because it changes a list that matters to you. Safeguards: people already on your
    list and ignored players are skipped; players from another realm are skipped where the client cannot
@@ -114,7 +128,7 @@ Hover the map button any time for a quick status (party, tracker, your key, prob
    <zone>"). The game's answers (added, already a friend, not found, list full, other faction) are read and
    summarised for you.
 
-8. **A quick chat ring, like in Diablo 4.** Bind a key (Game Menu > Options > Key Bindings > Quest Sharing,
+9. **A quick chat ring, like in Diablo 4.** Bind a key (Game Menu > Options > Key Bindings > Quest Sharing,
    or `/qs key V`). **Hold the key**: a clean ring of up to 8 messages opens around the mouse, each with a short
    label (14 letters at most) outside the ring. **Point at one**: its full text appears in the middle. Then
    **release the key** or **click** it. By default the ring has:
@@ -160,18 +174,18 @@ Hover the map button any time for a quick status (party, tracker, your key, prob
    play. Or by command: `/qs quick` lists them; `/qs quick add [label |] <text>`, `edit N <text>`, `label N <label>`,
    `remove N`, `move N M`, `reset`.
 
-9. **A minimap button.** Left click opens the settings window, right click shows or hides the
+10. **A minimap button.** Left click opens the settings window, right click shows or hides the
    quests-in-common panel, drag it around the minimap edge to move it (`/qs minimap off` hides it).
-10. **An "Invite" action on the wheel.** A message that starts with `@invite` invites the player you target to
+11. **An "Invite" action on the wheel.** A message that starts with `@invite` invites the player you target to
     your party and whispers them the rest of the text. The last default wheel slot is
     `@invite Sending you a party invite - let's quest together!`. It checks first that you have a target, are
     the party leader (if you are in one) and that the party is not full.
-11. **Built-in help for problems.** `/qs doctor` shows what works on your client and opens the report in a
+12. **Built-in help for problems.** `/qs doctor` shows what works on your client and opens the report in a
     window where the text is already selected (Ctrl+C to copy it). `/qs errors` shows any error the addon has
     caused (also kept between sessions). If something misbehaves in your game, paste the `/qs doctor` report
     into a GitHub issue.
 
-12. **Quest objectives are easier to find.**
+13. **Quest objectives are easier to find.**
     - **Quest icons over creatures:** every creature that is part of one of your quests gets a gold quest icon
       above its nameplate (the game itself tells the addon which creatures those are).
     - **The nearest quest is pinned in the world:** while "tracker follows me" is on, the game's own
@@ -192,8 +206,8 @@ explanation, and groups its settings in short sections:
 | Tab | What is on it |
 |---|---|
 | **General** | *Getting started*: your **quick chat key** (click, then press the key), **Show the ring**, **Check my setup**. *Basics*: the master switch, the map button, a soft sound for good news, reset |
-| **Sharing** | *When I join a party*, *Party chat*, *Clicking a quest*, *Behind the scenes* (sync, quest-log markers) |
-| **Party window** | show it in a party, hide it in combat, its size, move it back |
+| **Sharing** | *When I join a party*, *Party chat* (in common, done, picked up a quest someone has, where the items were), *Behind the scenes* (sync, quest-log markers) |
+| **Party** | the Party quests window (show it in a party, hide it in combat, its size, move it back) and *Clicking a quest* (what a click posts, where it goes) |
 | **Tracker** | *The quest list on the right* (follows you, how many, distance or zone, the pause) and *Finding objectives* (the world pin, quest icons over creatures, the game-settings helper) |
 | **Quick chat** | the ring, its key, hold or toggle, its size, where Auto messages go, and the **message editor** |
 | **Social** | the friends beta, and *Add my party to my friends now* |
@@ -278,7 +292,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 539 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 569 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -332,8 +346,9 @@ python tests/test_extras.py           # 35 tests: error log + doctor, invite act
 python tests/test_highlight.py        # 22 tests: quest icons over creatures, the world pin, the game-settings helper
 python tests/test_look.py             # 42 tests: the settings window layout, the key capture, welcome, sounds, ring colours
 python tests/test_together.py         # 30 tests: several Quest Sharing users in one party, fewer messages
+python tests/test_team.py             # 30 tests: picked up a quest someone has, where the items were, the message budget
 ```
-Expected: every line ends in `passed` with all tests green (539 in total).
+Expected: every line ends in `passed` with all tests green (569 in total).
 
 ## Files
 | File | Purpose |
@@ -351,6 +366,7 @@ Expected: every line ends in `passed` with all tests green (539 in total).
 | `build_release.py`, `CHANGELOG.md` | builds `dist/QuestSharing-<version>.zip` and the release notes |
 | `QuestSharing/Quick.lua`, `QuestSharing/Bindings.xml` | the quick chat ring, its placeholders, the message commands and the key binding |
 | `QuestSharing/Friends.lua` | (beta) adds party members to your friends list, with safeguards |
+| `QuestSharing/Team.lua` | "picked up a quest someone has - let's do it together?" (once per quest, not for shared ones) |
 | `QuestSharing/Style.lua` | one look for every window (dialog and on-screen frames, buttons, check boxes, chat colours) and the good-news sound |
 | `QuestSharing/Settings.lua` | the tabbed settings window (sections, check boxes, key capture) with the message editor, and the options entry |
 | `QuestSharing/Status.lua` | the status message, tracker / link hooks, `/qs probe` |
