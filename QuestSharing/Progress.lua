@@ -18,16 +18,11 @@ local function snapshot()
     return snap
 end
 
-local function list(names)
-    if #names == 1 then return names[1] .. " has it too!" end
-    return table.concat(names, ", ") .. " have it too!"
-end
-
 function ns.onQuestCompleted(e)
     ns.syncUpdate("C|" .. e.questID)
     local names = ns.partyHas(e)
     if #names > 0 and ns.db.announce then
-        ns.say(string.format("%s %s - %s (%s)", ICON, C.link(e), ns.pick(LINES), list(names)))
+        ns.say(string.format("%s %s - %s", ICON, C.link(e), ns.pick(LINES)))
     end
 end
 

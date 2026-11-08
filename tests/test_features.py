@@ -217,7 +217,7 @@ def test_finishing_a_shared_quest_is_announced_to_the_party(style):
     objectives_done(g, 100, "Wolf slain: 8/8", "Wolf Pelt: 4/4")
     g.fire("QUEST_LOG_UPDATE")
     g.advance(2)
-    assert g.sent() == [(f"{{rt1}} {LINK100} - I'm done with this one, ready to turn in! (Anna has it too!)", "PARTY")]
+    assert g.sent() == [(f"{{rt1}} {LINK100} - I'm done with this one, ready to turn in!", "PARTY")]
     g.fire("QUEST_LOG_UPDATE")                                              # the log keeps firing: said only once
     g.advance(2)
     assert len(g.sent()) == 1
@@ -339,6 +339,14 @@ def test_clicking_a_row_tells_the_party_how_i_am_doing(style):
     g.advance(2)
     g.eval("function(r) r.scripts.OnClick(r, 'LeftButton') end")(rows[1])
     assert len(g.sent()) == 2
+
+
+def test_a_finished_quest_does_not_add_who_else_has_it(style):
+    g = quiet_party(style, ("Anna",), on_quest={"party1": [100, 101]})
+    done = g.eval("NS.statusMessage")(g.eval("NS.compat.findEntry")(101))
+    open_ = g.eval("NS.statusMessage")(g.eval("NS.compat.findEntry")(100))
+    assert "has it too" not in done and done.startswith("{rt1} "), "finished: no 'Anna has it too' tail"
+    assert "Anna has it too!" in open_, "still said for a quest you are working on"
 
 
 def test_a_row_has_a_tooltip_with_everybodys_progress(style):

@@ -7,6 +7,8 @@
   message is a question that links your quests of the area; an `@invite` action invites your target to your party
 - **Tracker follows you**: keeps the quest tracker on the nearest quests (distance mode, or zone mode on clients that
   cannot measure distance); steps aside for 10 seconds (a setting) when you change the tracker yourself, with or without game events
+- Once a quest is finished, the messages no longer add "Anna has it too!" (the finished-quest announcement and the
+  status you share by clicking). It is still said for quests you are working on.
 - **Party quests window redesigned**: a row of class icons for who has each quest, the quest name, and your own
   progress; hover for everybody's progress, click to tell the party how you are doing.
 - Quick chat "auto" goes to the party first (`/p`), then a whisper to a targeted player (`/w`), then `/s`.
