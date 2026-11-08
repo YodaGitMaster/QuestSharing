@@ -64,7 +64,7 @@ ns.settingRows = {
       tip = "Hello / want to quest together? / what I need here... Pick the key with /qs key V or in Key Bindings." },
     { tab = "quick", kind = "choice", key = "quickMode", label = "The quick chat key", values = { "hold", "toggle" },
       names = { hold = "hold, point, release", toggle = "press to open, click a message" } },
-    { tab = "quick", kind = "choice", key = "quickChannel", label = "Quick chat says it to", values = { "auto", "say", "party", "whisper" },
+    { tab = "quick", kind = "choice", key = "quickChannel", label = "Auto messages go to", values = { "auto", "say", "party", "whisper" },
       names = { auto = "the party if I am in one, else my target (whisper), else nearby", say = "everybody nearby", party = "the party only", whisper = "the player I target" } },
     { tab = "quick", kind = "action", label = "Which key opens the ring? (set it with /qs key V)", action = function() ns.setQuickKey("") end },
     -- Social
@@ -148,7 +148,7 @@ function ns.editorRefresh()
         if list[i] then
             local hot = (ed.selected == i)
             line.text:SetText(string.format("%s%d.  [%s]  %s%s|r", hot and "|cffffd100" or "|cffffffff", i, list[i].label,
-                shorten(list[i].text, 52), list[i].channel == "nearby" and "  |cff88ccff/s|r" or ""))
+                shorten(list[i].text, 50), "  |cff88ccff" .. (ns.QUICK_ROUTE_TAG[list[i].channel or "auto"] or "auto") .. "|r"))
             line.frame:Show()
         else
             line.frame:Hide()
@@ -157,8 +157,18 @@ function ns.editorRefresh()
     local item = ed.selected and list[ed.selected]
     ed.labelBox:SetText(item and item.label or "")
     ed.textBox:SetText(item and item.text or "")
+    local route = item and (item.channel or "auto")
     if ed.routeText then
-        ed.routeText:SetText(item and (item.channel == "nearby" and "|cff55ccff[Goes to: nearby (/w target, else /s)]|r" or "|cff55ccff[Goes to: auto (party, else /w, else /s)]|r") or "")
+        ed.routeText:SetText(item and ("Goes to: |cffffd100" .. ns.QUICK_ROUTE_INFO[route] .. "|r") or "")
+    end
+    for _, c in ipairs(ed.routeButtons or {}) do
+        if item then
+            local hot = (c.route == route)
+            c.text:SetText((hot and "|cffffd100[" or "|cff55ccff ") .. c.title .. (hot and "]|r" or " |r"))
+            c.frame:Show()
+        else
+            c.frame:Hide()
+        end
     end
     ed.preview:SetText(item and ("|cff888888Looks like:|r " .. shorten(ns.quickResolve(item.text), 110)) or "|cff888888Click a message above to edit it.|r")
 end
@@ -184,9 +194,17 @@ function ns.editorSave(label, text)
     end
     ns.editorRefresh()
 end
-function ns.editorRoute()
+-- choose the channel of the selected message (no argument: the next one in the list)
+function ns.editorRoute(route)
     local item = ed.selected and ns.quickItems()[ed.selected]
-    if item then ns.quickRoute(ed.selected, item.channel == "nearby" and "auto" or "nearby") end
+    if item then
+        if not route then
+            local cur, list = item.channel or "auto", ns.QUICK_ROUTES
+            for k, r in ipairs(list) do if r == cur then route = list[k % #list + 1] end end
+            route = route or "auto"
+        end
+        ns.quickRoute(ed.selected, route)
+    end
     ns.editorRefresh()
 end
 function ns.editorReset() ns.quickReset(); ed.selected = nil; ns.editorRefresh() end
@@ -194,7 +212,7 @@ function ns.editorReset() ns.quickReset(); ed.selected = nil; ns.editorRefresh()
 local function buildEditor(parent)
     local f = CreateFrame("Frame", nil, parent)
     f:SetWidth(540)
-    f:SetHeight(250)
+    f:SetHeight(290)
     ed.frame, ed.lines = f, {}
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
@@ -206,11 +224,23 @@ local function buildEditor(parent)
         t:SetPoint("LEFT", line, "LEFT", 0, 0)
         ed.lines[i] = { frame = line, text = t }
     end
-    local route = clickable(f, 250, 16, function() ns.editorRoute() end)
-    route:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    ed.routeText = route:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    ed.routeText:SetPoint("RIGHT", route, "RIGHT", 0, 0)
-    ed.route = route
+    -- the channel of the selected message: one click on a choice
+    local cap = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    cap:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -256)
+    cap:SetText("Channel:")
+    ed.routeButtons = {}
+    local TITLES = { auto = "Auto", nearby = "Nearby", say = "/s Say", yell = "/y Yell", party = "/p Party", whisper = "/w Whisper" }
+    local rx = 56
+    for _, r in ipairs(ns.QUICK_ROUTES) do
+        local btn = clickable(f, 72, 16, function() ns.editorRoute(r) end)
+        btn:SetPoint("TOPLEFT", f, "TOPLEFT", rx, -254)
+        local t = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        t:SetPoint("LEFT", btn, "LEFT", 0, 0)
+        ed.routeButtons[#ed.routeButtons + 1] = { route = r, title = TITLES[r], frame = btn, text = t }
+        rx = rx + 76
+    end
+    ed.routeText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    ed.routeText:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -274)
     local cap1 = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     cap1:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -172)
     cap1:SetText("Label (on the ring, 14 letters)")
