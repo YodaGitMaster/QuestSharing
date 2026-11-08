@@ -203,6 +203,33 @@ local function placeOf(s)
     return where
 end
 
+-- the creatures a quest's objectives need: the ones to kill, and the ones that drop its items (names)
+function Q.creatureNames(questID)
+    local out = {}
+    local objs = field("quest", questID, "objectives")
+    if type(objs) ~= "table" then return out end
+    if type(objs[1]) == "table" then                                  -- creatures to kill: { { npcId, text }, ... }
+        for _, o in ipairs(objs[1]) do
+            local id = type(o) == "table" and o[1] or o
+            local n = id and field("npc", id, "name")
+            if n then out[#out + 1] = n end
+        end
+    end
+    if type(objs[3]) == "table" then                                  -- items to get: the creatures that drop them
+        for _, o in ipairs(objs[3]) do
+            local item = type(o) == "table" and o[1] or o
+            local drops = item and field("item", item, "npcDrops")
+            if type(drops) == "table" then
+                for i = 1, math.min(#drops, 6) do
+                    local n = field("npc", drops[i], "name")
+                    if n then out[#out + 1] = n end
+                end
+            end
+        end
+    end
+    return out
+end
+
 -- the items a quest hands you or needs (sourceItemId, requiredSourceItems): candidates for "use this item"
 function Q.questItemIds(questID)
     local out = {}

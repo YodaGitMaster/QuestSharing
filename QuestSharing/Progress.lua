@@ -32,6 +32,7 @@ local function noteProgress(old, cur)
         local was = old.objs[j]
         local moved = was and ((o.have and was.have and o.have > was.have) or (o.finished and not was.finished))
         if moved and PICK[o.type or ""] then
+            if ns.onPickProgress then ns.onPickProgress(cur.entry.questID) end   -- you picked up / used one
             local map, x, y = C.playerPos()
             if x then ns.spots[cur.entry.questID] = { what = o.name or o.text, map = map, x = x, y = y, zone = C.zone(), at = GetTime() } end
         end

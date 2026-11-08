@@ -12,15 +12,12 @@ local C = ns.compat
 local TEXTURE = "Interface\\TargetingFrame\\PortraitQuestBadge"       -- the gold quest badge
 local SIZE = 28
 
+-- needs the nameplate calls; telling quest creatures apart works with the game's own answer or the names (Compat)
 function C.canMarkMobs()
-    return (C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlateForUnit
-            and C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest) and true or false
+    return (C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlateForUnit) and true or false
 end
 
-local function isObjective(unit)
-    local ok, r = pcall(function() return C_QuestLog.UnitIsRelatedToActiveQuest(unit) and true or false end)
-    return ok and r == true
-end
+local function isObjective(unit) return C.isQuestCreature(unit) end
 
 local function tokenOf(plate)
     return plate.unitToken or plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)

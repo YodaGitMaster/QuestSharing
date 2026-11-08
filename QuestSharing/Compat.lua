@@ -215,6 +215,54 @@ function C.safeCut(s, max, tail)
     return head .. tail
 end
 
+-- The names of the creatures your quests still need, for clients that cannot say "is this unit part of a quest":
+-- from the quest log ("Kobold Vermin slain: 3/8", read with the game's own QUEST_MONSTERS_KILLED string, so it works in
+-- every language) and, with Questie, the creatures to kill and the ones that drop your quest items.
+local mobCache = { at = -100, set = nil }
+local function slainSuffix()
+    local f = _G.QUEST_MONSTERS_KILLED
+    if type(f) == "string" then
+        local suffix = string.match(f, "^%%s(.-):")                  -- "%s slain: %d/%d" -> " slain"
+        if suffix and suffix ~= "" then return suffix end
+    end
+    return " slain"
+end
+function C.questMobNames()
+    local now = GetTime and GetTime() or 0
+    if mobCache.set and now - mobCache.at < 2 then return mobCache.set end
+    local set, suffix = {}, slainSuffix()
+    for _, e in ipairs(C.entries()) do
+        if not e.complete then
+            local open = false
+            for _, o in ipairs(C.objectives(e)) do
+                if not o.finished then
+                    open = true
+                    if o.type == "monster" or (o.name and string.sub(o.name, -#suffix) == suffix) then
+                        local n = o.name or ""
+                        if string.sub(n, -#suffix) == suffix then n = string.sub(n, 1, #n - #suffix) end
+                        if n ~= "" then set[string.lower(n)] = true end
+                    end
+                end
+            end
+            if open and ns.questie and ns.questie.available() and ns.questie.creatureNames then
+                for _, n in ipairs(ns.questie.creatureNames(e.questID)) do set[string.lower(n)] = true end
+            end
+        end
+    end
+    mobCache.at, mobCache.set = now, set
+    return set
+end
+
+-- Is this unit a creature your quests need? The game's own answer when it has one, otherwise the names above.
+function C.isQuestCreature(unit)
+    if C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest then          -- the game answers: trust it, read nothing more
+        local ok, r = pcall(function() return C_QuestLog.UnitIsRelatedToActiveQuest(unit) and true or false end)
+        return ok and r == true
+    end
+    local okN, name = pcall(UnitName, unit)
+    return okN and type(name) == "string" and C.questMobNames()[string.lower(name)] == true or false
+end
+
 -- Where the player stands: map, x, y (0..1), or nil (inside a dungeon, or a client without the map calls)
 function C.playerPos()
     if not (C_Map and C_Map.GetBestMapForUnit and C_Map.GetPlayerMapPosition) then return nil end
