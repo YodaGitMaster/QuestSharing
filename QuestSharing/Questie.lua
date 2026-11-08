@@ -108,40 +108,72 @@ function Q.starter(questID)
     end
 end
 
--- The quests that must be done first: a list of names. preQuestSingle = any one of them, preQuestGroup = all of them.
-function Q.before(questID)
+-- The quests that must be done first: names, ids, any. preQuestSingle = any one of them, preQuestGroup = all of them.
+local function beforeIds(questID)
     local single = field("quest", questID, "preQuestSingle")
     local group = field("quest", questID, "preQuestGroup")
-    local list, any = {}, false
-    if type(single) == "table" and #single > 0 then list, any = single, true
-    elseif type(group) == "table" then list = group end
-    local names = {}
+    if type(single) == "table" and #single > 0 then return single, true end
+    if type(group) == "table" then return group, false end
+    return {}, false
+end
+
+function Q.before(questID)
+    local list, any = beforeIds(questID)
+    local names, ids = {}, {}
     for i = 1, math.min(#list, 3) do
-        local n = field("quest", math.abs(list[i]), "name")
-        if n then names[#names + 1] = n end
+        local id = math.abs(list[i])
+        local n = field("quest", id, "name")
+        if n then names[#names + 1] = n; ids[#ids + 1] = id end
     end
-    return names, any
+    return names, any, ids
+end
+
+-- how many steps come before this quest, following the first earlier quest each time (at most 10 are counted)
+function Q.stepsBefore(questID)
+    local n, id, seen = 0, questID, {}
+    while n < 10 do
+        local list = beforeIds(id)
+        local first = list[1] and math.abs(list[1])
+        if not first or seen[first] then break end
+        seen[first] = true
+        n, id = n + 1, first
+    end
+    return n
+end
+
+-- "Marshal McBride in Elwynn Forest (48.9, 41.6)" for where a quest starts, or nil
+local function placeOf(s)
+    if not s then return nil end
+    local where
+    if s.dungeon then where = " inside a dungeon" .. (s.zone and (" (" .. s.zone .. ")") or "")
+    elseif s.x then where = string.format(" in %s (%.1f, %.1f)", s.zone or "this zone", s.x, s.y)
+    else where = s.zone and (" in " .. s.zone) or "" end
+    return where
 end
 
 -- "starts at Marshal Dughan in Elwynn Forest (42.1, 65.9), after "A Threat Within""   (nil when Questie does not know)
 function Q.whereText(questID)
     local s = Q.starter(questID)
     if not s then return nil end
-    local place
-    if s.dungeon then place = " inside a dungeon" .. (s.zone and (" (" .. s.zone .. ")") or "")
-    elseif s.x then place = string.format(" in %s (%.1f, %.1f)", s.zone or "this zone", s.x, s.y)
-    else place = s.zone and (" in " .. s.zone) or "" end
+    local place = placeOf(s)
     local text
     if s.kind == "item" then
         text = "starts from the item " .. s.who .. (s.from and (", dropped by " .. s.from) or "") .. place
     else
         text = "starts at " .. s.who .. place
     end
-    local names, any = Q.before(questID)
+    -- the earlier step, and where IT starts, so they can go and get it; and how many steps lie before that one
+    local names, any, ids = Q.before(questID)
     if #names > 0 then
         local quoted = {}
         for _, n in ipairs(names) do quoted[#quoted + 1] = '"' .. n .. '"' end
         text = text .. ", after " .. table.concat(quoted, any and " or " or " and ")
+        local first = Q.starter(ids[1])
+        if first and first.kind ~= "item" then
+            text = text .. " (from " .. first.who .. (placeOf(first) or "") .. ")"
+        end
+        local more = Q.stepsBefore(ids[1])
+        if more > 0 then text = text .. string.format(", %d more step%s before that", more, more == 1 and "" or "s") end
     end
     return text
 end

@@ -6,8 +6,8 @@
   `{common}`, the Party quests window and Post all, the quest-log star and the map pin's preference). Clicking it in the
   game's tracker still says you are done. The "turn in!" hint is gone with it.
 - **Right click opens a small menu** on a Party quests line: tell the party how I am doing, offer it, **tell them where
-  to get it** (with Questie: quest giver, zone, coordinates and the quests that come first; or the item and who drops
-  it), focus it on my map, open it in the quest log. Grey lines say why they cannot be used.
+  to get it** (with Questie: quest giver, zone, coordinates, the quest that comes first and where it starts, how many
+  steps lie before that; or the item and who drops it), focus it on my map, open it in the quest log. Grey lines say why they cannot be used.
 - **Questie support** (optional, read only): the QuestieDB API of Questie 12 (`QuestDB.Get`) and the older
   `QuestieLoader:ImportModule("QuestieDB")`, every call guarded; the row tooltip says where a quest starts.
 - **Sound:** checked that the addon never changes sound settings or game globals; the quick chat now refuses keys
