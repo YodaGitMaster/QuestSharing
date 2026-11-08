@@ -59,6 +59,7 @@ local function newObject()
     function o:GetText() return self.text end
     function o:CreateFontString() return newObject() end
     function o:CreateTexture() return newObject() end
+    function o:SetTexture(path) self.texture = path end
     function o:SetPoint(p, rel, rp, x, y) self.point = { p, rel, rp, x or 0, y or 0 } end
     function o:GetPoint() return unpack(self.point) end
     function o:SetHeight(h) self.height = h end
@@ -67,7 +68,7 @@ local function newObject()
                             "RegisterForDrag", "SetJustifyH", "StartMoving", "StopMovingOrSizing", "SetAllPoints",
                             "ClearAllPoints", "SetFontObject", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "SetFocus",
                             "SetMultiLine", "HighlightText", "SetFrameLevel", "RegisterForClicks", "SetHighlightTexture",
-                            "SetTexture" }) do
+                            }) do
         o[name] = function() end
     end
     return o
@@ -295,6 +296,53 @@ function FRIENDS_CLASSIC()                       -- the classic list is read by 
     IsIgnored = function(name) return IGNORED[shortname(name)] and true or false end
 end
 
+-- Nameplates, the game's highlighted quest, game settings (CVars) ---------------------------------------------------
+PLATES, RELATED, SUPER, SUPER_LOG, RELATED_ERROR = {}, {}, 0, {}, false
+CVARS, CVAR_LOG = { nameplateShowEnemies = "1", SoftTargetIconGameObject = "0" }, {}
+
+function HIGHLIGHT_MODERN()
+    C_NamePlate = {
+        GetNamePlateForUnit = function(unit) return PLATES[unit] end,
+        GetNamePlates = function()
+            local t = {}
+            for _, p in pairs(PLATES) do t[#t + 1] = p end
+            table.sort(t, function(a, b) return a.unitToken < b.unitToken end)
+            return t
+        end,
+    }
+    C_QuestLog.UnitIsRelatedToActiveQuest = function(unit)
+        if RELATED_ERROR then error("attempt to compare a secret value") end
+        return RELATED[unit] == true
+    end
+    C_SuperTrack = {
+        GetSuperTrackedQuestID = function() return SUPER end,
+        SetSuperTrackedQuestID = function(id) SUPER = id; SUPER_LOG[#SUPER_LOG + 1] = id end,
+    }
+    C_CVar = {
+        GetCVar = function(n) return CVARS[n] end,
+        SetCVar = function(n, v) CVARS[n] = v; CVAR_LOG[#CVAR_LOG + 1] = n .. "=" .. v end,
+    }
+end
+
+function HIGHLIGHT_CLASSIC()                      -- no nameplate / super-track API on this client, but CVars exist
+    function GetCVar(n) return CVARS[n] end
+    function SetCVar(n, v) CVARS[n] = v; CVAR_LOG[#CVAR_LOG + 1] = n .. "=" .. v end
+end
+
+function ADD_PLATE(unit, related)
+    local p = newObject()
+    p.unitToken, p.UnitFrame = unit, newObject()
+    PLATES[unit] = p
+    RELATED[unit] = related
+    FIRE("NAME_PLATE_UNIT_ADDED", unit)
+    return p
+end
+
+function REMOVE_PLATE(unit)
+    FIRE("NAME_PLATE_UNIT_REMOVED", unit)
+    PLATES[unit] = nil
+end
+
 function CLASSIC_API()
     function GetNumQuestLogEntries() return #QUESTS end
     function GetQuestLogTitle(i)
@@ -368,6 +416,7 @@ class Game:
         self.lua.execute("MODERN_API()" if style == "modern" else "CLASSIC_API()")
         self.lua.execute("TRACKER_MODERN()" if style == "modern" else "TRACKER_CLASSIC()")
         self.lua.execute("FRIENDS_MODERN()" if style == "modern" else "FRIENDS_CLASSIC()")
+        self.lua.execute("HIGHLIGHT_MODERN()" if style == "modern" else "HIGHLIGHT_CLASSIC()")
         if pre:
             self.lua.execute(pre)
         self.style, self.fresh = style, fresh
@@ -410,6 +459,12 @@ class Game:
 
     def watch_log(self):
         return list(self.lua.eval("WATCH_LOG").values())
+
+    def plate(self, unit):
+        return self.lua.eval("PLATES")[unit]
+
+    def super_log(self):
+        return list(self.lua.eval("SUPER_LOG").values())
 
     def invited(self):
         return list(self.lua.eval("INVITED").values())

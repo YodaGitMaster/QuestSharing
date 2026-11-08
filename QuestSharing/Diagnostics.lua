@@ -139,6 +139,10 @@ function ns.doctorLines()
     add(ns.hooks.qlClassic or ns.hooks.qlModern, "quest log markers (classic " .. (ns.hooks.qlClassic and "yes" or "no") .. ", modern " .. (ns.hooks.qlModern and "yes" or "no")
         .. ")" .. ((ns.hooks.qlClassic or ns.hooks.qlModern) and "" or " - the panel still works"))
     add(C.canWatch(), "tracker follows you: " .. ns.nearMode() .. " mode" .. (C.hasDistance() and "" or " (this client cannot measure distance)"))
+    add(C.canMarkMobs(), "quest icons above creatures that are part of your quests" ..
+        (C.canMarkMobs() and (ns.enemyNameplatesOn() and "" or " - BUT enemy nameplates are off: /qs highlight cvars on") or ""))
+    add(ns.canPin(), "pin the nearest quest in the world (the game's waypoint marker)" ..
+        ((ns.canPin() and not C.hasDistance()) and " - needs quest distances, which this client lacks" or ""))
     add(C.canAddFriend(), "friends (beta): add call " .. (C.canAddFriend() and "yes" or "NO") .. ", " .. ns.friendPatternCount() .. " reply messages recognised")
     local key = GetBindingKey and GetBindingKey("QUESTSHARING_QUICKCHAT")
     add(key ~= nil, "quick chat wheel: key " .. tostring(key or "not set - type /qs key V"))

@@ -11,6 +11,8 @@
   a quest someone declined is never offered to them again automatically
 - Addon-to-addon sync of exact quest lists and progress; "quest finished" announcements; a quests-in-common panel and
   quest log markers
+- **Easier-to-find objectives**: a quest icon above the nameplate of creatures that are part of your quests, the
+  game's own waypoint marker follows the nearest quest, and an optional helper for the game settings these need
 - `/qs doctor` (a report you can copy) and `/qs errors` (an error log) for problems on a real game client
 
 ## 0.1.0
