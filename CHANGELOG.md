@@ -10,6 +10,11 @@
 - **Calls the game refuses are written down and switched off:** the error log says what the addon was doing ("while
   putting the star over your head", "while sharing a quest with the party", ...), and that feature stays off until
   `/reload`, so the error cannot repeat. The star over your head is never set during combat.
+- **Fixed "tried to call the protected function SetPassThroughButtons()".** The addon never calls it, but the menu's
+  "Open it in the quest log" opened the world map from addon code on clients whose quest log is inside the map; the
+  map then built its pins in the addon's name and the game refused. The addon no longer opens the map: there the
+  quest is selected ("Select it in the quest log") and you press L or M. The old quest log window still opens. A test
+  now fails if the code ever names a map-opening function or `SetPassThroughButtons`.
 
 ## 0.3.0
 - **You decide when to talk.** The automatic party chat ("in common", "done", "picked up") is **off by default**, and
