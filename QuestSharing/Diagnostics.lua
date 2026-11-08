@@ -62,6 +62,10 @@ local function blocked(_, addon, fn)
                 ns.db.mode = "box"
                 ns.print("this game does not let addons send chat messages: from now on your messages go into the " ..
                     "chat box - just press Enter. (The automatic party messages cannot work here.)")
+            elseif only and only.feature and not ns.blockedFeatures[only.feature] and only.retry then
+                ns.blockedFeatures[only.feature] = true                   -- next time straight into the chat box
+                if ChatFrame_OpenChat then pcall(ChatFrame_OpenChat, only.retry) end
+                ns.print("the game does not let the addon do this here: " .. only.what .. ". It is in your chat box: press Enter.")
             elseif only and only.feature and not ns.blockedFeatures[only.feature] then
                 ns.blockedFeatures[only.feature] = true                   -- no second try: no second error
                 ns.print("the game does not let the addon do this here: " .. only.what ..

@@ -593,6 +593,29 @@ def test_a_row_has_a_tooltip_with_everybodys_status(style):
     assert any("Left click: offer it" in l for l in lines) and any("Right click: more" in l for l in lines)
 
 
+def test_alone_the_window_lists_my_quests_and_the_menu_says_what_needs_a_party(style):
+    g = Game(style)
+    g.start()
+    g.slash("auto off")
+    g.slash("panel on")
+    g.slash("solo on")
+    g.advance(1)
+    panel, rows, cols, notes = g.eval("NS._panel()")
+    assert panel.shown is True and panel.title.text == "Quests here"
+    titles = [plain(rows[i].title.text) for i in range(1, 6) if rows[i].shown]
+    assert "Wolves Among Us" in titles and "The Defias Brotherhood" not in titles, "this zone's quests, no member columns"
+    row = next(rows[i] for i in range(1, 6) if rows[i].shown and "Wolves Among Us" in rows[i].title.text)
+    assert row.cells[1].shown is False
+    g.eval("function(r) r.scripts.OnClick(r, 'RightButton') end")(row)
+    menu, lines = g.eval("NS._questMenu()")
+    tell = next(lines[i] for i in range(1, 7) if lines[i].shown and "Tell the party" in plain(lines[i].text))
+    assert tell.tipText == "you are not in a party"
+    assert panel.share.shown is False and panel.post.shown is False, "party-only buttons are hidden when alone"
+    g.run("PRINTED = {}")
+    g.eval("NS.postAllProgress")()
+    assert "not in a party" in "\n".join(g.printed())
+
+
 def test_the_window_is_as_wide_as_the_party(style):
     g = quiet_party(style, ("Anna",))
     panel, rows, cols, notes = panel_of(g)

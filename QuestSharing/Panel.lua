@@ -128,7 +128,8 @@ local GRID_ROWS = 5           -- rows on screen
 local NEAREST = 5
 function ns.panelGrid(entries)
     local members = C.members()
-    if #members == 0 then return nil end
+    -- alone: your own quests of the zone (no member columns), when "show it when I am not in a party" is on
+    if #members == 0 and not (ns.db.panelSolo and not C.inGroup()) then return nil end
     entries = entries or C.entries()
     for _, m in ipairs(members) do
         if UnitClass then local _, file = UnitClass(m.unit); m.class = file end
@@ -204,7 +205,7 @@ end
 -- Post my progress at once (the "Post all" button): the quests on the window that someone in the party has, one message
 function ns.postAllProgress()
     local grid = ns.panelGrid()
-    if not grid then ns.print("you are not in a party"); return 0 end
+    if not grid or not C.inGroup() then ns.print("you are not in a party"); return 0 end
     local list = {}
     for _, row in ipairs(grid.rows) do
         for _, st in ipairs(row.cells) do if st == "has" or st == "done" then list[#list + 1] = row.e; break end end
@@ -425,7 +426,10 @@ function ns.refreshPanel()
     local width = math.max(MIN_W, 16 + QUEST_W + math.min(#members, MAX_MEMBERS) * COL_W)
     panel:SetWidth(width)
     offset = math.max(0, math.min(offset, #rows - GRID_ROWS))
-    panel.count:SetText(grid and (S.GREY .. "(" .. grid.shared .. " shared, " .. #rows .. " here)|r") or "")
+    local solo = grid and #members == 0
+    panel.title:SetText(solo and "Quests here" or "Party quests")
+    if solo then panel.share:Hide(); panel.post:Hide() else panel.share:Show(); panel.post:Show() end   -- party-only
+    panel.count:SetText(grid and (S.GREY .. (solo and ("(" .. #rows .. " in " .. C.zone() .. ")") or ("(" .. grid.shared .. " shared, " .. #rows .. " here)")) .. "|r") or "")
     panel.collapse:SetLabel(folded and "+" or "-")
     if folded then panel.questHead:Hide(); panel.headLine:Hide() else panel.questHead:Show(); panel.headLine:Show() end
     for j = 1, MAX_MEMBERS do
@@ -475,6 +479,7 @@ function ns.refreshPanel()
         local below = #rows - GRID_ROWS - offset
         note = below > 0 and (S.GREY .. "scroll down: " .. below .. " more in " .. C.zone() .. "|r")
                           or (S.GREY .. "scroll up for the nearest quests|r")
+    elseif solo then note = nil
     elseif grid.shared == 0 then note = "Nobody in the party has these quests yet.  " .. S.GREY .. "Share offers them.|r" end
     if note then
         notes:ClearAllPoints()
@@ -508,7 +513,8 @@ local function inCombat() return (InCombatLockdown and InCombatLockdown()) or (U
 
 -- the setting means "show the panel while I am in a party" (and, with panelCombat, "but not during a fight")
 function ns.syncPanelVisibility()
-    if ns.db.panel and C.inGroup() and not (ns.db.panelCombat and inCombat()) then
+    local wanted = ns.db.panel and (C.inGroup() or ns.db.panelSolo)
+    if wanted and not (ns.db.panelCombat and inCombat()) then
         ns.showPanel(true)
     elseif panel and panel:IsShown() then
         panel:Hide()

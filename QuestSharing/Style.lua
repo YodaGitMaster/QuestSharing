@@ -11,7 +11,7 @@ S.WHITE8 = "Interface\\Buttons\\WHITE8X8"
 -- the colours the game uses for each chat channel, so the ring tells you at a glance where a message goes
 S.CHAT = {
     PARTY = { 0.67, 0.67, 1 }, INSTANCE_CHAT = { 1, 0.5, 0.1 }, RAID = { 1, 0.5, 0.1 },
-    WHISPER = { 1, 0.5, 1 }, SAY = { 1, 1, 1 }, YELL = { 1, 0.25, 0.25 }, INVITE = { 1, 0.82, 0 },
+    WHISPER = { 1, 0.5, 1 }, SAY = { 1, 1, 1 }, YELL = { 1, 0.25, 0.25 }, INVITE = { 1, 0.82, 0 }, EMOTE = { 1, 0.5, 0.25 },
 }
 
 function S.hex(r, g, b) return string.format("|cff%02x%02x%02x", math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5)) end

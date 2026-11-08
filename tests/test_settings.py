@@ -6,7 +6,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from harness import Game  # noqa: E402
 
 STYLES = ("modern", "classic")
-BOOLS = ["enabled", "auto", "shareNew", "click", "link", "sync", "markers", "panel", "near", "selfMark", "mapPins", "teamWaypoint"]
+BOOLS = ["enabled", "auto", "shareNew", "click", "link", "sync", "markers", "panel", "panelSolo", "near", "selfMark", "mapPins", "teamWaypoint"]
 QUIET = ["chat", "announce", "pickup"]          # the automatic party chat: off until you switch it on
 
 
@@ -109,18 +109,22 @@ def test_the_tracker_starts_in_zone_mode_on_a_client_without_distances():
     assert g.eval("NS.nearMode()") == "zone" and g.watched() == [100, 101, 102]
 
 
-def test_the_panel_shows_only_while_in_a_party(style):
+def test_the_panel_shows_alone_too_and_the_option_turns_that_off(style):
     g = fresh(style)
     g.advance(3)
-    assert panel_shown(g) is False, "no party, no panel"
+    assert panel_shown(g) is True, "on your own: your quests of the zone"
+    panel, rows, cols, notes = g.eval("NS._panel()")
+    assert panel.title.text == "Quests here" and "(2 in Elwynn Forest)" in panel.count.text
+    assert cols[1].icon.shown is False, "no member columns when alone"
+    g.slash("solo off")
+    assert panel_shown(g) is False and g.eval("NS.db.panelSolo") is False
     g.join_party(["Anna"])
     g.advance(2)
     panel, rows, legend, notes = g.eval("NS._panel()")
-    assert panel.shown is True and "Anna" in legend[1].name.text and rows[1].shown is True, "my nearest quests, one column for Anna"
+    assert panel.shown is True and panel.title.text == "Party quests" and "Anna" in legend[1].name.text
     g.leave_party()
     g.advance(2)
-    assert panel_shown(g) is False
-
+    assert panel_shown(g) is False, "alone again, with the option off: hidden"
 
 def test_the_panel_setting_off_keeps_it_hidden(style):
     g = fresh(style)

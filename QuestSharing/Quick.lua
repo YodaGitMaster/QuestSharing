@@ -97,6 +97,32 @@ ns.on("ADDON_LOADED", function(_, name)
     if name == ADDON then items() end
 end)
 
+-- The other rings: while the ring is open, the mouse wheel flips through them. Ring 1 is your messages (edit them in the
+-- settings); the others are the game's emotes (they are not chat, so they work where chat from addons does not).
+local function emote(label, token) return { label = label, text = "@emote " .. token } end
+ns.QUICK_PAGES = {
+    { title = "Messages" },
+    { title = "Emotes", items = { emote("Thank", "THANK"), emote("Bow", "BOW"), emote("Dance", "DANCE"), emote("Wave", "WAVE"),
+                                  emote("Cheer", "CHEER"), emote("Point", "POINT"), emote("No", "NO"), emote("Wait", "WAIT") } },
+    { title = "Group calls", items = { emote("Follow me", "FOLLOW"), emote("Charge", "CHARGE"), emote("Attack!", "ATTACKMYTARGET"),
+                                       emote("Heal me", "HEALME"), emote("Help me", "HELPME"), emote("Incoming", "INCOMING"),
+                                       emote("Flee", "FLEE"), emote("Out of mana", "OOM") } },
+    { title = "Fun", items = { emote("Train", "TRAIN"), emote("Laugh", "LAUGH"), emote("Applaud", "APPLAUD"), emote("Salute", "SALUTE"),
+                               emote("Hug", "HUG"), emote("Flex", "FLEX"), emote("Chicken", "CHICKEN"), emote("Roar", "ROAR") } },
+}
+local page = 1                       -- which ring is showing
+local function ringItems()
+    if page == 1 then return items() end
+    local p = ns.QUICK_PAGES[page]
+    return (p and p.items) or items()
+end
+ns.quickRingItems = ringItems
+function ns.quickPage() return page, ns.QUICK_PAGES[page] and ns.QUICK_PAGES[page].title end
+
+local function isEmote(text) return string.sub(text or "", 1, 7) == "@emote " end
+local function emoteToken(text) return string.upper(string.match(text or "", "^@emote%s+(%S+)") or "") end
+ns.quickIsEmote = isEmote
+
 -- Placeholders ---------------------------------------------------------------------------------------------
 local function targetName()
     if UnitExists and UnitExists("target") and UnitIsPlayer and UnitIsPlayer("target")
@@ -258,8 +284,9 @@ local RESTRICTED = { SAY = true, YELL = true, EMOTE = true }
 local function sendsDirectly() return ns.db.mode == "send" and not ns.isBlocked("chat") end
 
 local function needsClick(i)
-    local item = items()[i]
+    local item = ringItems()[i]
     if not item then return false end
+    if isEmote(item.text) then return false end
     if isInvite(item.text) or isPing(item.text) then return true end   -- the game wants a real click for these
     if not sendsDirectly() then return false end            -- into the chat box: a release is fine, you press Enter
     local channel = channelFor(item)
@@ -294,9 +321,21 @@ function ns.quickBlocked()
 end
 
 function ns.quickSend(i)
-    local item = items()[i]
+    local item = ringItems()[i]
     if not item then return false end
     if GetTime() - q.lastSend < 1 then return false end      -- no accidental double sends
+    if isEmote(item.text) then
+        local token = emoteToken(item.text)
+        local typed = "/" .. string.lower(token)
+        if DoEmote and not ns.isBlocked("emote") then
+            ns.trying("doing the emote " .. typed, "emote", typed)      -- refused: the chat box gets it, the next ones too
+            pcall(DoEmote, token)
+        else
+            C.openChat(typed)
+        end
+        q.lastSend = GetTime()
+        return true
+    end
     if isPing(item.text) then                                 -- only the secure ping button (a click on it) can ping
         ns.print("pings work with a click on the ring outside combat, or with your ping key anytime (/qs pingkey <KEY>)")
         return false
@@ -354,8 +393,10 @@ end
 -- what the middle of the ring shows for a slot (filled in once per slot per opening)
 local function middleText(i)
     if q.cache[i] == nil then
-        local item = items()[i]
-        if isPing(item.text) then
+        local item = ringItems()[i]
+        if isEmote(item.text) then
+            q.cache[i] = item.label .. "  (/" .. string.lower(emoteToken(item.text)) .. ")"
+        elseif isPing(item.text) then
             local p = ns.ping
             q.cache[i] = (p and p.kind == "unit" and ("Ping " .. tostring(p.name) .. ": attack!"))
                 or (p and p.kind == "object" and "Ping the quest object you face: look here")
@@ -372,19 +413,20 @@ end
 
 -- where slot i would go right now: "PARTY", "WHISPER", "SAY", "YELL", "INSTANCE_CHAT", "RAID", "INVITE" (or nil)
 local function destination(i)
-    local item = items()[i]
+    local item = ringItems()[i]
     if not item then return nil end
     if isInvite(item.text) then return "INVITE" end
     if isPing(item.text) then return "YELL" end              -- red, like the game's Attack ping
+    if isEmote(item.text) then return "EMOTE" end
     local channel, target = channelFor(item)
     return channel, target
 end
 
-local DEST_TEXT = { PARTY = "to the party", INSTANCE_CHAT = "to the group", RAID = "to the raid", SAY = "to everybody nearby (/s)",
+local DEST_TEXT = { EMOTE = "an emote everybody around sees", PARTY = "to the party", INSTANCE_CHAT = "to the group", RAID = "to the raid", SAY = "to everybody nearby (/s)",
                     YELL = "yelled to everybody around (/y)", INVITE = "invites your target to the party" }
 
 local function paintSlot(i)
-    local s, item = slots[i], items()[i]
+    local s, item = slots[i], ringItems()[i]
     if not s then return end
     if not item then s.button:Hide(); return end
     local hot = (q.hover == i)
@@ -426,7 +468,7 @@ function ns.quickUpdateHover()
     local dx, dy = x - q.cx, y - q.cy
     if dx == q.lastDx and dy == q.lastDy then return end     -- the mouse has not moved: nothing to do
     q.lastDx, q.lastDy = dx, dy
-    local new = ns.quickSlotAt(dx, dy, #items())
+    local new = ns.quickSlotAt(dx, dy, #ringItems())
     if new == q.hover then return end                        -- still on the same slot: nothing to repaint
     local old = q.hover
     q.hover = new
@@ -457,6 +499,10 @@ local function build()
     centerText:SetJustifyH("CENTER")
     hintText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     hintText:SetJustifyH("CENTER")
+    f.pageText = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    f.pageText:SetJustifyH("CENTER")
+    f:EnableMouseWheel(true)                               -- the mouse wheel flips to the other rings
+    f:SetScript("OnMouseWheel", function(_, delta) ns.quickFlip(delta > 0 and -1 or 1) end)
     slots = {}
     for i = 1, MAX_ITEMS do
         -- one button per slot: a click on it is the real mouse click the game wants for /say
@@ -485,7 +531,7 @@ end
 local function layout()
     RADIUS = ringRadius()
     centerText:SetWidth(2 * (RADIUS - 46))
-    local n = #items()
+    local n = #ringItems()
     local w, h = UIParent:GetWidth() or 1920, UIParent:GetHeight() or 1080
     local margin = RADIUS + 70
     q.cx = math.max(margin, math.min(w - margin, q.cx))
@@ -498,6 +544,9 @@ local function layout()
     centerText:SetPoint("CENTER", UIParent, "BOTTOMLEFT", q.cx, q.cy + 8)
     hintText:ClearAllPoints()
     hintText:SetPoint("CENTER", UIParent, "BOTTOMLEFT", q.cx, q.cy - 38)
+    frame.pageText:ClearAllPoints()
+    frame.pageText:SetPoint("CENTER", UIParent, "BOTTOMLEFT", q.cx, q.cy + RADIUS + 44)
+    frame.pageText:SetText(string.format("%s  |cff888888(%d/%d - mouse wheel: more)|r", ns.QUICK_PAGES[page].title, page, #ns.QUICK_PAGES))
     for i = 1, MAX_ITEMS do
         local s = slots[i]
         local a = (i - 1) * 2 * math.pi / math.max(n, 1)
@@ -519,16 +568,31 @@ end
 function ns.quickOpen(atCenter)
     local f = build()
     if not f then return ns.print("this client does not allow the quick chat wheel (frame creation failed)") end
-    if #items() == 0 then return ns.print("quick chat has no messages: /qs settings > Quick chat, or /qs quick add <text>") end
+    page = math.max(1, math.min(#ns.QUICK_PAGES, ns.db.quickPage or 1))    -- the ring you used last
+    if #ringItems() == 0 then page = 2 end                                   -- no messages of your own: start on the emotes
     if atCenter then q.cx, q.cy = (UIParent:GetWidth() or 1920) / 2, (UIParent:GetHeight() or 1080) / 2 else q.cx, q.cy = cursor() end
     q.open, q.openedAt, q.hover, q.sticky, q.cache, q.lastDx, q.lastDy = true, GetTime(), nil, atCenter and true or false, {}, nil, nil
     q.dest = {}
-    for i = 1, #items() do q.dest[i] = destination(i) end
+    for i = 1, #ringItems() do q.dest[i] = destination(i) end
     layout()
     for i = 1, MAX_ITEMS do paintSlot(i) end
     paintMiddle()
     f:Show()
     if ns.quickPlacePing then ns.quickPlacePing() end          -- defined further down
+end
+
+-- the mouse wheel: the next / previous ring (wraps around)
+function ns.quickFlip(step)
+    if not q.open then return end
+    page = (page - 1 + step) % #ns.QUICK_PAGES + 1
+    ns.db.quickPage = page
+    q.hover, q.cache, q.lastDx, q.lastDy = nil, {}, nil, nil
+    q.dest = {}
+    for i = 1, #ringItems() do q.dest[i] = destination(i) end
+    layout()
+    for i = 1, MAX_ITEMS do paintSlot(i) end
+    paintMiddle()
+    if ns.quickPlacePing then ns.quickPlacePing() end
 end
 
 function ns.quickClose()
@@ -540,9 +604,10 @@ end
 -- while the ring is open (outside combat), the secure ping button lies over the ring's ping slot
 local function placePingButton()
     if not (ns.pingOverlay and ns.db.ping) then return end
-    for i, it in ipairs(items()) do
+    for i, it in ipairs(ringItems()) do
         if isPing(it.text) and slots[i] then ns.pingOverlay(slots[i].button); return end
     end
+    ns.pingOverlay(nil)
 end
 ns.quickPlacePing = placePingButton
 

@@ -119,6 +119,8 @@ function seterrorhandler(h) ERROR_HANDLER = h end
 function RAISE(msg) return ERROR_HANDLER(msg) end
 INVITED, LEADER = {}, true
 function InviteUnit(name) INVITED[#INVITED + 1] = name end
+EMOTED = {}
+function DoEmote(token, target) EMOTED[#EMOTED + 1] = token end
 function UnitIsGroupLeader(u) return LEADER end
 function GetNumGroupMembers() return #GROUP.members > 0 and (#GROUP.members + 1) or 0 end
 UIParent = newObject()

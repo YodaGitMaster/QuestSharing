@@ -116,6 +116,8 @@ the game's tracker still tells the party you are done, because that is your own 
      it, **?** = the game cannot tell (the player is out of range or offline; players running Quest Sharing are
      always known exactly, **QS** after their name).
    - **Only the quests of the zone you are in**, never filled up with quests from elsewhere.
+   - **Also when you are alone** (*Show it when I am not in a party too*, on by default; `/qs solo off`): then it is
+     "Quests here", your quests of the zone with your progress, without member columns or party buttons.
    - **The 5 nearest quests, re-sorted as you move** (every few seconds). A quest only moves up, or onto the list, when
      it is clearly closer (about 20 %), so the rows stay calm while you walk. On a client that cannot measure distance,
      the quests of the zone you are in come first.
@@ -218,6 +220,14 @@ the game's tracker still tells the party you are done, because that is your own 
    **release the key** or **click** it. By default the ring has:
    *Hello - Team up? - What I need - Same quests? - Thanks - Wait - Follow me - Invite*. *Team up?* says
    "Doing [your nearest quest] here - anyone want to group up?" in `/s`.
+
+   **More rings with the mouse wheel.** While the ring is open, **scroll the mouse wheel** to flip to the other rings
+   (and around): **Emotes** (*Thank, Bow, Dance, Wave, Cheer, Point, No, Wait*), **Group calls** (*Follow me, Charge,
+   Attack!, Heal me, Help me, Incoming, Flee, Out of mana*) and **Fun** (*Train, Laugh, Applaud, Salute, Hug, Flex,
+   Chicken, Roar*). The name of the ring is shown above it, and the ring you used last opens first. Emotes are the
+   game's own (with their animations and voices), not chat: a release does them. If your game refuses emotes from
+   addons, the emote is typed into the chat box instead (`/bow`, press Enter), and so are the next ones. (There is no
+   "stop" emote in the game; *Wait* is the closest.)
 
    **Where it goes.** Every message has its **own channel**. In `/qs settings > Quick chat`, click a message and pick
    one in the **Channel** row under it (the list shows each message's channel), or type `/qs quick route N <channel>`:
@@ -388,7 +398,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 737 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 753 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -432,7 +442,7 @@ computer's audio can also take the sound device away from the game.
 ```
 pip install lupa
 python tests/test_questsharing.py     # 68 tests: sharing, replies, announcements, tracker clicks, commands
-python tests/test_features.py         # 94 tests: sync, completion, the Party quests grid, quest-log markers
+python tests/test_features.py         # 96 tests: sync, completion, the Party quests grid, quest-log markers
 python tests/test_triggers.py         # 34 tests: when it shares (once per join / new member / new quest), no nagging
 python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 44 tests: everything on by default, migration, the tabbed settings window
@@ -450,8 +460,9 @@ python tests/test_box.py              # 23 tests: messages into the chat box, re
 python tests/test_ping.py             # 13 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
 python tests/test_zone.py             # 10 tests: only the quests of where you are (Teldrassil vs Stormwind)
 python tests/test_items.py            # 22 tests: quest item icons in the tracker, the item key and button
+python tests/test_emotes.py           # 14 tests: the emote rings behind the mouse wheel
 ```
-Expected: every line ends in `passed` with all tests green (737 in total).
+Expected: every line ends in `passed` with all tests green (753 in total).
 
 ## Files
 | File | Purpose |
