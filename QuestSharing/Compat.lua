@@ -217,7 +217,8 @@ end
 
 -- The names of the creatures your quests still need, for clients that cannot say "is this unit part of a quest":
 -- from the quest log ("Kobold Vermin slain: 3/8", read with the game's own QUEST_MONSTERS_KILLED string, so it works in
--- every language) and, with Questie, the creatures to kill and the ones that drop your quest items.
+-- every language) and, with Questie, the creatures to kill and the ones that drop your quest items (only when Questie's
+-- names are in the game's language: otherwise they never match a name on screen).
 local mobCache = { at = -100, set = nil }
 local function slainSuffix()
     local f = _G.QUEST_MONSTERS_KILLED
@@ -244,7 +245,7 @@ function C.questMobNames()
                     end
                 end
             end
-            if open and ns.questie and ns.questie.available() and ns.questie.creatureNames then
+            if open and ns.questie and ns.questie.available() and ns.questie.creatureNames and ns.questie.sameLanguage() then
                 for _, n in ipairs(ns.questie.creatureNames(e.questID)) do set[string.lower(n)] = true end
             end
         end

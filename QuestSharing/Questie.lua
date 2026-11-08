@@ -67,6 +67,37 @@ end
 
 function Q.available() return Q.source() ~= nil end
 
+-- The language of the names Questie hands out, and the game's. QuestieDB starts in the game's language, but Questie
+-- switches it to Questie's own language setting (English when the game's is one Questie has no translation for).
+-- Names on screen are always in the game's language, so Questie's names only recognise creatures when the two agree.
+local function oneEnglish(l) return (l == "enGB") and "enUS" or l end      -- the database has one English
+function Q.languages()
+    local client = call(GetLocale)
+    client = oneEnglish(type(client) == "string" and client or "enUS")
+    local names
+    local l10n = type(LibQuestieDB) == "table" and LibQuestieDB.l10n
+    if type(l10n) == "table" and type(l10n.currentLocale) == "string" then
+        names = l10n.currentLocale                                          -- Questie 12: what QuestieDB reads now
+    elseif type(Questie) == "table" and type(Questie.db) == "table" and type(Questie.db.global) == "table" then
+        local g = Questie.db.global                                         -- older Questie: its language setting
+        if g.questieLocaleDiff and type(g.questieLocale) == "string" then names = g.questieLocale end
+    end
+    return oneEnglish(names or client), client
+end
+
+function Q.sameLanguage()
+    local names, client = Q.languages()
+    return names == client
+end
+
+-- "Questie's names are in enUS, the game is in deDE: ..." when they differ, or nil
+function Q.languageNote()
+    local names, client = Q.languages()
+    if names == client then return nil end
+    return string.format("Questie's names are in %s, the game is in %s: they cannot recognise creatures on screen "
+        .. "(set Questie's language to the game's)", names, client)
+end
+
 local function loaded(name)
     local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
     if not f then return nil end
@@ -91,6 +122,7 @@ function Q.report()
     end
     local how = { QuestieDB = "QuestieDB (Questie 12 and newer)", LibQuestieDB = "LibQuestieDB", Questie = "Questie's own database (older Questie)" }
     out[#out + 1] = "reading: " .. how[src] .. ((Questie and Questie.API and Questie.API.isReady == false) and " - Questie is not fully ready yet" or "")
+    out[#out + 1] = Q.languageNote() or ("names: " .. (Q.languages()) .. ", the game's language")
     local tried, found = 0, 0
     for _, e in ipairs(C.entries()) do
         if tried >= 3 then break end
@@ -203,7 +235,8 @@ local function placeOf(s)
     return where
 end
 
--- the creatures a quest's objectives need: the ones to kill, and the ones that drop its items (names)
+-- the creatures a quest's objectives need: the ones to kill (also those that count for another), and the ones that
+-- drop its items (names, in Questie's language: see Q.sameLanguage)
 function Q.creatureNames(questID)
     local out = {}
     local objs = field("quest", questID, "objectives")
@@ -213,6 +246,17 @@ function Q.creatureNames(questID)
             local id = type(o) == "table" and o[1] or o
             local n = id and field("npc", id, "name")
             if n then out[#out + 1] = n end
+        end
+    end
+    if type(objs[5]) == "table" then                                  -- kill credit, any of them counts: { { {npcIds}, npcId, text }, ... }
+        for _, o in ipairs(objs[5]) do
+            local ids = type(o) == "table" and o[1]
+            if type(ids) == "table" then
+                for i = 1, math.min(#ids, 10) do
+                    local n = field("npc", ids[i], "name")
+                    if n then out[#out + 1] = n end
+                end
+            end
         end
     end
     if type(objs[3]) == "table" then                                  -- items to get: the creatures that drop them

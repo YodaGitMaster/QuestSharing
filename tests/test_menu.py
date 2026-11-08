@@ -218,6 +218,15 @@ def test_slash_questie_proves_it_with_a_quest_from_your_log(style):
         assert "Questie works with Quest Sharing." in text
 
 
+def test_slash_questie_names_the_language_of_its_names(style):
+    g = party(style, pre=LOADED + QUESTIE_12)
+    assert "names: enUS, the game's language" in report(g)
+    g2 = party(style, pre=LOADED + QUESTIE_12 + "LibQuestieDB = { l10n = { currentLocale = 'frFR' } }\n")
+    assert "Questie's names are in frFR, the game is in enUS" in report(g2)
+    g3 = party(style, pre=LOADED + QUESTIE_11 + "Questie.db = { global = { questieLocaleDiff = true, questieLocale = 'deDE' } }\n")
+    assert "Questie's names are in deDE, the game is in enUS" in report(g3), "older Questie: its language setting"
+
+
 def test_slash_questie_says_what_is_missing(style):
     g = party(style, pre="LOADED_ADDONS = {}; function IsAddOnLoaded(n) return LOADED_ADDONS[n] == true end")
     text = report(g)

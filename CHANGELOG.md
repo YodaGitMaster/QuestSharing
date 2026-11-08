@@ -21,6 +21,10 @@
   addon uses the creature names in your quest log ("Kobold Vermin slain: 3/8", in your language) and, with Questie,
   the creatures to kill and the ones that drop your quest items. This makes the ping key and the quest icons over
   creatures work there. The ping system is also recognised by its key bindings, not only by `C_Ping`.
+- **Questie's creature names, done right:** creatures that count for another one ("kill credit", e.g. any of several
+  gnolls for one objective) are recognised too. Questie's names are only used when Questie's language is the game's
+  (Questie can be set to another language, or falls back to English): otherwise they never matched a name on screen.
+  `/qs questie` names the language of Questie's names, and `/qs ping` says when they differ from the game's.
 - A test now compiles every file under Lua 5.1.
 
 ## 0.3.1
