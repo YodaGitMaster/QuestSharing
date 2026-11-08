@@ -122,7 +122,7 @@ end
 local function tick()
     if panel and panel:IsShown() then
         ns.refreshPanel()
-        ns.after(2, tick)
+        ns.after(5, tick)
     end
 end
 
@@ -132,7 +132,7 @@ function ns.showPanel(show)
         if show then ns.print("this client does not allow the panel (frame creation failed)") end
         return
     end
-    if show then f:Show(); ns.refreshPanel(); ns.after(2, tick) else f:Hide() end
+    if show then f:Show(); ns.refreshPanel(); ns.after(5, tick) else f:Hide() end
 end
 
 -- the setting means "show the panel while I am in a party"
@@ -154,10 +154,15 @@ local function marked(text) return text and string.find(text, "UI-RaidTargetingI
 -- classic quest log: buttons QuestLogTitle1..N, button:GetID() is the quest log index
 local function decorateClassic()
     if not ns.db.markers then return end
+    local byIndex
     for i = 1, (QUESTS_DISPLAYED or 6) do
         local btn = _G["QuestLogTitle" .. i]
         if btn and btn:IsShown() and not btn.isHeader then
-            local e = C.findEntry(nil, btn:GetID())
+            if not byIndex then
+                byIndex = {}
+                for _, entry in ipairs(C.entries()) do byIndex[entry.index] = entry end       -- one scan for all buttons
+            end
+            local e = byIndex[btn:GetID()]
             local text = btn:GetText()
             if e and text and not marked(text) then
                 local mark = ns.markerText(e)
@@ -172,8 +177,10 @@ local function decorateModern()
     if not ns.db.markers then return end
     local pool = QuestScrollFrame and QuestScrollFrame.titleFramePool
     if not (pool and pool.EnumerateActive) then return end
+    local byId
     for btn in pool:EnumerateActive() do
-        local e = btn.questID and C.findEntry(btn.questID)
+        if btn.questID and not byId then byId = C.entryMap() end                               -- one scan for all buttons
+        local e = btn.questID and byId[btn.questID]
         local fs = btn.Text
         if e and fs then
             local text = fs:GetText()

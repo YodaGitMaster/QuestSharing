@@ -5,13 +5,13 @@
 --   zone mode      works everywhere: tracks the quests of the zone you are standing in
 --
 -- Off by default. While it is on it manages the whole tracker list; turning it off puts your old
--- list back. It never fights you: if you change the tracker yourself it pauses for 5 minutes.
+-- list back. It never fights you: if you change the tracker yourself it steps aside for 10 seconds (a setting).
 local ADDON, ns = ...
 local C = ns.compat
 
 local INTERVAL = 2          -- seconds between two looks
 local STICKY = 0.6          -- a quest that is already tracked counts as this much of its real squared distance
-local PAUSE = 300           -- seconds to leave the tracker alone after you changed it yourself
+local function PAUSE() return (ns.db and ns.db.nearPause) or 10 end      -- seconds to leave the tracker alone after you changed it yourself
 
 local state = { pinned = nil, pinSaved = nil, pinSeen = nil, pinPausedUntil = 0, active = false, expected = nil, sig = nil, pausedUntil = 0, ownChange = -100, lastAccept = -100, ticker = nil, soon = nil }
 
@@ -100,7 +100,7 @@ function ns.nearEvaluate(force)
     evaluatePin(entries, force)                                            -- the pin has its own pause
     if GetTime() < state.pausedUntil then return end
     if state.pausedUntil > 0 and state.expected == nil and GetTime() >= state.pausedUntil then state.pausedUntil = 0 end
-    local current = C.watchedSet()
+    local current = C.watchedSet(entries)
     local now = GetTime()
     if state.expected then
         if now - state.lastAccept < 10 then
@@ -111,8 +111,8 @@ function ns.nearEvaluate(force)
             for id in pairs(current) do if not state.expected[id] then changed = true end end
             for id in pairs(state.expected) do if inLog[id] and not current[id] then changed = true end end
             if changed then                                        -- someone else changed the tracker: you did
-                state.pausedUntil, state.expected, state.sig = now + PAUSE, nil, nil
-                ns.print("tracker follows you: paused for 5 minutes because you changed the tracker (/qs near resume to continue)")
+                state.pausedUntil, state.expected, state.sig = now + PAUSE(), nil, nil
+                ns.print(string.format("tracker follows you: paused for %d seconds because you changed the tracker (/qs near resume to continue)", PAUSE()))
                 return
             end
         end
@@ -153,8 +153,8 @@ evaluatePin = function(entries, force)
         if now - state.lastAccept < 10 then
             state.pinned = nil                                    -- the game pins a quest you just accepted: that is fine
         else
-            state.pinPausedUntil, state.pinned, state.pinSeen = now + PAUSE, nil, nil
-            ns.print("pin: paused for 5 minutes because you chose another quest (/qs near resume to continue)")
+            state.pinPausedUntil, state.pinned, state.pinSeen = now + PAUSE(), nil, nil
+            ns.print(string.format("pin: paused for %d seconds because you chose another quest (/qs near resume to continue)", PAUSE()))
             return
         end
     end
@@ -287,8 +287,8 @@ ns.on("QUEST_WATCH_LIST_CHANGED", function()
     if not ns.db.near then return end
     local now = GetTime()
     if now - state.ownChange < 3 or now - state.lastAccept < 3 then return end
-    state.pausedUntil, state.expected = now + PAUSE, nil
-    ns.print("tracker follows you: paused for 5 minutes because you changed the tracker (/qs near resume to continue)")
+    state.pausedUntil, state.expected = now + PAUSE(), nil
+    ns.print(string.format("tracker follows you: paused for %d seconds because you changed the tracker (/qs near resume to continue)", PAUSE()))
 end)
 
 -- "near" is on by default: after the loading screen (the quest log needs a moment), remember the player's own

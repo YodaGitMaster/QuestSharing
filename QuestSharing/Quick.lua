@@ -1,53 +1,86 @@
--- Quick.lua: a quick-chat wheel, like the one in Diablo 4.
+-- Quick.lua: a quick-chat wheel.
 --   Bind a key (Game Menu > Options > Key Bindings > Quest Sharing, or  /qs key V ).
---   Hold the key: a wheel of up to 8 messages opens around the mouse. Point at one and release the key to say it.
---   A quick tap keeps the wheel open so you can click a slot instead; Esc closes it.
--- The messages are a list you can change (/qs quick, or the editor in /qs settings). They may contain
--- placeholders that fill themselves in when you send them:
---   (a message starting with @invite invites your target to your party and whispers them the rest of the text)
+--   HOLD the key: a clean ring of up to 8 messages opens around the mouse. Point at one: its full text shows in the
+--   middle. Release the key to say it, or click it. The messages and their short labels are yours to change
+--   (/qs settings > Quick chat).
+--
+-- Where it goes:  a player targeted -> a whisper to them;  otherwise your party;  otherwise everybody nearby (/say).
+--
+-- The game only lets an addon say things to everybody nearby (/say, /yell, /emote) as the direct result of a key PRESS
+-- or a mouse CLICK, never from a key RELEASE. So for those (and for @invite) a release keeps the ring open on your
+-- choice and one click, or one more press of the key, sends it. Whispers and party chat are not restricted: they
+-- send on release.
+--
+-- Messages may contain placeholders, filled in when you point at them (not before, so the ring costs nothing):
 --   {name} the friendly player you target (or "there")      {here} your subzone / zone
 --   {need} what you still have to do in this area            {common} quests you and your party have in common
 --   {mine} links to your unfinished quests of this area       {quest} the nearest unfinished quest of this area
---   {shared} a whole sentence that fits the moment: in a party "we have these in common", with a stranger a
---            QUESTION that links your quests of this area (you cannot know theirs)     {zone} the zone
+--   {shared} a sentence that fits the moment: with a party "we have these in common", with a stranger a QUESTION
+--            that links your quests of this area (you cannot know theirs)     {zone} the zone
+--   A message that starts with @invite invites your target to your party and whispers them the rest of the text.
 local ADDON, ns = ...
 local C = ns.compat
 
 BINDING_HEADER_QUESTSHARING = "Quest Sharing"
-BINDING_NAME_QUESTSHARING_QUICKCHAT = "Quick chat wheel (hold, point, release)"
+BINDING_NAME_QUESTSHARING_QUICKCHAT = "Quick chat wheel (hold, point, release or click)"
 local ACTION = "QUESTSHARING_QUICKCHAT"
 
-local MAX_ITEMS = 8
-local RADIUS, DEAD = 95, 28          -- wheel radius and the empty middle, in UI units
-local TAP = 0.25                     -- a release sooner than this is a "tap": the wheel stays open
+local MAX_ITEMS, LABEL_MAX = 8, 14
+local RADIUS, DEAD = 118, 30         -- ring radius and the empty middle, in UI units
+local TAP = 0.25                     -- a release sooner than this is a "tap": the ring stays open
+local CIRCLE = "Interface\\Minimap\\UI-Minimap-Background"
+
+-- The messages ------------------------------------------------------------------------------------------------
 local DEFAULT_ITEMS = {
-    "Hey {name}! o/",
-    "Want to quest together here? ({here})",
-    "I need to: {need}",
-    "{shared}",
-    "Thanks!",
-    "Wait for me, one sec!",
-    "Follow me!",
-    "@invite Sending you a party invite - let's quest together!",
+    { label = "Hello",         text = "Hey {name}! o/" },
+    { label = "Team up?",      text = "Want to quest together here? ({here})" },
+    { label = "What I need",   text = "I need to: {need}" },
+    { label = "Same quests?",  text = "{shared}" },
+    { label = "Thanks",        text = "Thanks!" },
+    { label = "Wait",          text = "Wait for me, one sec!" },
+    { label = "Follow me",     text = "Follow me!" },
+    { label = "Invite",        text = "@invite Sending you a party invite - let's quest together!" },
 }
 
 function ns.defaultQuickItems()
     local t = {}
-    for i, v in ipairs(DEFAULT_ITEMS) do t[i] = v end
+    for i, v in ipairs(DEFAULT_ITEMS) do t[i] = { label = v.label, text = v.text } end
     return t
 end
 
-local function items()
-    ns.db.quickItems = ns.db.quickItems or ns.defaultQuickItems()
-    return ns.db.quickItems
+local function autoLabel(text)
+    if string.sub(text, 1, 7) == "@invite" then return "Invite" end
+    local clean = string.gsub(text, "{%a+}", "")
+    clean = string.match(string.gsub(clean, "%s+", " "), "^%s*(.-)%s*$")
+    if clean == "" then return "Message" end
+    if #clean <= LABEL_MAX then return clean end
+    local cut = string.sub(clean, 1, LABEL_MAX)
+    local words = string.match(cut, "^(.*)%s%S*$")             -- cut at a word boundary when that leaves something sensible
+    return (words and #words >= 4) and words or cut
 end
 
-ns.on("ADDON_LOADED", function(_, name)
-    if name ~= ADDON then return end
-    if not ns.db.quickItems then ns.db.quickItems = ns.defaultQuickItems() end
-    for i, text in ipairs(ns.db.quickItems) do          -- the old default message 4, if the player never changed it
-        if text == "We have these quests in common: {common}" then ns.db.quickItems[i] = "{shared}" end
+local DEFAULT_LABEL = {}
+for _, v in ipairs(DEFAULT_ITEMS) do DEFAULT_LABEL[v.text] = v.label end
+
+-- earlier versions stored plain strings: turn them into {label, text}
+local function normalise(list)
+    for i, v in ipairs(list) do
+        if type(v) == "string" then
+            if v == "We have these quests in common: {common}" then v = "{shared}" end   -- the old fourth default
+            list[i] = { label = DEFAULT_LABEL[v] or autoLabel(v), text = v }
+        end
     end
+    return list
+end
+
+local function items()
+    ns.db.quickItems = normalise(ns.db.quickItems or ns.defaultQuickItems())
+    return ns.db.quickItems
+end
+ns.quickItems = items
+
+ns.on("ADDON_LOADED", function(_, name)
+    if name == ADDON then items() end
 end)
 
 -- Placeholders ---------------------------------------------------------------------------------------------
@@ -56,6 +89,14 @@ local function targetName()
        and not (UnitIsUnit and UnitIsUnit("target", "player")) then
         return UnitName("target")
     end
+end
+
+-- the name to whisper (with the realm for players of another realm)
+local function targetWhisperName()
+    if not targetName() then return nil end
+    local n, r = UnitName("target")
+    if r and r ~= "" then return n .. "-" .. r end
+    return n
 end
 
 local function hereText()
@@ -96,7 +137,6 @@ local function needText()
     return table.concat(parts, " and ")
 end
 
--- links to the quests you and the party both have (nil if none)
 local function commonLinks()
     local links = {}
     for _, e in ipairs(C.entries()) do
@@ -106,9 +146,6 @@ local function commonLinks()
     return table.concat(links, ", ")
 end
 
-local function commonText() return commonLinks() or "nothing yet" end
-
--- links to your own unfinished quests of this area, nearest first (nil if none)
 local function mineLinks()
     local list = unfinishedHere()
     local links = {}
@@ -117,8 +154,8 @@ local function mineLinks()
     return table.concat(links, ", ")
 end
 
--- A whole sentence that fits the moment. Before someone is in your party you cannot know which quests they
--- have, so with a stranger it is a QUESTION that links yours: they can click a link and tell you.
+-- Before someone is in your party you cannot know which quests they have, so with a stranger it is a QUESTION
+-- that links yours: they can click a link and tell you.
 local function sharedText()
     local mine = mineLinks()
     if C.inGroup() then
@@ -136,7 +173,7 @@ local FILL = {
     here = hereText,
     zone = function() return C.zone() end,
     need = needText,
-    common = commonText,
+    common = function() return commonLinks() or "nothing yet" end,
     mine = function() return mineLinks() or "my quests" end,
     shared = sharedText,
     quest = function()
@@ -155,68 +192,68 @@ function ns.quickResolve(text)
     return out
 end
 
--- Where the message goes ------------------------------------------------------------------------------------
-local function pickChannel()
-    local mode = ns.db.quickChannel
-    if mode == "say" then return "SAY" end
-    if mode == "party" then
-        if C.inGroup() then return C.channel() end
-        ns.print("quick chat: you are not in a party")
-        return nil
-    end
-    if mode == "whisper" then
-        local who = targetName()
-        if who then return "WHISPER", who end
-        ns.print("quick chat: target a player first to whisper them")
-        return nil
-    end
-    if C.inGroup() then return C.channel() end            -- auto: the party if you are in one, else everybody nearby
-    return "SAY"
-end
-
+-- Actions and channels ------------------------------------------------------------------------------------------
 local function isInvite(text)
     return string.sub(text, 1, 7) == "@invite" and (#text == 7 or string.sub(text, 8, 8) == " ")
 end
-
 local function inviteRest(text) return (string.gsub(string.sub(text, 8), "^%s+", "")) end
 
--- what the wheel shows for a message
-local function displayText(text)
-    if isInvite(text) then
-        local rest = inviteRest(text)
-        return "Invite: " .. (rest ~= "" and ns.quickResolve(rest) or "party invite")
+-- channel, whisper target (or nil, reason). A targeted player always gets a whisper in "auto".
+local function channelFor()
+    local mode = ns.db.quickChannel
+    local who = targetWhisperName()
+    if mode == "say" then return "SAY" end
+    if mode == "party" then
+        if C.inGroup() then return C.channel() end
+        return nil, nil, "you are not in a party"
     end
-    return ns.quickResolve(text)
+    if mode == "whisper" then
+        if who then return "WHISPER", who end
+        return nil, nil, "target a player first to whisper them"
+    end
+    if who then return "WHISPER", who end                 -- auto: you picked someone, so it is for them
+    if C.inGroup() then return C.channel() end
+    return "SAY"
 end
 
-local q = { open = false, hover = nil, cx = 0, cy = 0, openedAt = 0, lastSend = -10, sticky = false }
+-- Does sending this need a real key press / click (rather than a key release)?
+local RESTRICTED = { SAY = true, YELL = true, EMOTE = true }
+local function needsClick(i)
+    local item = items()[i]
+    if not item then return false end
+    if isInvite(item.text) then return true end
+    local channel = channelFor()
+    return channel ~= nil and RESTRICTED[channel] == true
+end
+
+local q = { open = false, hover = nil, cx = 0, cy = 0, openedAt = 0, lastSend = -10, sticky = false, cache = {}, lastDx = nil, lastDy = nil }
 ns.quick = q
 
 function ns.quickSend(i)
-    local text = items()[i]
-    if not text then return false end
-    if GetTime() - q.lastSend < 1 then return false end   -- no accidental double sends
-    if isInvite(text) then
-        local who = targetName()
+    local item = items()[i]
+    if not item then return false end
+    if GetTime() - q.lastSend < 1 then return false end      -- no accidental double sends
+    if isInvite(item.text) then
+        local who = targetWhisperName()
         if not who then ns.print("quick chat: target a player first to invite them"); return false end
         if not C.canInvite() then ns.print("quick chat: this client has no call to invite players"); return false end
         if C.inGroup() and not C.isLeader() then ns.print("quick chat: only the party leader can invite"); return false end
         if C.groupSize() >= 5 then ns.print("quick chat: your party is full"); return false end
         if not C.invite(who) then ns.print("quick chat: the invite did not go through"); return false end
-        local rest = inviteRest(text)
+        local rest = inviteRest(item.text)
         if rest ~= "" then SendChatMessage(ns.quickResolve(rest), "WHISPER", nil, who) end
         q.lastSend = GetTime()
         return true
     end
-    local channel, target = pickChannel()
-    if not channel then return false end
-    SendChatMessage(ns.quickResolve(text), channel, nil, target)
+    local channel, target, why = channelFor()
+    if not channel then ns.print("quick chat: " .. tostring(why)); return false end
+    SendChatMessage(ns.quickResolve(item.text), channel, nil, target)
     q.lastSend = GetTime()
     return true
 end
 
--- Wheel geometry ----------------------------------------------------------------------------------------------
--- Slot number (1 = top, clockwise) for a mouse offset (dx, dy) from the wheel's centre, or nil in the middle.
+-- Ring geometry ------------------------------------------------------------------------------------------------------
+-- Slot number (1 = top, clockwise) for a mouse offset (dx, dy) from the ring's centre, or nil in the middle.
 function ns.quickSlotAt(dx, dy, n)
     if n < 1 or dx * dx + dy * dy < DEAD * DEAD then return nil end
     local a = math.atan2(dx, dy)                           -- 0 = straight up, clockwise
@@ -225,7 +262,7 @@ function ns.quickSlotAt(dx, dy, n)
     return math.floor((a + step / 2) / step) % n + 1
 end
 
-local frame, labels, preview
+local frame, slots, disc, centerText, hintText
 
 local function cursor()
     local x, y = GetCursorPosition()
@@ -238,26 +275,55 @@ local function shorten(s, n)
     return string.sub(s, 1, n - 3) .. "..."
 end
 
-local function paint()
-    if not labels then return end
-    local list = items()
-    for i = 1, MAX_ITEMS do
-        local fs = labels[i]
-        if list[i] then
-            local text = shorten(displayText(list[i]), 30)
-            fs:SetText((q.hover == i and "|cffffd100> " or "|cffffffff") .. text .. "|r")
-            fs:Show()
+-- what the middle of the ring shows for a slot (filled in once per slot per opening)
+local function middleText(i)
+    if q.cache[i] == nil then
+        local item = items()[i]
+        if isInvite(item.text) then
+            local rest = inviteRest(item.text)
+            q.cache[i] = "Invite to my party" .. (rest ~= "" and (" - " .. ns.quickResolve(rest)) or "")
         else
-            fs:Hide()
+            q.cache[i] = ns.quickResolve(item.text)
         end
     end
-    preview:SetText(q.hover and ("|cffffd100" .. shorten(displayText(list[q.hover] or ""), 110) .. "|r") or "|cff888888point and release|r")
+    return q.cache[i]
+end
+
+local function paintSlot(i)
+    local s, item = slots[i], items()[i]
+    if not s then return end
+    if not item then s.button:Hide(); return end
+    local hot = (q.hover == i)
+    s.button:Show()
+    s.label:SetText((hot and "|cffffd100" or "|cffffffff") .. item.label .. "|r")
+    if hot then s.node:SetVertexColor(1, 0.82, 0, 1) else s.node:SetVertexColor(0.5, 0.5, 0.55, 1) end
+end
+
+local function paintMiddle()
+    if not centerText then return end
+    if q.hover then
+        centerText:SetText("|cffffd100" .. shorten(middleText(q.hover), 120) .. "|r")
+        if q.sticky then hintText:SetText("click it (or press the key again) to say it")
+        elseif needsClick(q.hover) then hintText:SetText("release: keeps it open - click to say it")
+        else hintText:SetText("release or click to send") end
+    else
+        centerText:SetText("|cff888888point at a message|r")
+        hintText:SetText(q.sticky and "click a message, or click outside to close" or "")
+    end
 end
 
 function ns.quickUpdateHover()
     local x, y = cursor()
-    q.hover = ns.quickSlotAt(x - q.cx, y - q.cy, #items())
-    paint()
+    local dx, dy = x - q.cx, y - q.cy
+    if dx == q.lastDx and dy == q.lastDy then return end     -- the mouse has not moved: nothing to do
+    q.lastDx, q.lastDy = dx, dy
+    local new = ns.quickSlotAt(dx, dy, #items())
+    if new == q.hover then return end                        -- still on the same slot: nothing to repaint
+    local old = q.hover
+    q.hover = new
+    if old then paintSlot(old) end
+    if new then paintSlot(new) end
+    paintMiddle()
 end
 
 local function build()
@@ -267,55 +333,102 @@ local function build()
     if not (ok and f) then return nil end
     f:SetAllPoints(UIParent)
     f:SetFrameStrata("FULLSCREEN_DIALOG")
-    f:EnableMouse(true)                                    -- it catches the click that picks a slot
-    f:SetScript("OnMouseUp", function(_, button)
-        if button == "RightButton" then ns.quickClose(); return end
-        ns.quickUpdateHover()
-        local i = q.hover
-        ns.quickClose()
-        if i then ns.quickSend(i) end
-    end)
+    f:EnableMouse(true)                                    -- a click outside the ring (or a right click) closes it
+    f:SetScript("OnMouseUp", function() ns.quickClose() end)
     local acc = 0
     f:SetScript("OnUpdate", function(_, dt)
         acc = acc + (dt or 0)
-        if acc >= 0.03 then acc = 0; if q.open then ns.quickUpdateHover() end end
+        if acc >= 0.04 then acc = 0; if q.open then ns.quickUpdateHover() end end
     end)
-    labels = {}
+    disc = f:CreateTexture(nil, "BACKGROUND")
+    disc:SetTexture(CIRCLE)
+    disc:SetVertexColor(0, 0, 0, 0.6)
+    centerText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    centerText:SetWidth(2 * (RADIUS - 46))
+    centerText:SetJustifyH("CENTER")
+    hintText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    hintText:SetJustifyH("CENTER")
+    slots = {}
     for i = 1, MAX_ITEMS do
-        labels[i] = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        -- one button per slot: a click on it is the real mouse click the game wants for /say
+        local b = CreateFrame("Button", nil, f)
+        b:SetWidth(34)
+        b:SetHeight(34)
+        b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        b:SetScript("OnClick", function(_, which)
+            if which == "RightButton" then ns.quickClose() else ns.quickClick(i) end
+        end)
+        local node = b:CreateTexture(nil, "ARTWORK")
+        node:SetTexture(CIRCLE)
+        node:SetWidth(24)
+        node:SetHeight(24)
+        node:SetPoint("CENTER", b, "CENTER", 0, 0)
+        local label = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        slots[i] = { button = b, node = node, label = label }
     end
-    preview = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     if UISpecialFrames then table.insert(UISpecialFrames, "QuestSharingQuickChat") end       -- Esc closes it
     frame = f
     f:Hide()
     return f
 end
 
-function ns.quickOpen()
+-- put the ring on the screen, around (cx, cy) but never off the edge
+local function layout()
+    local n = #items()
+    local w, h = UIParent:GetWidth() or 1920, UIParent:GetHeight() or 1080
+    local margin = RADIUS + 70
+    q.cx = math.max(margin, math.min(w - margin, q.cx))
+    q.cy = math.max(margin, math.min(h - margin, q.cy))
+    disc:ClearAllPoints()
+    disc:SetPoint("CENTER", UIParent, "BOTTOMLEFT", q.cx, q.cy)
+    disc:SetWidth(2 * (RADIUS - 20))
+    disc:SetHeight(2 * (RADIUS - 20))
+    centerText:ClearAllPoints()
+    centerText:SetPoint("CENTER", UIParent, "BOTTOMLEFT", q.cx, q.cy + 8)
+    hintText:ClearAllPoints()
+    hintText:SetPoint("CENTER", UIParent, "BOTTOMLEFT", q.cx, q.cy - 38)
+    for i = 1, MAX_ITEMS do
+        local s = slots[i]
+        local a = (i - 1) * 2 * math.pi / math.max(n, 1)
+        local sx, sy = math.sin(a), math.cos(a)
+        s.button:ClearAllPoints()
+        s.button:SetPoint("CENTER", UIParent, "BOTTOMLEFT", q.cx + RADIUS * sx, q.cy + RADIUS * sy)
+        s.label:ClearAllPoints()
+        -- the label sits OUTSIDE the ring, on the side away from the middle, so neighbours never overlap
+        if math.abs(sx) < 0.3 then
+            if sy > 0 then s.label:SetPoint("BOTTOM", s.button, "TOP", 0, 2) else s.label:SetPoint("TOP", s.button, "BOTTOM", 0, -2) end
+        elseif sx > 0 then
+            s.label:SetPoint("LEFT", s.button, "RIGHT", 2, 0)
+        else
+            s.label:SetPoint("RIGHT", s.button, "LEFT", -2, 0)
+        end
+    end
+end
+
+function ns.quickOpen(atCenter)
     local f = build()
     if not f then return ns.print("this client does not allow the quick chat wheel (frame creation failed)") end
-    local list = items()
-    if #list == 0 then return ns.print("quick chat has no messages: /qs quick add <text>") end
-    q.cx, q.cy = cursor()
-    q.open, q.openedAt, q.hover = true, GetTime(), nil
-    local n = #list
-    for i = 1, MAX_ITEMS do
-        local a = (i - 1) * 2 * math.pi / math.max(n, 1)
-        labels[i]:ClearAllPoints()
-        labels[i]:SetPoint("CENTER", UIParent, "BOTTOMLEFT", q.cx + RADIUS * math.sin(a) * 1.35, q.cy + RADIUS * math.cos(a))
-    end
-    preview:ClearAllPoints()
-    preview:SetPoint("CENTER", UIParent, "BOTTOMLEFT", q.cx, q.cy)
-    paint()
+    if #items() == 0 then return ns.print("quick chat has no messages: /qs settings > Quick chat, or /qs quick add <text>") end
+    if atCenter then q.cx, q.cy = (UIParent:GetWidth() or 1920) / 2, (UIParent:GetHeight() or 1080) / 2 else q.cx, q.cy = cursor() end
+    q.open, q.openedAt, q.hover, q.sticky, q.cache, q.lastDx, q.lastDy = true, GetTime(), nil, atCenter and true or false, {}, nil, nil
+    layout()
+    for i = 1, MAX_ITEMS do paintSlot(i) end
+    paintMiddle()
     f:Show()
 end
 
 function ns.quickClose()
-    q.open, q.hover = false, nil
+    q.open, q.hover, q.sticky = false, nil, false
     if frame then frame:Hide() end
 end
 
--- The key. Held: the wheel is open; released: the pointed slot is said. A quick tap leaves it open. -----------
+-- a click on a slot: a real mouse click, so even /say is allowed
+function ns.quickClick(i)
+    ns.quickClose()
+    ns.quickSend(i)
+end
+
+-- The key. -----------------------------------------------------------------------------------------------------------------
 function ns.quickKey(state)
     local d = ns.db
     if not (d.enabled and d.quick) then
@@ -323,15 +436,28 @@ function ns.quickKey(state)
         return
     end
     if state == "down" then
-        if q.open then ns.quickClose() else ns.quickOpen() end            -- pressing again closes it
+        if q.open then                                    -- a key PRESS is a real input: it may send what is pointed at
+            ns.quickUpdateHover()
+            local i = q.hover
+            ns.quickClose()
+            if i then ns.quickSend(i) end
+        else
+            ns.quickOpen()
+        end
         return
     end
-    if d.quickMode == "toggle" or not q.open then return end              -- toggle mode ignores the release
-    if GetTime() - q.openedAt < TAP then return end                       -- a tap: the wheel stays open for a click
+    if d.quickMode == "toggle" or not q.open then return end                -- toggle mode waits for a click
+    if GetTime() - q.openedAt < TAP then q.sticky = true; paintMiddle(); return end   -- a tap: stay open for a click
     ns.quickUpdateHover()
     local i = q.hover
+    if not i then ns.quickClose(); return end
+    if needsClick(i) then                                 -- /say, /yell, /emote, invite: not allowed from a release
+        q.sticky = true
+        paintMiddle()
+        return
+    end
     ns.quickClose()
-    if i then ns.quickSend(i) end
+    ns.quickSend(i)
 end
 
 function QuestSharing_QuickDown() ns.quickKey("down") end
@@ -358,33 +484,37 @@ function ns.setQuickKey(key)
     end
     local save = SaveBindings or AttemptToSaveBindings
     if save then save(GetCurrentBindingSet and GetCurrentBindingSet() or 1) end
-    ns.print(key == "NONE" and "quick chat key removed" or ("quick chat key: " .. key .. " (hold it, point, release)"))
+    ns.print(key == "NONE" and "quick chat key removed" or ("quick chat key: " .. key .. " (hold it, point, release or click)"))
 end
 
--- Editing the messages ----------------------------------------------------------------------------------------------
-local function listItems()
-    local list = items()
-    if #list == 0 then ns.print("quick chat: no messages (/qs quick add <text>)") end
-    for i, t in ipairs(list) do ns.print(string.format("%d. %s", i, t)) end
-    ns.print("placeholders: {name} {here} {zone} {need} {mine} {common} {shared} {quest}   |   '@invite <text>' invites your target and whispers <text>")
-end
+-- Editing the messages ---------------------------------------------------------------------------------------------------
+local function clean(s) return (string.match(s or "", "^%s*(.-)%s*$")) end
 
-function ns.quickAdd(text)
+function ns.quickAdd(text, label)
     local list = items()
-    text = string.match(text or "", "^%s*(.-)%s*$")
+    text, label = clean(text), clean(label)
     if text == "" then return ns.print("quick chat: write the message after 'add'") end
     if #text > 200 then return ns.print("quick chat: that message is too long (200 characters at most)") end
-    if #list >= MAX_ITEMS then return ns.print("quick chat: the wheel holds " .. MAX_ITEMS .. " messages; remove one first") end
-    list[#list + 1] = text
+    if #list >= MAX_ITEMS then return ns.print("quick chat: the ring holds " .. MAX_ITEMS .. " messages; remove one first") end
+    list[#list + 1] = { label = (label ~= "" and string.sub(label, 1, LABEL_MAX)) or autoLabel(text), text = text }
     return #list
 end
 
 function ns.quickEdit(i, text)
     local list = items()
-    text = string.match(text or "", "^%s*(.-)%s*$")
+    text = clean(text)
     if not list[i] then return ns.print("quick chat: there is no message " .. tostring(i)) end
     if text == "" or #text > 200 then return ns.print("quick chat: the message must be 1 to 200 characters") end
-    list[i] = text
+    list[i].text = text
+    return i
+end
+
+function ns.quickLabel(i, label)
+    local list = items()
+    label = clean(label)
+    if not list[i] then return ns.print("quick chat: there is no message " .. tostring(i)) end
+    if label == "" then return ns.print("quick chat: the label cannot be empty") end
+    list[i].label = string.sub(label, 1, LABEL_MAX)
     return i
 end
 
@@ -398,9 +528,17 @@ end
 function ns.quickMove(from, to)
     local list = items()
     if not (list[from] and to and to >= 1 and to <= #list) then return ns.print("quick chat: use /qs quick move <from> <to> with numbers from the list") end
-    local v = table.remove(list, from)
-    table.insert(list, to, v)
+    table.insert(list, to, table.remove(list, from))
     return true
+end
+
+function ns.quickReset() ns.db.quickItems = ns.defaultQuickItems() end
+
+local function listItems()
+    local list = items()
+    if #list == 0 then ns.print("quick chat: no messages (/qs quick add <text>)") end
+    for i, it in ipairs(list) do ns.print(string.format("%d. [%s] %s", i, it.label, it.text)) end
+    ns.print("placeholders: {name} {here} {zone} {need} {mine} {common} {shared} {quest}   |   '@invite <text>' invites your target and whispers <text>")
 end
 
 function ns.quickCommand(arg)
@@ -411,131 +549,21 @@ function ns.quickCommand(arg)
     if sub == "" or sub == "list" then listItems()
     elseif sub == "on" or sub == "off" then ns.setSetting("quick", sub == "on")
     elseif sub == "open" then ns.quickOpen()
-    elseif sub == "add" then if ns.quickAdd(rest) then listItems() end
+    elseif sub == "add" then
+        local label, text = string.match(rest, "^(.-)%s*|%s*(.+)$")         -- "label | text" or just "text"
+        if ns.quickAdd(text or rest, label) then listItems() end
     elseif sub == "edit" and n1 then if ns.quickEdit(tonumber(n1), n2) then listItems() end
+    elseif sub == "label" and n1 then if ns.quickLabel(tonumber(n1), n2) then listItems() end
     elseif sub == "remove" and n1 then if ns.quickRemove(tonumber(n1)) then listItems() end
     elseif sub == "move" and n1 then if ns.quickMove(tonumber(n1), tonumber(n2)) then listItems() end
-    elseif sub == "reset" then ns.db.quickItems = ns.defaultQuickItems(); listItems()
+    elseif sub == "reset" then ns.quickReset(); listItems()
     elseif sub == "mode" and (rest == "hold" or rest == "toggle") then ns.setSetting("quickMode", rest)
     elseif sub == "channel" and (rest == "auto" or rest == "say" or rest == "party" or rest == "whisper") then ns.setSetting("quickChannel", rest)
-    elseif sub == "editor" then ns.openQuickEditor()
+    elseif sub == "editor" then ns.toggleSettings(true, "quick")
     else
-        ns.print("/qs quick [list] | add <text> | edit N <text> | remove N | move N M | reset | on|off | mode hold|toggle | channel auto|say|party|whisper | editor | open")
+        ns.print("/qs quick [list] | add [label |] <text> | edit N <text> | label N <label> | remove N | move N M | reset | on|off | mode hold|toggle | channel auto|say|party|whisper | editor | open")
     end
     if ns.refreshSettings then ns.refreshSettings() end
 end
 
--- The editor window ----------------------------------------------------------------------------------------------------
-local ed = { win = nil, rows = nil, box = nil, selected = nil }
-
-function ns.editorRefresh()
-    if not ed.win then return end
-    local list = items()
-    for i = 1, MAX_ITEMS do
-        local row = ed.rows[i]
-        if list[i] then
-            row.text:SetText(string.format("%s%d. %s|r", ed.selected == i and "|cffffd100" or "|cffffffff", i, shorten(list[i], 52)))
-            row.frame:Show()
-        else
-            row.frame:Hide()
-        end
-    end
-    ed.box:SetText(ed.selected and list[ed.selected] or "")
-end
-
-function ns.editorSelect(i) ed.selected = (items()[i] and i) or nil; ns.editorRefresh() end
-function ns.editorMove(delta)
-    if ed.selected and ns.quickMove(ed.selected, ed.selected + delta) then ed.selected = ed.selected + delta end
-    ns.editorRefresh()
-end
-function ns.editorDelete()
-    if ed.selected and ns.quickRemove(ed.selected) then ed.selected = nil end
-    ns.editorRefresh()
-end
-function ns.editorAdd()
-    local n = ns.quickAdd("New message")
-    if n then ed.selected = n end
-    ns.editorRefresh()
-end
-function ns.editorSave(text)
-    if ed.selected then ns.quickEdit(ed.selected, text) end
-    ns.editorRefresh()
-end
-
-local function button(parent, label, x, onClick)
-    local b = CreateFrame("Frame", nil, parent)
-    b:SetWidth(70)
-    b:SetHeight(16)
-    b:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", x, 12)
-    b:EnableMouse(true)
-    b:SetScript("OnMouseUp", onClick)
-    local t = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    t:SetPoint("LEFT", b, "LEFT", 0, 0)
-    t:SetText("|cff55ccff[" .. label .. "]|r")
-    return b
-end
-
-function ns.openQuickEditor()
-    if not ed.win then
-        if not (CreateFrame and UIParent) then return ns.print("this client does not allow the editor window") end
-        local ok, f = pcall(CreateFrame, "Frame", "QuestSharingQuickEditor", UIParent, "BackdropTemplate")
-        if not (ok and f) then ok, f = pcall(CreateFrame, "Frame", "QuestSharingQuickEditor", UIParent) end
-        if not (ok and f) then return ns.print("this client does not allow the editor window") end
-        f:SetWidth(440)
-        f:SetHeight(48 + MAX_ITEMS * 18 + 70)
-        f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-        pcall(function()
-            f:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-                            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12,
-                            insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-            f:SetBackdropColor(0, 0, 0, 0.92)
-        end)
-        f:SetFrameStrata("DIALOG")
-        f:SetMovable(true)
-        f:EnableMouse(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-        f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-        local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        title:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -12)
-        title:SetText("Quick chat messages")
-        local hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        hint:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -28)
-        hint:SetText("Click a line, edit the text below and press Enter. Placeholders: {name} {here} {need} {mine} {common} {shared} {quest} {zone}")
-        ed.rows = {}
-        for i = 1, MAX_ITEMS do
-            local r = CreateFrame("Frame", nil, f)
-            r:SetWidth(410)
-            r:SetHeight(18)
-            r:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -46 - (i - 1) * 18)
-            r:EnableMouse(true)
-            r:SetScript("OnMouseUp", function() ns.editorSelect(i) end)
-            local t = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            t:SetPoint("LEFT", r, "LEFT", 0, 0)
-            ed.rows[i] = { frame = r, text = t }
-        end
-        local box = CreateFrame("EditBox", nil, f)
-        box:SetWidth(410)
-        box:SetHeight(20)
-        box:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 40)
-        if ChatFontNormal then box:SetFontObject(ChatFontNormal) end
-        box:SetAutoFocus(false)
-        box:SetMaxLetters(200)
-        box:SetScript("OnEnterPressed", function(self) ns.editorSave(self:GetText()); self:ClearFocus() end)
-        box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-        ed.box = box
-        button(f, "Up", 14, function() ns.editorMove(-1) end)
-        button(f, "Down", 84, function() ns.editorMove(1) end)
-        button(f, "Delete", 154, function() ns.editorDelete() end)
-        button(f, "Add", 224, function() ns.editorAdd() end)
-        button(f, "Reset", 294, function() ns.db.quickItems = ns.defaultQuickItems(); ed.selected = nil; ns.editorRefresh() end)
-        button(f, "Close", 364, function() f:Hide() end)
-        if UISpecialFrames then table.insert(UISpecialFrames, "QuestSharingQuickEditor") end
-        ed.win = f
-    end
-    ns.editorRefresh()
-    ed.win:Show()
-end
-
-function ns._quickEditor() return ed end              -- for the tests
-function ns._quickWheel() return frame, labels, preview end
+function ns._quickWheel() return frame, slots, centerText, hintText end         -- for the tests

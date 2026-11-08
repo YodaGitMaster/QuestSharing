@@ -25,9 +25,9 @@ def panel_shown(g):
 
 
 def window(g):
-    res = g.eval("NS._settingsWindow()")
-    return res if isinstance(res, tuple) and res[0] is not None else (None, None)
-
+    """The settings window's state (win, tab, rows, tabs, ed), or None before it was ever opened."""
+    W = g.eval("NS._settingsWindow()")
+    return W if W is not None and W.win is not None else None
 
 def idx(g, key=None, label=None):
     if key:
@@ -207,30 +207,72 @@ def test_slash_reset_does_the_same(style):
     assert g.eval("NS.db.link") is True
 
 
+def visible_texts(W):
+    return [W.rows[n].text.text for n in range(1, 15) if W.rows[n].frame.shown]
+
+
 def test_the_window_opens_closes_and_follows_commands(style):
     g = fresh(style)
-    assert window(g) == (None, None)
+    assert window(g) is None
     g.slash("settings")
-    win, lines = window(g)
-    assert win.shown is True and int(g.eval("#NS.settingRows")) == len(lines)
-    assert "Announce quests in common" in lines[idx(g, "chat")].text.text and "[ON]" in lines[idx(g, "chat")].text.text
-    g.slash("chat off")                                   # a command changes it: the window shows it at once
-    assert "[OFF]" in lines[idx(g, "chat")].text.text
+    W = window(g)
+    assert W.win.shown is True and W.tab == "general"
+    assert any("Quest Sharing enabled" in t and "[ON]" in t for t in visible_texts(W))
+    g.slash("minimap off")                                # a command changes it: the window shows it at once
+    assert any("Minimap button" in t and "[OFF]" in t for t in visible_texts(W))
     g.slash("config")
-    assert win.shown is False
+    assert W.win.shown is False
     g.slash("options")
-    assert win.shown is True
+    assert W.win.shown is True
     assert "QuestSharingSettings" in list(g.eval("UISpecialFrames").values()), "Esc closes it"
+
+
+def test_every_setting_is_on_exactly_one_tab(style):
+    g = fresh(style)
+    n = int(g.eval("#NS.settingRows"))
+    tabs = [g.eval("NS.settingRows[%d].tab" % i) for i in range(1, n + 1)]
+    ids = [g.eval("NS.settingTabs[%d].id" % i) for i in range(1, int(g.eval("#NS.settingTabs")) + 1)]
+    assert ids == ["general", "sharing", "tracker", "quick", "social"]
+    assert all(t in ids for t in tabs)
+    assert all(tabs.count(t) >= 1 for t in ids), "no empty tab"
+    keys = [g.eval("NS.settingRows[%d].key" % i) for i in range(1, n + 1) if g.eval("NS.settingRows[%d].key" % i)]
+    assert len(keys) == len(set(keys)), "no setting appears twice"
+
+
+def test_tabs_show_only_their_own_rows(style):
+    g = fresh(style)
+    g.slash("settings")
+    W = window(g)
+    general = visible_texts(W)
+    g.eval("NS.settingsTab")("tracker")
+    tracker = visible_texts(W)
+    assert W.tab == "tracker" and not set(general) & set(tracker)
+    assert any("Tracker follows me" in t for t in tracker) and any("Seconds it waits after I change the tracker" in t for t in tracker)
+    assert W.tabs.tracker.text.text.startswith("|cffffd100") and W.tabs.general.text.text.startswith("|cff55ccff"), "the open tab is gold"
+    assert W.ed.frame.shown is False, "the message editor belongs to the Quick chat tab only"
+    g.eval("NS.settingsTab")("quick")
+    assert W.ed.frame.shown is True
+
+
+def test_clicking_a_tab_button_switches_tab(style):
+    g = fresh(style)
+    g.slash("settings")
+    W = window(g)
+    g.eval("function(t) t.frame.scripts.OnMouseUp(t.frame, 'LeftButton') end")(W.tabs.sharing)
+    assert W.tab == "sharing" and any("Share my quests" in t for t in visible_texts(W))
 
 
 def test_clicking_a_row_in_the_window_frame_works(style):
     g = fresh(style)
     g.slash("settings")
-    win, lines = window(g)
-    row = lines[idx(g, "sync")]
-    g.eval("function(f, b) f.scripts.OnMouseUp(f, b) end")(row.frame, "LeftButton")
-    assert g.eval("NS.db.sync") is False and "[OFF]" in row.text.text
-    g.eval("function(f) f.scripts.OnEnter(f) end")(lines[idx(g, "near")].frame)
+    W = window(g)
+    g.eval("NS.settingsTab")("sharing")
+    n = next(i for i in range(1, 15) if W.rows[i].frame.shown and "Sync quest lists" in W.rows[i].text.text)
+    g.eval("function(f, b) f.scripts.OnMouseUp(f, b) end")(W.rows[n].frame, "LeftButton")
+    assert g.eval("NS.db.sync") is False and "[OFF]" in W.rows[n].text.text
+    g.eval("NS.settingsTab")("tracker")
+    n = next(i for i in range(1, 15) if W.rows[i].frame.shown and "Tracker follows me" in W.rows[i].text.text)
+    g.eval("function(f) f.scripts.OnEnter(f) end")(W.rows[n].frame)
     assert "puts your old list back" in g.eval("TOOLTIP.text")
 
 
@@ -240,7 +282,7 @@ def test_the_panels_settings_link_opens_the_window(style):
     g.advance(2)
     panel, _ = g.eval("NS._panel()")
     g.eval("function(f) f.scripts.OnMouseUp(f, 'LeftButton') end")(panel.settingsLink)
-    assert window(g)[0].shown is True
+    assert window(g).win.shown is True
 
 
 def test_the_game_options_get_an_entry(style):
