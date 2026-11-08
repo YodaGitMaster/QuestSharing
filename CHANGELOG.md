@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.5
+- **The quick chat ring always does something on a release.** `/s` and `/y` only go out at once from a click (the
+  game wants a real click for them); a release used to leave the ring open waiting for one, so "Hello", "Team up?" or
+  "What I need" alone seemed to do nothing. Now a release puts them in your chat box (press Enter), and a click on the
+  message still says it at once. The ring says so once.
+- **Whispers to the player you highlight.** The player a message is for is your target, or, with nobody targeted,
+  the player under your mouse when you open the ring. Auto messages whisper that player when they are not in your
+  party, even while you are in one (before, a party always got them). A party member targeted: the party. Players of
+  the other faction are never picked.
+
 ## 0.3.4
 - **The quick chat ring sends at once.** A message you pick on the ring is sent straight away, no Enter: its own
   switch, *Settings > Quick chat > Send the message at once* (`/qs quick send on|off`), on by default. Off: it goes

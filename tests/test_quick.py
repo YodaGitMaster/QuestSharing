@@ -207,14 +207,57 @@ def hold_and_release_on(g, i, hold=0.6):
 
 
 def pick(g, i):
-    """What a player does: hold the key, point at slot i, release; if the ring stays open (/say needs a click), click it."""
-    hold_and_release_on(g, i)
-    if g.wheel()[0].shown:
-        click_slot(g, i)
+    """What a player does to send at once: hold the key, point at slot i and click it (a click may even /say)."""
+    open_wheel(g)
+    g.advance(0.6)
+    point_slot(g, i)
+    click_slot(g, i)
+    key_up(g)                                                    # letting go of the key afterwards does nothing more
 
 
 def target(g, name="Lia"):
     g.run('TARGET = { name = "%s", player = true }' % name)
+
+
+# ---- what was reported: whispers to the player you highlight, /s on a release -----------------------------------------
+def test_the_player_under_the_mouse_when_the_ring_opens_is_whispered(style):
+    g = game(style)
+    g.run('HOVER_PLAYER = { name = "Kael", realm = "Stormrage" }')      # the mouse is over a player, nothing targeted
+    open_wheel(g)
+    g.run("HOVER_PLAYER = nil")                                  # moving to a slot: the mouse leaves the player
+    g.advance(0.6)
+    point_slot(g, 5)                                             # "Thanks": auto
+    key_up(g)
+    assert sent(g) == [("Thanks!", "WHISPER")] and g.eval("SENT[1].target") == "Kael-Stormrage", sent(g)
+
+
+def test_in_a_party_the_player_you_pick_outside_it_is_whispered_on_release(style):
+    g = game(style)
+    g.join_party(["Anna"])
+    target(g, "Lia")
+    hold_and_release_on(g, 5)
+    assert sent(g)[-1] == ("Thanks!", "WHISPER") and g.eval("SENT[#SENT].target") == "Lia"
+
+
+def test_a_player_of_the_other_faction_is_not_whispered(style):
+    g = game(style)
+    g.run('TARGET = { name = "Grukk", player = true, hostile = true }')
+    pick(g, 5)
+    assert sent(g)[-1] == ("Thanks!", "SAY"), "they could not read a whisper"
+
+
+def test_alone_with_nobody_picked_every_message_does_something_on_release(style):
+    """Reported: "Hello" alone did nothing, slots 2 and 3 did not open the chat."""
+    g = Game(style, fresh=True)
+    g.fire("ADDON_LOADED", "QuestSharing")
+    g.fire("PLAYER_ENTERING_WORLD")
+    g.slash("auto off")
+    for i, want in ((1, "/s Hey there! o/"), (2, "/s Doing "), (3, "/s I need to: ")):
+        g.advance(2)
+        g.run("OPENED = {}")
+        hold_and_release_on(g, i)
+        assert g.opened() and g.opened()[0].startswith(want), (i, g.opened())
+        assert g.wheel()[0].shown is False
 
 
 # ---- the key and the ring ---------------------------------------------------------------------------------------------------
@@ -233,14 +276,22 @@ def test_in_a_party_releasing_sends_to_the_party(style):
     assert sent(g) == [("I need to: Wolf slain 3/8, Wolf Pelt 0/4 [Wolves Among Us] and [A Personal Quest]", "PARTY")]
 
 
-def test_say_is_not_sent_on_release_but_on_a_click(style):
+def test_say_on_release_goes_into_the_chat_box_and_a_click_says_it(style):
     g = game(style)                                             # nobody targeted, no party: it would be /say
-    hold_and_release_on(g, 1)
-    frame, slots, center, hint = g.wheel()
-    assert sent(g) == [] and frame.shown is True, "the game only allows /say from a key press or a click"
-    assert "click it" in hint.text
-    click_slot(g, 1)
-    assert sent(g) == [("Hey there! o/", "SAY")] and frame.shown is False
+    g.run("PRINTED = {}")
+    open_wheel(g)
+    g.advance(0.6)
+    point_slot(g, 1)
+    tick(g)
+    hint = g.wheel()[3]
+    assert "click: said at once" in hint.text and "release: into your chat box" in hint.text
+    key_up(g)
+    assert sent(g) == [] and g.opened() == ["/s Hey there! o/"], "the game only sends /say from a click: the chat box"
+    assert g.wheel()[0].shown is False, "a release always does something: the ring closes"
+    assert "a release puts them in your chat box" in "\n".join(g.printed())
+    g.advance(2)
+    pick(g, 1)                                                   # a click says it at once
+    assert sent(g) == [("Hey there! o/", "SAY")]
 
 
 LINK = "|cffffff00|Hquest:100:3|h[Wolves Among Us]|h|r"
@@ -287,7 +338,11 @@ def test_greetings_go_to_the_people_around_you_not_to_the_party(style):
     pick(g, 1)
     assert sent(g)[-1] == ("Hey Lia! o/", "WHISPER")
     g.advance(2)
-    pick(g, 3)                                                   # "What I need" still follows the party
+    pick(g, 3)                                                   # "What I need": Lia is not in the party, so to her
+    assert sent(g)[-1][1] == "WHISPER"
+    g.advance(2)
+    target(g, "Anna")                                            # a party member targeted: the party
+    pick(g, 3)
     assert sent(g)[-1][1] == "PARTY"
 
 
@@ -326,7 +381,7 @@ def test_every_channel_can_be_chosen_for_a_message(style):
     g.join_party(["Anna"])
     target(g, "Lia")
     expect = {"say": ("SAY", None), "yell": ("YELL", None), "party": ("PARTY", None), "whisper": ("WHISPER", "Lia"),
-              "nearby": ("WHISPER", "Lia"), "auto": ("PARTY", None)}
+              "nearby": ("WHISPER", "Lia"), "auto": ("WHISPER", "Lia")}   # auto: Lia is not in the party
     for route, (channel, who) in expect.items():
         g.slash(f"quick route 5 {route}")                        # 5 = "Thanks"
         g.advance(2)
@@ -345,15 +400,16 @@ def test_a_fixed_channel_that_cannot_be_used_says_why(style):
     g.advance(2)
     g.run("PRINTED = {}")
     pick(g, 5)
-    assert sent(g) == [] and "target a player first" in "\n".join(g.printed())
+    assert sent(g) == [] and "target a player (or point at one when you open the ring)" in "\n".join(g.printed())
 
 
-def test_yell_also_waits_for_a_click(style):
+def test_yell_on_release_goes_into_the_chat_box_too(style):
     g = game(style)
     g.slash("quick route 5 yell")
     hold_and_release_on(g, 5)
-    assert sent(g) == [] and g.wheel()[0].shown is True, "the game only allows /y from a press or a click"
-    click_slot(g, 5)
+    assert sent(g) == [] and g.opened() == ["/y Thanks!"] and g.wheel()[0].shown is False
+    g.advance(2)
+    pick(g, 5)
     assert sent(g) == [("Thanks!", "YELL")]
 
 
@@ -374,7 +430,7 @@ def test_the_editor_shows_and_sets_the_channel_of_the_selected_message(style):
     g.eval("NS.editorSelect")(3)
     titles = [c.text.text for c in ed.routeButtons.values()]
     assert len(titles) == 6 and titles[0].startswith("|cffffd100[Auto"), "the current channel is highlighted"
-    assert "party if I am in one" in ed.routeText.text
+    assert "else the party" in ed.routeText.text
     party = [c for c in ed.routeButtons.values() if c.route == "party"][0]
     g.eval("function(f) f.scripts.OnMouseUp(f, 'LeftButton') end")(party.frame)       # one click on "/p Party"
     assert g.eval("NS.db.quickItems[3].channel") == "party"
@@ -388,8 +444,7 @@ def test_the_editor_shows_and_sets_the_channel_of_the_selected_message(style):
 
 def test_a_send_the_game_blocks_ends_up_in_the_chat_box_and_in_the_error_log(style):
     g = game(style)
-    hold_and_release_on(g, 1)
-    click_slot(g, 1)
+    pick(g, 1)
     g.run("OPENED = {}")
     g.fire("ADDON_ACTION_FORBIDDEN", "QuestSharing", "UNKNOWN()")      # what the game says when it blocks the send
     assert g.eval("OPENED") and g.eval("OPENED[1]") == "/s Hey there! o/", "ready for Enter"
@@ -429,8 +484,10 @@ def test_an_old_send_is_not_blamed_for_a_later_block(style):
 
 def test_pressing_the_key_again_says_what_is_pointed_at(style):
     g = game(style)
-    hold_and_release_on(g, 7)
-    assert sent(g) == []
+    open_wheel(g)
+    key_up(g)                                                   # a tap: the ring stays open
+    point_slot(g, 7)
+    assert sent(g) == [] and g.wheel()[0].shown is True
     key_down(g)                                                 # a key PRESS is a real input
     assert sent(g) == [("Follow me!", "SAY")] and g.wheel()[0].shown is False
 
@@ -592,9 +649,14 @@ def test_channels(style):
     assert sent(g)[-1][1] == "INSTANCE_CHAT"
     g.run("INSTANCE_GROUP = false")
     g.advance(2)
-    target(g, "Lia")                                             # in a party the party comes first, target or not
+    target(g, "Lia")                                             # in a party, a player you pick outside it: /w
+    pick(g, 3)
+    assert sent(g)[-1][1] == "WHISPER" and g.eval("SENT[#SENT].target") == "Lia"
+    g.advance(2)
+    target(g, "Anna")                                            # a party member: the party
     pick(g, 3)
     assert sent(g)[-1][1] == "PARTY"
+    target(g, "Lia")
     g.leave_party()
     g.advance(2)
     pick(g, 3)                                                   # alone with a target: /w
@@ -620,7 +682,7 @@ def test_channels(style):
     g.advance(2)
     g.run("PRINTED = {}")
     pick(g, 3)
-    assert "target a player first to whisper" in "\n".join(g.printed())
+    assert "target a player (or point at one when you open the ring) to whisper" in "\n".join(g.printed())
 
 
 def test_a_cross_realm_target_is_whispered_with_the_realm(style):
