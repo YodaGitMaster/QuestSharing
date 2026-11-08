@@ -31,6 +31,20 @@ local function mode()
 end
 ns.nearMode = mode
 
+-- "paused because you changed it" is said once per session: after that you know, and it would only be noise
+local told = {}
+ns.pauseCounts = { tracker = 0, pin = 0 }
+function ns.notePause(what)
+    ns.pauseCounts[what] = (ns.pauseCounts[what] or 0) + 1
+    if told[what] then return end
+    told[what] = true
+    if what == "pin" then
+        ns.print(string.format("pin: paused for %d seconds because you chose another quest (/qs near resume to continue). This is said once.", PAUSE()))
+    else
+        ns.print(string.format("tracker follows you: paused for %d seconds because you changed the tracker (/qs near resume to continue). This is said once.", PAUSE()))
+    end
+end
+
 local function chooseDistance(entries, current, n)
     local ranked = {}
     for _, e in ipairs(entries) do
@@ -112,7 +126,7 @@ function ns.nearEvaluate(force)
             for id in pairs(state.expected) do if inLog[id] and not current[id] then changed = true end end
             if changed then                                        -- someone else changed the tracker: you did
                 state.pausedUntil, state.expected, state.sig = now + PAUSE(), nil, nil
-                ns.print(string.format("tracker follows you: paused for %d seconds because you changed the tracker (/qs near resume to continue)", PAUSE()))
+                ns.notePause("tracker")
                 return
             end
         end
@@ -154,7 +168,7 @@ evaluatePin = function(entries, force)
             state.pinned = nil                                    -- the game pins a quest you just accepted: that is fine
         else
             state.pinPausedUntil, state.pinned, state.pinSeen = now + PAUSE(), nil, nil
-            ns.print(string.format("pin: paused for %d seconds because you chose another quest (/qs near resume to continue)", PAUSE()))
+            ns.notePause("pin")
             return
         end
     end
@@ -288,7 +302,7 @@ ns.on("QUEST_WATCH_LIST_CHANGED", function()
     local now = GetTime()
     if now - state.ownChange < 3 or now - state.lastAccept < 3 then return end
     state.pausedUntil, state.expected = now + PAUSE(), nil
-    ns.print(string.format("tracker follows you: paused for %d seconds because you changed the tracker (/qs near resume to continue)", PAUSE()))
+    ns.notePause("tracker")
 end)
 
 -- "near" is on by default: after the loading screen (the quest log needs a moment), remember the player's own

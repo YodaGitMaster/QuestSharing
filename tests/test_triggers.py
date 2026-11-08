@@ -91,7 +91,7 @@ def test_a_quest_someone_declined_is_not_offered_again_automatically(style):
     g.join_party(["Anna", "Bob"])
     g.advance(30)
     assert g.pushed() == [100, 101, 101], "100 would pop up on Anna again, so it is skipped"
-    assert "someone declined" in "\n".join(g.printed())
+    assert "sharing" not in "\n".join(g.printed()).replace("shared", ""), "automatic rounds do not announce themselves"
 
 
 def test_slash_share_repeats_offers_on_purpose(style):

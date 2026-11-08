@@ -9,12 +9,33 @@ local run                 -- the share in progress (nil when idle)
 local lastPush            -- { id = questID, at = time } of the most recent push
 local group = { joined = false, names = {}, ready = false }
 local pendingJoin
+local decide                -- defined below (the push step needs it too)
 
 local function key(name)
     name = tostring(name or "")
     return string.lower(string.match(name, "^([^-]+)") or name)
 end
 ns.memberKey = key
+
+-- every current party member has been offered this quest (by us, or by another Quest Sharing user: "O|" message)
+function ns.markOffered(questID)
+    ns.offered[questID] = ns.offered[questID] or {}
+    for _, m in ipairs(C.members()) do ns.offered[questID][key(m.name)] = true end
+end
+
+-- Quests that somebody else just named in party chat (a link in their message), so we do not say them again
+ns.recentlySaid = {}
+local SAID_FOR = 120
+local function heard(_, text, sender)
+    if not (text and sender) then return end
+    if key(sender) == key(C.player()) then return end
+    for id in string.gmatch(text, "|Hquest:(%d+)") do ns.recentlySaid[tonumber(id)] = GetTime() end
+end
+for _, ev in ipairs({ "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER", "CHAT_MSG_INSTANCE_CHAT", "CHAT_MSG_INSTANCE_CHAT_LEADER" }) do
+    ns.on(ev, heard)
+end
+local function saidLately(id) return ns.recentlySaid[id] and GetTime() - ns.recentlySaid[id] < SAID_FOR end
+ns.saidLately = saidLately
 
 local function setKnown(questID, name, status)
     if not questID then return end
@@ -92,11 +113,7 @@ function ns.onPushReply(kind, name)
         run.results[id] = run.results[id] or {}
         run.results[id][key(name)] = { name = name, kind = kind }
     end
-    if kind == "accepted" and ns.goodNews then ns.goodNews() end
-    if ns.db.verbose and kind ~= "has" then
-        local e = C.findEntry(id)
-        ns.print(string.format("%s %s %s", name, WORDS[kind] or kind, e and C.link(e) or ("quest " .. id)))
-    end
+    if kind == "accepted" and ns.goodNews then ns.goodNews() end            -- the round's summary says the rest
 end
 
 ns.on("CHAT_MSG_SYSTEM", function(_, msg)
@@ -122,6 +139,7 @@ local function joinNames(list)
 end
 
 local function announce(links, names)
+    if #links == 0 then return end
     local prefix = string.format(ns.pick(GREETINGS), joinNames(names)) .. " "
     local messages = ns.chunk(links, prefix, ", ", 225)
     local tail = ns.pick(TAILS)
@@ -145,13 +163,15 @@ local function step()
     run.finishing = false
     local e = C.findEntry(q.questID)            -- it may have been abandoned or turned in meanwhile
     local delay = 0.1
-    if e and C.pushable(e) then
+    -- look again right before: another Quest Sharing user may have offered it meanwhile, or the player took it
+    local still = e and decide(e, C.members(), run.force) == "push"
+    if e and C.pushable(e) and still then
         run.current = e.questID
         lastPush = { id = e.questID, at = GetTime() }
         C.push(e)
         run.pushed = run.pushed + 1
-        ns.offered[e.questID] = ns.offered[e.questID] or {}
-        for _, m in ipairs(C.members()) do ns.offered[e.questID][key(m.name)] = true end
+        ns.markOffered(e.questID)
+        if ns.syncUpdate then ns.syncUpdate("O|" .. e.questID) end      -- the others will not offer it again
         delay = ns.db.gap
     else
         run.skipped = run.skipped + 1
@@ -159,27 +179,53 @@ local function step()
     run.timer = ns.after(delay, step)
 end
 
-finish = function()
-    local r = run
-    run = nil
-    if not r then return end
+-- the quests in common worth saying now: not ones somebody else just named in party chat
+local function inCommon(r)
     local links, names, seen = {}, {}, {}
     for _, e in ipairs(r.entries) do
         local with = commonNames(e)
-        if #with > 0 then
+        if #with > 0 and not saidLately(e.questID) then
             links[#links + 1] = C.link(e)
             for _, n in ipairs(with) do if not seen[n] then seen[n] = true; names[#names + 1] = n end end
         end
     end
-    local accepted, declined = 0, 0
+    return links, names
+end
+
+-- one short line for you: who took what (only when something was shared, or when you asked for it)
+local function summary(r)
+    local took, said, missed = {}, {}, 0
+    local MISSED = { busy = true, full = true, dead = true, expired = true, other = true }
     for _, per in pairs(r.results) do
         for _, res in pairs(per) do
-            if res.kind == "accepted" then accepted = accepted + 1 elseif res.kind == "declined" then declined = declined + 1 end
+            if res.kind == "accepted" then took[res.name] = (took[res.name] or 0) + 1
+            elseif res.kind == "declined" then said[#said + 1] = res.name
+            elseif MISSED[res.kind] then missed = missed + 1 end
         end
     end
-    ns.print(string.format("done: %d shared, %d in common, %d accepted, %d declined%s", r.pushed, #links, accepted, declined,
-        r.skipped > 0 and (", " .. r.skipped .. " could not be shared") or ""))
-    if #links > 0 then announce(links, names) end
+    if r.pushed == 0 and r.reason ~= "manual" then return end
+    local parts = {}
+    local names = {}
+    for n in pairs(took) do names[#names + 1] = n end
+    table.sort(names)
+    for _, n in ipairs(names) do parts[#parts + 1] = string.format("%s took %d", n, took[n]) end
+    if #said > 0 then parts[#parts + 1] = #said .. " declined" end
+    if missed > 0 then parts[#parts + 1] = missed .. " could not take it right now" end
+    ns.print(string.format("shared %d quest%s with the party%s", r.pushed, r.pushed == 1 and "" or "s",
+        #parts > 0 and (": " .. table.concat(parts, ", ")) or ""))
+end
+
+finish = function()
+    local r = run
+    run = nil
+    if not r then return end
+    summary(r)
+    -- a quest you just accepted is no news to the party (they are usually the ones who gave it to you)
+    if r.reason == "new quest" or not ns.db.chat then return end
+    ns.after(ns.turnDelay and ns.turnDelay() or 0, function()        -- the first Quest Sharing user in line speaks first
+        if not C.inGroup() then return end
+        announce(inCommon(r))
+    end)
 end
 
 function ns.stopShare(reason)
@@ -195,7 +241,7 @@ function ns.isSharing() return run ~= nil end
 --   "known"    everybody already has it
 --   "offered"  everybody who lacks it was already offered it (we never repeat an offer)
 --   "declined" someone who lacks it declined it before and a repeat would pop it up on them again
-local function decide(e, members, force)
+decide = function(e, members, force)
     local lacking, fresh, decliner = 0, 0, false
     for _, m in ipairs(members) do
         local st = ns.known[e.questID] and ns.known[e.questID][key(m.name)]
@@ -249,19 +295,21 @@ function ns.startShare(reason, opts)
     end
 
     local force = (reason == "manual")
-    run = { queue = {}, entries = entries, entryIds = {}, results = {}, pushed = 0, skipped = 0, grace = 6, reason = reason }
+    run = { queue = {}, entries = entries, entryIds = {}, results = {}, pushed = 0, skipped = 0, grace = 6, reason = reason, force = force }
     local why = { known = 0, offered = 0, declined = 0 }
     for _, e in ipairs(entries) do
         run.entryIds[e.questID] = true
         local verdict = decide(e, members, force)
-        if verdict == "push" then run.queue[#run.queue + 1] = { questID = e.questID } else why[verdict] = why[verdict] + 1 end
+        if verdict == "push" and not C.pushable(e) then verdict = "unshareable" end      -- a quest the game never lets you share
+        if verdict == "push" then run.queue[#run.queue + 1] = { questID = e.questID } else why[verdict] = (why[verdict] or 0) + 1 end
     end
     local notes = {}
     if why.known > 0 then notes[#notes + 1] = why.known .. " already with everyone" end
     if why.offered > 0 then notes[#notes + 1] = why.offered .. " offered before" end
     if why.declined > 0 then notes[#notes + 1] = why.declined .. " skipped, someone declined them (/qs share forces it)" end
-    if not (quiet and #run.queue == 0) then
-        ns.print(string.format("%s: sharing %d quest(s) with %d player(s), %d second(s) apart%s (/qs stop to cancel)", reason or "share",
+    if (why.unshareable or 0) > 0 then notes[#notes + 1] = why.unshareable .. " cannot be shared" end
+    if force then                                                 -- only when you asked for it; automatic rounds stay quiet
+        ns.print(string.format("sharing %d quest(s) with %d player(s), %d second(s) apart%s (/qs stop to cancel)",
             #run.queue, #members, d.gap, #notes > 0 and (" - " .. table.concat(notes, ", ")) or ""))
     end
     step()
@@ -308,13 +356,18 @@ end
 ns.on("QUEST_ACCEPTED", function(_, first, second) ns.shareNewQuest(second or first) end)
 
 -- Noticing a new party -------------------------------------------------------------------------------
-local function schedule(delay, reason)
+-- waited = the turn was already taken into account. The order among Quest Sharing users is only known once their addons
+-- said hello (a couple of seconds after joining), so it is looked at when the round is about to start.
+local function schedule(delay, reason, waited)
     if pendingJoin then ns.cancel(pendingJoin) end
     pendingJoin = ns.after(delay, function()
         pendingJoin = nil
-        if run then schedule(5, reason) else ns.startShare(reason) end
+        local turn = (not waited and ns.turnDelay) and ns.turnDelay() * 2 or 0
+        if turn > 0 then return schedule(turn, reason, true) end   -- someone first in line goes first
+        if run then schedule(5, reason, true) else ns.startShare(reason) end
     end)
 end
+local function scheduleTurn(reason) schedule(ns.db.settle, reason) end
 
 local function snapshot()
     local set, n = {}, 0
@@ -338,7 +391,7 @@ local function onRoster()
     if not group.joined then
         group.joined, group.names = true, set
         ns.known, ns.offered = {}, {}
-        if d.enabled and d.auto then schedule(d.settle, "joined a party") end
+        if d.enabled and d.auto then scheduleTurn("joined a party") end
         return
     end
     local fresh = false
@@ -349,7 +402,7 @@ local function onRoster()
         end
     end
     group.names = set
-    if fresh and d.enabled and d.auto then schedule(d.settle, "a new member joined") end
+    if fresh and d.enabled and d.auto then scheduleTurn("a new member joined") end
 end
 
 ns.on("PLAYER_ENTERING_WORLD", function()

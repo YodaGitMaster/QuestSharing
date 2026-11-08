@@ -1,6 +1,13 @@
 # Changelog
 
 ## 0.2.0
+- **Fewer messages, and several Quest Sharing users in one party work together.** A quest one of you offered is
+  not offered again by the others (an `O|` sync message), and every offer is checked again right before it goes out;
+  accepting a shared quest no longer makes your addon offer it around and announce it. The "in common" message and
+  the "done" message are said once for the whole party: the addons take turns in alphabetical order and leave out
+  what someone already said in party chat. Your own chat: the per-answer lines and the `verbose` setting are gone,
+  automatic rounds start silently and end with one short line only when something was shared, and the tracker pause
+  is explained once per session. The start line of `/qs share` counts only quests that can be shared.
 - **A more beautiful, easier addon.** A four-step start in the README and a welcome in chat (once; after an update, a
   short "what's new"). The settings window has the game's dialog look, six tabs that each open with one line on what
   they are for, sections, real check boxes, `< choice >` and `- number +` controls, a grey line under every setting,

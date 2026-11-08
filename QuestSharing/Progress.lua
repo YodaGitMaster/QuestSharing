@@ -18,12 +18,20 @@ local function snapshot()
     return snap
 end
 
+-- someone else just said this quest is done (a Quest Sharing user finished it, or a link of it in party chat)
+local function alreadySaid(id)
+    local t = ns.recentDone and ns.recentDone[id]
+    return (t and GetTime() - t < 30) or (ns.saidLately and ns.recentlySaid[id] and GetTime() - ns.recentlySaid[id] < 30)
+end
+
 function ns.onQuestCompleted(e)
     ns.syncUpdate("C|" .. e.questID)
-    local names = ns.partyHas(e)
-    if #names > 0 and ns.db.announce then
+    if not (ns.db.announce and #ns.partyHas(e) > 0) then return end
+    -- finishing together is common (the last kill counts for everybody): only the first one says it
+    ns.after(ns.turnDelay and ns.turnDelay() or 0, function()
+        if alreadySaid(e.questID) or not C.inGroup() then return end
         ns.say(string.format("%s %s - %s", ICON, C.link(e), ns.pick(LINES)))
-    end
+    end)
 end
 
 local function check()

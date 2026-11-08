@@ -7,6 +7,7 @@
 --   P|entry               one quest changed or was accepted
 --   R|questID             a quest was removed (abandoned or turned in)
 --   C|questID             all objectives of a quest are done
+--   O|questID             I just offered this quest to the party (so the others do not offer it again)
 -- objectives = comma separated  have/need  (counted)  or  f / u  (finished / unfinished, not counted)
 local ADDON, ns = ...
 local C = ns.compat
@@ -38,6 +39,25 @@ end
 function ns.syncUpdate(text)
     if next(ns.peers) then queue(text) end
 end
+
+-- When several people in the party run Quest Sharing, they take turns instead of all talking at once. The order is
+-- simply the names in alphabetical order: 1 = first. Everyone works it out the same way, without asking.
+function ns.addonRank()
+    local mine = key(C.player())
+    local list = { mine }
+    for k in pairs(ns.peers) do list[#list + 1] = k end
+    table.sort(list)
+    for i, k in ipairs(list) do if k == mine then return i, #list end end
+    return 1, #list
+end
+
+-- seconds to wait before saying something the others might say too (0 for the first in line)
+function ns.turnDelay()
+    local rank = ns.addonRank()
+    return (rank - 1) * 1.5
+end
+
+ns.recentDone = {}         -- ns.recentDone[questID] = time a party member running the addon finished its objectives
 
 -- Encoding -----------------------------------------------------------------------------------------
 local function encodeObjectives(objs)
@@ -138,6 +158,9 @@ local function handle(sender, text)
     elseif kind == "R" then
         local id = tonumber(rest)
         if id then peer.quests[id] = nil; changed() end
+    elseif kind == "O" then                                       -- they offered it: nobody else needs to
+        local id = tonumber(rest)
+        if id and ns.markOffered then ns.markOffered(id) end
     elseif kind == "C" then
         local id = tonumber(rest)
         if not id then return end
@@ -145,8 +168,8 @@ local function handle(sender, text)
         rec.complete = true
         peer.quests[id] = rec
         local e = C.findEntry(id)
-        if e and ns.db.verbose then ns.print(string.format("%s finished the objectives of %s", peer.name, C.link(e))) end
-        if e and ns.goodNews then ns.goodNews() end
+        ns.recentDone[id] = GetTime()
+        if e and ns.goodNews then ns.goodNews() end           -- no chat line: the Party quests window shows a check
         changed()
     end
 end
