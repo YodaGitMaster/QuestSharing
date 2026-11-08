@@ -11,4 +11,5 @@ Share.lua
 Sync.lua
 Progress.lua
 Panel.lua
+Track.lua
 Status.lua

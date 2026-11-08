@@ -159,6 +159,32 @@ function MODERN_API()
     }
 end
 
+-- The quest tracker and quest distances -------------------------------------------------------------------
+IN_COMBAT, IN_INSTANCE = false, false
+WATCHED, WATCH_LOG, DIST, OFF_CONTINENT, DISTANCE_CALLS = {}, {}, {}, {}, 0
+function InCombatLockdown() return IN_COMBAT end
+function IsInInstance() return IN_INSTANCE, "party" end
+
+function TRACKER_MODERN()
+    Constants = { QuestWatchConsts = { MAX_QUEST_WATCHES = 25 } }
+    C_QuestLog.GetQuestWatchType = function(id) return WATCHED[id] and 0 or nil end
+    C_QuestLog.AddQuestWatch = function(id) WATCHED[id] = true; WATCH_LOG[#WATCH_LOG + 1] = "+" .. id end
+    C_QuestLog.RemoveQuestWatch = function(id) WATCHED[id] = nil; WATCH_LOG[#WATCH_LOG + 1] = "-" .. id end
+    C_QuestLog.GetDistanceSqToQuest = function(id)
+        DISTANCE_CALLS = DISTANCE_CALLS + 1
+        local d = DIST[id]
+        if d == nil then return nil end
+        return d, not OFF_CONTINENT[id]
+    end
+end
+
+function TRACKER_CLASSIC()                       -- no distance information on this client
+    MAX_WATCHABLE_QUESTS = 5
+    function IsQuestWatched(i) return WATCHED[QUESTS[i].id] and true or false end
+    function AddQuestWatch(i) WATCHED[QUESTS[i].id] = true; WATCH_LOG[#WATCH_LOG + 1] = "+" .. QUESTS[i].id end
+    function RemoveQuestWatch(i) WATCHED[QUESTS[i].id] = nil; WATCH_LOG[#WATCH_LOG + 1] = "-" .. QUESTS[i].id end
+end
+
 function CLASSIC_API()
     function GetNumQuestLogEntries() return #QUESTS end
     function GetQuestLogTitle(i)
@@ -229,6 +255,7 @@ class Game:
         self.lua.execute(MOCK)
         self.lua.execute("DEFAULT_QUESTS()")
         self.lua.execute("MODERN_API()" if style == "modern" else "CLASSIC_API()")
+        self.lua.execute("TRACKER_MODERN()" if style == "modern" else "TRACKER_CLASSIC()")
         if pre:
             self.lua.execute(pre)
         self.style = style
@@ -265,6 +292,16 @@ class Game:
 
     def pushed(self):
         return list(self.lua.eval("PUSHED").values())
+
+    def watched(self):
+        return sorted(int(k) for k in self.lua.eval("WATCHED").keys())
+
+    def watch_log(self):
+        return list(self.lua.eval("WATCH_LOG").values())
+
+    def set_dist(self, **kw):
+        """set_dist(q100=400, q101=900): squared distances in yards; None removes the entry."""
+        self.run("DIST = {%s}" % ", ".join(f"[{k[1:]}] = {v}" for k, v in kw.items()))
 
     def peer(self, sender, text, prefix="QSHARE", channel="PARTY"):
         """Another player's Quest Sharing addon sends us a message."""
