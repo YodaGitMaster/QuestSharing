@@ -53,7 +53,7 @@ A World of Warcraft addon for playing quests together.
      when you change zone.
    - `/qs near N` sets how many quests it keeps (default 5, limited by the tracker's maximum).
    - It manages the whole tracker list while it is on, and **`/qs near off` puts your old list back**.
-     If you change the tracker yourself it pauses for 5 minutes (`/qs near resume` to continue). It waits
+     If you change the tracker yourself it steps aside for 10 seconds (a setting; `/qs near resume` to continue). It waits
      during combat and inside instances.
    - Note this fills the tracker list. It does not touch the single highlighted "waypoint" quest.
 
@@ -66,14 +66,24 @@ A World of Warcraft addon for playing quests together.
    <zone>"). The game's answers (added, already a friend, not found, list full, other faction) are read and
    summarised for you.
 
-8. **A quick chat wheel, like in Diablo 4.** Bind a key (Game Menu > Options > Key Bindings > Quest Sharing,
-   or `/qs key V`). **Hold the key**: a wheel of up to 8 messages opens around the mouse. **Point at one and
-   release the key** to say it. A quick tap opens the wheel and keeps it open so you can click a slot
-   instead; Esc or a right click closes it. By default the wheel says:
+8. **A quick chat ring, like in Diablo 4.** Bind a key (Game Menu > Options > Key Bindings > Quest Sharing,
+   or `/qs key V`). **Hold the key**: a clean ring of up to 8 messages opens around the mouse, each with a short
+   label (14 letters at most) outside the ring. **Point at one**: its full text appears in the middle. Then
+   **release the key** or **click** it. By default the ring has:
+   *Hello - Team up? - What I need - Same quests? - Thanks - Wait - Follow me - Invite*.
 
-   > Hey {name}! o/ - Want to quest together here? ({here}) - I need to: {need} - {shared} - Thanks! - Wait for me, one sec! - Follow me! - Ready when you are!
+   **Where it goes.** If you have a **player targeted** it is a **whisper to them** (so `{name}` is their name).
+   Otherwise it goes to your party, or to everybody nearby (`/say`) if you are not in one.
+   `/qs quick channel auto|say|party|whisper` changes that.
 
-   Messages are filled in when you send them: `{name}` is the friendly player you target (or "there"),
+   **Why `/say` needs a click.** The game only lets an addon say things to everybody nearby (`/say`, `/yell`,
+   `/emote`) as the direct result of a key *press* or a mouse *click*, never from a key *release*; that is what
+   caused the "Interface action failed because of an AddOn" message in an earlier version. So:
+   whispers and party chat send the moment you release the key; for `/say` (and for the invite action) a release
+   keeps the ring open on your choice and **one click, or one more press of the key,** sends it. A quick tap of the
+   key also keeps the ring open so you can click a message.
+
+   **Messages are filled in when you point at them.** `{name}` is the friendly player you target (or "there"),
    `{here}` your subzone or zone, `{need}` what you still have to do in this area (your unfinished
    objectives, nearest quest first where the client can measure distance), `{mine}` links to your
    unfinished quests of this area, `{common}` the quests you and your party share, `{quest}` the nearest
@@ -81,12 +91,12 @@ A World of Warcraft addon for playing quests together.
    **`{shared}` knows you cannot see a stranger's quests**, so with someone who is not in your party it asks a
    question that links yours (they can click a link and tell you): *"Are you doing any of these quests here?
    [Wolves Among Us], [A Personal Quest] Want to do them together?"*. Once you are in a party it says *"We have
-   these quests in common: ..."*, or *"No quest in common yet - I'm on ... Any of these yours?"*. It goes to the party when
-   you are in one, otherwise to everybody nearby (`/qs quick channel auto|say|party|whisper`; `whisper`
-   sends it to your target).
-   **Arrange them as you please:** `/qs quick` lists them; `/qs quick add <text>`, `edit N <text>`,
-   `remove N`, `move N M`, `reset`; or `/qs quick editor` for a small window (click a line, change the text,
-   press Enter, use Up / Down / Delete / Add).
+   these quests in common: ..."*, or *"No quest in common yet - I'm on ... Any of these yours?"*.
+
+   **Arrange the messages as you please.** Open `/qs settings`, tab **Quick chat**: click a message, change its
+   label and text, press Enter, use Up / Down / Remove / Add / Reset, and **Show the ring** to see it as it looks in
+   play. Or by command: `/qs quick` lists them; `/qs quick add [label |] <text>`, `edit N <text>`, `label N <label>`,
+   `remove N`, `move N M`, `reset`.
 
 9. **A minimap button.** Left click opens the settings window, right click shows or hides the
    quests-in-common panel, drag it around the minimap edge to move it (`/qs minimap off` hides it).
@@ -104,7 +114,7 @@ A World of Warcraft addon for playing quests together.
       above its nameplate (the game itself tells the addon which creatures those are).
     - **The nearest quest is pinned in the world:** while "tracker follows me" is on, the game's own
       highlighted-quest marker (waypoint) follows the closest quest as you move. A quest only takes over after
-      it has been the clear winner twice in a row, and if you pin a quest yourself it steps aside for 5 minutes.
+      it has been the clear winner twice in a row, and if you pin a quest yourself it steps aside for 10 seconds.
       Switching it off gives back the quest you had pinned.
     - **Optional game-settings helper** (`/qs highlight cvars on`, off by default because it changes game
       settings): turns on enemy nameplates (the icons need them) and the game's icons over objects you can
@@ -112,25 +122,22 @@ A World of Warcraft addon for playing quests together.
     - `/qs highlight mobs|pin|cvars [on|off]`; the same switches are in `/qs settings`.
 
 ## Settings window
-**Everything is switched on by default.** To change anything, type `/qs settings` (or the minimap button, or click **Settings** on
-the quests-in-common panel, or open *Game Menu > Options > AddOns > Quest Sharing*). Every line is one
-click:
+**Everything is switched on by default** (except the friends beta and the game-settings helper). To change
+anything, type `/qs settings` (or use the minimap button, or click **Settings** on the quests-in-common panel, or
+open *Game Menu > Options > AddOns > Quest Sharing*). It has five tabs:
 
-```
-[ON]  Share my quests when I join a party or someone joins
-[ON]  Share a quest when I accept it (in a party)
-      Which quests to share: this zone only          (click to change)
-      Seconds between shared quests: 4               (left click +, right click -, Shift = 5 at a time)
-[ON]  Announce quests in common in party chat
-[OFF] Sync quest lists with other Quest Sharing users
-...
-      Reset everything to the defaults (all on)
-```
-On/off lines switch with a click; lines with a choice cycle through the choices (right click goes back);
-number lines count up with the left button and down with the right one. Hover a line for a short
-explanation. The same things can be done with `/qs` commands, and a change in either place shows up in the
-other at once. Settings saved by an earlier version get the new defaults (tracker and panel on); every
-other choice you made is kept.
+| Tab | What is on it |
+|---|---|
+| **General** | the master switch, the minimap button, the panel, accept/decline messages, reset |
+| **Sharing** | when quests are shared and to whom, announcements, clicking a tracked quest, sync, quest-log markers |
+| **Tracker** | the tracker that follows you (how many quests, distance or zone, how long it waits after you change it yourself), the world pin, quest icons over creatures, the game-settings helper |
+| **Quick chat** | the ring on/off, hold or toggle, where it goes, and the **editor for your messages** |
+| **Social** | the friends beta |
+
+Every line is one click: on/off lines switch, choice lines cycle through the choices (right click goes back), number
+lines count up with the left button and down with the right one (Shift = 5 at a time). Hover a line for a short
+explanation. The same things can be done with `/qs` commands, and a change in either place shows up in the other at
+once. Settings saved by an earlier version get the new defaults; every other choice you made is kept.
 
 ## Install
 **Easiest:** download `QuestSharing-<version>.zip` from the GitHub *Releases* page, unzip it and drop the
@@ -168,7 +175,7 @@ other choice you made is kept.
 | `/qs friends` | (beta) add everybody in your party to your friends list now |
 | `/qs friends on\|off` | (beta) do it automatically when a party forms or someone joins (default off) |
 | `/qs key [KEY]` | bind the quick chat wheel to a key, e.g. `/qs key V` or `/qs key ALT-E`; `/qs key none` removes it |
-| `/qs quick ...` | the quick chat messages: `add`, `edit`, `remove`, `move`, `reset`, `editor`, `mode hold\|toggle`, `channel auto\|say\|party\|whisper`, `on\|off` |
+| `/qs quick ...` | the quick chat messages: `add [label \|] <text>`, `edit`, `label`, `remove`, `move`, `reset`, `editor`, `mode hold\|toggle`, `channel auto\|say\|party\|whisper`, `on\|off` |
 | `/qs highlight mobs\|pin\|cvars [on\|off]` | quest icons over creatures / pin the nearest quest / the game-settings helper |
 | `/qs doctor` | a report of what works on this client, in a window you can copy from |
 | `/qs errors [clear]` | errors this addon has caused |
@@ -200,7 +207,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 372 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 406 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -215,9 +222,8 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
   another continent are ignored.
 - **Quick chat key:** an addon cannot press a key for you, so you choose the key yourself. Pick one you do
   not need: for example **E is "strafe right" by default**; `/qs key E` tells you what the key used to do
-  before it takes it over. Chat to nearby players (`/say`) is only allowed as the direct result of a key or
-  mouse press, which is exactly what choosing a slot is. The wheel needs a free mouse pointer (not
-  mouse-look). It is untested in the real game: `/qs probe` shows `quick chat wheel: key ...`.
+  before it takes it over. Chat to everybody nearby (`/say`) is only allowed from a key press or a click, so the
+  ring waits for one (see the quick chat section). The ring needs a free mouse pointer (not mouse-look). It is untested in the real game: `/qs probe` shows `quick chat wheel: key ...`.
 - **Quest icons over creatures** only appear where the game shows nameplates: enemy nameplates must be on
   (`/qs highlight cvars on` does that), and creatures farther away than your nameplate distance have none.
   Objects (items on the ground, chests) are not creatures, so they get no icon from this addon; the helper
@@ -247,14 +253,14 @@ pip install lupa
 python tests/test_questsharing.py     # 63 tests: sharing, replies, announcements, tracker clicks, commands
 python tests/test_features.py         # 50 tests: sync, completion, panel, quest-log markers
 python tests/test_triggers.py         # 34 tests: when it shares (once per join / new member / new quest), no nagging
-python tests/test_tracker.py          # 28 tests: the tracker follows you (distance and zone modes)
-python tests/test_settings.py         # 36 tests: everything on by default, migration, the settings window
+python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
+python tests/test_settings.py         # 42 tests: everything on by default, migration, the tabbed settings window
 python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
-python tests/test_quick.py            # 63 tests: the quick chat wheel, placeholders, editing, key binding
+python tests/test_quick.py            # 89 tests: the quick chat ring, placeholders, editing, key binding, performance
 python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
-python tests/test_highlight.py        # 21 tests: quest icons over creatures, the world pin, the game-settings helper
+python tests/test_highlight.py        # 22 tests: quest icons over creatures, the world pin, the game-settings helper
 ```
-Expected: `63/63`, `50/50`, `34/34`, `28/28`, `36/36`, `42/42`, `63/63`, `35/35` and `21/21 passed`.
+Expected: every line ends in `passed` with all tests green (406 in total).
 
 ## Files
 | File | Purpose |
@@ -270,8 +276,8 @@ Expected: `63/63`, `50/50`, `34/34`, `28/28`, `36/36`, `42/42`, `63/63`, `35/35`
 | `QuestSharing/Diagnostics.lua` | the error log, `/qs doctor` and the copyable report window |
 | `QuestSharing/MinimapButton.lua` | the minimap button |
 | `build_release.py`, `CHANGELOG.md` | builds `dist/QuestSharing-<version>.zip` and the release notes |
-| `QuestSharing/Quick.lua`, `QuestSharing/Bindings.xml` | the quick chat wheel, its placeholders, the message editor and the key binding |
+| `QuestSharing/Quick.lua`, `QuestSharing/Bindings.xml` | the quick chat ring, its placeholders, the message commands and the key binding |
 | `QuestSharing/Friends.lua` | (beta) adds party members to your friends list, with safeguards |
-| `QuestSharing/Settings.lua` | the settings window (plain clickable lines, no game UI templates) and the options entry |
+| `QuestSharing/Settings.lua` | the tabbed settings window with the message editor (plain clickable controls, no game UI templates) and the options entry |
 | `QuestSharing/Status.lua` | the status message, tracker / link hooks, `/qs probe` |
 | `tests/` | the Lua 5.1 test harness with a WoW API mock, and the two test files |

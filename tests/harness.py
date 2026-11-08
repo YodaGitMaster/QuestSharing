@@ -11,6 +11,7 @@ FILES = [line.strip() for line in (ADDON_DIR / "QuestSharing.toc").read_text().s
 
 MOCK = r'''
 NOW = 1000
+CALLS = {}
 FRAMES, SENT, PRINTED, OPENED, PUSHED = {}, {}, {}, {}, {}
 UNKNOWN_EVENTS = {}
 SELECTED = 0
@@ -55,11 +56,13 @@ local function newObject()
     function o:Show() self.shown = true end
     function o:Hide() self.shown = false end
     function o:IsShown() return self.shown end
-    function o:SetText(t) self.text = t end
+    function o:SetText(t) self.text = t; self.sets = (self.sets or 0) + 1 end
     function o:GetText() return self.text end
     function o:CreateFontString() return newObject() end
     function o:CreateTexture() return newObject() end
     function o:SetTexture(path) self.texture = path end
+    function o:GetWidth() return self.width or 100 end
+    function o:GetHeight() return self.height or 20 end
     function o:SetPoint(p, rel, rp, x, y) self.point = { p, rel, rp, x or 0, y or 0 } end
     function o:GetPoint() return unpack(self.point) end
     function o:SetHeight(h) self.height = h end
@@ -67,7 +70,8 @@ local function newObject()
     for _, name in ipairs({ "SetBackdrop", "SetBackdropColor", "SetFrameStrata", "SetMovable", "EnableMouse",
                             "RegisterForDrag", "SetJustifyH", "StartMoving", "StopMovingOrSizing", "SetAllPoints",
                             "ClearAllPoints", "SetFontObject", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "SetFocus",
-                            "SetMultiLine", "HighlightText", "SetFrameLevel", "RegisterForClicks", "SetHighlightTexture",
+                            "SetMultiLine", "HighlightText", "SetFrameLevel", "RegisterForClicks", "SetHighlightTexture", "SetVertexColor",
+                            "SetAlpha", "SetColorTexture", "SetJustifyV", "SetWordWrap",
                             }) do
         o[name] = function() end
     end
@@ -96,6 +100,7 @@ function InviteUnit(name) INVITED[#INVITED + 1] = name end
 function UnitIsGroupLeader(u) return LEADER end
 function GetNumGroupMembers() return #GROUP.members > 0 and (#GROUP.members + 1) or 0 end
 UIParent = newObject()
+UIParent.width, UIParent.height = 1920, 1080
 function UIParent:GetEffectiveScale() return UI_SCALE end
 function GetCursorPosition() return CURSOR.x * UI_SCALE, CURSOR.y * UI_SCALE end
 ChatFontNormal = {}
@@ -197,6 +202,7 @@ function MODERN_API()
     C_QuestLog = {
         GetNumQuestLogEntries = function() return #QUESTS end,
         GetInfo = function(i)
+            CALLS.GetInfo = (CALLS.GetInfo or 0) + 1
             local q = QUESTS[i]
             if not q then return nil end
             if q.header then return { title = q.header, isHeader = true } end
@@ -346,6 +352,7 @@ end
 function CLASSIC_API()
     function GetNumQuestLogEntries() return #QUESTS end
     function GetQuestLogTitle(i)
+        CALLS.GetInfo = (CALLS.GetInfo or 0) + 1
         local q = QUESTS[i]
         if not q then return nil end
         if q.header then return q.header, 0, nil, true, false, nil, nil, nil end

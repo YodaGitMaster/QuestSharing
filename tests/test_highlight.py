@@ -128,13 +128,23 @@ def test_a_short_detour_never_moves_the_pin():
     assert g.super_log() == [100]
 
 
-def test_choosing_another_quest_yourself_pauses_the_pin_for_five_minutes():
+def test_choosing_another_quest_yourself_pauses_the_pin_for_ten_seconds():
     g = following()
     g.run("SUPER = 200")                                     # you pinned a quest by hand
     g.advance(2.3)
-    assert "pin: paused for 5 minutes" in printed(g) and g.eval("SUPER") == 200
-    g.advance(120)
+    assert "pin: paused for 10 seconds" in printed(g) and g.eval("SUPER") == 200
+    g.advance(5)
     assert g.eval("SUPER") == 200, "it does not fight you"
+    g.advance(8)                                             # the pause is over
+    g.advance(2.3)
+    g.advance(2.3)
+    assert g.eval("SUPER") == 100
+
+
+def test_resume_ends_a_pin_pause_early():
+    g = following()
+    g.run("SUPER = 200")
+    g.advance(2.3)
     g.slash("near resume")
     g.advance(2.3)
     g.advance(2.3)

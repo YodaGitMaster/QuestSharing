@@ -125,28 +125,37 @@ def test_the_report_text_cannot_be_edited_by_accident(style):
 
 
 # ---- invite from the wheel ------------------------------------------------------------------------------------------
-def invite_slot(g):
+def invite_slot(g, click=True):
     g.cursor(*CENTER)
     g.eval("QuestSharing_QuickDown")()
     g.advance(0.6)
     g.cursor(CENTER[0] - 64, CENTER[1] + 64)                        # upper left = slot 8
     g.eval("QuestSharing_QuickUp")()
+    if click and g.wheel()[0].shown:                                # an invite needs a real click (release is not allowed)
+        g.eval("function(b, w) b.scripts.OnClick(b, w) end")(g.wheel()[1][8].button, "LeftButton")
+    g.advance(1.2)
 
 
 def test_the_last_slot_invites_the_target_and_whispers_them(style):
     g = game(style)
     g.run('TARGET = { name = "Lia", player = true }')
-    invite_slot(g)
+    invite_slot(g, click=False)
+    assert g.invited() == [] and g.wheel()[0].shown is True, "a key release cannot invite: the ring waits for a click"
+    g.eval("function(b, w) b.scripts.OnClick(b, w) end")(g.wheel()[1][8].button, "LeftButton")
     assert g.invited() == ["Lia"]
     assert g.sent() == [("Sending you a party invite - let's quest together!", "WHISPER")] and g.eval("SENT[1].target") == "Lia"
 
 
-def test_the_wheel_shows_an_invite_slot_as_such(style):
+def test_the_ring_shows_an_invite_slot_as_such(style):
     g = game(style)
+    g.run('TARGET = { name = "Lia", player = true }')
     g.cursor(*CENTER)
     g.eval("QuestSharing_QuickDown")()
-    _, labels, _ = g.wheel()
-    assert "Invite: Sending you a party" in labels[8].text          # the wheel shortens labels to 30 characters
+    _, slots, center, _ = g.wheel()
+    assert "Invite" in slots[8].label.text
+    g.cursor(CENTER[0] - 64, CENTER[1] + 64)
+    g.eval("function(f) f.scripts.OnUpdate(f, 0.05) end")(g.wheel()[0])
+    assert "Invite to my party" in center.text and "Sending you a party invite" in center.text
 
 
 def test_invites_are_refused_politely_when_they_cannot_work(style):
@@ -173,14 +182,14 @@ def test_an_invite_without_text_does_not_whisper_and_lookalikes_are_plain_text(s
     g = game(style)
     g.run('TARGET = { name = "Lia", player = true }')
     g.slash("quick remove 8")
-    g.slash("quick add @invite")
+    g.slash("quick add Invite | @invite")
     invite_slot(g)
     assert g.invited() == ["Lia"] and g.sent() == []
     g.advance(2)
     g.slash("quick edit 8 @inviteme please")
-    invite_slot(g)
-    assert g.invited() == ["Lia"], "'@inviteme' is just a message, not the action"
-    assert g.sent()[-1][0] == "@inviteme please"
+    invite_slot(g, click=False)                                     # "@inviteme" is just a message: a whisper, sent on release
+    assert g.invited() == ["Lia"], "'@inviteme' is not the action"
+    assert g.sent()[-1] == ("@inviteme please", "WHISPER")
 
 
 # ---- minimap button ---------------------------------------------------------------------------------------------------
@@ -200,7 +209,7 @@ def test_left_click_opens_the_settings_right_click_toggles_the_panel(style):
     b = g.eval("NS._minimapButton()")
     click = g.eval("function(b, which) b.scripts.OnClick(b, which) end")
     click(b, "LeftButton")
-    assert g.eval("NS._settingsWindow()")[0].shown is True
+    assert g.eval("NS._settingsWindow()").win.shown is True
     before = g.eval("NS.db.panel")
     click(b, "RightButton")
     assert g.eval("NS.db.panel") is (not before)
@@ -258,7 +267,7 @@ def test_the_release_zip_is_ready_to_install():
     assert "QuestSharing/Bindings.xml" in inside and "QuestSharing/QuestSharing.toc" in inside
     assert not any("test" in n or n.endswith(".py") for n in inside), "no tests in the install package"
     notes = (zpath.parent / "RELEASE_NOTES.md").read_text()
-    assert "Quick chat wheel" in notes and "0.1.0" not in notes
+    assert "Quick chat ring" in notes and "0.1.0" not in notes
 
 
 if __name__ == "__main__":

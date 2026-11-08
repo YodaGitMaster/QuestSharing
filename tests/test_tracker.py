@@ -129,17 +129,28 @@ def test_it_is_off_by_default_and_never_touches_the_tracker():
 
 
 # ---- you stay in charge --------------------------------------------------------------------------------------------
-def test_changing_the_tracker_yourself_pauses_it_for_five_minutes():
+def test_changing_the_tracker_yourself_pauses_it_for_ten_seconds():
     g = modern()
     g.advance(10)
     g.run("WATCHED[200] = true")                                                   # you added a quest by hand
     g.fire("QUEST_WATCH_LIST_CHANGED")
-    assert "paused for 5 minutes" in "\n".join(g.printed())
-    g.advance(120)
+    assert "paused for 10 seconds" in "\n".join(g.printed())
+    g.advance(6)
     assert 200 in g.watched(), "it does not fight you"
-    g.advance(200)
+    g.advance(10)
     g.advance(6)
     assert 200 not in g.watched(), "after the pause it takes over again"
+
+
+def test_the_pause_length_is_a_setting():
+    g = modern()
+    g.advance(10)
+    g.run("NS.db.nearPause = 60")
+    g.run("WATCHED[200] = true")
+    g.fire("QUEST_WATCH_LIST_CHANGED")
+    assert "paused for 60 seconds" in "\n".join(g.printed())
+    g.advance(50)
+    assert 200 in g.watched()
 
 
 def test_resume_command_ends_the_pause_early():
@@ -190,21 +201,21 @@ def classic_following():
 
 
 def pauses(g):
-    return g.printed().count("|cff55ccffQuestSharing:|r tracker follows you: paused for 5 minutes because you changed the tracker (/qs near resume to continue)")
+    return g.printed().count("|cff55ccffQuestSharing:|r tracker follows you: paused for 10 seconds because you changed the tracker (/qs near resume to continue)")
 
 
 def test_a_manual_change_is_noticed_without_any_event():
     g = classic_following()
     assert g.watched() == [100, 101, 102] and pauses(g) == 0
     g.run("WATCHED[200] = true")                                                   # you track a quest from another zone
-    g.advance(6)
+    g.advance(4)
     assert pauses(g) == 1 and 200 in g.watched(), "it pauses instead of undoing your choice"
     log = len(g.watch_log())
-    g.advance(200)
-    assert len(g.watch_log()) == log, "and stays out of the way for the five minutes"
-    g.advance(120)
-    g.advance(8)
-    assert 200 not in g.watched(), "then it takes over again"
+    g.advance(4)
+    assert len(g.watch_log()) == log, "and stays out of the way for the ten seconds"
+    g.advance(12)                                                                  # the ten seconds are over
+    g.advance(8)                                                                   # two looks to be sure, then it takes over
+    assert 200 not in g.watched()
 
 
 def test_untracking_a_quest_by_hand_also_pauses_it():

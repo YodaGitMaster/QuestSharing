@@ -52,6 +52,13 @@ function C.entries()
     return out
 end
 
+-- questID -> entry, for code that has to look up many quests: one scan instead of one per lookup
+function C.entryMap()
+    local m = {}
+    for _, e in ipairs(C.entries()) do m[e.questID] = e end
+    return m
+end
+
 function C.findEntry(questID, index)
     for _, e in ipairs(C.entries()) do
         if (questID and e.questID == questID) or (not questID and index and e.index == index) then return e end
@@ -174,18 +181,27 @@ function C.zone()
     return (GetRealZoneText and GetRealZoneText()) or (GetZoneText and GetZoneText()) or ""
 end
 
+-- The quests the game puts on the map the player is on. Asking the game for this list once per quest would be
+-- slow, so it is kept for one second (it is only ever asked about a whole quest log at a time).
+local areaCache = { at = -10, set = nil }
+local function onMapSet()
+    if not (C_Map and C_Map.GetBestMapForUnit and C_QuestLog and C_QuestLog.GetQuestsOnMap) then return nil end
+    local now = GetTime()
+    if areaCache.set and now - areaCache.at < 1 then return areaCache.set end
+    local set = {}
+    local map = C_Map.GetBestMapForUnit("player")
+    if map then
+        for _, q in ipairs(C_QuestLog.GetQuestsOnMap(map) or {}) do set[q.questID] = true end
+    end
+    areaCache = { at = now, set = set }
+    return set
+end
+
 -- is this quest "in the area" the player is standing in?
 function C.inArea(e)
-    if lower(e.header) == lower(C.zone()) and e.header then return true end
-    if C_Map and C_Map.GetBestMapForUnit and C_QuestLog and C_QuestLog.GetQuestsOnMap then
-        local map = C_Map.GetBestMapForUnit("player")
-        if map then
-            for _, q in ipairs(C_QuestLog.GetQuestsOnMap(map) or {}) do
-                if q.questID == e.questID then return true end
-            end
-        end
-    end
-    return false
+    if e.header and lower(e.header) == lower(C.zone()) then return true end
+    local set = onMapSet()
+    return set ~= nil and set[e.questID] == true
 end
 
 -- Addon-to-addon messages -----------------------------------------------------------------------
@@ -209,10 +225,10 @@ function C.canWatch()
     return ((C.modern and C_QuestLog.AddQuestWatch) or AddQuestWatch) and true or false
 end
 
--- set of questIDs currently shown in the tracker
-function C.watchedSet()
+-- set of questIDs currently shown in the tracker (pass the entries you already read to save a second scan)
+function C.watchedSet(entries)
     local set = {}
-    for _, e in ipairs(C.entries()) do
+    for _, e in ipairs(entries or C.entries()) do
         local watched
         if C.modern and C_QuestLog.GetQuestWatchType then
             watched = (C_QuestLog.GetQuestWatchType(e.questID) ~= nil)       -- nil = not tracked (0 / 1 = automatic / manual)

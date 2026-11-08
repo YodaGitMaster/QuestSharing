@@ -1,11 +1,13 @@
 # Changelog
 
 ## 0.2.0
-- **Quick chat wheel** (hold a key, point, release) with editable messages and placeholders; with a stranger the
+- **Quick chat ring** (hold a key, point, release or click): a clean ring with short labels, editable messages and
+  placeholders, a whisper to the player you target, and `/say` sent on a click or key press (the game forbids it from a
+  release); light on the game (messages are only filled in when you point at them); with a stranger the
   message is a question that links your quests of the area; an `@invite` action invites your target to your party
 - **Tracker follows you**: keeps the quest tracker on the nearest quests (distance mode, or zone mode on clients that
-  cannot measure distance); notices when you change the tracker yourself, with or without game events
-- **Settings window** (`/qs settings`), minimap button, entry in the game's options; everything on by default
+  cannot measure distance); steps aside for 10 seconds (a setting) when you change the tracker yourself, with or without game events
+- **Tabbed settings window** (`/qs settings`) with a message editor, minimap button, entry in the game's options; everything on by default
 - **Friends (beta)**: add the people you group with to your friends list, with safeguards
 - Sharing happens once per member: when you join a party, when someone new joins, and when you accept a quest;
   a quest someone declined is never offered to them again automatically

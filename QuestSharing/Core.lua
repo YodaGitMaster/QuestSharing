@@ -29,6 +29,7 @@ ns.defaults = {
     highlightCVars = false, -- (off) also switch on the game settings these need (enemy nameplates, object icons)
     near = true,        -- keep the quest tracker filled with the quests closest to you
     nearCount = 5,      -- how many quests the tracker keeps while "near" is on
+    nearPause = 10,     -- seconds the tracker and the pin leave your choice alone after you change the tracker yourself
     nearMode = "auto",  -- "auto" (distance if the client can measure it, else zone), "distance" or "zone"
 }
 ns.db = {}
