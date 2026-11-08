@@ -173,9 +173,12 @@ function ns.pingReport()
     local api = C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest
     local names = 0
     for _ in pairs(C.questMobNames()) do names = names + 1 end
+    local qs = ns.questie and ns.questie.available()
+    local qsNote = qs and ns.questie.languageNote()                     -- Questie in another language: its names are not used
     line(api ~= nil or names > 0, "telling quest creatures apart: " .. (api and "yes (the game says)" or
-        (names > 0 and ("by name, from your quest log" .. ((ns.questie and ns.questie.available()) and " and Questie" or "") .. ": " .. names .. " creature(s)")
-         or "NO - no creature names in your quest log (Questie would help)")))
+        (names > 0 and ("by name, from your quest log" .. ((qs and not qsNote) and " and Questie" or "") .. ": " .. names .. " creature(s)")
+         or ("NO - no creature names in your quest log" .. (qs and "" or " (Questie would help)")))))
+    if qsNote and not api then line(false, qsNote) end
     line(ns.enemyNameplatesOn and ns.enemyNameplatesOn(), "enemy nameplates: " .. ((ns.enemyNameplatesOn and ns.enemyNameplatesOn()) and "on" or "OFF - press V (the addon finds quest creatures through them)"))
     local name = ns.nearestQuestCreature()
     line(name ~= nil, "nearest quest creature right now: " .. (name or "none in sight"))

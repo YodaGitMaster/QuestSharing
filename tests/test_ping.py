@@ -271,6 +271,38 @@ def test_questie_adds_the_creatures_that_drop_your_quest_items():
     assert g.eval("NS.compat.questMobNames()").prowler is True, "Prowlers drop the pelts: they count too"
 
 
+QUESTIE_KILL_CREDIT = """
+    QUESTIE_Q = { [100] = { objectives = { nil, nil, nil, nil, { { { 41, 42 }, 40, "Scouts slain" } } } } }
+    QUESTIE_N = { [40] = { name = "Credit Bunny" }, [41] = { name = "Gnoll Scout" }, [42] = { name = "Gnoll Lookout" } }
+    QuestDB = { Get = function(id, k) local r = QUESTIE_Q[id]; return r and r[k] end }
+    NpcDB = { Get = function(id, k) local r = QUESTIE_N[id]; return r and r[k] end }
+    ItemDB = { Get = function() return nil end }"""
+
+
+def test_questie_adds_the_creatures_that_count_for_another():
+    g = Game("classic", QUESTIE_KILL_CREDIT)
+    g.start()
+    names = g.eval("NS.compat.questMobNames()")
+    assert names["gnoll scout"] is True and names["gnoll lookout"] is True, "either one counts for the objective"
+    assert names["credit bunny"] is None, "the creature that gets the credit is not one you can see"
+
+
+def test_questie_names_in_another_language_are_not_used():
+    lib = "\n    LibQuestieDB = { l10n = { currentLocale = 'enUS' } }"
+    g = Game("classic", QUESTIE_KILL_CREDIT + lib + "\n    function GetLocale() return 'deDE' end")
+    g.start()
+    assert g.eval("NS.compat.questMobNames()")["gnoll scout"] is None, "English names never match a German nameplate"
+    assert g.eval("NS.compat.questMobNames()").wolf is True, "the quest log still names its creatures"
+    g.run("PRINTED = {}")
+    g.slash("ping")
+    text = "\n".join(g.printed())
+    assert "[--] Questie's names are in enUS, the game is in deDE" in text, text
+    assert "from your quest log and Questie" not in text, text
+    g2 = Game("classic", QUESTIE_KILL_CREDIT + lib + "\n    function GetLocale() return 'enGB' end")
+    g2.start()
+    assert g2.eval("NS.compat.questMobNames()")["gnoll scout"] is True, "enGB reads the one English the database has"
+
+
 # ---- objects: collect one, then the next press shows another ------------------------------------------------------------
 def test_after_you_collect_the_object_the_next_press_points_at_another(style):
     g = game(style)
