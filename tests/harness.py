@@ -146,12 +146,14 @@ ChatFontNormal = {}
 TARGET, SUBZONE = nil, ""
 function UnitExists(u)
     if u == "questnpc" then return QUESTNPC ~= nil end
+    if u == "mouseover" and HOVER_PLAYER then return true end          -- a player under the mouse
     if u == "softenemy" or u == "mouseover" then local a = (u == "softenemy") and SOFTENEMY or MOUSEOVER; return a ~= nil and CREATURES[a] ~= nil end
     if CREATURES and CREATURES[u] then return true end
     return u == "target" and TARGET ~= nil
 end
 function UnitIsPlayer(u)
     if u == "questnpc" then return QUESTNPC ~= nil and QUESTNPC.player == true end
+    if u == "mouseover" and HOVER_PLAYER then return true end
     return u == "target" and TARGET ~= nil and TARGET.player == true
 end
 RAID_ICONS, IN_INSTANCE = {}, false
@@ -233,9 +235,22 @@ function UnitName(unit)
     if unit == "player" then return "Me" end
     if unit == "target" and TARGET then return TARGET.name end
     if unit == "questnpc" and QUESTNPC then return QUESTNPC.name end
+    if unit == "mouseover" and HOVER_PLAYER then return HOVER_PLAYER.name, HOVER_PLAYER.realm end
     if unit == "softenemy" and SOFTENEMY then unit = SOFTENEMY elseif unit == "mouseover" and MOUSEOVER then unit = MOUSEOVER end
     if CREATURES and CREATURES[unit] then return CREATURES[unit].name end
 end
+-- players: the other faction (hostile = true) is not a friend; party members are in the party
+function UnitIsFriend(a, u)
+    if u == "target" then return TARGET ~= nil and not TARGET.hostile end
+    if u == "mouseover" and HOVER_PLAYER then return not HOVER_PLAYER.hostile end
+    return true
+end
+function UnitInParty(u)
+    local n = UnitName(u)
+    for _, m in ipairs(GROUP.members) do if m == n then return true end end
+    return false
+end
+function UnitInRaid(u) return nil end
 function GetRealZoneText() return ZONE end
 
 -- chat edit box for the shift-click link hook

@@ -168,21 +168,33 @@ local function isEmote(text) return string.sub(text or "", 1, 7) == "@emote " en
 local function emoteToken(text) return string.upper(string.match(text or "", "^@emote%s+(%S+)") or "") end
 ns.quickIsEmote = isEmote
 
--- Placeholders ---------------------------------------------------------------------------------------------
-local function targetName()
-    if UnitExists and UnitExists("target") and UnitIsPlayer and UnitIsPlayer("target")
-       and not (UnitIsUnit and UnitIsUnit("target", "player")) then
-        return UnitName("target")
-    end
+-- The person a message is for ----------------------------------------------------------------------------------
+-- Your target if it is a friendly player, else the friendly player under your mouse when the ring opened (the one you
+-- "highlight"). Chosen when the ring opens, so moving the mouse to a slot cannot change it; the other faction is never
+-- picked (it cannot be whispered).
+local function friendlyPlayer(unit)
+    if not (UnitExists and UnitExists(unit) and UnitIsPlayer and UnitIsPlayer(unit)) then return nil end
+    if UnitIsUnit and UnitIsUnit(unit, "player") then return nil end
+    if UnitIsFriend and not UnitIsFriend("player", unit) then return nil end
+    local n, r = UnitName(unit)
+    if not n or n == "" then return nil end
+    local inGroup = (UnitInParty and UnitInParty(unit)) or (UnitInRaid and UnitInRaid(unit))
+    return { name = n, whisper = (r and r ~= "") and (n .. "-" .. r) or n, inGroup = inGroup and true or false }
 end
 
--- the name to whisper (with the realm for players of another realm)
-local function targetWhisperName()
-    if not targetName() then return nil end
-    local n, r = UnitName("target")
-    if r and r ~= "" then return n .. "-" .. r end
-    return n
+local chosen = nil                    -- set when the ring opens (false = nobody); nil = look now
+local function pickPerson() return friendlyPlayer("target") or friendlyPlayer("mouseover") end
+local function currentPerson()
+    if chosen ~= nil then return chosen or nil end
+    return pickPerson()
 end
+ns.quickPerson = currentPerson
+
+-- Placeholders ---------------------------------------------------------------------------------------------
+local function targetName() local p = currentPerson(); return p and p.name end
+
+-- the name to whisper (with the realm for players of another realm)
+local function targetWhisperName() local p = currentPerson(); return p and p.whisper end
 
 local function hereText()
     local sub = GetSubZoneText and GetSubZoneText() or ""
@@ -287,14 +299,14 @@ local function isPing(text) return text == "@ping" or string.sub(text or "", 1, 
 ns.quickIsPing = isPing
 
 -- channel, whisper target (or nil, reason).
--- "auto": in a party it goes to the party (/p, or /i /raid there); alone, a targeted player gets a whisper (/w),
--- and with nobody targeted it is /s.
+-- "auto": a player you picked (target, or under the mouse) who is not in your party gets a whisper (/w); otherwise
+-- the party (/p, or /i /raid there); alone and with nobody picked it is /s.
 ns.QUICK_ROUTES = { "auto", "nearby", "say", "yell", "party", "whisper" }
 ns.QUICK_ROUTE_TAG = { auto = "auto", nearby = "/w or /s", say = "/s", yell = "/y", party = "/p", whisper = "/w" }
 ns.QUICK_ROUTE_INFO = {
-    auto = "party if I am in one, else /w my target, else /s",
-    nearby = "/w my target, else /s - never the party",
-    say = "/s everybody nearby", yell = "/y everybody around", party = "/p the party only", whisper = "/w the player I target",
+    auto = "/w the player I pick (not in my party), else the party, else /s",
+    nearby = "/w the player I pick, else /s - never the party",
+    say = "/s everybody nearby", yell = "/y everybody around", party = "/p the party only", whisper = "/w the player I pick",
 }
 local VALID_ROUTE = {}
 for _, r in ipairs(ns.QUICK_ROUTES) do VALID_ROUTE[r] = true end
@@ -313,14 +325,16 @@ local function channelFor(item)
     end
     if mode == "whisper" then
         if who then return "WHISPER", who end
-        return nil, nil, "target a player first to whisper them"
+        return nil, nil, "target a player (or point at one when you open the ring) to whisper them"
     end
     if mode == "nearby" then                               -- greetings: the people around you, not the party chat
         if who then return "WHISPER", who end
         return "SAY"
     end
-    if C.inGroup() then return C.channel() end            -- auto: the party comes first
-    if who then return "WHISPER", who end                 -- not in a party: you picked someone, so it is for them
+    local p = currentPerson()
+    if p and not p.inGroup then return "WHISPER", p.whisper end   -- auto: you picked someone outside the party: for them
+    if C.inGroup() then return C.channel() end            -- then the party
+    if who then return "WHISPER", who end
     return "SAY"
 end
 
@@ -328,6 +342,12 @@ end
 local RESTRICTED = { SAY = true, YELL = true, EMOTE = true }
 -- sent at once: the ring's own switch (Settings > Quick chat), or "My messages: sent at once"; never once the game refused it
 local function sendsDirectly() return (ns.db.quickSend or ns.db.mode == "send") and not ns.isBlocked("chat") end
+
+-- a message that cannot be sent from a release can still go into the chat box (you press Enter); invites and pings cannot
+local function boxable(i)
+    local item = ringItems()[i]
+    return item ~= nil and not isInvite(item.text) and not isPing(item.text) and not isEmote(item.text)
+end
 
 local function needsClick(i)
     local item = ringItems()[i]
@@ -366,7 +386,15 @@ function ns.quickBlocked()
     return true, l
 end
 
-function ns.quickSend(i)
+local sendOne
+-- toBox: a release on a message the game only sends from a click (/s, /y): it goes into the chat box instead
+function ns.quickSend(i, toBox)
+    local ok = sendOne(i, toBox)
+    chosen = nil                                             -- the next ring picks the person again
+    return ok
+end
+
+sendOne = function(i, toBox)
     local item = ringItems()[i]
     if not item then return false end
     if GetTime() - q.lastSend < 1 then return false end      -- no accidental double sends
@@ -388,7 +416,7 @@ function ns.quickSend(i)
     end
     if isInvite(item.text) then
         local who = targetWhisperName()
-        if not who then ns.print("quick chat: target a player first to invite them"); return false end
+        if not who then ns.print("quick chat: target a player (or point at one when you open the ring) to invite them"); return false end
         if not C.canInvite() then ns.print("quick chat: this client has no call to invite players"); return false end
         if C.inGroup() and not C.isLeader() then ns.print("quick chat: only the party leader can invite"); return false end
         if C.groupSize() >= 5 then ns.print("quick chat: your party is full"); return false end
@@ -405,7 +433,7 @@ function ns.quickSend(i)
     local channel, target, why = channelFor(item)
     if not channel then ns.print("quick chat: " .. tostring(why)); return false end
     local text = ns.quickResolve(item.text)
-    if sendsDirectly() or not C.openChat(text, channel, target) then
+    if (sendsDirectly() and not toBox) or not C.openChat(text, channel, target) then
         ns.trying("sending a quick chat message (" .. tostring(channel) .. ")", "chat")
         deliver(text, channel, target)
     end
@@ -501,7 +529,8 @@ local function paintMiddle()
         centerText:SetText("|cffffd100" .. shorten(middleText(q.hover), 120) .. "|r\n" .. destinationLine(q.hover))
         if not sendsDirectly() and not needsClick(q.hover) then hintText:SetText("release or click: it goes into your chat box - press Enter")
         elseif q.sticky then hintText:SetText("click it (or press the key again) to say it")
-        elseif needsClick(q.hover) then hintText:SetText("release: keeps it open - click to say it")
+        elseif needsClick(q.hover) and boxable(q.hover) then hintText:SetText("click: said at once - release: into your chat box (Enter)")
+        elseif needsClick(q.hover) then hintText:SetText("release: keeps it open - click it")
         else hintText:SetText("release or click to send") end
     else
         centerText:SetText("|cff888888point at a message|r")
@@ -619,6 +648,7 @@ function ns.quickOpen(atCenter)
     if #ringItems() == 0 then page = 2 end                                   -- no messages of your own: start on the emotes
     if atCenter then q.cx, q.cy = (UIParent:GetWidth() or 1920) / 2, (UIParent:GetHeight() or 1080) / 2 else q.cx, q.cy = cursor() end
     q.open, q.openedAt, q.hover, q.sticky, q.cache, q.lastDx, q.lastDy = true, GetTime(), nil, atCenter and true or false, {}, nil, nil
+    chosen = pickPerson() or false                           -- your target, or the player under the mouse right now
     q.dest = {}
     for i = 1, #ringItems() do q.dest[i] = destination(i) end
     layout()
@@ -687,8 +717,18 @@ function ns.quickKey(state)
     ns.quickUpdateHover()
     local i = q.hover
     if not i then ns.quickClose(); return end
-    if needsClick(i) then                                 -- /say, /yell, /emote, invite: not allowed from a release
-        q.sticky = true
+    if needsClick(i) then                                 -- /say, /yell: the game wants a click to send them
+        if boxable(i) then                                -- a release still does something: into the chat box
+            ns.quickClose()
+            ns.quickSend(i, true)
+            if not q.toldBox then
+                q.toldBox = true
+                ns.print("quick chat: /s and /y need a click to go out at once, so a release puts them in your chat box " ..
+                    "(press Enter). Click the message on the ring to say it at once.")
+            end
+            return
+        end
+        q.sticky = true                                   -- invites and pings: only a click can do them
         paintMiddle()
         return
     end

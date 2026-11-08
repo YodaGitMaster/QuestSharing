@@ -161,7 +161,7 @@ def test_the_ring_shows_an_invite_slot_as_such(style):
 def test_invites_are_refused_politely_when_they_cannot_work(style):
     g = game(style)
     invite_slot(g)                                                  # nobody targeted
-    assert g.invited() == [] and "target a player first to invite" in printed(g)
+    assert g.invited() == [] and "target a player (or point at one when you open the ring) to invite" in printed(g)
     g.run('TARGET = { name = "Lia", player = true }')
     g.join_party(["Anna", "Bob", "Cy", "Dee"])                      # five in the party already
     g.advance(2)

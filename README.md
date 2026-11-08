@@ -238,9 +238,14 @@ the game's tracker still tells the party you are done, because that is your own 
 
    **Sent at once.** A message you pick on the ring is sent straight away, no Enter (*Settings > Quick chat > Send
    the message at once*, or `/qs quick send on|off`; on by default). Off: it goes into the chat box and you press
-   Enter. Messages to everybody nearby (`/s`, `/y`) need a click on the slot rather than a release, because the game
-   wants a real click for those. If the game refuses a message from the ring, it goes into your chat box instead and
-   the switch turns itself off (switch it back on and `/reload` to try again).
+   Enter. Messages to everybody nearby (`/s`, `/y`) only go out at once from a **click** on the slot, because the game
+   wants a real click for those; **releasing the key on them puts them in your chat box** (press Enter), so a release
+   always does something. If the game refuses a message from the ring, it goes into your chat box instead and the
+   switch turns itself off (switch it back on and `/reload` to try again).
+
+   **The player a message is for** is your **target** if it is a friendly player, otherwise the friendly player
+   **under your mouse when you open the ring** (the one you highlight). The middle of the ring shows where the message
+   goes ("whispered to Lia") before you let go. Players of the other faction are never picked (they cannot read it).
 
    **More rings with the mouse wheel.** While the ring is open, **scroll the mouse wheel** to flip to the other rings
    (and around): **Emotes** (*Thank, Bow, Dance, Wave, Cheer, Point, No, Wait*), **Group calls** (*Follow me, Charge,
@@ -258,13 +263,12 @@ the game's tracker still tells the party you are done, because that is your own 
 
    | Channel | Goes to |
    |---|---|
-   | **Auto** (most messages) | in a party the party (`/p`; `/i` in a dungeon group); not in a party a whisper to the player you target (`/w`, and `{name}` is their name); nobody targeted `/s` |
-   | **Nearby** (*Hello*) | a whisper to the player you target, otherwise `/s`: greetings never go to the party chat |
-   | **/s Say**, **/y Yell**, **/p Party**, **/w Whisper** | always that channel (Whisper = the player you target) |
+   | **Auto** (most messages) | a whisper to the player you picked if they are not in your party (`/w`, and `{name}` is their name); otherwise the party (`/p`; `/i` in a dungeon group); alone with nobody picked `/s` |
+   | **Nearby** (*Hello*) | a whisper to the player you picked, otherwise `/s`: greetings never go to the party chat |
+   | **/s Say**, **/y Yell**, **/p Party**, **/w Whisper** | always that channel (Whisper = the player you picked) |
 
    The setting *Auto messages go to* (or `/qs quick channel auto|say|party|whisper`) changes only the messages left on
    Auto.
-   `/qs quick channel auto|say|party|whisper` changes that.
 
    **You see where it goes before you send it.** Every dot on the ring has the colour of the chat it goes to, the
    game's own chat colours: **party blue**, **whisper pink**, **say white**, **yell red**, gold for the invite. The
@@ -425,7 +429,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 795 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 803 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -474,7 +478,7 @@ python tests/test_triggers.py         # 34 tests: when it shares (once per join 
 python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 44 tests: everything on by default, migration, the tabbed settings window
 python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
-python tests/test_quick.py            # 119 tests: the quick chat ring, placeholders, editing, key binding, performance
+python tests/test_quick.py            # 127 tests: the quick chat ring, placeholders, editing, key binding, performance
 python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
 python tests/test_highlight.py        # 23 tests: quest icons over creatures, the world pin, the game-settings helper
 python tests/test_look.py             # 42 tests: the settings window layout, the key capture, welcome, sounds, ring colours
@@ -489,7 +493,7 @@ python tests/test_zone.py             # 10 tests: only the quests of where you a
 python tests/test_items.py            # 24 tests: quest item icons in the tracker, the item key and button
 python tests/test_emotes.py           # 24 tests: the emote rings behind the mouse wheel, and editing them
 ```
-Expected: every line ends in `passed` with all tests green (795 in total).
+Expected: every line ends in `passed` with all tests green (803 in total).
 
 ## Files
 | File | Purpose |
