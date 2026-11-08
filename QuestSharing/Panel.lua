@@ -359,8 +359,8 @@ local function ensurePanel()
     f.post = headerButton(f, "Post all", 62, function() ns.postAllProgress() end,
         "Put my progress on these quests (the ones someone in the party has) in the chat box, in one message")
     f.post:SetPoint("RIGHT", f.collapse, "LEFT", -4, 0)
-    f.share = headerButton(f, "Share", 48, function() ns.startShare("manual") end,
-        "Offer my quests of this area to the party now (once per person)")
+    f.share = headerButton(f, "Share", 48, function() ns.shareClick() end,
+        "Offer my quests of this area to the party now (once per person; one quest per click where the game only allows that)")
     f.share:SetPoint("RIGHT", f.post, "LEFT", -4, 0)
     -- the column titles: "Quest", then a class icon and the name of each party member
     f.questHead = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

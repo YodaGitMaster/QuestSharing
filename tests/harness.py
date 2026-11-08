@@ -119,6 +119,17 @@ ERROR_HANDLER = function(msg) ERROR_SEEN = msg end
 function geterrorhandler() return ERROR_HANDLER end
 function seterrorhandler(h) ERROR_HANDLER = h end
 function RAISE(msg) return ERROR_HANDLER(msg) end
+-- the game's debugstack(start, top, bottom): start 1 = the function calling it; one line per call, newest first
+function debugstack(start, top)
+    local tb = debug.traceback("", (start or 1) + 1)
+    tb = string.gsub(string.gsub(tb, "^\n?stack traceback:\n", ""), "\t", "")
+    local out = {}
+    for line in string.gmatch(tb, "[^\n]+") do
+        if top and top > 0 and #out >= top then break end
+        out[#out + 1] = line
+    end
+    return table.concat(out, "\n") .. "\n"
+end
 INVITED, LEADER = {}, true
 function InviteUnit(name) INVITED[#INVITED + 1] = name end
 EMOTED = {}

@@ -378,6 +378,22 @@ def test_slash_ping_checks_every_step(style):
     assert g.eval("NS.db.ping") is True, "/qs ping alone does not switch it off"
 
 
+def test_no_distance_is_measured_in_a_fight(style):
+    """The game refuses distances to enemies in combat ("protected function UNKNOWN()")."""
+    g = game(style)
+    g.run("""DIST_IN_COMBAT = 0
+    local real = CheckInteractDistance
+    function CheckInteractDistance(u, i) if IN_COMBAT then DIST_IN_COMBAT = DIST_IN_COMBAT + 1 end return real(u, i) end""")
+    g.run('ADD_CREATURE("nameplate1", "Kobold Vermin", true, 0, 0, true)')
+    g.run("IN_COMBAT = true")
+    g.fire("PLAYER_REGEN_DISABLED")
+    g.advance(5)
+    g.run("PRINTED = {}")
+    g.slash("ping")
+    assert g.eval("DIST_IN_COMBAT") == 0
+    assert "nearest quest creature right now: Kobold Vermin" in "\n".join(g.printed()), "still found, without a distance"
+
+
 def test_slash_ping_on_a_client_without_pings():
     g = Game("classic")
     g.start()

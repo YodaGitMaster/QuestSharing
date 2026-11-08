@@ -30,8 +30,8 @@ ns.defaults = {
     nearCount = 5,      -- how many quests the tracker keeps while "near" is on
     nearPause = 10,     -- seconds the tracker and the pin leave your choice alone after you change the tracker yourself
     nearMode = "auto",  -- "auto" (distance if the client can measure it, else zone), "distance" or "zone"
+    shareByClick = false, -- share only on my clicks (set by itself when the game refuses an automatic share)
     pickup = false,     -- (off) say in party chat when I pick up a quest someone in the party has ("let's do it together?")
-    selfMark = true,    -- put the star raid icon over my head while in a party (not in dungeons), so people see where I am
     mapPins = true,     -- show party members who run Quest Sharing on my world map, and send them where I am
     teamWaypoint = true, -- put a map pin where a teammate says they found the quest items
     coords = true,      -- add where I found / used the quest items to my messages, when someone in the party still needs them
@@ -78,13 +78,61 @@ end
 
 function ns.pick(list) return list[math.random(#list)] end
 
+-- Stacks, for the error log: what called what ------------------------------------------------------------------------
+-- The game's debugstack() lines, readable: our files as "QuestItems.lua:150: in function 'paint'", other addons and the
+-- game's own code with their folder ("Blizzard_ObjectiveTracker/...", "FrameXML/...").
+function ns.cleanStack(raw, max)
+    local out = {}
+    if type(raw) ~= "string" then return out end
+    for line in string.gmatch(raw, "[^\n]+") do
+        line = string.gsub(line, '%[string "@?([^"]*)"%]', "%1")
+        line = string.gsub(line, "^=?%[C%]:?%-?%d*:", "[C]:")              -- "=[C]:-1: in function ..." -> "[C]: in ..."
+        line = string.gsub(line, "Interface[/\\]AddOns[/\\]", "")
+        line = string.gsub(line, "Interface[/\\]FrameXML[/\\]", "FrameXML/")
+        line = string.gsub(line, ADDON .. "[/\\]", "")
+        line = string.gsub(line, "^%s+", "")
+        if line ~= "" and line ~= "stack traceback:" and line ~= "..." then out[#out + 1] = line end
+        if max and #out >= max then break end
+    end
+    return out
+end
+
+-- What the addon is running right now (a timer or an event; nil for clicks, keys, hooks and the game's own code), and
+-- what it ran last: when the game refuses something, this says which part of the addon was at work.
+ns.running, ns.lastRan = nil, nil
+
+-- "a timer set at QuestItems.lua:342" / "the event QUEST_LOG_UPDATE"
+function ns.describeRun(r)
+    if not r then return nil end
+    if r.event then return "the event " .. r.event end
+    local at = r.from and ns.cleanStack(r.from, 1)[1]
+    at = at and string.match(at, "^(.-:%d+):") or at
+    return "a timer" .. (at and (" set at " .. at) or "")
+end
+
+-- Lua errors in timers and events keep their stack (pcall would lose it)
+local function withStack(err)
+    return { msg = err, stack = debugstack and debugstack(2, 14, 0) or nil }
+end
+
+local function logFailure(source, err)
+    local msg, detail = err, nil
+    if type(err) == "table" then
+        msg, detail = err.msg, ns.cleanStack(err.stack, 12)
+        for i = 1, #detail do detail[i] = "  " .. detail[i] end
+        if #detail > 0 then table.insert(detail, 1, "stack (newest call first):") end
+    end
+    if ns.logError then ns.logError(source, msg, detail) else ns.print("error in " .. tostring(source) .. ": " .. tostring(msg)) end
+end
+
 -- Timers: one frame, no dependency on C_Timer (older clients do not have it) -----------------------
 local timers = {}
 local frame = CreateFrame("Frame")
 ns.frame = frame
 
 function ns.after(delay, fn)
-    local t = { at = GetTime() + delay, fn = fn }
+    -- from: the line that set it, kept raw (made readable only when an error needs it)
+    local t = { at = GetTime() + delay, fn = fn, from = debugstack and debugstack(2, 1, 0) or nil }
     timers[#timers + 1] = t
     return t
 end
@@ -103,8 +151,12 @@ frame:SetScript("OnUpdate", function(_, dt)
         local t = timers[i]
         if t and now >= t.at then
             table.remove(timers, i)
-            local ok, err = pcall(t.fn)
-            if not ok then if ns.logError then ns.logError("timer", err) else ns.print("error: " .. tostring(err)) end end
+            local run = { from = t.from }
+            ns.running = run
+            local ok, err = xpcall(t.fn, withStack)
+            ns.running = nil
+            run.at, ns.lastRan = GetTime(), run
+            if not ok then logFailure("timer", err) end
         end
     end
 end)
@@ -117,10 +169,27 @@ function ns.on(event, fn)
     pcall(frame.RegisterEvent, frame, event)        -- an event this client does not know must not break us
 end
 
+local BLOCK_EVENTS = { ADDON_ACTION_BLOCKED = true, ADDON_ACTION_FORBIDDEN = true }
+
 frame:SetScript("OnEvent", function(_, event, ...)
-    for _, fn in ipairs(handlers[event] or {}) do
-        local ok, err = pcall(fn, event, ...)
-        if not ok then if ns.logError then ns.logError(event, err) else ns.print("error in " .. event .. ": " .. tostring(err)) end end
+    local list = handlers[event]
+    if not list then return end
+    local outer = ns.running
+    if BLOCK_EVENTS[event] then
+        -- the game refuses a call right as it is made: everything above this function is what made it
+        ns.blockedStack = debugstack and debugstack(2, 24, 0) or nil
+    else
+        ns.running = { event = event }
+    end
+    local n, args = select("#", ...), { ... }
+    for _, fn in ipairs(list) do
+        local ok, err = xpcall(function() return fn(event, unpack(args, 1, n)) end, withStack)
+        if not ok then logFailure(event, err) end
+    end
+    if not BLOCK_EVENTS[event] then
+        local run = ns.running
+        ns.running = outer
+        if run then run.at, ns.lastRan = GetTime(), run end
     end
 end)
 
@@ -232,7 +301,6 @@ function ns.setSetting(key, value)
         if key == "markers" and ns.refreshQuestLog then ns.refreshQuestLog() end
         if (key == "panel" or key == "panelCombat" or key == "panelSolo") and ns.syncPanelVisibility then ns.syncPanelVisibility() end
         if key == "panelScale" and ns.applyPanelScale then ns.applyPanelScale() end
-        if (key == "selfMark" or key == "enabled") and ns.syncSelfMark then ns.syncSelfMark() end
         if key == "mapPins" and ns.refreshMapPins then ns.refreshMapPins() end
         if (key == "questItems" or key == "itemButton") and ns.applyQuestItems then ns.applyQuestItems() end
         if key == "minimap" and ns.syncMinimapButton then ns.syncMinimapButton() end
@@ -287,7 +355,7 @@ local help = {
     "/qs announce on|off  say in party chat when a quest we share has all its objectives done",
     "/qs pickup on|off    say when I pick up a quest someone in the party has (let's do it together?)",
     "/qs coords on|off    add where I found the quest items to my messages, when someone still needs them",
-    "/qs star on|off      the star over my head while in a party, so people see where I am",
+    "/qs shareclick on|off share only when I click Share (on by itself where the game refuses automatic sharing)",
     "/qs pingkey <KEY>    the key that pings the nearest quest creature (Attack) or quest object (look here); none removes it",
     "/qs itemkey <KEY>    the key that uses the item of your nearest quest (a torch, a flare...); none removes it",
     "/qs items on|off     item icons next to the quests in the tracker, and the quest item button",
@@ -310,7 +378,7 @@ local help = {
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", star = "selfMark", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", shareclick = "shareByClick", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"
@@ -318,7 +386,7 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     local cmd, arg = string.match(msg or "", "^(%S*)%s*(.-)%s*$")
     cmd = string.lower(cmd or "")
     local d = ns.db
-    if cmd == "share" then ns.startShare("manual")
+    if cmd == "share" then ns.shareClick()
     elseif cmd == "stop" then ns.stopShare("stopped by you")
     elseif cmd == "on" or cmd == "off" then ns.setSetting("enabled", cmd == "on"); status()
     elseif cmd == "ping" and (arg == "" or arg == "test" or arg == "status") then

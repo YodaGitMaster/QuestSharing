@@ -9,15 +9,18 @@ local lastNotice = -1000
 
 local function stamp() return date and date("%H:%M:%S") or "?" end
 
-function ns.logError(source, msg)
+-- detail: more lines for the copy window (what was running, the stack); the newest one is kept
+function ns.logError(source, msg, detail)
     ns.db.errors = ns.db.errors or {}
     local list = ns.db.errors
     msg = tostring(msg)
+    if type(detail) == "table" and #detail == 0 then detail = nil end
     local last = list[#list]
     if last and last.msg == msg then
         last.count, last.at = (last.count or 1) + 1, stamp()
+        if detail then last.detail = detail end
     else
-        list[#list + 1] = { at = stamp(), source = tostring(source), msg = msg, count = 1 }
+        list[#list + 1] = { at = stamp(), source = tostring(source), msg = msg, count = 1, detail = detail }
         if #list > MAX_ERRORS then table.remove(list, 1) end
     end
     if GetTime() - lastNotice > 60 then                     -- at most one notice a minute: never spam the chat
@@ -30,15 +33,63 @@ end
 if seterrorhandler and geterrorhandler then
     local previous = geterrorhandler()
     seterrorhandler(function(msg)
-        if type(msg) == "string" and string.find(msg, "QuestSharing", 1, true) then pcall(ns.logError, "lua", msg) end
+        if type(msg) == "string" and string.find(msg, "QuestSharing", 1, true) then
+            local detail = ns.cleanStack(debugstack and debugstack(2, 14, 0), 12)
+            for i = 1, #detail do detail[i] = "  " .. detail[i] end
+            if #detail > 0 then table.insert(detail, 1, "stack (newest call first):") end
+            pcall(ns.logError, "lua", msg, detail)
+        end
         if previous then return previous(msg) end
     end)
 end
 
+-- Where a refused call came from. The game fires the event while the refused call is still running, so the stack the
+-- event dispatcher caught (Core.lua) shows the line that made it and everything that led there. Returns the function's
+-- real name when the stack has it (the game often only says "UNKNOWN()"), our first line ("QuestItems.lua:150 paint"),
+-- and the lines for the copy window.
+local function blockReport(event)
+    local stack = ns.cleanStack(ns.blockedStack, 16)
+    ns.blockedStack = nil
+    local realFn, oursAt
+    for _, line in ipairs(stack) do
+        if not oursAt then
+            local c = string.match(line, "^%[C%]: in function [`']([^'`]+)'")
+            if c and not realFn and c ~= "pcall" and c ~= "xpcall" then realFn = c end
+            local at = string.match(line, "^([%w_]+%.lua:%d+):")
+            if at then
+                local name = string.match(line, ":%d+: in [%a ]-[`']([^'`]+)'")
+                oursAt = at .. (name and (" " .. name) or "")
+            end
+        end
+    end
+    local detail = { "the game's event: " .. tostring(event) }
+    local running = ns.describeRun(ns.running)
+    detail[#detail + 1] = "running: " .. (running or "no timer or event of the addon (a click, a key, a hook, or the game's own code)")
+    if not running and ns.lastRan then
+        detail[#detail + 1] = string.format("the addon last ran %s, %.1f s before", ns.describeRun(ns.lastRan),
+            GetTime() - (ns.lastRan.at or GetTime()))
+    end
+    detail[#detail + 1] = "in combat: " .. ((InCombatLockdown and InCombatLockdown()) and "yes" or "no")
+    if not oursAt then
+        detail[#detail + 1] = "no Quest Sharing line on the stack: the game noticed it later, often \"taint\" (the game's own " ..
+            "code ran into something the addon had changed)"
+    end
+    if #stack > 0 then
+        detail[#detail + 1] = "stack (newest call first):"
+        for i = 1, math.min(#stack, 12) do detail[#detail + 1] = "  " .. stack[i] end
+    else
+        detail[#detail + 1] = "stack: the game gave none"
+    end
+    return realFn, oursAt, detail
+end
+
 -- When the game blocks something we tried ("Interface action failed because of an AddOn") it fires these events
 -- with the name of the protected function. Writing it down tells us exactly what was blocked.
-local function blocked(_, addon, fn)
-    if addon ~= ADDON then return end
+local function blocked(event, addon, fn)
+    if addon ~= ADDON then ns.blockedStack = nil; return end
+    local realFn, oursAt, detail = blockReport(event)
+    local name = tostring(fn)
+    if realFn and (fn == nil or fn == "UNKNOWN()" or fn == "UNKNOWN") then name = realFn .. "()" end
     local ours, l
     if ns.quickBlocked then ours, l = ns.quickBlocked() end
     local what = ""
@@ -57,7 +108,9 @@ local function blocked(_, addon, fn)
             for _, c in ipairs(recent) do names[#names + 1] = c.what end
             what = " (while " .. table.concat(names, ", then ") .. ")"
             local only = (#recent == 1) and recent[1] or nil
-            if only and only.feature == "chat" and not ns.blockedFeatures.chat then
+            if ns.sharePushing and GetTime() - (ns.sharePushing.at or 0) < 1 and ns.onShareRefused then
+                ns.onShareRefused()                       -- a refused share: Share.lua decides (your clicks from now on)
+            elseif only and only.feature == "chat" and not ns.blockedFeatures.chat then
                 ns.blockedFeatures.chat = true
                 ns.db.mode = "box"
                 ns.print("this game does not let addons send chat messages: from now on your messages go into the " ..
@@ -73,7 +126,8 @@ local function blocked(_, addon, fn)
             end
         end
     end
-    ns.logError("BLOCKED by the game", "tried to call the protected function " .. tostring(fn) .. what)
+    ns.logError("BLOCKED by the game", "tried to call the protected function " .. name ..
+        (oursAt and (" from " .. oursAt) or "") .. what, detail)
 end
 ns.on("ADDON_ACTION_FORBIDDEN", blocked)
 ns.on("ADDON_ACTION_BLOCKED", blocked)
@@ -132,13 +186,17 @@ end
 function ns._reportWindow() return win, box end
 
 -- /qs errors --------------------------------------------------------------------------------------------------------
-function ns.errorLines()
+-- full: also what was running and the stack (for the copy window; the chat gets the short lines)
+function ns.errorLines(full)
     local list = ns.db.errors or {}
     local out = {}
     for i = math.max(1, #list - 9), #list do
         local e = list[i]
         out[#out + 1] = string.format("[%s] %s%s", e.at or "?", e.source and (e.source .. ": ") or "", e.msg)
         if (e.count or 1) > 1 then out[#out + 1] = string.format("    (happened %d times)", e.count) end
+        if full and type(e.detail) == "table" then
+            for _, d in ipairs(e.detail) do out[#out + 1] = "    " .. tostring(d) end
+        end
     end
     return out
 end
@@ -151,7 +209,11 @@ function ns.errorsCommand(arg)
     local lines = ns.errorLines()
     if #lines == 0 then return ns.print("no errors recorded - good") end
     for _, l in ipairs(lines) do ns.print(l) end
-    ns.reportWindow("Quest Sharing - errors", lines)
+    ns.print("the window has the details (what was running, the stack): Ctrl+A, Ctrl+C and send it")
+    local full = { "Quest Sharing " .. tostring(ns.version) .. " | game interface " ..
+        tostring(GetBuildInfo and select(4, GetBuildInfo()) or "?"), "" }
+    for _, l in ipairs(ns.errorLines(true)) do full[#full + 1] = l end
+    ns.reportWindow("Quest Sharing - errors", full)
 end
 
 -- /qs doctor ---------------------------------------------------------------------------------------------------------
@@ -210,7 +272,7 @@ function ns.doctorLines()
         flags[#flags + 1] = k .. "=" .. (d[k] and "on" or "off")
     end
     out[#out + 1] = "settings: " .. table.concat(flags, " ") .. string.format(" area=%s gap=%s mode=%s channel=%s", d.area, tostring(d.gap), d.quickMode, d.quickChannel)
-    for _, l in ipairs(ns.errorLines()) do out[#out + 1] = "error: " .. l end
+    for _, l in ipairs(ns.errorLines(true)) do out[#out + 1] = "error: " .. l end
     return out
 end
 

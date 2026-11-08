@@ -156,7 +156,31 @@ local function announce(links, names)
 end
 
 -- The share ----------------------------------------------------------------------------------------
+-- Some game clients only let an addon share a quest from your own click or key press (an automatic share is refused:
+-- "tried to call the protected function QuestLogPushQuest()"). After the first refusal the addon remembers it
+-- (ns.db.shareByClick): a round then waits, and each click on Share (or /qs share) offers the next quest.
 local finish
+local clicking = false          -- inside your click / key press right now: the game lets the addon share
+
+local function asClick(fn, ...)
+    clicking = true
+    local ok, err = pcall(fn, ...)
+    clicking = false
+    if not ok then error(err, 0) end
+    return err
+end
+
+-- the next quest waits for your click (at most 2 minutes, then the round ends quietly)
+local function park()
+    run.waiting = true
+    if not run.told then
+        run.told = true
+        ns.print(string.format("%d quest(s) to offer: click |cffffd100Share|r in the Party quests window, one quest per " ..
+            "click (or click a quest there)", #run.queue))
+    end
+    if run.timer then ns.cancel(run.timer) end
+    run.timer = ns.after(120, function() if run and run.waiting then ns.stopShare("nobody clicked Share") end end)
+end
 
 local function step()
     if not run then return end
@@ -174,8 +198,16 @@ local function step()
     -- look again right before: another Quest Sharing user may have offered it meanwhile, or the player took it
     local still = e and not C.doneByMe(e) and decide(e, C.members(), run.force) == "push"
     if e and C.pushable(e) and still then
+        if ns.db.shareByClick and not clicking then
+            table.insert(run.queue, 1, q)
+            return park()
+        end
         run.current = e.questID
-        ns.pushOne(e)
+        if not ns.pushOne(e) then                -- refused: it waits for your click (or sharing is off now)
+            table.insert(run.queue, 1, q)
+            if ns.isBlocked("share") then return ns.stopShare("the game refused it") end
+            return park()
+        end
         run.pushed = run.pushed + 1
         delay = ns.db.gap
     else
@@ -234,12 +266,50 @@ finish = function()
 end
 
 -- push one quest to the party now, and tell the other Quest Sharing users so they do not offer it again
+-- true when the game took it. The game answers while the call runs: a refusal reaches ns.onShareRefused right then.
+local refused = false
 function ns.pushOne(e)
     lastPush = { id = e.questID, at = GetTime() }
-    ns.trying("sharing a quest with the party", "share")
+    refused = false
+    -- (no pcall around the push: the error log's stack would lose the name of the function that made it)
+    ns.sharePushing = { how = clicking and "click" or "auto", at = GetTime() }
+    ns.trying(clicking and "sharing a quest with the party (your click)" or "sharing a quest with the party", "share")
     C.push(e)
+    ns.sharePushing = nil
+    if refused then return false end
     ns.markOffered(e.questID)
     if ns.syncUpdate then ns.syncUpdate("O|" .. e.questID) end
+    return true
+end
+
+-- The game refused a share (called by Diagnostics while the push runs). An automatic one: from now on the addon shares
+-- on your clicks. One from your click: the game refuses sharing altogether here, so it is off until /reload.
+function ns.onShareRefused()
+    refused = true
+    if ns.sharePushing and ns.sharePushing.how == "click" then
+        if not ns.blockedFeatures.share then
+            ns.blockedFeatures.share = true
+            ns.print("the game refuses sharing quests even when you click: sharing is off until you reload (/reload)")
+        end
+    elseif not ns.db.shareByClick then
+        ns.db.shareByClick = true
+        ns.print("the game only lets the addon share a quest when you click: click |cffffd100Share|r in the Party quests " ..
+            "window (one quest per click) or a quest there. (/qs shareclick off tries automatic sharing again)")
+    end
+end
+
+-- Share (Party quests window) and /qs share: inside your click the game lets the addon share. A round waiting for clicks
+-- goes on with the next quest; otherwise a new round starts (its first quest is offered right away, in this click).
+function ns.shareClick()
+    asClick(function()
+        if run and run.waiting then
+            run.waiting = false
+            if run.timer then ns.cancel(run.timer) end
+            step()
+        else
+            ns.startShare("manual")
+        end
+    end)
 end
 
 -- A click on a quest in the Party quests window: offer it to whoever does not have it (a click is your decision, so it
@@ -250,14 +320,18 @@ function ns.offerQuest(e)
     if C.inRaid() then ns.print("quests can only be shared in a 5-player party, not in a raid"); return false end
     if C.doneByMe(e) then ns.print("you have finished " .. C.link(e) .. " - it is not offered"); return false end
     if not C.pushable(e) then ns.print(C.link(e) .. " cannot be shared: the game does not allow it for this quest"); return false end
-    if run then ns.print("quests are being shared right now - try again in a few seconds"); return false end
+    if ns.isBlocked("share") then ns.print("sharing quests was refused by the game earlier: /reload to try again"); return false end
+    if run and not run.waiting then ns.print("quests are being shared right now - try again in a few seconds"); return false end
     local lacking = {}
     for _, m in ipairs(C.members()) do
         local st = ns.memberStatus and ns.memberStatus(m, e) or "unknown"
         if st ~= "has" and st ~= "done" then lacking[#lacking + 1] = m.name end
     end
     if #lacking == 0 then ns.print("everybody in the party has " .. C.link(e)); return false end
-    ns.pushOne(e)
+    if not asClick(ns.pushOne, e) then return false end         -- a click: the game lets the addon share now
+    if run and run.waiting then                                  -- a round waiting for clicks: this one is done
+        for i = #run.queue, 1, -1 do if run.queue[i].questID == e.questID then table.remove(run.queue, i) end end
+    end
     ns.print("offered " .. C.link(e) .. " to " .. joinNames(lacking))
     return true
 end
