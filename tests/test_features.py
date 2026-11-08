@@ -410,10 +410,18 @@ def test_left_click_explains_when_it_cannot_offer(style):
     assert g.pushed() == [] and "cannot be shared" in "\n".join(g.printed())
 
 
+def menu_pick(g, row, label):
+    """Right click a row, then click the menu line with this text."""
+    g.eval("function(r) r.scripts.OnClick(r, 'RightButton') end")(row)
+    menu, lines = g.eval("NS._questMenu()")
+    i = next(i for i in range(1, 7) if lines[i].shown and label in plain(lines[i].text))
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(lines[i])
+
+
 def test_right_click_tells_the_party_how_i_am_doing_and_asks_them(style):
     g = quiet_party(style, ("Anna",), on_quest={"party1": [100, 101]})
     panel, rows, cols, notes = panel_of(g)
-    ask = g.eval("function(r) r.scripts.OnClick(r, 'RightButton') end")
+    ask = lambda row: menu_pick(g, row, "Tell the party how I am doing")
     ask(row_of(rows, "Wolves Among Us"))
     msg, channel = g.sent()[-1]
     assert channel == "PARTY" and "[Wolves Among Us]" in msg
@@ -433,7 +441,7 @@ def test_the_question_carries_where_i_found_the_items(style):
     g.fire("QUEST_LOG_UPDATE")
     g.advance(2)
     panel, rows, cols, notes = panel_of(g)
-    g.eval("function(r) r.scripts.OnClick(r, 'RightButton') end")(row_of(rows, "Wolves Among Us"))
+    menu_pick(g, row_of(rows, "Wolves Among Us"), "Tell the party how I am doing")
     assert "Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8)." in g.sent()[-1][0]
     g.advance(1)
     assert any(m.startswith("S|100|1429|0.4230|0.6180|Wolf Pelt") for m in g.addon_sent()), "addon users get a map pin there"
@@ -575,7 +583,7 @@ def test_a_row_has_a_tooltip_with_everybodys_status(style):
     g.eval("function(r) r.scripts.OnEnter(r) end")(row)
     lines = list(g.eval("TOOLTIP.lines").values())
     assert g.eval("TOOLTIP.text") == "Wolves Among Us" and "Anna: 5/8, 1/4" in lines and "Bob: has it" in lines
-    assert any("Left click: offer it" in l for l in lines) and any("Right click: tell the party" in l for l in lines)
+    assert any("Left click: offer it" in l for l in lines) and any("Right click: more" in l for l in lines)
 
 
 def test_the_window_is_as_wide_as_the_party(style):

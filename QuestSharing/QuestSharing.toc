@@ -4,6 +4,7 @@
 ## Author: YodaGitMaster
 ## Version: 0.2.0
 ## SavedVariables: QuestSharingDB
+## OptionalDeps: Questie, QuestieDB
 
 Compat.lua
 Core.lua
@@ -14,6 +15,8 @@ Progress.lua
 Team.lua
 Marker.lua
 Panel.lua
+Questie.lua
+Menu.lua
 Track.lua
 Highlight.lua
 Friends.lua

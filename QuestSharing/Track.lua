@@ -195,6 +195,11 @@ evaluatePin = function(entries, force)
     if pcall(C_SuperTrack.SetSuperTrackedQuestID, best.questID) then state.pinned = best.questID end
 end
 
+-- you chose a quest yourself (the menu's "Focus it on my map"): the "nearest quest" pin leaves it alone for a while
+function ns.pinPauseFor(seconds)
+    state.pinPausedUntil, state.pinned, state.pinSeen = GetTime() + seconds, nil, nil
+end
+
 -- give the game's highlighted quest back to whatever it was before we started pinning
 function ns.releasePin()
     if ns.canPin() and state.pinned and (C_SuperTrack.GetSuperTrackedQuestID() or 0) == state.pinned

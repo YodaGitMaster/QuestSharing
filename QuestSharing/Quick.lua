@@ -554,6 +554,10 @@ function QuestSharing_QuickDown() ns.quickKey("down") end
 function QuestSharing_QuickUp() ns.quickKey("up") end
 
 -- Choosing the key ------------------------------------------------------------------------------------------------
+-- keys the quick chat must never take over: losing them would leave you without sound control or the game menu
+ns.PROTECTED_KEYS = { TOGGLESOUND = "toggle sound", TOGGLEMUSIC = "toggle music", MASTERVOLUMEUP = "volume up",
+                      MASTERVOLUMEDOWN = "volume down", TOGGLEGAMEMENU = "game menu", TOGGLEAMBIENCE = "toggle ambience" }
+
 -- the key that opens the ring, as the game names it ("E", "ALT-Q"), or nil
 function ns.quickKeyName()
     if not GetBindingKey then return nil end
@@ -574,6 +578,9 @@ function ns.setQuickKey(key)
         for _, k in ipairs({ GetBindingKey(ACTION) }) do SetBinding(k) end
     else
         local before = GetBindingAction and GetBindingAction(key) or ""
+        if ns.PROTECTED_KEYS[before] then
+            return ns.print(key .. " is the game's \"" .. ns.PROTECTED_KEYS[before] .. "\" key - pick another one (nothing was changed)")
+        end
         if not SetBinding(key, ACTION) then return ns.print("could not bind " .. key .. " (is that a valid key name?)") end
         if before ~= "" and before ~= ACTION then
             ns.print(key .. " used to do: " .. before .. " (it now opens the quick chat wheel; /qs key none and rebind it in Key Bindings to undo)")

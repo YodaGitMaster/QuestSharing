@@ -106,14 +106,23 @@ Hover the map button any time for a quick status (party, tracker, your key, prob
    - **Left click** a quest: it is **offered** to the members who do not have it (the quest popup; a click is your
      decision, so it is offered even to someone who declined before). It says why when it cannot: everybody has it,
      the game does not let this quest be shared, a share is already running, you are in a raid.
-   - **Right click** a quest: you **tell the party how you are doing and ask them**, at once:
+   - **Right click** a quest: a **small menu** opens (Esc or moving away closes it; a grey line says why it cannot be
+     used right now):
+     - **Tell the party how I am doing** (see below),
+     - **Offer it to the party** (the same as a left click),
+     - **Tell them where to get it**: with the [Questie](https://github.com/Questie/Questie) addon installed, the party
+       hears `Bob: [Wolves Among Us] starts at Marshal McBride in Elwynn Forest (48.9, 41.6), after "A Threat Within".`
+       (also "starts from the item ..., dropped by ..." when an item starts it),
+     - **Focus it on my map** (the game's quest marker and arrow; the nearest-quest pin waits a minute),
+     - **Open it in the quest log**.
+   - **Tell the party how I am doing** sends at once:
      `[Wolves Among Us] - I still need Wolf slain 3/8, Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8). What about you?` or
      `[Report to Goldshire] - I finished it, ready to turn in! What about you?`. The spot is added only for things you
      collect or use, and only while someone in the party still needs them; Quest Sharing users also get a pin there on
      their map.
    - A **grey dash** means that member **cannot take** the quest (did it before, quest log full, not eligible), so you
      do not keep offering it. When everybody who has it is done, your progress says **turn in!**
-   - **Hover** a row for everybody's status and progress.
+   - **Hover** a row for everybody's status and progress (and, with Questie, where the quest starts).
    - In a raid the window says so: the game only lets quests be shared in a 5-player party.
    - **Share** offers your quests of this area to the party now. **Post all** puts your progress on the quests someone
      in the party has in the chat box, in one message. **-** folds the window to its title.
@@ -257,7 +266,9 @@ party member running Quest Sharing finishes one you share. Never during combat.
    the game's `Interface\AddOns` folder, so you have `...\AddOns\QuestSharing\QuestSharing.toc`.
 2. Start the game; on the character screen click **AddOns** and make sure **Quest Sharing** is ticked
    (tick **Load out of date AddOns** if the game says it is out of date).
-3. In game type `/qs probe`. It tells you what your game client supports. **If something looks wrong,
+3. Optional: install **Questie** too. Quest Sharing only reads its quest database (where quests start, which
+   quests come first) for "Tell them where to get it"; everything else works without it.
+4. In game type `/qs probe`. It tells you what your game client supports. **If something looks wrong,
    open an issue at https://github.com/YodaGitMaster/QuestSharing/issues and paste that output.**
 
 ## Commands (`/qs` or `/questsharing`)
@@ -316,9 +327,17 @@ fallbacks stay in for other clients. Very recent clients also hide some values f
 instances ("secret values"); everything that reads such a value is wrapped so it fails quietly instead of
 breaking. `/qs doctor` tells you exactly what works on your copy.
 
+## Sound
+Quest Sharing **never changes your game's sound settings**: its only sound is the soft good-news ping
+(`/qs sound off`, or *Settings > General*). It also refuses to put the quick chat on a key the game uses for its
+sound (toggle sound, toggle music, volume up/down) or for the game menu, so a stray Ctrl+S while choosing a key
+cannot leave you without sound control. `/qs doctor` shows how the game's sound is set right now (only read).
+If the game's sound goes away, check `/qs doctor` and `/qs errors`; another program that records or captures the
+computer's audio can also take the sound device away from the game.
+
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 613 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 637 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -374,8 +393,9 @@ python tests/test_look.py             # 42 tests: the settings window layout, th
 python tests/test_together.py         # 30 tests: several Quest Sharing users in one party, fewer messages
 python tests/test_team.py             # 30 tests: picked up a quest someone has, where the items were, the message budget
 python tests/test_where.py            # 24 tests: the star, map icons, a teammate's pin, the pin preferring shared quests
+python tests/test_menu.py             # 24 tests: the right-click menu, Questie's where-to-get-it, the sound-key guard
 ```
-Expected: every line ends in `passed` with all tests green (613 in total).
+Expected: every line ends in `passed` with all tests green (637 in total).
 
 ## Files
 | File | Purpose |
@@ -393,6 +413,8 @@ Expected: every line ends in `passed` with all tests green (613 in total).
 | `build_release.py`, `CHANGELOG.md` | builds `dist/QuestSharing-<version>.zip` and the release notes |
 | `QuestSharing/Quick.lua`, `QuestSharing/Bindings.xml` | the quick chat ring, its placeholders, the message commands and the key binding |
 | `QuestSharing/Friends.lua` | (beta) adds party members to your friends list, with safeguards |
+| `QuestSharing/Menu.lua` | the right-click menu of the Party quests window |
+| `QuestSharing/Questie.lua` | reads Questie's quest database (when installed): where a quest starts, which quests come first |
 | `QuestSharing/Marker.lua` | the star over your head, positions on the world map, a pin where a teammate found the items |
 | `QuestSharing/Team.lua` | "picked up a quest someone has - let's do it together?" (once per quest, not for shared ones) |
 | `QuestSharing/Style.lua` | one look for every window (dialog and on-screen frames, buttons, check boxes, chat colours) and the good-news sound |

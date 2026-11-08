@@ -161,6 +161,13 @@ function ns.doctorLines()
     add(C.canInvite(), "invite a player from the wheel")
     add(ns.hooks.optionsEntry, "entry in the game's options (/qs settings works anyway)")
     add(ns.hooks.minimap, "minimap button")
+    -- the game's own sound settings, only READ: this addon never changes them (its one sound is the good-news ping)
+    local get = (C_CVar and C_CVar.GetCVar) or GetCVar
+    local function cv(n) local ok, v = pcall(get or function() end, n); return ok and v or nil end
+    local all, sfx = cv("Sound_EnableAllSound"), cv("Sound_EnableSFX")
+    add(all ~= "0" and sfx ~= "0", string.format("game sound: %s, effects %s (Quest Sharing never changes these; its only sound is the good-news ping, %s)",
+        all == "0" and "OFF" or "on", sfx == "0" and "OFF" or "on", d.sound and "on: /qs sound off" or "off"))
+    add(ns.questie and ns.questie.available(), "Questie: " .. ((ns.questie and ns.questie.available()) and "found - \"where to get it\" works" or "not found - \"where to get it\" needs it"))
     local errs = d.errors or {}
     out[#out + 1] = (#errs == 0) and "[OK] no errors recorded" or ("[--] " .. #errs .. " error(s) recorded - see below")
     local flags = {}
