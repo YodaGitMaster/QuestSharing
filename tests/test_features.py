@@ -291,8 +291,9 @@ def test_panel_window_shows_the_lines_and_remembers_where_it_was_put(style):
     hello(g, "Anna", "100:0:5/8,1/4")                                         # new data refreshes it by itself
     g.advance(6)
     assert rows[1].shown and "Anna: 5/8, 1/4" not in rows[1].title.text
+    assert (panel.point[0 + 1], panel.point[4], panel.point[5]) == ("LEFT", 20, 120), "first time: on the left, not mid-screen"
     g.eval("function(p) p.scripts.OnDragStop(p) end")(panel)
-    assert tuple(g.eval("NS.db.panelPos").values()) == ("CENTER", 0, 0)
+    assert tuple(g.eval("NS.db.panelPos").values()) == ("LEFT", 20, 120)
     g.slash("panel off")
     assert panel.shown is False
 

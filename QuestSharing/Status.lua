@@ -45,7 +45,7 @@ function ns.statusMessage(e)
     local msg = icon .. link .. " - " .. text .. suffix
     if #msg > 250 then                      -- too many objectives: cut the list, keep the link and the suffix
         local room = 250 - #(icon .. link .. " - ") - #suffix - 3
-        msg = icon .. link .. " - " .. string.sub(text, 1, math.max(room, 0)) .. "..." .. suffix
+        msg = icon .. link .. " - " .. C.safeCut(text, math.max(room, 0) + 3) .. suffix
     end
     return msg
 end
