@@ -221,6 +221,72 @@ def test_switched_off_it_does_nothing_and_says_so(style):
     assert g.wheel()[0] is None or g.wheel()[0].shown is False, "the master switch wins"
 
 
+
+# ---- before somebody is in your party you cannot know their quests: ask, linking yours -----------------------------------
+LINK102 = "|cffffff00|Hquest:102:2|h[A Personal Quest]|h|r"
+
+
+def test_mine_links_your_unfinished_quests_of_this_area(style):
+    g = game(style)
+    r = g.eval("NS.quickResolve")
+    assert r("{mine}") == f"{LINK100}, {LINK102}", "the finished quest and the other zone's quest are left out"
+    g.run("for _, q in ipairs(QUESTS) do if q.id then q.complete = true end end")
+    assert r("{mine}") == "my quests"
+
+
+def test_mine_is_nearest_first_and_at_most_three_when_the_client_measures_distance():
+    g = game("modern")
+    for i in range(3):
+        g.run("table.insert(QUESTS, 5, { id = %d, title = 'Extra %d', level = 4, objectives = {} })" % (310 + i, i))
+    g.set_dist(q100=900, q102=500, q310=10, q311=700, q312=800)
+    links = g.eval("NS.quickResolve")("{mine}").split(", ")
+    assert len(links) == 3 and "Extra 0" in links[0] and "A Personal Quest" in links[1] and "Extra 1" in links[2]
+
+
+def test_with_a_stranger_the_message_is_a_question_that_links_your_quests(style):
+    g = game(style)
+    assert g.eval("NS.quickResolve")("{shared}") == f"Are you doing any of these quests here? {LINK100}, {LINK102} Want to do them together?"
+    g.run("for _, q in ipairs(QUESTS) do if q.id then q.complete = true end end")
+    assert g.eval("NS.quickResolve")("{shared}") == "Are you questing around here? Want to team up?"
+
+
+def test_in_a_party_the_same_message_reports_what_you_have_in_common(style):
+    g = game(style)
+    g.join_party(["Anna"])
+    r = g.eval("NS.quickResolve")
+    assert r("{shared}") == f"No quest in common yet - I'm on {LINK100}, {LINK102}. Any of these yours?"
+    g.run('ON_QUEST["party1"] = {[100] = true}')
+    assert r("{shared}") == f"We have these quests in common: {LINK100}"
+    g.run('ON_QUEST["party1"] = {}; for _, q in ipairs(QUESTS) do if q.id then q.complete = true end end')
+    assert r("{shared}") == "No quest in common yet - what are you working on here?"
+
+
+def test_the_fourth_slot_of_the_wheel_asks_a_stranger(style):
+    g = game(style)
+    say_slot(g, 64, -64)                                         # lower right = slot 4
+    assert sent(g) == [(f"Are you doing any of these quests here? {LINK100}, {LINK102} Want to do them together?", "SAY")]
+
+
+def test_the_old_fourth_default_is_updated_but_your_own_list_is_not(style):
+    g = Game(style, fresh=True)
+    old = "We have these quests in common: {common}"
+    g.run("QuestSharingDB = { dbVersion = 2, quickItems = { 'Hello', '%s', 'Mine' } }" % old)
+    g.fire("ADDON_LOADED", "QuestSharing")
+    assert items(g) == ["Hello", "{shared}", "Mine"]
+    g.run("QuestSharingDB = { dbVersion = 2, quickItems = { 'We have these quests in common: {common} :)' } }")
+    g.fire("ADDON_LOADED", "QuestSharing")
+    assert items(g) == ["We have these quests in common: {common} :)"], "a message you changed is left alone"
+    assert g.eval("NS.defaultQuickItems()[4]") == "{shared}"
+
+
+def test_three_long_quest_titles_still_fit_one_message(style):
+    g = game(style)
+    g.run("QUESTS = {{ header = 'Elwynn Forest' }}")
+    for i in range(3):
+        g.run("QUESTS[#QUESTS+1] = { id = %d, title = '%s', level = 9, objectives = {} }" % (900 + i, "A very long quest title indeed " * 3 + str(i)))
+    assert len(g.eval("NS.quickResolve")("{shared}")) <= 255
+
+
 # ---- channels ------------------------------------------------------------------------------------------------------------
 def test_channels(style):
     g = game(style)

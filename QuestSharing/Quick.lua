@@ -6,7 +6,9 @@
 -- placeholders that fill themselves in when you send them:
 --   {name} the friendly player you target (or "there")      {here} your subzone / zone
 --   {need} what you still have to do in this area            {common} quests you and your party have in common
---   {quest} the nearest unfinished quest of this area         {zone} the zone
+--   {mine} links to your unfinished quests of this area       {quest} the nearest unfinished quest of this area
+--   {shared} a whole sentence that fits the moment: in a party "we have these in common", with a stranger a
+--            QUESTION that links your quests of this area (you cannot know theirs)     {zone} the zone
 local ADDON, ns = ...
 local C = ns.compat
 
@@ -21,7 +23,7 @@ local DEFAULT_ITEMS = {
     "Hey {name}! o/",
     "Want to quest together here? ({here})",
     "I need to: {need}",
-    "We have these quests in common: {common}",
+    "{shared}",
     "Thanks!",
     "Wait for me, one sec!",
     "Follow me!",
@@ -40,7 +42,11 @@ local function items()
 end
 
 ns.on("ADDON_LOADED", function(_, name)
-    if name == ADDON and not ns.db.quickItems then ns.db.quickItems = ns.defaultQuickItems() end
+    if name ~= ADDON then return end
+    if not ns.db.quickItems then ns.db.quickItems = ns.defaultQuickItems() end
+    for i, text in ipairs(ns.db.quickItems) do          -- the old default message 4, if the player never changed it
+        if text == "We have these quests in common: {common}" then ns.db.quickItems[i] = "{shared}" end
+    end
 end)
 
 -- Placeholders ---------------------------------------------------------------------------------------------
@@ -89,13 +95,39 @@ local function needText()
     return table.concat(parts, " and ")
 end
 
-local function commonText()
+-- links to the quests you and the party both have (nil if none)
+local function commonLinks()
     local links = {}
     for _, e in ipairs(C.entries()) do
         if #ns.partyHas(e) > 0 and #links < 4 then links[#links + 1] = C.link(e) end
     end
-    if #links == 0 then return "nothing yet" end
+    if #links == 0 then return nil end
     return table.concat(links, ", ")
+end
+
+local function commonText() return commonLinks() or "nothing yet" end
+
+-- links to your own unfinished quests of this area, nearest first (nil if none)
+local function mineLinks()
+    local list = unfinishedHere()
+    local links = {}
+    for i = 1, math.min(3, #list) do links[#links + 1] = C.link(list[i].e) end
+    if #links == 0 then return nil end
+    return table.concat(links, ", ")
+end
+
+-- A whole sentence that fits the moment. Before someone is in your party you cannot know which quests they
+-- have, so with a stranger it is a QUESTION that links yours: they can click a link and tell you.
+local function sharedText()
+    local mine = mineLinks()
+    if C.inGroup() then
+        local common = commonLinks()
+        if common then return "We have these quests in common: " .. common end
+        if mine then return "No quest in common yet - I'm on " .. mine .. ". Any of these yours?" end
+        return "No quest in common yet - what are you working on here?"
+    end
+    if mine then return "Are you doing any of these quests here? " .. mine .. " Want to do them together?" end
+    return "Are you questing around here? Want to team up?"
 end
 
 local FILL = {
@@ -104,6 +136,8 @@ local FILL = {
     zone = function() return C.zone() end,
     need = needText,
     common = commonText,
+    mine = function() return mineLinks() or "my quests" end,
+    shared = sharedText,
     quest = function()
         local list = unfinishedHere()
         return list[1] and C.link(list[1].e) or "my quests"
@@ -304,7 +338,7 @@ local function listItems()
     local list = items()
     if #list == 0 then ns.print("quick chat: no messages (/qs quick add <text>)") end
     for i, t in ipairs(list) do ns.print(string.format("%d. %s", i, t)) end
-    ns.print("placeholders: {name} {here} {zone} {need} {common} {quest}")
+    ns.print("placeholders: {name} {here} {zone} {need} {mine} {common} {shared} {quest}")
 end
 
 function ns.quickAdd(text)
@@ -439,7 +473,7 @@ function ns.openQuickEditor()
         title:SetText("Quick chat messages")
         local hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         hint:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -28)
-        hint:SetText("Click a line, edit the text below and press Enter. Placeholders: {name} {here} {need} {common} {quest} {zone}")
+        hint:SetText("Click a line, edit the text below and press Enter. Placeholders: {name} {here} {need} {mine} {common} {shared} {quest} {zone}")
         ed.rows = {}
         for i = 1, MAX_ITEMS do
             local r = CreateFrame("Frame", nil, f)
