@@ -40,8 +40,8 @@ function ns.statusMessage(e)
     local names = ns.partyHas(e)
     local icon = (#names > 0) and (ICON .. " ") or ""
     local link = C.link(e)
-    local text = ns.statusText(e)
-    local suffix = haveSuffix(names)
+    local text, done = ns.statusText(e)
+    local suffix = done and "" or haveSuffix(names)          -- "Anna has it too!" is no news once you are finished
     local msg = icon .. link .. " - " .. text .. suffix
     if #msg > 250 then                      -- too many objectives: cut the list, keep the link and the suffix
         local room = 250 - #(icon .. link .. " - ") - #suffix - 3

@@ -217,7 +217,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 424 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 426 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -261,7 +261,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 ```
 pip install lupa
 python tests/test_questsharing.py     # 63 tests: sharing, replies, announcements, tracker clicks, commands
-python tests/test_features.py         # 60 tests: sync, completion, the party quests window, quest-log markers
+python tests/test_features.py         # 62 tests: sync, completion, the party quests window, quest-log markers
 python tests/test_triggers.py         # 34 tests: when it shares (once per join / new member / new quest), no nagging
 python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 42 tests: everything on by default, migration, the tabbed settings window
@@ -270,7 +270,7 @@ python tests/test_quick.py            # 93 tests: the quick chat ring, placehold
 python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
 python tests/test_highlight.py        # 22 tests: quest icons over creatures, the world pin, the game-settings helper
 ```
-Expected: every line ends in `passed` with all tests green (406 in total).
+Expected: every line ends in `passed` with all tests green (426 in total).
 
 ## Files
 | File | Purpose |
