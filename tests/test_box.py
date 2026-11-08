@@ -206,6 +206,16 @@ def test_the_addon_never_calls_what_makes_the_game_refuse_it():
     assert found == [], found
 
 
+def test_every_file_compiles_under_lua_5_1():
+    """The game runs Lua 5.1: no goto, no broken strings - every file must load."""
+    from lupa.lua51 import LuaRuntime
+    lua = LuaRuntime()
+    check = lua.eval("function(s, n) local f, err = loadstring(s, n); return err end")
+    root = pathlib.Path(__file__).resolve().parent.parent / "QuestSharing"
+    errors = [check(f.read_text(), f.name) for f in sorted(root.glob("*.lua"))]
+    assert [e for e in errors if e] == []
+
+
 if __name__ == "__main__":
     import inspect
     failed = total = 0

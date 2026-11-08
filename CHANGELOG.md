@@ -9,6 +9,12 @@
   nameplates ("Lua Taint: QuestSharing"). They are now the addon's own frames, kept in its own list and only placed
   over the nameplates; none are made during a fight (new nameplates get theirs right after it). The quest item icons
   in the tracker are placed at a spot on the screen instead of being tied to the tracker's own buttons.
+- **Pings that do nothing are no longer a mystery:** every press of the ping key says what happened ("ping: Kobold
+  Vermin (attack)", "nothing to ping: no quest creature in sight", "held back..."), the game's own ping errors are shown
+  ("the game did not send the ping: ..."), and **`/qs ping`** checks every step: the game's ping system, pings switched
+  on, the ping key, telling quest creatures apart, enemy nameplates, the nearest quest creature now, what the next
+  press does. A press with nothing loaded is no longer reported as "held back".
+- A test now compiles every file under Lua 5.1.
 
 ## 0.3.1
 - **Your messages go into the chat box and you press Enter**, by default. Some game clients do not let addons send

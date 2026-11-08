@@ -230,6 +230,59 @@ def test_the_doctor_names_the_ping_key(style):
     assert "[OK] pings: the game's ping system is here, ping key G" in "\n".join(g.eval("NS.doctorLines()").values())
 
 
+# ---- a press is never a mystery ---------------------------------------------------------------------------------------------
+def test_every_press_says_what_happened(style):
+    g = game(style)
+    g.run('ADD_CREATURE("nameplate1", "Kobold Vermin", true, 0, 0, true)')
+    g.advance(1.5)
+    g.run("PRINTED = {}")
+    press(g)
+    assert "ping: Kobold Vermin (attack)" in "\n".join(g.printed())
+    g.run("CREATURES.nameplate1.dead = true; TARGET.dead = true")
+    g.slash("pingobjects off")
+    g.advance(1.5)
+    g.run("PRINTED = {}")
+    press(g)
+    assert "nothing to ping: no quest creature in sight" in "\n".join(g.printed())
+
+
+def test_the_games_own_ping_errors_are_passed_on(style):
+    g = game(style)
+    g.run("PRINTED = {}")
+    g.fire("PING_SYSTEM_ERROR", "Pings are disabled.")
+    assert "the game did not send the ping: Pings are disabled." in "\n".join(g.printed())
+
+
+def test_slash_ping_checks_every_step(style):
+    g = game(style)
+    g.run('CVARS.nameplateShowEnemies = "0"')
+    g.run("PRINTED = {}")
+    g.slash("ping")
+    text = "\n".join(g.printed())
+    for want in ("[OK] the game's ping system: here", "[--] ping key: NOT SET", "[OK] telling quest creatures apart: yes",
+                 "[--] enemy nameplates: OFF - press V", "[--] nearest quest creature right now: none in sight",
+                 "presses so far: 0, pings sent: 0"):
+        assert want in text, (want, text)
+    g.slash("pingkey G")
+    g.run('CVARS.nameplateShowEnemies = "1"; ADD_CREATURE("nameplate1", "Kobold Vermin", true, 0, 0, true)')
+    g.advance(1.5)
+    g.run("PRINTED = {}")
+    g.slash("ping")
+    text = "\n".join(g.printed())
+    assert "[OK] ping key: G" in text and "[OK] nearest quest creature right now: Kobold Vermin" in text
+    assert "next press does: /targetexact Kobold Vermin  +  /ping [@target] attack" in text
+    assert g.eval("NS.db.ping") is True, "/qs ping alone does not switch it off"
+
+
+def test_slash_ping_on_a_client_without_pings():
+    g = Game("classic")
+    g.start()
+    g.run("PRINTED = {}")
+    g.slash("ping")
+    text = "\n".join(g.printed())
+    assert "[--] the game's ping system: NOT on this client" in text and "[--] telling quest creatures apart: NO" in text
+
+
 if __name__ == "__main__":
     import inspect
     failed = total = 0
