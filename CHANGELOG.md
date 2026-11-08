@@ -10,6 +10,11 @@
 - **Calls the game refuses are written down and switched off:** the error log says what the addon was doing ("while
   putting the star over your head", "while sharing a quest with the party", ...), and that feature stays off until
   `/reload`, so the error cannot repeat. The star over your head is never set during combat.
+- **Fixed: quests from far away in Teldrassil** (Stormwind quests in the Party quests window, also with "by zone").
+  The Party quests window now lists only the quests of the zone you are in (the 5 nearest first, then the rest of the
+  zone) and is never filled up with quests from elsewhere. The tracker and the map pin take a quest of another zone
+  only when it is within about 1000 yards and the game says it is on your continent; a client that does not say so
+  (or reports nonsense distances) cannot pull far quests in any more.
 - **Ping the quest target:** a ping key (and an `@ping` slot on the ring) gives the nearest creature your quests need
   the game's **Attack** ping and makes it your target; with none in sight, the quest object you face gets **"look
   here"**. Anti-spam: a new ping once the one you pinged is dead (or no longer your target), or after 5 / 10 / 15

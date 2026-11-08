@@ -115,6 +115,7 @@ the game's tracker still tells the party you are done, because that is your own 
    - **v** (green check) = has the quest, **v\*** (gold check) = has it and finished it, **x** (red) = does not have
      it, **?** = the game cannot tell (the player is out of range or offline; players running Quest Sharing are
      always known exactly, **QS** after their name).
+   - **Only the quests of the zone you are in**, never filled up with quests from elsewhere.
    - **The 5 nearest quests, re-sorted as you move** (every few seconds). A quest only moves up, or onto the list, when
      it is clearly closer (about 20 %), so the rows stay calm while you walk. On a client that cannot measure distance,
      the quests of the zone you are in come first.
@@ -375,7 +376,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 697 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 707 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -435,8 +436,9 @@ python tests/test_menu.py             # 28 tests: the right-click menu, Questie'
 python tests/test_done.py             # 20 tests: a quest you finished is never shared, announced or listed
 python tests/test_box.py              # 23 tests: messages into the chat box, refused calls written down and switched off
 python tests/test_ping.py             # 13 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
+python tests/test_zone.py             # 10 tests: only the quests of where you are (Teldrassil vs Stormwind)
 ```
-Expected: every line ends in `passed` with all tests green (697 in total).
+Expected: every line ends in `passed` with all tests green (707 in total).
 
 ## Files
 | File | Purpose |

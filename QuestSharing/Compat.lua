@@ -323,11 +323,12 @@ function C.hasDistance()
     return (C_QuestLog and C_QuestLog.GetDistanceSqToQuest) and true or false
 end
 
--- squared distance in yards to the quest's next objective / turn-in, or nil when unknown or on
--- another continent
+-- squared distance in yards to the quest's next objective / turn-in, and whether the game SAYS it is on your continent
+-- (true / false / nil when the client does not tell); nil when unknown or on another continent
+local FAR = 5000 * 5000          -- farther than any zone: a quest somewhere else entirely
 function C.distanceSq(e)
     local ok, d, onContinent = pcall(C_QuestLog.GetDistanceSqToQuest, e.questID)
-    if ok and d and onContinent ~= false then return d end
+    if ok and d and onContinent ~= false and d < FAR then return d, onContinent end
 end
 
 -- Friends list ----------------------------------------------------------------------------------------

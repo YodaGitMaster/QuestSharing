@@ -331,8 +331,8 @@ def test_at_most_five_quests_the_nearest_first(style):
     g = quiet_party(style, ("Anna",))
     g.run(OPEN_101)                                   # two quests in progress
     g.run("""for i = 1, 6 do
-        QUESTS[#QUESTS + 1] = { id = 400 + i, title = "Extra " .. i, level = 5, objectives = {} }
-    end""")
+        table.insert(QUESTS, 5, { id = 400 + i, title = "Extra " .. i, level = 5, objectives = {} })
+    end""")                                                  # all six in Elwynn Forest, like 100-102
     g.fire("QUEST_LOG_UPDATE")
     if style == "modern":
         g.set_dist(q100=900, q101=100, q102=4000, q200=50, q401=10, q402=8000, q403=2500, q404=9000, q405=6000, q406=7000)
@@ -340,8 +340,9 @@ def test_at_most_five_quests_the_nearest_first(style):
     titles = [t for t, _ in grid(rows, cols, 1)]
     assert len(titles) == 5 and rows[5].shown, "five at most"
     if style == "modern":
-        assert titles == ["Extra 1", "The Defias Brotherhood", "Report to Goldshire", "Wolves Among Us", "Extra 3"], titles
-    else:                                                # no distances on this client: the quests of this zone first
+        assert titles == ["Extra 1", "Report to Goldshire", "Wolves Among Us", "Extra 3", "A Personal Quest"], titles
+        assert "The Defias Brotherhood" not in titles, "Westfall's quest is not shown in Elwynn, however near"
+    else:                                                # no distances on this client: the quest-log order of this zone
         assert titles[:3] == ["Wolves Among Us", "Report to Goldshire", "A Personal Quest"], titles
 
 
@@ -349,9 +350,10 @@ def test_the_list_follows_me_as_i_move_without_jumping_around(style):
     if style != "modern":
         return
     g = quiet_party(style, ("Anna",))
+    g.run(OPEN_101)
     g.set_dist(q100=900, q101=100, q102=4000, q200=50)
     panel, rows, cols, notes = panel_of(g)
-    assert [t for t, _ in grid(rows, cols, 1)][0] == "The Defias Brotherhood"
+    assert [t for t, _ in grid(rows, cols, 1)][0] == "Report to Goldshire"
     g.set_dist(q100=10, q101=100, q102=4000, q200=50)       # I walked to the wolves
     g.advance(4.5)
     assert [t for t, _ in grid(rows, cols, 1)][0] == "Wolves Among Us", "re-sorted by itself"
@@ -497,7 +499,7 @@ def test_the_header_counts_the_shared_quests_and_marks_addon_users(style):
     g.run(OPEN_101)                                   # two quests in progress
     hello(g, "Bob", "100:0:1/8")
     panel, rows, cols, notes = panel_of(g)
-    assert plain(panel.count.text) == "(1 shared, 4 here)"
+    assert plain(panel.count.text) == "(1 shared, 3 here)"
     assert "QS" not in cols[1].name.text and plain(cols[2].name.text) == "Bob QS", "Bob runs Quest Sharing too"
 
 

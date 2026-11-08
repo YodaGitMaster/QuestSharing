@@ -15,11 +15,15 @@ local function PAUSE() return (ns.db and ns.db.nearPause) or 10 end      -- seco
 
 local state = { pinned = nil, pinSaved = nil, pinSeen = nil, pinPausedUntil = 0, active = false, expected = nil, sig = nil, pausedUntil = 0, ownChange = -100, lastAccept = -100, ticker = nil, soon = nil }
 
-local dcache = {}             -- each quest's distance, measured once per look (the tracker and the pin share it)
+local dcache, ccache = {}, {} -- each quest's distance (and "on your continent"), measured once per look; shared by the pin
 local function distOf(e)
     local v = dcache[e.questID]
-    if v == nil then v = C.distanceSq(e) or false; dcache[e.questID] = v end
-    return v or nil
+    if v == nil then
+        local d, cont = C.distanceSq(e)
+        v = d or false
+        dcache[e.questID], ccache[e.questID] = v, cont
+    end
+    return v or nil, ccache[e.questID]
 end
 
 local evaluatePin          -- defined further down (the pin); declared here because nearEvaluate calls it
@@ -45,10 +49,21 @@ function ns.notePause(what)
     end
 end
 
+-- A quest of another zone only counts when it is close (within ~1000 yards: just across the border) AND the game says
+-- it is on your continent. Without that, a client that does not tell the continent would let quests from the other side
+-- of the world in (Stormwind quests while you stand in Teldrassil).
+local NEAR_OTHER_ZONE = 1000 * 1000
+local function nearEnough(e, d)
+    if C.inArea(e) then return true end
+    local _, onContinent = distOf(e)
+    return onContinent == true and d <= NEAR_OTHER_ZONE
+end
+
 local function chooseDistance(entries, current, n)
     local ranked = {}
     for _, e in ipairs(entries) do
         local d = distOf(e)
+        if d and not nearEnough(e, d) then d = nil end
         if d then
             if current[e.questID] then d = d * STICKY end        -- hysteresis: do not swap for a small gain
             ranked[#ranked + 1] = { e = e, d = d }
@@ -111,7 +126,7 @@ function ns.nearEvaluate(force)
     if InCombatLockdown and InCombatLockdown() then return end
     if IsInInstance and IsInInstance() then return end
     local entries = C.entries()
-    dcache = {}
+    dcache, ccache = {}, {}
     evaluatePin(entries, force)                                            -- the pin has its own pause
     if GetTime() < state.pausedUntil then return end
     if state.pausedUntil > 0 and state.expected == nil and GetTime() >= state.pausedUntil then state.pausedUntil = 0 end
@@ -178,6 +193,7 @@ evaluatePin = function(entries, force)
     local grouped = C.inGroup()
     for _, e in ipairs(entries) do
         local dist = distOf(e)
+        if dist and not nearEnough(e, dist) then dist = nil end            -- never a quest from the other side of the world
         if dist then
             if e.questID == cur and state.pinned == cur then dist = dist * STICKY end      -- hysteresis
             if not best or dist < bestD or (dist == bestD and e.questID < best.questID) then best, bestD = e, dist end
