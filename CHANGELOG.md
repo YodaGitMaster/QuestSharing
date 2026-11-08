@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.1
+- **Your messages go into the chat box and you press Enter**, by default. Some game clients do not let addons send
+  chat messages at all ("tried to call the protected function UNKNOWN()"); typing into the chat box always works.
+  The ring (no extra click needed for `/s` any more), the right-click menu, quest clicks and Post all all do this,
+  with the channel set (`/p`, `/s`, `/w Name`). *Settings > General > My messages* / `/qs mode send` sends at once
+  where the game allows it; if the game refuses, the addon switches back to the chat box by itself and says so once.
+  The automatic party messages need "sent at once".
+- **Calls the game refuses are written down and switched off:** the error log says what the addon was doing ("while
+  putting the star over your head", "while sharing a quest with the party", ...), and that feature stays off until
+  `/reload`, so the error cannot repeat. The star over your head is never set during combat.
+
 ## 0.3.0
 - **You decide when to talk.** The automatic party chat ("in common", "done", "picked up") is **off by default**, and
   switched off once for existing settings. Your own chat gets one short line after quests were shared

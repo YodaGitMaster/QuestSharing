@@ -25,17 +25,25 @@ local function wantStar()
 end
 
 function ns.syncSelfMark()
-    if not (SetRaidTarget and GetRaidTargetIndex) then return end
+    if not (SetRaidTarget and GetRaidTargetIndex) or ns.isBlocked("star") then return end
+    if InCombatLockdown and InCombatLockdown() then return end          -- never during a fight; again after it
     if wantStar() then
         if not starSet then
             starSet = true
-            if GetRaidTargetIndex("player") ~= STAR then pcall(SetRaidTarget, "player", STAR) end
+            if GetRaidTargetIndex("player") ~= STAR then
+                ns.trying("putting the star over your head", "star")
+                pcall(SetRaidTarget, "player", STAR)
+            end
         end
     elseif starSet then
         starSet = false
-        if GetRaidTargetIndex("player") == STAR then pcall(SetRaidTarget, "player", 0) end
+        if GetRaidTargetIndex("player") == STAR then
+            ns.trying("taking the star off your head", "star")
+            pcall(SetRaidTarget, "player", 0)
+        end
     end
 end
+ns.on("PLAYER_REGEN_ENABLED", function() ns.after(1, ns.syncSelfMark) end)
 
 ns.on("GROUP_ROSTER_UPDATE", function() ns.after(1, ns.syncSelfMark) end)
 ns.on("GROUP_JOINED", function() ns.after(1, ns.syncSelfMark) end)
@@ -99,7 +107,7 @@ end
 
 function ns.refreshMapPins()
     local wm, cv = canvas()
-    if not wm then return end
+    if not wm or ns.isBlocked("mappins") then return end
     local shownMap = wm:IsShown() and wm:GetMapID()
     local used = {}
     if ns.db.enabled and ns.db.mapPins and shownMap then
@@ -107,6 +115,7 @@ function ns.refreshMapPins()
         for k, peer in pairs(ns.peers) do
             local p = peer.pos
             if p and p.map == shownMap and now - p.at < FRESH then
+                ns.trying("drawing party members on the world map", "mappins")
                 local pin = pins[k] or newPin(cv)
                 pins[k] = pin
                 local c = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[classOf(k) or ""]

@@ -153,7 +153,7 @@ def test_choice_rows_cycle_with_left_and_right_clicks(style):
     assert g.eval("NS.db.mode") == "box"
     click(g, "mode", "RightButton")
     assert g.eval("NS.db.mode") == "print", "right click goes backwards"
-    assert "shows it only to me" in row_text(g, "mode")
+    assert "are only shown to me" in row_text(g, "mode")
 
 
 def test_number_rows_step_stay_in_range_and_shift_steps_by_five(style):

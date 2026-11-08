@@ -503,6 +503,7 @@ def test_the_header_counts_the_shared_quests_and_marks_addon_users(style):
 
 def test_post_all_puts_the_shared_ones_in_the_chat_box_at_once(style):
     g = quiet_party(style, ("Anna",), on_quest={"party1": [100, 101]})
+    g.slash("mode box")                          # the chat box, as by default
     g.run(OPEN_101)                                   # two quests in progress
     panel, rows, cols, notes = panel_of(g)
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(panel.post)

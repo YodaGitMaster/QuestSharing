@@ -563,7 +563,7 @@ class Game:
         """World entered, not grouped yet. Unless fresh=True the saved settings start with the tracker and the
         panel off, as in the first versions, so the older tests keep testing what they were written for."""
         if not self.fresh:
-            self.run('QuestSharingDB = { near = false, panel = false, dbVersion = 3, welcomed = "%s", chat = true, announce = true, pickup = true }' % VERSION)
+            self.run('QuestSharingDB = { near = false, panel = false, dbVersion = 3, welcomed = "%s", chat = true, announce = true, pickup = true, mode = "send" }' % VERSION)
         self.fire("ADDON_LOADED", "QuestSharing")
         self.fire("PLAYER_ENTERING_WORLD")
 

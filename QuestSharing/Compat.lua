@@ -176,6 +176,16 @@ function C.channel()
     return "PARTY"
 end
 
+-- Open the chat box with the message typed in and the channel set ("/p ", "/s ", "/w Name "): the player presses
+-- Enter. Some game clients do not let addons SEND chat messages at all; typing into the chat box always works.
+local BOX_SLASH = { SAY = "/s ", YELL = "/y ", EMOTE = "/e ", PARTY = "/p ", RAID = "/raid ", INSTANCE_CHAT = "/i ", GUILD = "/g " }
+function C.openChat(text, channel, target)
+    if not ChatFrame_OpenChat then return false end
+    local prefix = (channel == "WHISPER" and target) and ("/w " .. target .. " ") or BOX_SLASH[channel or ""] or ""
+    ChatFrame_OpenChat(prefix .. text)
+    return true
+end
+
 function C.slashFor(channel)
     return ({ INSTANCE_CHAT = "/i ", RAID = "/raid ", PARTY = "/p " })[channel] or "/p "
 end
@@ -225,6 +235,8 @@ function C.setWaypoint(map, x, y)
         local ok, can = pcall(C_Map.CanSetUserWaypointOnMap, map)
         if ok and can == false then return false end
     end
+    if ns.isBlocked and ns.isBlocked("waypoint") then return false end
+    if ns.trying then ns.trying("putting a pin on your map", "waypoint") end
     return (pcall(function() C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(map, x, y)) end))
 end
 

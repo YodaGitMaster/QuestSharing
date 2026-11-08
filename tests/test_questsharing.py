@@ -268,6 +268,7 @@ def click_modern(g, qid, button="LeftButton"):
 
 def test_tracker_click_fills_the_chat_box_for_the_party():
     g = party_game("modern", pre=MODERN_TRACKER)
+    g.slash("mode box")                          # the chat box, as by default
     click_modern(g, 100)
     assert g.opened() == [f"/p {LINK100} - {LEFT100}"]
 
@@ -275,12 +276,14 @@ def test_tracker_click_fills_the_chat_box_for_the_party():
 def test_tracker_click_without_a_party_has_no_channel():
     g = Game("modern", MODERN_TRACKER)
     g.start()
+    g.slash("mode box")                          # the chat box, as by default
     click_modern(g, 101)
     assert g.opened() == [f"{LINK101} - I'm done with this one, ready to turn in!"]
 
 
 def test_tracker_click_puts_no_icon_code_in_the_chat_box():
     g = party_game("modern", on_quest={"party1": [100]}, pre=MODERN_TRACKER)
+    g.slash("mode box")                          # the chat box, as by default
     click_modern(g, 100)
     assert g.opened() == [f"/p {LINK100} - {LEFT100} (Anna has it too!)"], "no raw {rt1} in the box"
     g.run("CLOSE_CHAT()")
@@ -291,6 +294,7 @@ def test_tracker_click_puts_no_icon_code_in_the_chat_box():
 
 def test_clicking_more_quests_adds_them_to_the_chat_box():
     g = party_game("modern", pre=MODERN_TRACKER)
+    g.slash("mode box")                          # the chat box, as by default
     click_modern(g, 100)
     click_modern(g, 101)
     assert g.opened() == [f"/p {LINK100} - {LEFT100}"], "the box is opened once"
@@ -300,6 +304,7 @@ def test_clicking_more_quests_adds_them_to_the_chat_box():
 
 def test_the_same_quest_is_not_added_twice():
     g = party_game("modern", pre=MODERN_TRACKER)
+    g.slash("mode box")                          # the chat box, as by default
     click_modern(g, 100)
     click_modern(g, 100)
     assert g.eval("EDITBOX.text") == f"{LINK100} - {LEFT100}"
@@ -308,6 +313,7 @@ def test_the_same_quest_is_not_added_twice():
 
 def test_what_you_typed_is_kept_and_the_status_goes_after_it():
     g = party_game("modern", pre=MODERN_TRACKER)
+    g.slash("mode box")                          # the chat box, as by default
     g.run('ACTIVE_BOX = EDITBOX; EDITBOX.text = "brb, my progress:"')
     click_modern(g, 100)
     assert g.eval("EDITBOX.text") == f"brb, my progress: + {LINK100} - {LEFT100}" and g.opened() == []
@@ -315,6 +321,7 @@ def test_what_you_typed_is_kept_and_the_status_goes_after_it():
 
 def test_after_sending_or_closing_the_box_the_next_click_starts_fresh():
     g = party_game("modern", pre=MODERN_TRACKER)
+    g.slash("mode box")                          # the chat box, as by default
     click_modern(g, 100)
     g.run("CLOSE_CHAT()")                                                # Enter or Esc
     click_modern(g, 101)
@@ -323,6 +330,7 @@ def test_after_sending_or_closing_the_box_the_next_click_starts_fresh():
 
 def test_a_full_chat_box_is_not_overfilled():
     g = party_game("modern", pre=MODERN_TRACKER)
+    g.slash("mode box")                          # the chat box, as by default
     g.run('ACTIVE_BOX = EDITBOX; EDITBOX.text = string.rep("x", 200)')
     click_modern(g, 100)
     assert g.eval("EDITBOX.text") == "x" * 200, "it would not fit in one message: nothing is cut or lost"
@@ -331,6 +339,7 @@ def test_a_full_chat_box_is_not_overfilled():
 
 def test_tracker_click_is_ignored_for_other_buttons_modifiers_and_when_off():
     g = party_game("modern", pre=MODERN_TRACKER)
+    g.slash("mode box")                          # the chat box, as by default
     click_modern(g, 100, "RightButton")
     g.run("SHIFT = true")
     click_modern(g, 100)
@@ -363,6 +372,7 @@ def test_tracker_click_modes_send_and_print():
 def test_classic_watch_frame_click():
     pre = "function WatchFrameLinkButtonTemplate_OnClick(self, button) end"
     g = party_game("classic", pre=pre)
+    g.slash("mode box")                          # the chat box, as by default
     click = g.eval("function(t, i, b) WatchFrameLinkButtonTemplate_OnClick({ type = t, index = i }, b) end")
     click("QUEST", 2, "LeftButton")
     click("ACHIEVEMENT", 2, "LeftButton")
@@ -372,6 +382,7 @@ def test_classic_watch_frame_click():
 def test_hooks_install_once_and_when_the_tracker_loads_late():
     g = Game("modern")
     g.start()
+    g.slash("mode box")                          # the chat box, as by default
     assert g.eval("NS.hooks.tracker") is None
     g.run(MODERN_TRACKER)
     for _ in range(3):

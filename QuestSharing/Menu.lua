@@ -37,12 +37,18 @@ function ns.tellWhere(e)
     local msg = ns.whereMessage(e)
     if not msg then ns.print("Questie does not know where this quest starts (or Questie is not installed)"); return false end
     if not C.inGroup() then ns.print(msg .. "  (not sent: you are not in a party)"); return false end
-    SendChatMessage(msg, C.channel())
+    if ns.db.mode == "send" and not ns.isBlocked("chat") then
+        ns.trying("telling the party where to get a quest", "chat")
+        SendChatMessage(msg, C.channel())
+    else
+        ns.addToChatBox(msg, C.link(e))                       -- typed into the chat box for you: press Enter
+    end
     return true
 end
 
 function ns.focusQuest(e)
     if not (ns.canPin and ns.canPin()) then ns.print("this client cannot focus a quest on the map"); return false end
+    ns.trying("focusing the quest on your map")
     local ok = pcall(C_SuperTrack.SetSuperTrackedQuestID, e.questID)
     if ok then
         if ns.pinPauseFor then ns.pinPauseFor(60) end           -- your choice: the "nearest quest" pin waits a minute
@@ -52,6 +58,7 @@ function ns.focusQuest(e)
 end
 
 function ns.openInLog(e)
+    ns.trying("opening the quest log")
     if C.modern and QuestMapFrame_OpenToQuestDetails then return (pcall(QuestMapFrame_OpenToQuestDetails, e.questID)) end
     if QuestLogFrame and ShowUIPanel then
         pcall(ShowUIPanel, QuestLogFrame)

@@ -88,6 +88,7 @@ end
 -- set the tracker to `wanted` (a set of questIDs): remove first to free slots, then add
 local function apply(wanted, current, byId)
     state.ownChange = GetTime()
+    ns.trying("changing the quest tracker", "tracker")
     for id in pairs(current) do
         if not wanted[id] and byId[id] then C.setWatched(byId[id], false) end
     end
@@ -106,7 +107,7 @@ end
 -- row, so a short detour does not reshuffle the list
 function ns.nearEvaluate(force)
     local d = ns.db
-    if not (d.near and state.active and C.canWatch()) then return end      -- 'active' = the startup snapshot is done
+    if not (d.near and state.active and C.canWatch()) or ns.isBlocked("tracker") then return end   -- 'active' = startup snapshot done
     if InCombatLockdown and InCombatLockdown() then return end
     if IsInInstance and IsInInstance() then return end
     local entries = C.entries()
@@ -159,7 +160,7 @@ end
 
 evaluatePin = function(entries, force)
     local d = ns.db
-    if not (d.nearPin and ns.canPin() and mode() == "distance") then return end
+    if not (d.nearPin and ns.canPin() and mode() == "distance") or ns.isBlocked("pin") then return end
     local now = GetTime()
     if now < state.pinPausedUntil then return end
     local cur = C_SuperTrack.GetSuperTrackedQuestID() or 0
@@ -192,6 +193,7 @@ evaluatePin = function(entries, force)
     if not force and state.pinSeen ~= best.questID then state.pinSeen = best.questID; return end    -- seen twice in a row
     state.pinSeen = nil
     if state.pinSaved == nil then state.pinSaved = cur end
+    ns.trying("pinning the nearest quest on the map", "pin")
     if pcall(C_SuperTrack.SetSuperTrackedQuestID, best.questID) then state.pinned = best.questID end
 end
 

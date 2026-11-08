@@ -28,6 +28,7 @@ end
 
 local function marker(plate)
     if plate.QuestSharingMarker then return plate.QuestSharingMarker end
+    ns.trying("marking a creature's nameplate", "markers")
     local f = CreateFrame("Frame", nil, plate)
     f:SetWidth(SIZE)
     f:SetHeight(SIZE)
@@ -42,7 +43,7 @@ local function marker(plate)
 end
 
 local function update(plate)
-    if not plate then return end
+    if not plate or ns.isBlocked("markers") then return end
     local unit = tokenOf(plate)
     local show = ns.db.markMobs and unit and isObjective(unit)
     if show then
@@ -100,6 +101,7 @@ local function getCVar(name)
 end
 
 local function setCVar(name, value)
+    ns.trying("changing a game setting (" .. tostring(name) .. ")", "cvars")
     local f = (C_CVar and C_CVar.SetCVar) or SetCVar
     return f and (pcall(f, name, value)) or false
 end

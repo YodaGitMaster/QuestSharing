@@ -275,7 +275,7 @@ def test_the_release_zip_is_ready_to_install():
     assert "QuestSharing/Bindings.xml" in inside and "QuestSharing/QuestSharing.toc" in inside
     assert not any("test" in n or n.endswith(".py") for n in inside), "no tests in the install package"
     notes = (zpath.parent / "RELEASE_NOTES.md").read_text()
-    assert "Quick chat ring" in notes and "## " not in notes, "only this version's section"
+    assert notes.strip().startswith("- ") and "## " not in notes, "only this version's section, as a list"
 
 
 if __name__ == "__main__":
