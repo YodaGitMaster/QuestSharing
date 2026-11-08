@@ -68,6 +68,8 @@ local function encodeObjectives(objs)
     return table.concat(t, ",")
 end
 
+ns.encodeObjectives = encodeObjectives
+
 function ns.encodeEntry(e)
     return string.format("%d:%d:%s", e.questID, e.complete and 1 or 0, encodeObjectives(C.objectives(e)))
 end
@@ -161,6 +163,7 @@ local function handle(sender, text)
     elseif kind == "O" then                                       -- they offered it: nobody else needs to
         local id = tonumber(rest)
         if id and ns.markOffered then ns.markOffered(id) end
+        if id and ns.offeredBy then ns.offeredBy[id] = GetTime() end          -- if I take it now, it came from them
     elseif kind == "C" then
         local id = tonumber(rest)
         if not id then return end

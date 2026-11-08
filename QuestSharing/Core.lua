@@ -30,6 +30,8 @@ ns.defaults = {
     nearCount = 5,      -- how many quests the tracker keeps while "near" is on
     nearPause = 10,     -- seconds the tracker and the pin leave your choice alone after you change the tracker yourself
     nearMode = "auto",  -- "auto" (distance if the client can measure it, else zone), "distance" or "zone"
+    pickup = true,      -- say in party chat when I pick up a quest someone in the party has ("let's do it together?")
+    coords = true,      -- add where I found / used the quest items to my messages, when someone in the party still needs them
     sound = true,       -- a soft sound for good news (someone accepted a quest I shared, a party member finished a shared quest)
     panelCombat = true, -- hide the Party quests window during combat
     panelScale = 100,   -- size of the Party quests window, in percent
@@ -170,8 +172,17 @@ local function pump()
     ns.after(2, pump)
 end
 
-function ns.say(msg)
-    if not ns.db.chat then return false end
+-- Automatic messages (not the ones you send yourself) have a budget: at most 4 a minute, whatever happens. Better to
+-- miss a line than to flood the party.
+local BUDGET, WINDOW = 4, 60
+local spent = {}
+ns.dropped = 0
+function ns.say(msg, always)
+    if not always and not ns.db.chat then return false end
+    local now = GetTime()
+    while spent[1] and now - spent[1] > WINDOW do table.remove(spent, 1) end
+    if #spent >= BUDGET then ns.dropped = ns.dropped + 1; return false end
+    spent[#spent + 1] = now
     outbox[#outbox + 1] = msg
     if not sending then sending = true; pump() end
     return true
@@ -239,6 +250,8 @@ local help = {
     "/qs mode box|send|print   what a click does: fill the chat box, send now, or only show you",
     "/qs sync on|off      exchange exact quest lists with other Quest Sharing users in the party",
     "/qs announce on|off  say in party chat when a quest we share has all its objectives done",
+    "/qs pickup on|off    say when I pick up a quest someone in the party has (let's do it together?)",
+    "/qs coords on|off    add where I found the quest items to my messages, when someone still needs them",
     "/qs markers on|off   mark shared quests in the quest log",
     "/qs panel [on|off]   show / hide the \"quests in common\" panel (drag it to move it)",
     "/qs near [on|off]    keep the tracker (right-hand list) filled with the quests closest to you",
@@ -254,7 +267,7 @@ local help = {
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", pickup = "pickup", coords = "coords",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"

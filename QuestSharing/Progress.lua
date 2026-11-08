@@ -13,9 +13,47 @@ local pending
 local function snapshot()
     local snap = {}
     for _, e in ipairs(C.entries()) do
-        snap[e.questID] = { entry = e, complete = e.complete, code = ns.encodeEntry(e) }
+        local objs = C.objectives(e)
+        snap[e.questID] = { entry = e, complete = e.complete, objs = objs,
+                            code = string.format("%d:%d:%s", e.questID, e.complete and 1 or 0, ns.encodeObjectives(objs)) }
     end
     return snap
+end
+
+-- Where you picked up or used quest things: the spot of the last progress on an item / object / event objective.
+-- Told to the party only inside a message you send anyway (the "done" message, a quest click), and only when someone
+-- in the party still needs it.
+ns.spots = {}               -- ns.spots[questID] = { what, x, y, zone, at }
+local PICK = { item = true, object = true, event = true }
+
+local function noteProgress(old, cur)
+    if not (old and old.objs and cur.objs) then return end
+    for j, o in ipairs(cur.objs) do
+        local was = old.objs[j]
+        local moved = was and ((o.have and was.have and o.have > was.have) or (o.finished and not was.finished))
+        if moved and PICK[o.type or ""] then
+            local _, x, y = C.playerPos()
+            if x then ns.spots[cur.entry.questID] = { what = o.name or o.text, x = x, y = y, zone = C.zone(), at = GetTime() } end
+        end
+    end
+end
+
+-- does anybody in the party still work on this quest? (synced players who finished it do not)
+function ns.someoneStillNeeds(e)
+    for _, name in ipairs(ns.partyHas(e)) do
+        local peer = ns.peers[ns.memberKey(name)]
+        local rec = peer and peer.quests and peer.quests[e.questID]
+        if not (rec and rec.complete) then return true end
+    end
+    return false
+end
+
+-- " - Wolf Pelt: 42.3, 61.8 in Elwynn Forest", or "" when there is nothing useful to add
+function ns.spotText(e)
+    if not ns.db.coords then return "" end
+    local s = ns.spots[e.questID]
+    if not s or not ns.someoneStillNeeds(e) then return "" end
+    return string.format(" - %s: %.1f, %.1f in %s", s.what, s.x * 100, s.y * 100, s.zone ~= "" and s.zone or "this zone")
 end
 
 -- someone else just said this quest is done (a Quest Sharing user finished it, or a link of it in party chat)
@@ -30,7 +68,7 @@ function ns.onQuestCompleted(e)
     -- finishing together is common (the last kill counts for everybody): only the first one says it
     ns.after(ns.turnDelay and ns.turnDelay() or 0, function()
         if alreadySaid(e.questID) or not C.inGroup() then return end
-        ns.say(string.format("%s %s - %s", ICON, C.link(e), ns.pick(LINES)))
+        ns.say(string.format("%s %s - %s%s", ICON, C.link(e), ns.pick(LINES), ns.spotText(e)))
     end)
 end
 
@@ -43,6 +81,7 @@ local function check()
             if not old then
                 ns.syncUpdate("P|" .. cur.code)                            -- a quest we just accepted
             elseif old.code ~= cur.code then
+                noteProgress(old, cur)
                 ns.syncUpdate("P|" .. cur.code)
                 if cur.complete and not old.complete then ns.onQuestCompleted(cur.entry) end
             end
