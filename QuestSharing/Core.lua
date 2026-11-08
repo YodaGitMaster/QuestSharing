@@ -129,7 +129,7 @@ end)
 
 -- A friendly hello the first time (and a short "what's new" after an update). Once per version, a few seconds after
 -- login so it is not buried under the login messages.
-local WHATS_NEW = "a Party quests window with class icons, a channel for every quick chat message, quest clicks that add up in the chat box, and a new settings window"
+local WHATS_NEW = "the Party quests window is a grid (check or X per member, your 5 nearest quests, right click for a menu), Questie's where-to-get-it, a star over your head and teammates on your map, and the automatic party chat is off: you decide when to talk"
 local greeted = false
 local function welcome()
     local d = ns.db

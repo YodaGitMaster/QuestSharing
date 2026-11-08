@@ -5,7 +5,7 @@ import re
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from harness import Game  # noqa: E402
+from harness import Game, VERSION  # noqa: E402
 
 STYLES = ("modern", "classic")
 
@@ -190,13 +190,13 @@ def test_a_new_install_is_welcomed_once(style):
     g = game(style, fresh=True)
     g.advance(6)
     text = printed(g)
-    assert "Welcome to Quest Sharing 0.2.0!" in text and "Quick chat key" in text
+    assert f"Welcome to Quest Sharing {VERSION}!" in text and "Quick chat key" in text
     g.run("PRINTED = {}")
     g.fire("PLAYER_ENTERING_WORLD")
     g.advance(10)
     assert "Welcome" not in printed(g)
     g2 = Game(style)                                           # the next login: the saved settings remember it
-    g2.run("QuestSharingDB = { welcomed = '0.2.0', dbVersion = 2 }")
+    g2.run("QuestSharingDB = { welcomed = '%s', dbVersion = 2 }" % VERSION)
     g2.fire("ADDON_LOADED", "QuestSharing")
     g2.fire("PLAYER_ENTERING_WORLD")
     g2.advance(10)
@@ -220,7 +220,7 @@ def test_an_update_says_what_is_new(style):
     g.fire("PLAYER_ENTERING_WORLD")
     g.advance(6)
     text = printed(g)
-    assert "Quest Sharing updated to 0.2.0" in text and "Welcome" not in text
+    assert f"Quest Sharing updated to {VERSION}" in text and "Welcome" not in text
 
 
 # ---- good news ----------------------------------------------------------------------------------------------------------
