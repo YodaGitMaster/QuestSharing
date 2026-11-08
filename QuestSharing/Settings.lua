@@ -250,9 +250,22 @@ end
 -- the message editor (inside the Quick chat tab) -------------------------------------------------------------------
 local ed = W.ed
 
+local function edList() return ns.quickListFor(ed.page or 1) or ns.quickItems() end
+
 function ns.editorRefresh()
     if not ed.frame then return end
-    local list = ns.quickItems()
+    local pages = ns.quickPageList()
+    ed.page = math.max(1, math.min(ed.page or 1, #pages))
+    for i, b in ipairs(ed.pageButtons or {}) do
+        local pg = pages[i]
+        if pg then
+            b.text:SetText((i == ed.page and "|cffffd100[" or "|cff55ccff ") .. pg.title .. (i == ed.page and "]|r" or " |r"))
+            b.frame:Show()
+        else
+            b.frame:Hide()
+        end
+    end
+    local list = edList()
     for i = 1, 8 do
         local line = ed.lines[i]
         if list[i] then
@@ -269,9 +282,11 @@ function ns.editorRefresh()
     ed.labelBox:SetText(item and item.label or "")
     ed.textBox:SetText(item and item.text or "")
     local route = item and (item.channel or "auto")
-    ed.routeText:SetText(item and ("Goes to: |cffffd100" .. ns.QUICK_ROUTE_INFO[route] .. "|r") or "")
+    local isEmote = item and ns.quickIsEmote(item.text)
+    ed.routeText:SetText((isEmote and "|cffffd100An emote: everybody around sees (and hears) it.|r")
+        or (item and ("Goes to: |cffffd100" .. ns.QUICK_ROUTE_INFO[route] .. "|r")) or "")
     for _, c in ipairs(ed.routeButtons) do
-        if item then
+        if item and not isEmote then
             local hot = (c.route == route)
             c.text:SetText((hot and "|cffffd100[" or "|cff55ccff ") .. c.title .. (hot and "]|r" or " |r"))
             c.frame:Show()
@@ -279,28 +294,33 @@ function ns.editorRefresh()
             c.frame:Hide()
         end
     end
-    if item then ed.channelCaption:Show() else ed.channelCaption:Hide() end
-    ed.preview:SetText(item and ("|cff888888Looks like:|r " .. shorten(ns.quickResolve(item.text), 110)) or "|cff888888Click a message above to edit it.|r")
+    if item and not isEmote then ed.channelCaption:Show() else ed.channelCaption:Hide() end
+    local looks = item and (isEmote and ("/" .. string.lower(string.match(item.text, "^@emote%s+(%S+)") or "") .. "  (an emote)")
+        or ns.quickResolve(item.text))
+    ed.preview:SetText(item and ("|cff888888Looks like:|r " .. shorten(looks, 110)) or "|cff888888Click a message above to edit it.|r")
 end
 
-function ns.editorSelect(i) ed.selected = (ns.quickItems()[i] and i) or nil; ns.editorRefresh() end
+-- which ring the editor shows (1 = your messages, then the emote rings)
+function ns.editorPage(n) ed.page, ed.selected = n, nil; ns.editorRefresh() end
+function ns.editorSelect(i) ed.selected = (edList()[i] and i) or nil; ns.editorRefresh() end
 function ns.editorMove(delta)
-    if ed.selected and ns.quickMove(ed.selected, ed.selected + delta) then ed.selected = ed.selected + delta end
+    if ed.selected and ns.quickMove(ed.selected, ed.selected + delta, ed.page) then ed.selected = ed.selected + delta end
     ns.editorRefresh()
 end
 function ns.editorDelete()
-    if ed.selected and ns.quickRemove(ed.selected) then ed.selected = nil end
+    if ed.selected and ns.quickRemove(ed.selected, ed.page) then ed.selected = nil end
     ns.editorRefresh()
 end
 function ns.editorAdd()
-    local n = ns.quickAdd("New message", "New")
+    local n
+    if (ed.page or 1) == 1 then n = ns.quickAdd("New message", "New", ed.page) else n = ns.quickAdd("/wave", "Wave", ed.page) end
     if n then ed.selected = n end
     ns.editorRefresh()
 end
 function ns.editorSave(label, text)
     if ed.selected then
-        ns.quickEdit(ed.selected, text)
-        if label and label ~= "" then ns.quickLabel(ed.selected, label) end
+        ns.quickEdit(ed.selected, text, ed.page)
+        if label and label ~= "" then ns.quickLabel(ed.selected, label, ed.page) end
     end
     ns.editorRefresh()
 end
@@ -313,23 +333,38 @@ function ns.editorRoute(route)
             for k, r in ipairs(list) do if r == cur then route = list[k % #list + 1] end end
             route = route or "auto"
         end
-        ns.quickRoute(ed.selected, route)
+        ns.quickRoute(ed.selected, route, ed.page)
     end
     ns.editorRefresh()
 end
-function ns.editorReset() ns.quickReset(); ed.selected = nil; ns.editorRefresh() end
+function ns.editorReset() ns.quickReset(ed.page); ed.selected = nil; ns.editorRefresh() end
+function ns.editorShowRing() ns.db.quickPage = ed.page or 1; ns.quickOpen(true) end
 
 local function buildEditor(parent)
     local f = CreateFrame("Frame", nil, parent)
     f:SetWidth(WIDTH - 2 * LEFT)
-    f:SetHeight(300)
+    f:SetHeight(320)
     ed.frame, ed.lines = f, {}
+    -- which ring to edit: your messages, or one of the emote rings (the mouse wheel flips them in play)
+    local ringCap = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    ringCap:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -2)
+    ringCap:SetText("Ring:")
+    ed.pageButtons = {}
+    local px = 40
+    for i = 1, 6 do
+        local btn = clickable(f, 100, 16, function() ns.editorPage(i) end)
+        btn:SetPoint("TOPLEFT", f, "TOPLEFT", px, 0)
+        local t = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        t:SetPoint("LEFT", btn, "LEFT", 0, 0)
+        ed.pageButtons[i] = { frame = btn, text = t }
+        px = px + 104
+    end
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
-    title:SetText("Messages on the ring (up to 8, clockwise from the top)")
+    title:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -20)
+    title:SetText("On the ring (up to 8, clockwise from the top)")
     for i = 1, 8 do
         local line = clickable(f, WIDTH - 2 * LEFT, 18, function() ns.editorSelect(i) end)
-        line:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -20 - (i - 1) * 18)
+        line:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -40 - (i - 1) * 18)
         local mark = S.fill(line, "BACKGROUND", 1, 0.82, 0, 0.12)            -- the selected message is lit
         mark:SetAllPoints(line)
         mark:Hide()
@@ -343,16 +378,16 @@ local function buildEditor(parent)
         ed.lines[i] = { frame = line, text = t, mark = mark }
     end
     local cap1 = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    cap1:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -172)
+    cap1:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -192)
     cap1:SetText("Label (on the ring, 14 letters)")
     local cap2 = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    cap2:SetPoint("TOPLEFT", f, "TOPLEFT", 170, -172)
-    cap2:SetText("Message (Enter saves) - {name} {here} {need} {mine} {common} {shared} {quest} {zone}, or start with @invite")
+    cap2:SetPoint("TOPLEFT", f, "TOPLEFT", 170, -192)
+    cap2:SetText("Message or emote (Enter saves): {name} {here} {need} {mine} {quest}..., @invite, @ping, or an emote like /dance")
     local function box(width, x, max)
         local b = CreateFrame("EditBox", nil, f)
         b:SetWidth(width)
         b:SetHeight(20)
-        b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -186)
+        b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -206)
         local bg = S.fill(b, "BACKGROUND", 0, 0, 0, 0.6)
         bg:SetAllPoints(b)
         if ChatFontNormal then b:SetFontObject(ChatFontNormal) end
@@ -365,37 +400,37 @@ local function buildEditor(parent)
     end
     ed.labelBox, ed.textBox = box(150, 0, 14), box(WIDTH - 2 * LEFT - 170, 170, 200)
     ed.preview = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    ed.preview:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -212)
+    ed.preview:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -232)
     local x = 0
     ed.buttons = {}
     for _, b in ipairs({
         { "Up", function() ns.editorMove(-1) end }, { "Down", function() ns.editorMove(1) end },
         { "Remove", function() ns.editorDelete() end }, { "Add", function() ns.editorAdd() end },
-        { "Reset", function() ns.editorReset() end }, { "Show the ring", function() ns.quickOpen(true) end },
+        { "Reset", function() ns.editorReset() end }, { "Show the ring", function() ns.editorShowRing() end },
     }) do
         local w = (b[1] == "Show the ring") and 110 or 70
         local btn = S.button(f, b[1], w, b[2])
-        btn:SetPoint("TOPLEFT", f, "TOPLEFT", x, -232)
+        btn:SetPoint("TOPLEFT", f, "TOPLEFT", x, -252)
         ed.buttons[b[1]] = btn
         x = x + w + 6
     end
     -- the channel of the selected message: one click on a choice
     ed.channelCaption = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    ed.channelCaption:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -262)
+    ed.channelCaption:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -282)
     ed.channelCaption:SetText("Channel:")
     ed.routeButtons = {}
     local TITLES = { auto = "Auto", nearby = "Nearby", say = "/s Say", yell = "/y Yell", party = "/p Party", whisper = "/w Whisper" }
     local rx = 56
     for _, r in ipairs(ns.QUICK_ROUTES) do
         local btn = clickable(f, 80, 16, function() ns.editorRoute(r) end)
-        btn:SetPoint("TOPLEFT", f, "TOPLEFT", rx, -260)
+        btn:SetPoint("TOPLEFT", f, "TOPLEFT", rx, -280)
         local t = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         t:SetPoint("LEFT", btn, "LEFT", 0, 0)
         ed.routeButtons[#ed.routeButtons + 1] = { route = r, title = TITLES[r], frame = btn, text = t }
         rx = rx + 84
     end
     ed.routeText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    ed.routeText:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -280)
+    ed.routeText:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -300)
     return f
 end
 

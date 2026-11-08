@@ -251,6 +251,7 @@ function ns.resetSettings()
     ns.db.panelPos, ns.db.panelCollapsed = nil, nil
     if ns.resetPanelPosition then ns.resetPanelPosition(true) end
     if ns.defaultQuickItems then ns.db.quickItems = ns.defaultQuickItems() end
+    ns.db.quickPages, ns.db.quickPage = nil, nil
     ns.print("all settings are back to their defaults (everything on)")
     if ns.refreshSettings then ns.refreshSettings() end
 end

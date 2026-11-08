@@ -224,7 +224,10 @@ the game's tracker still tells the party you are done, because that is your own 
    **More rings with the mouse wheel.** While the ring is open, **scroll the mouse wheel** to flip to the other rings
    (and around): **Emotes** (*Thank, Bow, Dance, Wave, Cheer, Point, No, Wait*), **Group calls** (*Follow me, Charge,
    Attack!, Heal me, Help me, Incoming, Flee, Out of mana*) and **Fun** (*Train, Laugh, Applaud, Salute, Hug, Flex,
-   Chicken, Roar*). The name of the ring is shown above it, and the ring you used last opens first. Emotes are the
+   Chicken, Roar*). The name of the ring is shown above it, and the ring you used last opens first. **All rings
+   are yours to edit**: *Settings > Quick chat*, pick the ring at the top of the editor (*Messages, Emotes, Group
+   calls, Fun*), then change a slot's label and text: type an emote as `/dance`, `/salute`... (any emote the game
+   knows), or a message; Up / Down / Remove / Add / Reset (Reset puts back that ring's defaults). Emotes are the
    game's own (with their animations and voices), not chat: a release does them. If your game refuses emotes from
    addons, the emote is typed into the chat box instead (`/bow`, press Enter), and so are the next ones. (There is no
    "stop" emote in the game; *Wait* is the closest.)
@@ -398,7 +401,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 753 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 763 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -460,9 +463,9 @@ python tests/test_box.py              # 23 tests: messages into the chat box, re
 python tests/test_ping.py             # 13 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
 python tests/test_zone.py             # 10 tests: only the quests of where you are (Teldrassil vs Stormwind)
 python tests/test_items.py            # 22 tests: quest item icons in the tracker, the item key and button
-python tests/test_emotes.py           # 14 tests: the emote rings behind the mouse wheel
+python tests/test_emotes.py           # 24 tests: the emote rings behind the mouse wheel, and editing them
 ```
-Expected: every line ends in `passed` with all tests green (753 in total).
+Expected: every line ends in `passed` with all tests green (763 in total).
 
 ## Files
 | File | Purpose |

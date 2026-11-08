@@ -66,7 +66,7 @@ def test_rows_are_laid_out_top_to_bottom_without_overlapping_and_fit_in_the_wind
         heights = [r.frame.height for r in rows(W)]
         for (a, h), b in zip(zip(tops, heights), tops[1:]):
             assert b >= a + h, (t, a, h, b)
-        bottom = W.bottom + (300 + 10 if t == "quick" else 0)
+        bottom = W.bottom + (320 + 10 if t == "quick" else 0)
         assert bottom <= W.win.height - 30, (t, bottom)
 
 
