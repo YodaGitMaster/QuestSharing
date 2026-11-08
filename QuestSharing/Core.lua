@@ -279,7 +279,7 @@ local help = {
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", pickup = "pickup", coords = "coords", star = "selfMark", mappins = "mapPins", waypoint = "teamWaypoint",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", pickup = "pickup", coords = "coords", star = "selfMark", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"

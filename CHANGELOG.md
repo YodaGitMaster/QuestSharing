@@ -1,6 +1,13 @@
 # Changelog
 
 ## 0.2.0
+- **Right click opens a small menu** on a Party quests line: tell the party how I am doing, offer it, **tell them where
+  to get it** (with Questie: quest giver, zone, coordinates and the quests that come first; or the item and who drops
+  it), focus it on my map, open it in the quest log. Grey lines say why they cannot be used.
+- **Questie support** (optional, read only): the QuestieDB API of Questie 12 (`QuestDB.Get`) and the older
+  `QuestieLoader:ImportModule("QuestieDB")`, every call guarded; the row tooltip says where a quest starts.
+- **Sound:** checked that the addon never changes sound settings or game globals; the quick chat now refuses keys
+  the game uses for sound, music, volume or its menu; `/qs doctor` shows the game's sound settings; `/qs sound`.
 - **You decide when to talk:** the automatic party chat ("in common", "done", "picked up") is **off by default** (and
   switched off once for existing settings). **Party quests window:** scroll down for all your quests in the zone below
   the 5 nearest; **left click offers** the quest to whoever does not have it; **right click tells the party** "I still
