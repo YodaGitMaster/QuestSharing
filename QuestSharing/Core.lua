@@ -38,6 +38,8 @@ ns.defaults = {
     ping = true,        -- the ping key / ring slot: Attack ping on the nearest quest creature, "look here" on quest objects
     pingGap = 10,       -- anti-spam: outside combat a new ping only after this many seconds (or once the last one died)
     pingObjects = true, -- with no quest creature in sight, ping the quest object you face ("look here")
+    questItems = true,  -- icons next to the quests in the tracker for usable quest items in your bags, and the item key
+    itemButton = true,  -- a small movable button with the item of your nearest quest
     sound = true,       -- a soft sound for good news (someone accepted a quest I shared, a party member finished a shared quest)
     panelCombat = true, -- hide the Party quests window during combat
     panelScale = 100,   -- size of the Party quests window, in percent
@@ -231,6 +233,7 @@ function ns.setSetting(key, value)
         if key == "panelScale" and ns.applyPanelScale then ns.applyPanelScale() end
         if (key == "selfMark" or key == "enabled") and ns.syncSelfMark then ns.syncSelfMark() end
         if key == "mapPins" and ns.refreshMapPins then ns.refreshMapPins() end
+        if (key == "questItems" or key == "itemButton") and ns.applyQuestItems then ns.applyQuestItems() end
         if key == "minimap" and ns.syncMinimapButton then ns.syncMinimapButton() end
         if key == "markMobs" and ns.refreshMarkers then ns.refreshMarkers() end
         if key == "nearPin" and not value and ns.releasePin then ns.releasePin() end
@@ -284,6 +287,8 @@ local help = {
     "/qs coords on|off    add where I found the quest items to my messages, when someone still needs them",
     "/qs star on|off      the star over my head while in a party, so people see where I am",
     "/qs pingkey <KEY>    the key that pings the nearest quest creature (Attack) or quest object (look here); none removes it",
+    "/qs itemkey <KEY>    the key that uses the item of your nearest quest (a torch, a flare...); none removes it",
+    "/qs items on|off     item icons next to the quests in the tracker, and the quest item button",
     "/qs questie          does Quest Sharing read Questie's quest database? (with a real lookup from your quest log)",
     "/qs ping on|off      the ping key and the ring's ping slot",
     "/qs mappins on|off   party members running Quest Sharing on my world map (and my position to them)",
@@ -303,7 +308,7 @@ local help = {
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", pickup = "pickup", coords = "coords", star = "selfMark", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", pickup = "pickup", coords = "coords", star = "selfMark", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"
@@ -326,6 +331,7 @@ SlashCmdList["QUESTSHARING"] = function(msg)
         if arg == "on" or arg == "off" then ns.setSetting("friends", arg == "on"); status() else ns.addPartyFriends(true) end
     elseif cmd == "highlight" then ns.highlightCommand(arg)
     elseif cmd == "pingkey" then ns.setPingKey(arg)
+    elseif cmd == "itemkey" then ns.setItemKey(arg)
     elseif cmd == "questie" then for _, l in ipairs((ns.questie.report())) do ns.print(l) end
     elseif cmd == "doctor" then ns.doctor()
     elseif cmd == "errors" then ns.errorsCommand(arg)

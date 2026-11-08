@@ -15,6 +15,7 @@ Progress.lua
 Team.lua
 Marker.lua
 Ping.lua
+QuestItems.lua
 Panel.lua
 Questie.lua
 Menu.lua

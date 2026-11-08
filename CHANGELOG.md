@@ -10,6 +10,11 @@
 - **Calls the game refuses are written down and switched off:** the error log says what the addon was doing ("while
   putting the star over your head", "while sharing a quest with the party", ...), and that feature stays off until
   `/reload`, so the error cannot repeat. The star over your head is never set during combat.
+- **Quest items one click away:** an icon next to the quest in the game's tracker for usable quest items in your bags
+  that the game does not show itself (matched by the bag's quest info, an objective naming the item, or Questie's
+  "item this quest gives / needs"); a **quest item key** and a small movable button for the item of your nearest
+  quest, with count, cooldown and an out-of-range tint. Secure item buttons, prepared outside combat. Settings: a new
+  **Pings & items** tab (pings moved there; the friends beta is now on General).
 - **`/qs questie`** says whether Quest Sharing can read Questie's quest database on your client: is Questie (and
   QuestieDB) loaded, which way it is read (QuestieDB of Questie 12, LibQuestieDB, or the older Questie), is it ready,
   and a real lookup on the first quests of your quest log. Also reads `LibQuestieDB.Quest.Get` when the short global

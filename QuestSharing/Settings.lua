@@ -17,7 +17,7 @@ ns.settingTabs = {
     { id = "party",   title = "Party",        intro = "The Party quests window, what a click posts, and showing each other where you are." },
     { id = "tracker", title = "Tracker",      intro = "Keep the quests near you in sight, and find the creatures you need." },
     { id = "quick",   title = "Quick chat",   intro = "Hold your key, point at a message, let go. Pick a message below to edit it." },
-    { id = "social",  title = "Social",       intro = "Keep in touch with the people you quest with." },
+    { id = "actions", title = "Pings & items", intro = "One key pings your quest target for the party, one uses your quest item." },
 }
 
 -- kind = header | bool | choice | number | action | key.   desc = the grey line under the label (also its tooltip)
@@ -39,6 +39,11 @@ ns.settingRows = {
       desc = "Some game clients do not let addons send chat messages; in the chat box you just press Enter." },
     { tab = "general", kind = "bool", key = "sound", label = "A soft sound for good news",
       desc = "When someone accepts a quest you shared, or a party member finishes one you share. Never in combat." },
+    { tab = "general", kind = "header", label = "Friends" },
+    { tab = "general", kind = "bool", key = "friends", label = "(beta) Add people I group with to my friends list",
+      desc = "Automatic. Skips friends, ignored players and random-dungeon groups." },
+    { tab = "general", kind = "action", label = "Add my party to my friends now", button = "Add",
+      desc = "Once, for the party you are in (the same as /qs friends).", action = function() ns.addPartyFriends(true) end },
     { tab = "general", kind = "action", label = "Reset everything to the defaults", button = "Reset",
       desc = "Every setting and your quick chat messages.", action = function() ns.resetSettings() end },
     -- Sharing
@@ -99,14 +104,6 @@ ns.settingRows = {
       desc = "On their nameplates. Needs enemy nameplates switched on in the game." },
     { tab = "tracker", kind = "bool", key = "highlightCVars", label = "Switch on the game settings the highlights need",
       desc = "Enemy nameplates and icons over objects. Switching this off puts your own values back." },
-    { tab = "tracker", kind = "header", label = "Pinging quest targets" },
-    { tab = "tracker", kind = "key", which = "ping", key = nil, label = "Ping key",
-      desc = "Press it: the nearest creature your quests need gets the Attack ping (and becomes your target)." },
-    { tab = "tracker", kind = "choice", key = "pingGap", label = "Ping again after", values = { 5, 10, 15 },
-      names = { [5] = "5 seconds", [10] = "10 seconds", [15] = "15 seconds" },
-      desc = "Or as soon as the one you pinged is dead. Shift + the key pings anyway." },
-    { tab = "tracker", kind = "bool", key = "pingObjects", label = "Ping quest objects too (look here)",
-      desc = "With no quest creature in sight: the thing to pick up or use (gear / hand icon) you are facing." },
     -- Quick chat
     { tab = "quick", kind = "bool", key = "quick", label = "Quick chat ring (hold a key, point, release or click)" },
     { tab = "quick", kind = "key", label = "Key that opens the ring", desc = "Click, then press a key (Esc cancels)." },
@@ -116,17 +113,29 @@ ns.settingRows = {
       names = { small = "small", normal = "normal", large = "large" } },
     { tab = "quick", kind = "choice", key = "quickChannel", label = "Auto messages go to", values = { "auto", "say", "party", "whisper" },
       names = { auto = "the party if I am in one, else my target (whisper), else nearby", say = "everybody nearby", party = "the party only", whisper = "the player I target" } },
-    -- Social
-    { tab = "social", kind = "bool", key = "friends", label = "(beta) Add people I group with to my friends list",
-      desc = "Automatic. Skips friends, ignored players and random-dungeon groups." },
-    { tab = "social", kind = "action", label = "Add my party to my friends now", button = "Add",
-      desc = "Once, for the party you are in (the same as /qs friends).", action = function() ns.addPartyFriends(true) end },
+    -- Pings & items
+    { tab = "actions", kind = "header", label = "Pinging quest targets" },
+    { tab = "actions", kind = "key", which = "ping", key = nil, label = "Ping key",
+      desc = "Press it: the nearest creature your quests need gets the Attack ping (and becomes your target)." },
+    { tab = "actions", kind = "choice", key = "pingGap", label = "Ping again after", values = { 5, 10, 15 },
+      names = { [5] = "5 seconds", [10] = "10 seconds", [15] = "15 seconds" },
+      desc = "Or as soon as the one you pinged is dead. Shift + the key pings anyway." },
+    { tab = "actions", kind = "bool", key = "pingObjects", label = "Ping quest objects too (look here)",
+      desc = "With no quest creature in sight: the thing to pick up or use (gear / hand icon) you are facing." },
+    { tab = "actions", kind = "header", label = "Quest items" },
+    { tab = "actions", kind = "bool", key = "questItems", label = "Item icons next to the quests in the tracker",
+      desc = "For quest items in your bags you can use (a torch, a flare...): click the icon to use it." },
+    { tab = "actions", kind = "key", which = "item", label = "Quest item key",
+      desc = "Press it: uses the item of your nearest quest that has one (also in combat, the one it had before)." },
+    { tab = "actions", kind = "bool", key = "itemButton", label = "A button with the nearest quest's item",
+      desc = "Shift + drag to move it. It shows the cooldown, and turns red when your target is out of range." },
 }
 
 local function limit(v) if type(v) == "function" then return v() end return v end
 
 local function keyName(row)
     if row and row.which == "ping" then return ns.pingKeyName and ns.pingKeyName() end
+    if row and row.which == "item" then return ns.itemKeyName and ns.itemKeyName() end
     return ns.quickKeyName and ns.quickKeyName()
 end
 
@@ -229,7 +238,9 @@ function ns.captureKeyPressed(key)
     if key ~= "ESCAPE" then
         local prefix = ((IsAltKeyDown and IsAltKeyDown()) and "ALT-" or "") .. ((IsControlKeyDown and IsControlKeyDown()) and "CTRL-" or "")
                     .. ((IsShiftKeyDown and IsShiftKeyDown()) and "SHIFT-" or "")
-        if W.captureFor == "ping" then ns.setPingKey(prefix .. key) else ns.setQuickKey(prefix .. key) end
+        if W.captureFor == "ping" then ns.setPingKey(prefix .. key)
+        elseif W.captureFor == "item" then ns.setItemKey(prefix .. key)
+        else ns.setQuickKey(prefix .. key) end
     end
     ns.refreshSettings()
 end
@@ -530,7 +541,7 @@ local function build()
 
     local x = LEFT
     for _, t in ipairs(ns.settingTabs) do
-        local width = (t.id == "party" or t.id == "quick") and 112 or 92
+        local width = (t.id == "quick" or t.id == "actions") and 112 or 92     -- six tabs fit the window
         local b = clickable(f, width, 24, function() ns.settingsTab(t.id) end)
         b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -42)
         local bg = S.fill(b, "BACKGROUND", 0.12, 0.14, 0.2, 0.9)

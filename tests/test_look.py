@@ -47,7 +47,7 @@ def printed(g):
 def test_every_tab_has_a_short_intro_and_sections(style):
     g = game(style)
     W = window(g)
-    for t in ("general", "sharing", "party", "tracker", "quick", "social"):
+    for t in ("general", "sharing", "party", "tracker", "quick", "actions"):
         g.eval("NS.settingsTab")(t)
         assert len(plain(W.intro.text)) > 20, t
     g.eval("NS.settingsTab")("sharing")
@@ -60,7 +60,7 @@ def test_every_tab_has_a_short_intro_and_sections(style):
 def test_rows_are_laid_out_top_to_bottom_without_overlapping_and_fit_in_the_window(style):
     g = game(style)
     W = window(g)
-    for t in ("general", "sharing", "party", "tracker", "quick", "social"):
+    for t in ("general", "sharing", "party", "tracker", "quick", "actions"):
         g.eval("NS.settingsTab")(t)
         tops = [-r.frame.point[5] for r in rows(W)]
         heights = [r.frame.height for r in rows(W)]

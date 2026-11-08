@@ -203,6 +203,16 @@ local function placeOf(s)
     return where
 end
 
+-- the items a quest hands you or needs (sourceItemId, requiredSourceItems): candidates for "use this item"
+function Q.questItemIds(questID)
+    local out = {}
+    local src = field("quest", questID, "sourceItemId")
+    if type(src) == "number" and src > 0 then out[#out + 1] = src end
+    local req = field("quest", questID, "requiredSourceItems")
+    if type(req) == "table" then for _, id in ipairs(req) do if type(id) == "number" then out[#out + 1] = id end end end
+    return out
+end
+
 -- "starts at Marshal Dughan in Elwynn Forest (42.1, 65.9), after "A Threat Within""   (nil when Questie does not know)
 function Q.whereText(questID)
     local s = Q.starter(questID)
