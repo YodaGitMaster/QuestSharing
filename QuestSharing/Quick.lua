@@ -326,7 +326,8 @@ end
 
 -- Does sending this need a real key press / click (rather than a key release)?
 local RESTRICTED = { SAY = true, YELL = true, EMOTE = true }
-local function sendsDirectly() return ns.db.mode == "send" and not ns.isBlocked("chat") end
+-- sent at once: the ring's own switch (Settings > Quick chat), or "My messages: sent at once"; never once the game refused it
+local function sendsDirectly() return (ns.db.quickSend or ns.db.mode == "send") and not ns.isBlocked("chat") end
 
 local function needsClick(i)
     local item = ringItems()[i]
@@ -827,10 +828,13 @@ function ns.quickCommand(arg)
     elseif sub == "move" and n1 then if ns.quickMove(tonumber(n1), tonumber(n2)) then listItems() end
     elseif sub == "reset" then ns.quickReset(); listItems()
     elseif sub == "mode" and (rest == "hold" or rest == "toggle") then ns.setSetting("quickMode", rest)
+    elseif sub == "send" and (rest == "on" or rest == "off") then
+        ns.setSetting("quickSend", rest == "on")
+        ns.print(rest == "on" and "quick chat: a message you pick is sent at once" or "quick chat: a message you pick goes into the chat box (press Enter)")
     elseif sub == "channel" and (rest == "auto" or rest == "say" or rest == "party" or rest == "whisper") then ns.setSetting("quickChannel", rest)
     elseif sub == "editor" then ns.toggleSettings(true, "quick")
     else
-        ns.print("/qs quick [list] | add [label |] <text> | edit N <text> | label N <label> | route N auto|nearby|say|yell|party|whisper | remove N | move N M | reset | on|off | mode hold|toggle | channel auto|say|party|whisper | editor | open")
+        ns.print("/qs quick [list] | add [label |] <text> | edit N <text> | label N <label> | route N auto|nearby|say|yell|party|whisper | remove N | move N M | reset | on|off | send on|off | mode hold|toggle | channel auto|say|party|whisper | editor | open")
     end
     if ns.refreshSettings then ns.refreshSettings() end
 end

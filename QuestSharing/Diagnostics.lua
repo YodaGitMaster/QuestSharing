@@ -98,6 +98,11 @@ local function blocked(event, addon, fn)
             ns.blockedFeatures.chat = true
             ns.db.mode = "box"                                      -- the next ones go straight into the chat box
         end
+        if ns.db.quickSend and l.channel ~= "INVITE" then           -- and the ring stops sending at once (remembered)
+            ns.db.quickSend = false
+            ns.print("quick chat: the game does not let the addon send from the ring, so its messages go into the chat " ..
+                "box from now on (to try again: Settings > Quick chat > Send the message at once, then /reload)")
+        end
         what = " (while sending from the quick chat ring to " .. tostring(l.channel) .. (l.channel == "WHISPER" and (" " .. tostring(l.target)) or "") .. ")"
     else
         -- what did we just try? (noted by ns.trying right before every call the game may refuse)

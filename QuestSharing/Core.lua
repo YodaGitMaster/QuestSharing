@@ -21,6 +21,7 @@ ns.defaults = {
     minimap = true,     -- the minimap button
     quick = true,       -- the quick chat wheel (hold a key, point, release)
     quickMode = "hold", -- "hold" (open while the key is held) or "toggle" (press to open, click a slot)
+    quickSend = true,   -- a message picked on the ring is sent at once (off: it goes into the chat box, you press Enter)
     quickChannel = "auto", -- "auto" (party if grouped, else a whisper to your target, else say), "say", "party" or "whisper" (your target)
     friends = false,    -- (BETA, off) add the people you group with to your friends list automatically
     markMobs = true,    -- a quest icon above the nameplate of creatures that are part of your quests

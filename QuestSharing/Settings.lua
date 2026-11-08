@@ -111,6 +111,8 @@ ns.settingRows = {
     { tab = "quick", kind = "key", label = "Key that opens the ring", desc = "Click, then press a key (Esc cancels)." },
     { tab = "quick", kind = "choice", key = "quickMode", label = "The quick chat key", values = { "hold", "toggle" },
       names = { hold = "hold, point, release", toggle = "press to open, click a message" } },
+    { tab = "quick", kind = "bool", key = "quickSend", label = "Send the message at once (no Enter)",
+      desc = "Off: it goes into the chat box and you press Enter. Switches itself off if the game refuses it." },
     { tab = "quick", kind = "choice", key = "quickSize", label = "Ring size", values = { "small", "normal", "large" },
       names = { small = "small", normal = "normal", large = "large" } },
     { tab = "quick", kind = "choice", key = "quickChannel", label = "Auto messages go to", values = { "auto", "say", "party", "whisper" },
@@ -191,7 +193,7 @@ end
 
 -- The window -----------------------------------------------------------------------------------------------------
 local W = { win = nil, tab = "general", rows = {}, tabs = {}, ed = { selected = nil }, capturing = false }
-local WIDTH, HEIGHT, LEFT = 660, 600, 24
+local WIDTH, HEIGHT, LEFT = 660, 630, 24
 local TOP = 98                     -- where the first row starts (below the title, the tabs and the intro line)
 local ROW_H, HEADER_H, DESC_H = 22, 24, 12
 local MAX_ROWS = 18

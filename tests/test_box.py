@@ -50,16 +50,32 @@ def ring(g, slot):
     g.run("CURSOR.x, CURSOR.y = 960, 540")
 
 
-# ---- the chat box by default ---------------------------------------------------------------------------------------
-def test_a_new_install_writes_into_the_chat_box(style):
+# ---- the ring sends at once by default; everything else goes into the chat box --------------------------------------
+def test_a_new_install_sends_from_the_ring_at_once(style):
     g = fresh_party(style)
-    assert g.eval("NS.db.mode") == "box"
+    assert g.eval("NS.db.mode") == "box" and g.eval("NS.db.quickSend") is True
     ring(g, 3)                                                       # "What I need": Auto -> the party
+    assert g.opened() == [] and len(g.sent()) == 1, g.sent()
+    msg, channel = g.sent()[0]
+    assert channel == "PARTY" and msg.startswith("I need to: "), g.sent()
+
+
+def test_with_sending_at_once_off_the_ring_writes_into_the_chat_box(style):
+    g = fresh_party(style)
+    g.run("PRINTED = {}")
+    g.slash("quick send off")
+    assert g.eval("NS.db.quickSend") is False and "goes into the chat box" in "\n".join(g.printed())
+    ring(g, 3)
     assert g.sent() == [] and len(g.opened()) == 1 and g.opened()[0].startswith("/p I need to: ")
+    g.advance(2)
+    g.slash("quick send on")
+    ring(g, 3)
+    assert len(g.sent()) == 1, "back on: sent at once"
 
 
 def test_say_and_whisper_also_go_into_the_chat_box_without_an_extra_click(style):
     g = fresh_party(style)
+    g.slash("quick send off")
     ring(g, 1)                                                       # Hello: nearby, nobody targeted -> /s
     assert g.opened()[-1] == "/s Hey there! o/" and g.sent() == []
     g.advance(2)
@@ -68,6 +84,18 @@ def test_say_and_whisper_also_go_into_the_chat_box_without_an_extra_click(style)
     assert g.opened()[-1] == "/w Lia Hey Lia! o/"
     hint = g.eval("NS._quickWheel()")[3]
     assert "chat box" in hint.text or hint.text == ""
+
+
+def test_a_refused_send_from_the_ring_goes_into_the_chat_box_and_switches_sending_at_once_off(style):
+    g = fresh_party(style, pre=REFUSE_CHAT)
+    g.run("PRINTED = {}")
+    ring(g, 3)
+    assert g.opened() and g.opened()[-1].startswith("/p I need to: "), "the refused message is in your chat box"
+    assert g.eval("NS.db.quickSend") is False
+    assert "does not let the addon send from the ring" in "\n".join(g.printed())
+    g.advance(2)
+    ring(g, 3)
+    assert g.eval("SEND_TRIES") == 1 and len(g.opened()) == 2, "straight into the chat box now: no second try"
 
 
 def test_the_menus_messages_go_into_the_chat_box_too(style):

@@ -6,7 +6,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from harness import Game  # noqa: E402
 
 STYLES = ("modern", "classic")
-BOOLS = ["enabled", "auto", "shareNew", "click", "link", "sync", "markers", "panel", "panelSolo", "near", "mapPins", "teamWaypoint"]
+BOOLS = ["enabled", "auto", "shareNew", "click", "link", "sync", "markers", "panel", "panelSolo", "near", "mapPins", "teamWaypoint", "quickSend"]
 QUIET = ["chat", "announce", "pickup"]          # the automatic party chat: off until you switch it on
 
 
