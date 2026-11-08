@@ -32,7 +32,6 @@ ERR_QUEST_PUSH_DEAD_S = "%s is dead."
 ERR_QUEST_PUSH_TIMER_EXPIRED_S = "%s did not respond."
 LE_PARTY_CATEGORY_INSTANCE = 2
 
-UIParent = {}
 UISpecialFrames = {}
 OPTIONS_ADDED = {}
 TOOLTIP = {}
@@ -64,7 +63,8 @@ local function newObject()
     function o:SetHeight(h) self.height = h end
     function o:SetWidth(w) self.width = w end
     for _, name in ipairs({ "SetBackdrop", "SetBackdropColor", "SetFrameStrata", "SetMovable", "EnableMouse",
-                            "RegisterForDrag", "SetJustifyH", "StartMoving", "StopMovingOrSizing" }) do
+                            "RegisterForDrag", "SetJustifyH", "StartMoving", "StopMovingOrSizing", "SetAllPoints",
+                            "ClearAllPoints", "SetFontObject", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "SetFocus" }) do
         o[name] = function() end
     end
     return o
@@ -75,6 +75,35 @@ function CreateFrame()
     FRAMES[#FRAMES + 1] = f
     return f
 end
+
+UI_SCALE, CURSOR = 1, { x = 960, y = 540 }
+UIParent = newObject()
+function UIParent:GetEffectiveScale() return UI_SCALE end
+function GetCursorPosition() return CURSOR.x * UI_SCALE, CURSOR.y * UI_SCALE end
+ChatFontNormal = {}
+
+-- targets, sub-zone, key bindings
+TARGET, SUBZONE = nil, ""
+function UnitExists(u) return u == "target" and TARGET ~= nil end
+function UnitIsPlayer(u) return u == "target" and TARGET ~= nil and TARGET.player == true end
+function UnitIsUnit(a, b) return a == b end
+function GetSubZoneText() return SUBZONE end
+BINDINGS, SAVED_BINDINGS = {}, 0
+function SetBinding(key, action)
+    if action == nil then BINDINGS[key] = nil; return true end
+    if string.find(key, "[^%w%-]") then return false end
+    BINDINGS[key] = action
+    return true
+end
+function GetBindingAction(key) return BINDINGS[key] or "" end
+function GetBindingKey(action)
+    local keys = {}
+    for k, a in pairs(BINDINGS) do if a == action then keys[#keys + 1] = k end end
+    table.sort(keys)
+    return unpack(keys)
+end
+function SaveBindings() SAVED_BINDINGS = SAVED_BINDINGS + 1 end
+function GetCurrentBindingSet() return 1 end
 
 function FIRE(event, ...)
     for _, f in ipairs(FRAMES) do
@@ -99,7 +128,7 @@ function hooksecurefunc(a, b, c)
     tbl[name] = function(...) local r = { orig(...) }; fn(...); return unpack(r) end
 end
 
-function SendChatMessage(msg, channel) SENT[#SENT + 1] = { msg = msg, channel = channel } end
+function SendChatMessage(msg, channel, lang, target) SENT[#SENT + 1] = { msg = msg, channel = channel, target = target } end
 DEFAULT_CHAT_FRAME = { AddMessage = function(_, m) PRINTED[#PRINTED + 1] = m end }
 function ChatFrame_OpenChat(text) OPENED[#OPENED + 1] = text end
 SlashCmdList = {}
@@ -116,6 +145,7 @@ function UnitName(unit)
     local i = tonumber(string.match(unit, "^party(%d)$") or "")
     if i then return GROUP.members[i], REALMS[GROUP.members[i]] end
     if unit == "player" then return "Me" end
+    if unit == "target" and TARGET then return TARGET.name end
 end
 function GetRealZoneText() return ZONE end
 
@@ -363,6 +393,12 @@ class Game:
 
     def watch_log(self):
         return list(self.lua.eval("WATCH_LOG").values())
+
+    def cursor(self, x, y):
+        self.run(f"CURSOR.x, CURSOR.y = {x}, {y}")
+
+    def wheel(self):
+        return self.eval("NS._quickWheel()")
 
     def friends(self):
         return sorted(self.lua.eval("(function() local t = {} for k in pairs(FRIENDS) do t[#t+1] = k end return t end)()").values())

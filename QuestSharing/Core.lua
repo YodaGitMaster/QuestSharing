@@ -19,6 +19,9 @@ ns.defaults = {
     announce = true,    -- say in party chat when a quest we share has all its objectives done
     markers = true,     -- mark quests your party shares in the quest log
     panel = true,       -- show the "quests in common" panel while you are in a party
+    quick = true,       -- the quick chat wheel (hold a key, point, release)
+    quickMode = "hold", -- "hold" (open while the key is held) or "toggle" (press to open, click a slot)
+    quickChannel = "auto", -- "auto" (party if grouped, else say), "say", "party" or "whisper" (your target)
     friends = false,    -- (BETA, off) add the people you group with to your friends list automatically
     near = true,        -- keep the quest tracker filled with the quests closest to you
     nearCount = 5,      -- how many quests the tracker keeps while "near" is on
@@ -155,6 +158,7 @@ function ns.resetSettings()
         if k ~= "dbVersion" and ns.db[k] ~= v then ns.setSetting(k, v) end
     end
     ns.db.panelPos = nil
+    if ns.defaultQuickItems then ns.db.quickItems = ns.defaultQuickItems() end
     ns.print("all settings are back to their defaults (everything on)")
     if ns.refreshSettings then ns.refreshSettings() end
 end
@@ -168,9 +172,9 @@ end
 local function status()
     local d = ns.db
     local function f(v) return v and "on" or "off" end
-    ns.print(string.format("%s | auto-share %s | new-quest %s | area %s | gap %ds | chat %s | announce %s | click %s | link %s | mode %s | sync %s | markers %s | panel %s | near %s | friends(beta) %s",
+    ns.print(string.format("%s | auto-share %s | new-quest %s | area %s | gap %ds | chat %s | announce %s | click %s | link %s | mode %s | sync %s | markers %s | panel %s | near %s | quick %s | friends(beta) %s",
         d.enabled and "ON" or "OFF", f(d.auto), f(d.shareNew), d.area, d.gap, f(d.chat), f(d.announce), f(d.click), f(d.link),
-        d.mode, f(d.sync), f(d.markers), f(d.panel), f(d.near), f(d.friends)))
+        d.mode, f(d.sync), f(d.markers), f(d.panel), f(d.near), f(d.quick), f(d.friends)))
 end
 
 local help = {
@@ -193,6 +197,8 @@ local help = {
     "/qs near [on|off]    keep the tracker (right-hand list) filled with the quests closest to you",
     "/qs near N           how many quests it keeps  |  /qs near mode auto|distance|zone  |  now  |  resume",
     "/qs friends          (beta) add everybody in your party to your friends list now; /qs friends on|off = automatically",
+    "/qs quick            the quick chat wheel: list / add / edit / remove / move / reset the messages (see /qs quick help)",
+    "/qs key [KEY]        bind the quick chat wheel to a key, e.g. /qs key V   (/qs key none removes it)",
     "/qs reset            put every setting back to its default (everything on)",
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
@@ -214,6 +220,8 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     elseif cmd == "mode" and (arg == "box" or arg == "send" or arg == "print") then ns.setSetting("mode", arg); status()
     elseif cmd == "near" then ns.nearCommand(arg); if arg == "" or arg == "on" or arg == "off" then status() end
     elseif cmd == "settings" or cmd == "config" or cmd == "options" then ns.toggleSettings()
+    elseif cmd == "quick" then ns.quickCommand(arg)
+    elseif cmd == "key" then ns.setQuickKey(arg)
     elseif cmd == "friends" then
         if arg == "on" or arg == "off" then ns.setSetting("friends", arg == "on"); status() else ns.addPartyFriends(true) end
     elseif cmd == "reset" then ns.resetSettings()
