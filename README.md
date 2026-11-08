@@ -83,27 +83,29 @@ Hover the map button any time for a quick status (party, tracker, your key, prob
 
 6. **Shows who shares what.** A star and the names next to shared quests in the game's quest log, and a small
    movable **Party quests** window (shown while you are in a party, on the left of the screen the first time; drag it
-   anywhere and it stays there). It is built to be read at a glance:
+   anywhere and it stays there). It is a grid: **your 5 nearest quests** down the side, **one column per party member**:
 
    ```
-   Party quests (2 in common)          [Share] [Post all] [-]   Settings
-   [mage] Anna QS   [priest] Bob   [warrior] Cy
-   [mage][  ][warrior]  Wolves Among Us                3/8 +1
-   [   ][  ][warrior]   Report to Goldshire (green)      done
+   Party quests (2 of 5 shared)                 [Share] [Post all] [-]  Settings
+   Quest                           [mage] Anna QS   [priest] Bob
+   Wolves Among Us          3/8 +1        v              x
+   Report to Goldshire        done        v*             ?
+   A Personal Quest            ...        x              x
    ```
 
-   - The top line is your party: a **class icon** and the name **in class colour**; **QS** means that player runs
-     Quest Sharing too (so their progress is exact).
-   - Each row is **one shared quest**: the class icons of the members who have it (a green check = they finished it),
-     the quest name (green when you are done) and **your own progress** on the right (`3/8`, `3/8 +1` when more goals
-     are open, or `done`). Rows are striped so a line is easy to follow.
-   - **Hover** a row for everybody's progress; **click** it and your status goes into the chat box, exactly like a
-     click on the game's tracker (click more rows to add them).
-   - **Share** offers your quests of this area to the party now. **Post all** puts your progress on every shared quest
-     in the chat box in one message (and says so if not everything fits). **-** folds the window to its title.
-   - It **hides during combat** and comes back afterwards, its **size** can be changed (70-150 %), and *Settings >
-     Party window > Move back* finds it if you lost it.
-   - More than 12 shared quests: the rest is summed up as "+N more".
+   - **v** (green check) = has the quest, **v\*** (gold check) = has it and finished it, **x** (red) = does not have
+     it, **?** = the game cannot tell (the player is out of range or offline; players running Quest Sharing are
+     always known exactly, **QS** after their name).
+   - **The 5 nearest quests, re-sorted as you move** (every few seconds). A quest only moves up, or onto the list, when
+     it is clearly closer (about 20 %), so the rows stay calm while you walk. On a client that cannot measure distance,
+     the quests of the zone you are in come first.
+   - Your own progress is next to the quest name (`3/8 +1`, `done`); a finished quest of yours is green.
+   - **Hover** a row for everybody's status and progress; **click** it and your status goes into the chat box, exactly
+     like a click on the game's tracker (click more rows to add them).
+   - **Share** offers your quests of this area to the party now. **Post all** puts your progress on the quests someone
+     in the party has in the chat box, in one message. **-** folds the window to its title.
+   - It **hides during combat** and comes back afterwards, its **size** can be changed (70-150 %), it is as wide as
+     your party, and *Settings > Party > Move back* finds it if you lost it.
 
 7. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. It fills the
    tracker (the list on the right) with the quests closest to you and **re-checks every 2 seconds as you
@@ -292,7 +294,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 569 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 575 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -336,7 +338,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 ```
 pip install lupa
 python tests/test_questsharing.py     # 68 tests: sharing, replies, announcements, tracker clicks, commands
-python tests/test_features.py         # 76 tests: sync, completion, the Party quests window, quest-log markers
+python tests/test_features.py         # 82 tests: sync, completion, the Party quests grid, quest-log markers
 python tests/test_triggers.py         # 34 tests: when it shares (once per join / new member / new quest), no nagging
 python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 42 tests: everything on by default, migration, the tabbed settings window
@@ -348,7 +350,7 @@ python tests/test_look.py             # 42 tests: the settings window layout, th
 python tests/test_together.py         # 30 tests: several Quest Sharing users in one party, fewer messages
 python tests/test_team.py             # 30 tests: picked up a quest someone has, where the items were, the message budget
 ```
-Expected: every line ends in `passed` with all tests green (569 in total).
+Expected: every line ends in `passed` with all tests green (575 in total).
 
 ## Files
 | File | Purpose |
@@ -358,7 +360,7 @@ Expected: every line ends in `passed` with all tests green (569 in total).
 | `QuestSharing/Share.lua` | party detection, the push queue, reading the game's replies, announcing quests in common |
 | `QuestSharing/Sync.lua` | addon-to-addon protocol: hello, full quest list, updates (see the header of the file) |
 | `QuestSharing/Progress.lua` | notices finished quests, announces them, sends changes to synced players |
-| `QuestSharing/Panel.lua` | the "Party quests" window (class icons, clickable rows) and the quest-log markers |
+| `QuestSharing/Panel.lua` | the "Party quests" grid (nearest 5 quests x party members) and the quest-log markers |
 | `QuestSharing/Track.lua` | keeps the quest tracker on the quests nearest to you (distance or zone mode) |
 | `QuestSharing/Highlight.lua` | quest icons over creatures on their nameplates, and the game-settings helper |
 | `QuestSharing/Diagnostics.lua` | the error log, `/qs doctor` and the copyable report window |

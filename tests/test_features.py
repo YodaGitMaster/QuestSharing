@@ -282,24 +282,6 @@ def test_panel_lines_edge_cases(style):
     assert lines(g)[-1] == "No quests in common yet."
 
 
-def test_panel_window_shows_the_lines_and_remembers_where_it_was_put(style):
-    g = quiet_party(style, on_quest={"party1": [100]})
-    g.slash("panel on")
-    panel, rows, legend, notes = g.eval("NS._panel()")
-    assert g.eval("NS.db.panel") is True and panel.shown
-    assert plain(legend[1].name.text) == "Anna" and legend[1].icon.shown and legend[2].icon.shown is False
-    assert rows[1].shown and rows[1].title.text == "Wolves Among Us" and rows[2].shown is False, "unused rows are hidden"
-    assert panel.height == 52 + 22 + 4
-    hello(g, "Anna", "100:0:5/8,1/4")                                         # new data refreshes it by itself
-    g.advance(6)
-    assert rows[1].shown and "Anna: 5/8, 1/4" not in rows[1].title.text
-    assert (panel.point[0 + 1], panel.point[4], panel.point[5]) == ("LEFT", 20, 120), "first time: on the left, not mid-screen"
-    g.eval("function(p) p.scripts.OnDragStop(p) end")(panel)
-    assert tuple(g.eval("NS.db.panelPos").values()) == ("LEFT", 20, 120)
-    g.slash("panel off")
-    assert panel.shown is False
-
-
 def plain(t):
     """The text without colour codes."""
     return re.sub(r"\|c[0-9a-fA-F]{8}|\|r", "", t or "")
@@ -311,48 +293,118 @@ def panel_of(g):
     return g.eval("NS._panel()")
 
 
-def test_panel_rows_show_who_has_the_quest_with_class_icons_and_my_progress(style):
-    g = quiet_party(style, ("Anna", "Bob", "Cy"), on_quest={"party1": [100], "party3": [100, 101]})
-    g.run('CLASSES.Anna = "MAGE"; CLASSES.Bob = "PRIEST"; CLASSES.Cy = "WARRIOR"')
-    panel, rows, legend, notes = panel_of(g)
-    assert [plain(legend[i].name.text) for i in (1, 2, 3)] == ["Anna", "Bob", "Cy"]
-    assert legend[1].name.text.startswith("|cff40c7eb"), "names in their class colour (mage blue)"
-    assert legend[1].icon.coords[1] == 0.25 and legend[2].icon.coords[1] == 0.5, "each member shows their class"
-    first = rows[1]
-    assert first.title.text == "Wolves Among Us" and first.mine.text == "3/8 +1", "my own progress (and one more open goal)"
-    assert (first.icons[1].shown, first.icons[2].shown, first.icons[3].shown) == (True, False, True), "Anna and Cy have it, Bob does not"
-    assert first.icons[1].coords[1] == 0.25 and first.icons[3].coords[1] == 0
-    second = rows[2]                                                         # Cy also has the finished quest: green
-    assert second.shown and second.title.text == "|cff55ff55Report to Goldshire|r" and plain(second.mine.text) == "done"
-    assert second.icons[1].shown is False and second.icons[3].shown is True, "only Cy has the second quest"
+CHECK, CROSS, WAIT = ("Interface\\RaidFrame\\ReadyCheck-Ready", "Interface\\RaidFrame\\ReadyCheck-NotReady",
+                      "Interface\\RaidFrame\\ReadyCheck-Waiting")
 
 
-def test_a_finished_quest_is_green_and_a_member_who_finished_gets_a_check(style):
-    g = quiet_party(style, ("Anna",), on_quest={"party1": [101]})
-    hello(g, "Anna", "101:1:f")
-    panel, rows, legend, notes = panel_of(g)
-    row = [r for r in (rows[1], rows[2]) if "Report to Goldshire" in r.title.text][0]
-    assert row.title.text.startswith("|cff55ff55") and row.mine.text == "|cff55ff55done|r"
-    assert row.checks[1].shown is True
+def grid(rows, cols, n_members):
+    """[(quest title, [cell picture per member])] for the rows on screen."""
+    out = []
+    for i in range(1, 13):                               # every row the window has, not just the first five
+        r = rows[i]
+        if r is not None and r.shown:
+            out.append((plain(r.title.text), [r.cells[j].texture for j in range(1, n_members + 1)]))
+    return out
+
+
+def test_the_window_is_a_grid_quest_then_one_column_per_member(style):
+    g = quiet_party(style, ("Anna", "Bob"), on_quest={"party1": [100], "party2": [100, 101]})
+    panel, rows, cols, notes = panel_of(g)
+    assert g.eval("NS.db.panel") is True and panel.shown
+    assert plain(panel.questHead.text) == "Quest"
+    assert [plain(cols[j].name.text) for j in (1, 2)] == ["Anna", "Bob"] and cols[3].icon.shown is False
+    shown = dict(grid(rows, cols, 2))
+    assert shown["Wolves Among Us"] == [CHECK, CHECK]
+    assert shown["Report to Goldshire"] == [CROSS, CHECK], "Anna does not have it: an X"
+    assert shown["A Personal Quest"] == [CROSS, CROSS]
+    g.eval("function(p) p.scripts.OnDragStop(p) end")(panel)
+    assert (panel.point[1], panel.point[4], panel.point[5]) == ("LEFT", 20, 120), "first time: on the left, not mid-screen"
+    assert tuple(g.eval("NS.db.panelPos").values()) == ("LEFT", 20, 120)
+    g.slash("panel off")
+    assert panel.shown is False
+
+
+def test_at_most_five_quests_the_nearest_first(style):
+    g = quiet_party(style, ("Anna",))
+    g.run("""for i = 1, 6 do
+        QUESTS[#QUESTS + 1] = { id = 400 + i, title = "Extra " .. i, level = 5, objectives = {} }
+    end""")
+    g.fire("QUEST_LOG_UPDATE")
+    if style == "modern":
+        g.set_dist(q100=900, q101=100, q102=4000, q200=50, q401=10, q402=8000, q403=2500, q404=9000, q405=6000, q406=7000)
+    panel, rows, cols, notes = panel_of(g)
+    titles = [t for t, _ in grid(rows, cols, 1)]
+    assert len(titles) == 5 and rows[5].shown, "five at most"
+    if style == "modern":
+        assert titles == ["Extra 1", "The Defias Brotherhood", "Report to Goldshire", "Wolves Among Us", "Extra 3"], titles
+    else:                                                # no distances on this client: the quests of this zone first
+        assert titles[:3] == ["Wolves Among Us", "Report to Goldshire", "A Personal Quest"], titles
+
+
+def test_the_list_follows_me_as_i_move_without_jumping_around(style):
+    if style != "modern":
+        return
+    g = quiet_party(style, ("Anna",))
+    g.set_dist(q100=900, q101=100, q102=4000, q200=50)
+    panel, rows, cols, notes = panel_of(g)
+    assert [t for t, _ in grid(rows, cols, 1)][0] == "The Defias Brotherhood"
+    g.set_dist(q100=10, q101=100, q102=4000, q200=50)       # I walked to the wolves
+    g.advance(4.5)
+    assert [t for t, _ in grid(rows, cols, 1)][0] == "Wolves Among Us", "re-sorted by itself"
+    g.set_dist(q100=10, q101=12, q102=4000, q200=50)        # two quests about as near: no flip-flop
+    g.advance(4.5)
+    order = [t for t, _ in grid(rows, cols, 1)]
+    g.set_dist(q100=12, q101=10, q102=4000, q200=50)
+    g.advance(4.5)
+    assert [t for t, _ in grid(rows, cols, 1)] == order, "a small difference does not reorder the rows"
+
+
+def test_finished_members_get_a_gold_check_and_unknown_ones_a_question_mark(style):
+    g = quiet_party(style, ("Anna", "Bob"))
+    hello(g, "Anna", "101:1:f")                           # Anna runs the addon and finished 101
+    g.run("function UnitIsVisible(u) return u ~= 'party2' end")                 # Bob is far away: the game cannot tell
+    panel, rows, cols, notes = panel_of(g)
+    row = [rows[i] for i in range(1, 6) if rows[i].shown and "Report to Goldshire" in rows[i].title.text][0]
+    assert row.cells[1].texture == CHECK and tuple(round(v, 2) for v in list(row.cells[1].vertex.values())[:3]) == (1, 0.82, 0)
+    assert row.cells[2].texture == WAIT, "out of range: a question mark, not a wrong X"
+    assert row.title.text.startswith("|cff55ff55") and plain(row.mine.text) == "done", "my own finished quest is green"
+    assert "QS" in plain(cols[1].name.text) and "QS" not in plain(cols[2].name.text)
+
+
+def test_names_in_class_colour_with_the_class_icon(style):
+    g = quiet_party(style, ("Anna", "Bob"))
+    g.run('CLASSES.Anna = "MAGE"; CLASSES.Bob = "PRIEST"')
+    panel, rows, cols, notes = panel_of(g)
+    assert cols[1].name.text.startswith("|cff40c7eb") and cols[1].icon.coords[1] == 0.25
+    assert cols[2].icon.coords[1] == 0.5
+
+
+def test_my_own_progress_is_next_to_the_quest(style):
+    g = quiet_party(style, ("Anna",))
+    panel, rows, cols, notes = panel_of(g)
+    row = [rows[i] for i in range(1, 6) if rows[i].shown and "Wolves Among Us" in rows[i].title.text][0]
+    assert plain(row.mine.text) == "3/8 +1"
 
 
 def test_clicking_rows_adds_my_status_to_the_chat_box_like_the_tracker(style):
     g = quiet_party(style, ("Anna",), on_quest={"party1": [100, 101]})
-    panel, rows, legend, notes = panel_of(g)
+    panel, rows, cols, notes = panel_of(g)
     click = g.eval("function(r) r.scripts.OnClick(r, 'LeftButton') end")
-    click(rows[1])
+    first = [rows[i] for i in range(1, 6) if rows[i].shown and "Wolves Among Us" in rows[i].title.text][0]
+    second = [rows[i] for i in range(1, 6) if rows[i].shown and "Report to Goldshire" in rows[i].title.text][0]
+    click(first)
     assert g.sent() == [], "nothing is sent behind your back: it waits in the chat box"
     opened = g.opened()
     assert len(opened) == 1 and opened[0].startswith("/p ") and "{rt1}" not in opened[0]
     assert "Wolves Among Us" in opened[0] and "Wolf slain 3/8" in opened[0] and "Anna has it too" in opened[0]
-    click(rows[2])
+    click(second)
     text = g.eval("EDITBOX.text")
     assert " + " in text and "Wolves Among Us" in text and "Report to Goldshire" in text, "added, not replaced"
-    click(rows[1])
+    click(first)
     assert g.eval("EDITBOX.text") == text, "a quest already in the box is not added again"
     g.slash("mode send")
     g.run("CLOSE_CHAT()")
-    click(rows[1])
+    click(first)
     assert len(g.sent()) == 1 and g.sent()[0][1] == "PARTY", "the same setting as the tracker click"
 
 
@@ -364,20 +416,21 @@ def test_a_finished_quest_does_not_add_who_else_has_it(style):
     assert "Anna has it too!" in open_, "still said for a quest you are working on"
 
 
-def test_the_header_counts_the_quests_in_common_and_marks_addon_users(style):
+def test_the_header_counts_the_shared_quests_and_marks_addon_users(style):
     g = quiet_party(style, ("Anna", "Bob"), on_quest={"party1": [100]})
     hello(g, "Bob", "100:0:1/8")
-    panel, rows, legend, notes = panel_of(g)
-    assert plain(panel.count.text) == "(1 in common)"
-    assert "QS" not in legend[1].name.text and plain(legend[2].name.text) == "Bob QS", "Bob runs Quest Sharing too"
+    panel, rows, cols, notes = panel_of(g)
+    assert plain(panel.count.text) == "(1 of 4 shared)"
+    assert "QS" not in cols[1].name.text and plain(cols[2].name.text) == "Bob QS", "Bob runs Quest Sharing too"
 
 
-def test_post_all_puts_every_shared_quest_in_the_chat_box_at_once(style):
+def test_post_all_puts_the_shared_ones_in_the_chat_box_at_once(style):
     g = quiet_party(style, ("Anna",), on_quest={"party1": [100, 101]})
-    panel, rows, legend, notes = panel_of(g)
+    panel, rows, cols, notes = panel_of(g)
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(panel.post)
     text = g.eval("EDITBOX.text")
     assert "Wolves Among Us" in text and "Report to Goldshire" in text and " + " in text and "{rt1}" not in text
+    assert "Personal" not in text, "only quests someone in the party has"
     assert g.sent() == [] and len(g.opened()) == 1, "one message, waiting for Enter"
     g.run("CLOSE_CHAT()")
     g.slash("mode send")
@@ -387,22 +440,24 @@ def test_post_all_puts_every_shared_quest_in_the_chat_box_at_once(style):
 
 def test_post_all_says_when_not_everything_fits(style):
     g = quiet_party(style, ("Anna",))
-    g.run("""for i = 1, 8 do
+    g.run("""QUESTS = { { header = "Elwynn Forest" } }
+    for i = 1, 5 do
         QUESTS[#QUESTS + 1] = { id = 400 + i, title = "A rather long quest name number " .. i, level = 5, objectives = {
-            { text = "Something to collect: 0/10", finished = false, numFulfilled = 0, numRequired = 10 } } }
+            { text = "Something to collect: 0/10", finished = false, numFulfilled = 0, numRequired = 10 },
+            { text = "Something else to find: 0/10", finished = false, numFulfilled = 0, numRequired = 10 } } }
         ON_QUEST["party1"] = ON_QUEST["party1"] or {}
         ON_QUEST["party1"][400 + i] = true
     end""")
     g.fire("QUEST_LOG_UPDATE")
     panel_of(g)
     added = g.eval("NS.postAllProgress")()
-    assert 0 < added < 8 and len(g.eval("EDITBOX.text")) <= 255
+    assert 0 < added < 5 and len(g.eval("EDITBOX.text")) <= 255
     assert "fit in one message" in "\n".join(g.printed())
 
 
 def test_the_share_button_offers_my_quests_now(style):
     g = quiet_party(style, ("Anna",))
-    panel, rows, legend, notes = panel_of(g)
+    panel, rows, cols, notes = panel_of(g)
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(panel.share)
     g.advance(20)
     assert g.pushed() != [], "the area quests were offered"
@@ -410,9 +465,9 @@ def test_the_share_button_offers_my_quests_now(style):
 
 def test_the_window_folds_to_its_title_and_remembers_it(style):
     g = quiet_party(style, ("Anna",), on_quest={"party1": [100]})
-    panel, rows, legend, notes = panel_of(g)
+    panel, rows, cols, notes = panel_of(g)
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(panel.collapse)
-    assert g.eval("NS.db.panelCollapsed") is True and panel.height == 30 and rows[1].shown is False and legend[1].icon.shown is False
+    assert g.eval("NS.db.panelCollapsed") is True and panel.height == 30 and rows[1].shown is False and cols[1].icon.shown is False
     assert panel.collapse.text == "+"
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(panel.collapse)
     assert g.eval("NS.db.panelCollapsed") is False and rows[1].shown is True
@@ -420,7 +475,7 @@ def test_the_window_folds_to_its_title_and_remembers_it(style):
 
 def test_the_window_hides_in_combat_and_comes_back(style):
     g = quiet_party(style, ("Anna",), on_quest={"party1": [100]})
-    panel, rows, legend, notes = panel_of(g)
+    panel, rows, cols, notes = panel_of(g)
     g.run("IN_COMBAT = true")
     g.fire("PLAYER_REGEN_DISABLED")
     assert panel.shown is False
@@ -431,7 +486,6 @@ def test_the_window_hides_in_combat_and_comes_back(style):
     g.fire("PLAYER_REGEN_ENABLED")
     g.advance(1)
     assert panel.shown is True
-    g.slash("panel on")
     g.run("NS.setSetting('panelCombat', false); IN_COMBAT = true")
     g.fire("PLAYER_REGEN_DISABLED")
     assert panel.shown is True, "switched off: it stays"
@@ -439,42 +493,34 @@ def test_the_window_hides_in_combat_and_comes_back(style):
 
 def test_size_and_moving_it_back(style):
     g = quiet_party(style, ("Anna",))
-    panel, rows, legend, notes = panel_of(g)
+    panel, rows, cols, notes = panel_of(g)
     g.run("NS.setSetting('panelScale', 130)")
     assert panel.scale == 1.3
-    panel.point = None
     g.run('NS.db.panelPos = { "TOPLEFT", 3000, 3000 }')
     g.run("NS.resetPanelPosition()")
     assert g.eval("NS.db.panelPos") is None and (panel.point[1], panel.point[4], panel.point[5]) == ("LEFT", 20, 120)
 
 
-def test_a_row_has_a_tooltip_with_everybodys_progress(style):
+def test_a_row_has_a_tooltip_with_everybodys_status(style):
     g = quiet_party(style, ("Anna", "Bob"), on_quest={"party2": [100]})
     hello(g, "Anna", "100:0:5/8,1/4")
-    panel, rows, legend, notes = panel_of(g)
-    g.eval("function(r) r.scripts.OnEnter(r) end")(rows[1])
+    panel, rows, cols, notes = panel_of(g)
+    row = [rows[i] for i in range(1, 6) if rows[i].shown and "Wolves Among Us" in rows[i].title.text][0]
+    g.eval("function(r) r.scripts.OnEnter(r) end")(row)
     lines = list(g.eval("TOOLTIP.lines").values())
     assert g.eval("TOOLTIP.text") == "Wolves Among Us" and "Anna: 5/8, 1/4" in lines and "Bob: has it" in lines
     assert any("Click" in l for l in lines)
 
 
-def test_a_long_list_is_cut_with_a_note(style):
+def test_the_window_is_as_wide_as_the_party(style):
     g = quiet_party(style, ("Anna",))
-    g.run("""for i = 1, 14 do
-        QUESTS[#QUESTS + 1] = { id = 300 + i, title = "Extra " .. i, level = 5, objectives = {} }
-        ON_QUEST["party1"] = ON_QUEST["party1"] or {}
-        ON_QUEST["party1"][300 + i] = true
-    end""")
-    g.fire("QUEST_LOG_UPDATE")
-    panel, rows, legend, notes = panel_of(g)
-    assert all(rows[i].shown for i in range(1, 13)) and notes.text == "+2 more - see the quest log"
-    g.run("for i = 1, 14 do QUESTS[#QUESTS] = nil end")
-    g.fire("QUEST_LOG_UPDATE")
-    g.advance(6)
-    assert notes.shown is False or notes.text != "+2 more - see the quest log"
+    panel, rows, cols, notes = panel_of(g)
+    narrow = panel.width
+    g.join_party(["Anna", "Bob", "Cy", "Dee"])
+    g.advance(5)
+    assert panel.width > narrow and cols[4].icon.shown is True
 
 
-# ---- markers in the quest log ----------------------------------------------------------------------------------------
 def test_marker_text(style):
     g = quiet_party(style, ("Anna", "Bob"), on_quest={"party1": [100], "party2": [100]})
     e = lambda q: g.eval(f"NS.compat.findEntry({q})")                          # noqa: E731
