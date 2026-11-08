@@ -14,6 +14,7 @@ Sync.lua
 Progress.lua
 Team.lua
 Marker.lua
+Ping.lua
 Panel.lua
 Questie.lua
 Menu.lua

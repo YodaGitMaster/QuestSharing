@@ -194,6 +194,9 @@ function ns.doctorLines()
     local all, sfx = cv("Sound_EnableAllSound"), cv("Sound_EnableSFX")
     add(all ~= "0" and sfx ~= "0", string.format("game sound: %s, effects %s (Quest Sharing never changes these; its only sound is the good-news ping, %s)",
         all == "0" and "OFF" or "on", sfx == "0" and "OFF" or "on", d.sound and "on: /qs sound off" or "off"))
+    add(ns.pingSupported and ns.pingSupported(), "pings: " .. ((ns.pingSupported and ns.pingSupported())
+        and ("the game's ping system is here, ping key " .. tostring(ns.pingKeyName and ns.pingKeyName() or "not set - /qs pingkey <KEY>"))
+        or "this client has no ping system for addons to use"))
     add(ns.questie and ns.questie.available(), "Questie: " .. ((ns.questie and ns.questie.available()) and "found - \"where to get it\" works" or "not found - \"where to get it\" needs it"))
     local errs = d.errors or {}
     out[#out + 1] = (#errs == 0) and "[OK] no errors recorded" or ("[--] " .. #errs .. " error(s) recorded - see below")
