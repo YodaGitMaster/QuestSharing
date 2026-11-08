@@ -382,6 +382,24 @@ function HIGHLIGHT_MODERN()
     }
 end
 
+-- Bags and items: BAGS[bag][slot] = { id, questID, isQuestItem }; ITEMS[id] = { name, spell, icon, count }
+BAGS, ITEMS, SPECIAL, ITEM_IN_RANGE, USED = {}, {}, {}, true, {}
+C_Container = {
+    GetContainerNumSlots = function(bag) return BAGS[bag] and #BAGS[bag] or 0 end,
+    GetContainerItemInfo = function(bag, slot) local it = BAGS[bag] and BAGS[bag][slot]; return it and { itemID = it.id } end,
+    GetContainerItemQuestInfo = function(bag, slot)
+        local it = BAGS[bag] and BAGS[bag][slot]
+        return it and { isQuestItem = it.isQuestItem or false, questID = it.questID, isActive = it.questID ~= nil } or {}
+    end,
+    GetItemCooldown = function(id) return 0, 0, 1 end,
+}
+function GetItemSpell(id) local it = ITEMS[id]; return it and it.spell end
+function GetItemIcon(id) local it = ITEMS[id]; return it and it.icon end
+function GetItemCount(id) local it = ITEMS[id]; return it and (it.count or 1) or 0 end
+function GetItemInfo(id) local it = ITEMS[id]; return it and it.name end
+function IsItemInRange(id, unit) return ITEM_IN_RANGE end
+function GetQuestLogSpecialItemInfo(index) local id = SPECIAL[index]; if id then return "|Hitem:" .. id .. "|h[x]|h", "icon", 1, false end end
+
 -- The ping system: secure buttons, their wrapped snippets, click bindings, pings
 PINGS, SOFTINTERACT = {}, nil
 function SecureHandlerWrapScript(frame, script, header, pre) frame.wrapped = frame.wrapped or {}; frame.wrapped[script] = pre end

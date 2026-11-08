@@ -178,7 +178,18 @@ the game's tracker still tells the party you are done, because that is your own 
    anti-spam check runs inside the game's secure code, so it also works in combat (there it has no clock: in
    combat only "dead or no longer your target" and Shift unlock it).
 
-9. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. It fills the
+9. **Quest items you can use, one click away.** The game's tracker shows a button only for the quest items it calls
+   "special"; Quest Sharing adds an **icon next to the quest in the tracker** for the other usable quest items in your
+   bags (a torch to light, a flare to throw...). Click it to use the item. Which item goes with which quest: the bag's
+   own quest info, an objective that names the item, or (with Questie) the item the quest gives you or needs; items
+   without a "Use:" effect get nothing, and quests that already have the game's button are left to the game.
+   - **Quest item key** (*Settings > Pings & items*, or `/qs itemkey Q`): uses the item of your **nearest** quest that
+     has one, also in combat (the item it had before the fight).
+   - **A small button** with that item (Shift + drag to move it): cooldown, count, red when your target is out of range.
+   - Using an item is protected by the game, so these are secure buttons prepared outside combat; during a fight they
+     keep what they had and the tracker icons are put in place again afterwards.
+
+10. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. It fills the
    tracker (the list on the right) with the quests closest to you and **re-checks every 2 seconds as you
    move**, so the list follows you instead of changing only when you cross into another zone.
    - **Distance mode** (needs a client that can tell how far a quest is) ranks quests by distance. A quest
@@ -192,7 +203,7 @@ the game's tracker still tells the party you are done, because that is your own 
      during combat and inside instances.
    - Note this fills the tracker list. It does not touch the single highlighted "waypoint" quest.
 
-10. **(Beta) Adds the people you group with to your friends list.** `/qs friends` adds everybody in your
+11. **(Beta) Adds the people you group with to your friends list.** `/qs friends` adds everybody in your
    party now. `/qs friends on` also does it automatically when a party forms or someone joins; this is
    **off by default** because it changes a list that matters to you. Safeguards: people already on your
    list and ignored players are skipped; players from another realm are skipped where the client cannot
@@ -201,7 +212,7 @@ the game's tracker still tells the party you are done, because that is your own 
    <zone>"). The game's answers (added, already a friend, not found, list full, other faction) are read and
    summarised for you.
 
-11. **A quick chat ring, like in Diablo 4.** Bind a key (Game Menu > Options > Key Bindings > Quest Sharing,
+12. **A quick chat ring, like in Diablo 4.** Bind a key (Game Menu > Options > Key Bindings > Quest Sharing,
    or `/qs key V`). **Hold the key**: a clean ring of up to 8 messages opens around the mouse, each with a short
    label (14 letters at most) outside the ring. **Point at one**: its full text appears in the middle. Then
    **release the key** or **click** it. By default the ring has:
@@ -248,18 +259,18 @@ the game's tracker still tells the party you are done, because that is your own 
    play. Or by command: `/qs quick` lists them; `/qs quick add [label |] <text>`, `edit N <text>`, `label N <label>`,
    `remove N`, `move N M`, `reset`.
 
-12. **A minimap button.** Left click opens the settings window, right click shows or hides the
+13. **A minimap button.** Left click opens the settings window, right click shows or hides the
    quests-in-common panel, drag it around the minimap edge to move it (`/qs minimap off` hides it).
-13. **An "Invite" action on the wheel.** A message that starts with `@invite` invites the player you target to
+14. **An "Invite" action on the wheel.** A message that starts with `@invite` invites the player you target to
     your party and whispers them the rest of the text. The last default wheel slot is
     `@invite Sending you a party invite - let's quest together!`. It checks first that you have a target, are
     the party leader (if you are in one) and that the party is not full.
-14. **Built-in help for problems.** `/qs doctor` shows what works on your client and opens the report in a
+15. **Built-in help for problems.** `/qs doctor` shows what works on your client and opens the report in a
     window where the text is already selected (Ctrl+C to copy it). `/qs errors` shows any error the addon has
     caused (also kept between sessions). If something misbehaves in your game, paste the `/qs doctor` report
     into a GitHub issue.
 
-15. **Quest objectives are easier to find.**
+16. **Quest objectives are easier to find.**
     - **Quest icons over creatures:** every creature that is part of one of your quests gets a gold quest icon
       above its nameplate (the game itself tells the addon which creatures those are).
     - **The nearest quest is pinned in the world:** while "tracker follows me" is on, the game's own
@@ -279,12 +290,12 @@ explanation, and groups its settings in short sections:
 
 | Tab | What is on it |
 |---|---|
-| **General** | *Getting started*: your **quick chat key** (click, then press the key), **Show the ring**, **Check my setup**. *Basics*: the master switch, the map button, a soft sound for good news, reset |
+| **General** | *Getting started*: your **quick chat key** (click, then press the key), **Show the ring**, **Check my setup**. *Basics*: the master switch, how your messages go out, the map button, a soft sound for good news; *Friends* (the beta); reset |
 | **Sharing** | *When I join a party*, *Party chat* (in common, done, picked up a quest someone has, where the items were), *Behind the scenes* (sync, quest-log markers) |
 | **Party** | the Party quests window (show it in a party, hide it in combat, its size, move it back), *Clicking a quest* (what a click on the game's tracker posts) and *Showing where we are* (the star, the map icons, a teammate's pin) |
-| **Tracker** | *The quest list on the right* (follows you, how many, distance or zone, the pause), *Finding objectives* (the world pin, quest icons over creatures, the game-settings helper) and *Pinging quest targets* (the ping key, the anti-spam time, objects too) |
+| **Tracker** | *The quest list on the right* (follows you, how many, distance or zone, the pause), *Finding objectives* (the world pin, quest icons over creatures, the game-settings helper)  |
 | **Quick chat** | the ring, its key, hold or toggle, its size, where Auto messages go, and the **message editor** |
-| **Social** | the friends beta, and *Add my party to my friends now* |
+| **Pings & items** | *Pinging quest targets* (the ping key, the anti-spam time, objects too) and *Quest items* (icons in the tracker, the quest item key, the item button) |
 
 Every line is one click: a **check box** switches, a **choice** (`< value >`) moves to the next one (right click goes
 back), a **number** (`- 10 +`) counts up with the left button and down with the right one (Shift = bigger steps), and
@@ -377,7 +388,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 715 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 737 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -438,8 +449,9 @@ python tests/test_done.py             # 20 tests: a quest you finished is never 
 python tests/test_box.py              # 23 tests: messages into the chat box, refused calls written down and switched off
 python tests/test_ping.py             # 13 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
 python tests/test_zone.py             # 10 tests: only the quests of where you are (Teldrassil vs Stormwind)
+python tests/test_items.py            # 22 tests: quest item icons in the tracker, the item key and button
 ```
-Expected: every line ends in `passed` with all tests green (715 in total).
+Expected: every line ends in `passed` with all tests green (737 in total).
 
 ## Files
 | File | Purpose |
@@ -457,6 +469,7 @@ Expected: every line ends in `passed` with all tests green (715 in total).
 | `build_release.py`, `CHANGELOG.md` | builds `dist/QuestSharing-<version>.zip` and the release notes |
 | `QuestSharing/Quick.lua`, `QuestSharing/Bindings.xml` | the quick chat ring, its placeholders, the message commands and the key binding |
 | `QuestSharing/Friends.lua` | (beta) adds party members to your friends list, with safeguards |
+| `QuestSharing/QuestItems.lua` | usable quest items: icons next to the quests in the tracker, the item key and button |
 | `QuestSharing/Ping.lua` | the ping key: Attack ping on the nearest quest creature, "look here" on quest objects, anti-spam |
 | `QuestSharing/Menu.lua` | the right-click menu of the Party quests window |
 | `QuestSharing/Questie.lua` | reads Questie's quest database (when installed): where a quest starts, which quests come first |
