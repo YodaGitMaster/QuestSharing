@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.4
+- **The quick chat ring sends at once.** A message you pick on the ring is sent straight away, no Enter: its own
+  switch, *Settings > Quick chat > Send the message at once* (`/qs quick send on|off`), on by default. Off: it goes
+  into the chat box and you press Enter, as before. Messages to everybody nearby (`/s`, `/y`) still need a click on
+  the slot. If the game refuses a message from the ring, it goes into your chat box and the switch turns itself off
+  (remembered), so the refusal does not come back every session. The other messages (menu, quest clicks, Post all)
+  keep following *My messages*.
+- The settings window is a little taller (630 instead of 600), so the Quick chat tab fits with its editor.
+
 ## 0.3.3
 - **Fixed "tried to call the protected function UNKNOWN()" during fights** (once a second): the quest item icons turn
   red when your target is out of range, and asked the game for that range in combat too, which the game refuses for
