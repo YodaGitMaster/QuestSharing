@@ -243,6 +243,37 @@ def test_say_is_not_sent_on_release_but_on_a_click(style):
     assert sent(g) == [("Hey there! o/", "SAY")] and frame.shown is False
 
 
+LINK = "|cffffff00|Hquest:100:3|h[Wolves Among Us]|h|r"
+
+
+def test_a_long_message_is_never_cut_inside_a_quest_link(style):
+    g = game(style)
+    text = "x" * 230 + " {quest} and more"
+    out = g.eval("NS.quickResolve")(text)
+    assert len(out) <= 255 and out.endswith("...")
+    assert "|H" not in out or out.count("|h") == 2, "either the whole link or none of it"
+    for n in range(240, 262):                                    # wherever the limit falls, links stay whole
+        cut = g.eval("NS.compat.safeCut")(("y" * n) + LINK + " tail", 255)
+        assert len(cut) <= 255 and (LINK in cut or "|H" not in cut), n
+
+
+def test_a_long_message_never_splits_an_accented_letter(style):
+    g = game(style)
+    for n in range(248, 256):
+        cut = g.eval("NS.compat.safeCut")("a" * n + "è" * 10, 255)
+        cut.encode("utf-8") if isinstance(cut, str) else bytes(cut).decode("utf-8")   # valid UTF-8 or this raises
+
+
+def test_a_pipe_you_type_reaches_the_game_escaped(style):
+    g = game(style)
+    assert g.eval("NS.quickResolve")("left | right") == "left || right"
+    assert g.eval("NS.quickResolve")("left || right") == "left || right", "an edit box may already give ||"
+    assert g.eval("NS.quickResolve")("a {quest}") == "a " + LINK, "the links we add are left alone"
+    cut = g.eval("NS.compat.safeCut")
+    assert cut("z" * 251 + "||||x", 255) == "z" * 251 + "...", "half an escaped pipe at the cut is dropped"
+    assert cut("z" * 250 + "||||||", 255) == "z" * 250 + "||...", "a whole escaped pipe is kept"
+
+
 def test_greetings_go_to_the_people_around_you_not_to_the_party(style):
     g = game(style)
     g.join_party(["Anna"])

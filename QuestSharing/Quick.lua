@@ -189,12 +189,13 @@ local FILL = {
 
 -- Fill in the placeholders; unknown ones are left as typed. Always fits one chat message.
 function ns.quickResolve(text)
-    local out = string.gsub(text or "", "{(%a+)}", function(word)
+    -- a "|" you typed must reach the game as "||" (a lone "|" is an "invalid escape code" and the message is refused)
+    local tpl = string.gsub(string.gsub(text or "", "||", "|"), "|", "||")
+    local out = string.gsub(tpl, "{(%a+)}", function(word)
         local f = FILL[string.lower(word)]
         return f and tostring(f()) or nil
     end)
-    if #out > 255 then out = string.sub(out, 1, 252) .. "..." end
-    return out
+    return C.safeCut(out, 255)
 end
 
 -- Actions and channels ------------------------------------------------------------------------------------------

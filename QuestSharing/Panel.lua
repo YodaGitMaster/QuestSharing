@@ -167,7 +167,8 @@ local function ensurePanel()
     f:SetWidth(WIDTH)
     f:SetHeight(60)
     local pos = ns.db.panelPos
-    f:SetPoint(pos and pos[1] or "CENTER", UIParent, pos and pos[1] or "CENTER", pos and pos[2] or 0, pos and pos[3] or 0)
+    -- first time: on the left, out of the way (not in the middle of the screen); afterwards where you dragged it
+    if pos then f:SetPoint(pos[1], UIParent, pos[1], pos[2], pos[3]) else f:SetPoint("LEFT", UIParent, "LEFT", 20, 120) end
     pcall(function()
         f:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
                         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12,

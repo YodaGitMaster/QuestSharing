@@ -176,6 +176,31 @@ function C.slashFor(channel)
     return ({ INSTANCE_CHAT = "/i ", RAID = "/raid ", PARTY = "/p " })[channel] or "/p "
 end
 
+-- Cut a chat message to at most `max` bytes without breaking it: never in the middle of a quest link (the game refuses
+-- a message with half a link), of a letter like "è" (two bytes), or of an escaped "||".
+function C.safeCut(s, max, tail)
+    tail = tail or "..."
+    if #s <= max then return s end
+    local cut = max - #tail
+    while cut > 0 do                                          -- step back off the middle of a multi-byte letter
+        local b = string.byte(s, cut + 1)
+        if not b or b < 128 or b >= 192 then break end
+        cut = cut - 1
+    end
+    local head = string.sub(s, 1, cut)
+    local lastOpen, pos = nil, 1
+    while true do
+        local a = string.find(head, "|c%x%x%x%x%x%x%x%x|H", pos)
+        if not a then break end
+        lastOpen, pos = a, a + 1
+    end
+    if lastOpen and not string.find(head, "|h|r", lastOpen, true) then head = string.sub(head, 1, lastOpen - 1) end
+    local pipes = string.match(head, "|+$")                   -- an odd number of pipes at the end is half an escape
+    if pipes and #pipes % 2 == 1 then head = string.sub(head, 1, -2) end
+    head = string.gsub(head, "%s+$", "")
+    return head .. tail
+end
+
 -- Area ----------------------------------------------------------------------------------------
 function C.zone()
     return (GetRealZoneText and GetRealZoneText()) or (GetZoneText and GetZoneText()) or ""
