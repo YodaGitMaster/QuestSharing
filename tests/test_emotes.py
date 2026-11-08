@@ -131,6 +131,78 @@ def test_your_messages_ring_and_its_editor_are_unchanged(style):
     assert len(g.eval("NS.quickItems()")) == 8 and g.eval("NS.quickItems()[1].label") == "Hello"
 
 
+# ---- editing the emote rings -----------------------------------------------------------------------------------------------
+def editor(g, ring=1):
+    g.slash("settings")
+    g.eval("NS.settingsTab")("quick")
+    g.eval("NS.editorPage")(ring)
+    return g.eval("NS._settingsWindow().ed")
+
+
+def test_the_editor_has_a_ring_picker(style):
+    g = game(style)
+    ed = editor(g, 2)
+    names = [plain(ed.pageButtons[i].text.text).strip("[] ") for i in range(1, 5)]
+    assert names == ["Messages", "Emotes", "Group calls", "Fun"]
+    assert ed.pageButtons[2].text.text.startswith("|cffffd100["), "the ring being edited is gold"
+    assert "[Thank]" in ed.lines[1].text.text and "[Wait]" in ed.lines[8].text.text
+
+
+def test_change_an_emote_slot_by_typing_slash_and_its_name(style):
+    g = game(style)
+    ed = editor(g, 2)
+    g.eval("NS.editorSelect")(1)
+    assert ed.channelCaption.shown is False, "emotes have no chat channel"
+    assert "an emote" in plain(ed.preview.text)
+    g.eval("NS.editorSave")("Salute", "/salute")
+    item = g.eval("NS.quickListFor(2)[1]")
+    assert (item.label, item.text) == ("Salute", "@emote SALUTE")
+    g.eval("NS.editorShowRing")()
+    assert labels(g)[0] == "Salute", "Show the ring opens the ring you are editing"
+    g.eval("NS.quickClose")()
+    open_ring(g)
+    point_and_release(g, 1)
+    assert list(g.eval("EMOTED").values())[-1] == "SALUTE"
+
+
+def test_add_remove_and_reset_one_ring_only(style):
+    g = game(style)
+    g.slash("quick label 1 Hi")                                 # your messages: changed too
+    ed = editor(g, 4)
+    g.run("PRINTED = {}")
+    g.eval("NS.editorAdd")()
+    assert "holds 8" in "\n".join(g.printed()), "a ring holds 8"
+    g.eval("NS.editorSelect")(8)
+    g.eval("NS.editorDelete")()
+    g.eval("NS.editorAdd")()
+    g.eval("NS.editorSave")("", "/train")
+    last = g.eval("NS.quickListFor(4)[8]")
+    assert last.text == "@emote TRAIN"
+    g.eval("NS.editorReset")()
+    assert g.eval("NS.quickListFor(4)[8].label") == "Roar", "the Fun ring is back to its default"
+    assert g.eval("NS.quickItems()[1].label") == "Hi", "your messages were not touched"
+
+
+def test_only_a_real_emote_becomes_an_emote(style):
+    g = game(style)
+    editor(g, 2)
+    g.eval("NS.editorSelect")(1)
+    g.eval("NS.editorSave")("", "/dance now")
+    assert g.eval("NS.quickListFor(2)[1].text") == "/dance now", "a sentence stays a sentence"
+    g.eval("NS.editorSave")("", "/foobar")
+    assert g.eval("NS.quickListFor(2)[1].text") == "/foobar", "an unknown word is not an emote"
+
+
+def test_edited_rings_are_kept_and_reset_everything_puts_them_back(style):
+    g = game(style)
+    editor(g, 3)
+    g.eval("NS.editorSelect")(2)
+    g.eval("NS.editorSave")("Run!", "/flee")
+    assert g.eval("QuestSharingDB.quickPages[2].items[2].label") == "Run!", "saved with your settings"
+    g.slash("reset")
+    assert g.eval("NS.quickListFor(3)[2].label") == "Charge"
+
+
 if __name__ == "__main__":
     import inspect
     failed = total = 0

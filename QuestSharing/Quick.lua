@@ -56,8 +56,31 @@ function ns.defaultQuickItems()
     return t
 end
 
+-- the game's emote names (its own lists when it has them, otherwise the common ones)
+local KNOWN_EMOTES = {}
+for t in string.gmatch("AGREE AMAZE ANGRY APOLOGIZE APPLAUD ATTACKMYTARGET BASHFUL BECKON BEG BITE BLEED BLINK BLUSH BOGGLE BONK BORED BOUNCE BOW BRB BURP BYE CACKLE CALM CHARGE CHEER CHICKEN CHUCKLE CLAP COLD COMFORT CONFUSED CONGRATULATE COUGH COWER CRACK CRINGE CRY CUDDLE CURIOUS CURTSEY DANCE DING DOUBT DRINK DROOL DUCK EAT EMBARRASS ENCOURAGE EYE FACEPALM FART FIDGET FLEE FLEX FLIRT FLOP FOLLOW FROWN GASP GAZE GIGGLE GLARE GLOAT GOLFCLAP GREET GRIN GROAN GROVEL GROWL GUFFAW HAIL HAPPY HEALME HELLO HELPME HICCUP HIGHFIVE HUG HUNGRY HURRY IDEA INCOMING INSULT INTRODUCE JK JOKE KISS KNEEL LAUGH LAYDOWN LICK LISTEN LOST LOVE MASSAGE MOAN MOCK MOO MOON MOURN NO NOD NOSEPICK OOM OOPS OPENFIRE PANIC PAT PEER PITY PLEAD POINT POKE PONDER POUNCE PRAISE PRAY PURR PUZZLE RAISE READY REGRET ROAR ROFL RUDE SAD SALUTE SCARED SCRATCH SEXY SHAKE SHIMMY SHIVER SHOO SHRUG SHY SIGH SILENCE SING SIT SLAP SLEEP SMILE SMIRK SNARL SNICKER SNIFF SNUB SOOTHE SPIT STAND STARE SURPRISED SURRENDER TALK TAP TAUNT TEASE THANK THINK THIRSTY THREATEN TICKLE TIRED TRAIN TRUCE TWIDDLE VETO VICTORY VIOLIN WAIT WAVE WELCOME WHINE WHISTLE WINK WORK YAWN", "%u+") do
+    KNOWN_EMOTES[t] = true
+end
+local function isKnownEmote(word)
+    word = string.upper(word or "")
+    if KNOWN_EMOTES[word] then return true end
+    for _, list in ipairs({ _G.EmoteList, _G.TextEmoteSpeechList }) do
+        if type(list) == "table" then for _, t in ipairs(list) do if t == word then return true end end end
+    end
+    return false
+end
+-- "/dance" (an emote the game knows) becomes an emote slot; anything else stays a message
+local function normaliseText(text)
+    local word = string.match(text or "", "^/(%a+)$")
+    if word and isKnownEmote(word) then return "@emote " .. string.upper(word) end
+    return text
+end
+ns.quickNormaliseText = normaliseText
+
 local function autoLabel(text)
     if string.sub(text, 1, 7) == "@invite" then return "Invite" end
+    local tok = string.match(text, "^@emote%s+(%a+)")
+    if tok then return string.upper(string.sub(tok, 1, 1)) .. string.lower(string.sub(tok, 2, LABEL_MAX)) end
     local clean = string.gsub(text, "{%a+}", "")
     clean = string.match(string.gsub(clean, "%s+", " "), "^%s*(.-)%s*$")
     if clean == "" then return "Message" end
@@ -100,8 +123,7 @@ end)
 -- The other rings: while the ring is open, the mouse wheel flips through them. Ring 1 is your messages (edit them in the
 -- settings); the others are the game's emotes (they are not chat, so they work where chat from addons does not).
 local function emote(label, token) return { label = label, text = "@emote " .. token } end
-ns.QUICK_PAGES = {
-    { title = "Messages" },
+local DEFAULT_PAGES = {
     { title = "Emotes", items = { emote("Thank", "THANK"), emote("Bow", "BOW"), emote("Dance", "DANCE"), emote("Wave", "WAVE"),
                                   emote("Cheer", "CHEER"), emote("Point", "POINT"), emote("No", "NO"), emote("Wait", "WAIT") } },
     { title = "Group calls", items = { emote("Follow me", "FOLLOW"), emote("Charge", "CHARGE"), emote("Attack!", "ATTACKMYTARGET"),
@@ -110,14 +132,37 @@ ns.QUICK_PAGES = {
     { title = "Fun", items = { emote("Train", "TRAIN"), emote("Laugh", "LAUGH"), emote("Applaud", "APPLAUD"), emote("Salute", "SALUTE"),
                                emote("Hug", "HUG"), emote("Flex", "FLEX"), emote("Chicken", "CHICKEN"), emote("Roar", "ROAR") } },
 }
-local page = 1                       -- which ring is showing
-local function ringItems()
-    if page == 1 then return items() end
-    local p = ns.QUICK_PAGES[page]
-    return (p and p.items) or items()
+local function copyPage(p)
+    local t = { title = p.title, items = {} }
+    for i, it in ipairs(p.items) do t.items[i] = { label = it.label, text = it.text, channel = it.channel } end
+    return t
 end
+function ns.defaultQuickPages()
+    local t = {}
+    for i, p in ipairs(DEFAULT_PAGES) do t[i] = copyPage(p) end
+    return t
+end
+local function extraPages()
+    if type(ns.db.quickPages) ~= "table" then ns.db.quickPages = ns.defaultQuickPages() end
+    return ns.db.quickPages
+end
+-- every ring: ring 1 = your messages, then the emote rings (all editable in the settings)
+function ns.quickPageList()
+    local out = { { title = "Messages", items = items() } }
+    for _, p in ipairs(extraPages()) do out[#out + 1] = p end
+    return out
+end
+local function listFor(pg)
+    if not pg or pg == 1 then return items() end
+    local p = extraPages()[pg - 1]
+    return p and p.items
+end
+ns.quickListFor = listFor
+
+local page = 1                       -- which ring is showing
+local function ringItems() return listFor(page) or items() end
 ns.quickRingItems = ringItems
-function ns.quickPage() return page, ns.QUICK_PAGES[page] and ns.QUICK_PAGES[page].title end
+function ns.quickPage() local p = ns.quickPageList()[page]; return page, p and p.title end
 
 local function isEmote(text) return string.sub(text or "", 1, 7) == "@emote " end
 local function emoteToken(text) return string.upper(string.match(text or "", "^@emote%s+(%S+)") or "") end
@@ -546,7 +591,8 @@ local function layout()
     hintText:SetPoint("CENTER", UIParent, "BOTTOMLEFT", q.cx, q.cy - 38)
     frame.pageText:ClearAllPoints()
     frame.pageText:SetPoint("CENTER", UIParent, "BOTTOMLEFT", q.cx, q.cy + RADIUS + 44)
-    frame.pageText:SetText(string.format("%s  |cff888888(%d/%d - mouse wheel: more)|r", ns.QUICK_PAGES[page].title, page, #ns.QUICK_PAGES))
+    local pages = ns.quickPageList()
+    frame.pageText:SetText(string.format("%s  |cff888888(%d/%d - mouse wheel: more)|r", pages[page].title, page, #pages))
     for i = 1, MAX_ITEMS do
         local s = slots[i]
         local a = (i - 1) * 2 * math.pi / math.max(n, 1)
@@ -568,7 +614,7 @@ end
 function ns.quickOpen(atCenter)
     local f = build()
     if not f then return ns.print("this client does not allow the quick chat wheel (frame creation failed)") end
-    page = math.max(1, math.min(#ns.QUICK_PAGES, ns.db.quickPage or 1))    -- the ring you used last
+    page = math.max(1, math.min(#ns.quickPageList(), ns.db.quickPage or 1))    -- the ring you used last
     if #ringItems() == 0 then page = 2 end                                   -- no messages of your own: start on the emotes
     if atCenter then q.cx, q.cy = (UIParent:GetWidth() or 1920) / 2, (UIParent:GetHeight() or 1080) / 2 else q.cx, q.cy = cursor() end
     q.open, q.openedAt, q.hover, q.sticky, q.cache, q.lastDx, q.lastDy = true, GetTime(), nil, atCenter and true or false, {}, nil, nil
@@ -584,7 +630,7 @@ end
 -- the mouse wheel: the next / previous ring (wraps around)
 function ns.quickFlip(step)
     if not q.open then return end
-    page = (page - 1 + step) % #ns.QUICK_PAGES + 1
+    page = (page - 1 + step) % #ns.quickPageList() + 1
     ns.db.quickPage = page
     q.hover, q.cache, q.lastDx, q.lastDy = nil, {}, nil, nil
     q.dest = {}
@@ -694,9 +740,10 @@ end
 -- Editing the messages ---------------------------------------------------------------------------------------------------
 local function clean(s) return (string.match(s or "", "^%s*(.-)%s*$")) end
 
-function ns.quickAdd(text, label)
-    local list = items()
-    text, label = clean(text), clean(label)
+function ns.quickAdd(text, label, pg)
+    local list = listFor(pg)
+    if not list then return ns.print("quick chat: there is no ring " .. tostring(pg)) end
+    text, label = normaliseText(clean(text)), clean(label)
     if text == "" then return ns.print("quick chat: write the message after 'add'") end
     if #text > 200 then return ns.print("quick chat: that message is too long (200 characters at most)") end
     if #list >= MAX_ITEMS then return ns.print("quick chat: the ring holds " .. MAX_ITEMS .. " messages; remove one first") end
@@ -704,17 +751,17 @@ function ns.quickAdd(text, label)
     return #list
 end
 
-function ns.quickEdit(i, text)
-    local list = items()
-    text = clean(text)
+function ns.quickEdit(i, text, pg)
+    local list = listFor(pg) or {}
+    text = normaliseText(clean(text))
     if not list[i] then return ns.print("quick chat: there is no message " .. tostring(i)) end
     if text == "" or #text > 200 then return ns.print("quick chat: the message must be 1 to 200 characters") end
     list[i].text = text
     return i
 end
 
-function ns.quickLabel(i, label)
-    local list = items()
+function ns.quickLabel(i, label, pg)
+    local list = listFor(pg) or {}
     label = clean(label)
     if not list[i] then return ns.print("quick chat: there is no message " .. tostring(i)) end
     if label == "" then return ns.print("quick chat: the label cannot be empty") end
@@ -723,8 +770,8 @@ function ns.quickLabel(i, label)
 end
 
 -- where one message goes: auto, nearby, say, yell, party or whisper
-function ns.quickRoute(i, route)
-    local list = items()
+function ns.quickRoute(i, route, pg)
+    local list = listFor(pg) or {}
     route = string.lower(clean(route))
     if not list[i] then return ns.print("quick chat: there is no message " .. tostring(i)) end
     if not VALID_ROUTE[route] then return ns.print("quick chat: the channel is one of: " .. table.concat(ns.QUICK_ROUTES, ", ")) end
@@ -732,21 +779,25 @@ function ns.quickRoute(i, route)
     return i
 end
 
-function ns.quickRemove(i)
-    local list = items()
+function ns.quickRemove(i, pg)
+    local list = listFor(pg) or {}
     if not list[i] then return ns.print("quick chat: there is no message " .. tostring(i)) end
     table.remove(list, i)
     return true
 end
 
-function ns.quickMove(from, to)
-    local list = items()
+function ns.quickMove(from, to, pg)
+    local list = listFor(pg) or {}
     if not (list[from] and to and to >= 1 and to <= #list) then return ns.print("quick chat: use /qs quick move <from> <to> with numbers from the list") end
     table.insert(list, to, table.remove(list, from))
     return true
 end
 
-function ns.quickReset() ns.db.quickItems = ns.defaultQuickItems() end
+function ns.quickReset(pg)
+    if not pg or pg == 1 then ns.db.quickItems = ns.defaultQuickItems(); return end
+    local pages = extraPages()
+    if DEFAULT_PAGES[pg - 1] then pages[pg - 1] = copyPage(DEFAULT_PAGES[pg - 1]) end
+end
 
 local function listItems()
     local list = items()

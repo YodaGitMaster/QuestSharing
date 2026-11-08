@@ -14,6 +14,8 @@
   (thank, bow, dance, wave, cheer, point, no, wait), Group calls (follow, charge, attack my target, heal me, help me,
   incoming, flee, out of mana) and Fun (train, laugh, applaud, salute, hug, flex, chicken, roar). The ring used last
   opens first. Emotes are done with the game's own call; if the game refuses, they are typed into the chat box.
+  **Every ring is editable** in Settings > Quick chat (a ring picker on top of the editor; type `/dance` for an emote
+  slot; Reset puts back that ring's defaults).
 - **The Party quests window when you are alone** (option, on by default): "Quests here", your quests of the zone.
 - **Quest items one click away:** an icon next to the quest in the game's tracker for usable quest items in your bags
   that the game does not show itself (matched by the bag's quest info, an objective naming the item, or Questie's
