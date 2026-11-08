@@ -92,6 +92,7 @@ function ns.onPushReply(kind, name)
         run.results[id] = run.results[id] or {}
         run.results[id][key(name)] = { name = name, kind = kind }
     end
+    if kind == "accepted" and ns.goodNews then ns.goodNews() end
     if ns.db.verbose and kind ~= "has" then
         local e = C.findEntry(id)
         ns.print(string.format("%s %s %s", name, WORDS[kind] or kind, e and C.link(e) or ("quest " .. id)))

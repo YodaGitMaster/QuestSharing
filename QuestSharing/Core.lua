@@ -31,15 +31,26 @@ ns.defaults = {
     nearCount = 5,      -- how many quests the tracker keeps while "near" is on
     nearPause = 10,     -- seconds the tracker and the pin leave your choice alone after you change the tracker yourself
     nearMode = "auto",  -- "auto" (distance if the client can measure it, else zone), "distance" or "zone"
+    sound = true,       -- a soft sound for good news (someone accepted a quest I shared, a party member finished a shared quest)
+    panelCombat = true, -- hide the Party quests window during combat
+    panelScale = 100,   -- size of the Party quests window, in percent
+    quickSize = "normal", -- size of the quick chat ring: "small", "normal" or "large"
 }
 ns.db = {}
 for k, v in pairs(ns.defaults) do ns.db[k] = v end        -- until the saved variables are loaded
 
 -- Output -----------------------------------------------------------------------------------------
+-- the version from the .toc file
+do
+    local f = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+    local ok, v = pcall(function() return f and f(ADDON, "Version") end)
+    ns.version = (ok and v) or "?"
+end
+
 function ns.print(...)
     local parts = {}
     for i = 1, select("#", ...) do parts[#parts + 1] = tostring((select(i, ...))) end
-    local msg = "|cff55ccffQuestSharing:|r " .. table.concat(parts, " ")
+    local msg = "|cff55ccffQuest Sharing:|r " .. table.concat(parts, " ")
     if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then DEFAULT_CHAT_FRAME:AddMessage(msg) else print(msg) end
 end
 
@@ -93,6 +104,7 @@ end)
 
 ns.on("ADDON_LOADED", function(_, name)
     if name ~= ADDON then return end
+    ns.newInstall = (QuestSharingDB == nil) or (next(QuestSharingDB) == nil)
     QuestSharingDB = QuestSharingDB or {}
     local savedVersion = QuestSharingDB.dbVersion or 0            -- read before the defaults fill the gaps
     for k, v in pairs(ns.defaults) do
@@ -105,6 +117,31 @@ ns.on("ADDON_LOADED", function(_, name)
     end
     ns.db = QuestSharingDB
     if ns.refreshSettings then ns.refreshSettings() end
+end)
+
+-- A friendly hello the first time (and a short "what's new" after an update). Once per version, a few seconds after
+-- login so it is not buried under the login messages.
+local WHATS_NEW = "a Party quests window with class icons, a channel for every quick chat message, quest clicks that add up in the chat box, and a new settings window"
+local greeted = false
+local function welcome()
+    local d = ns.db
+    if d.welcomed == ns.version then return end
+    local S = ns.style
+    local key = ns.quickKeyName and ns.quickKeyName()
+    if ns.newInstall or not d.welcomed then
+        ns.print(S.GOLD .. "Welcome to Quest Sharing " .. tostring(ns.version) .. "!|r Everything is on and ready for your next party.")
+        ns.print("Left-click the map button (or type /qs settings) to change anything.")
+        if key then ns.print("Hold " .. S.GOLD .. key .. "|r for the quick chat ring.")
+        else ns.print("Tip: give the quick chat ring a key in " .. S.GOLD .. "Settings > General > Quick chat key|r.") end
+    else
+        ns.print(S.GOLD .. "Quest Sharing updated to " .. tostring(ns.version) .. "|r: " .. WHATS_NEW .. ". /qs settings")
+    end
+    d.welcomed = ns.version
+end
+ns.on("PLAYER_ENTERING_WORLD", function()
+    if greeted then return end
+    greeted = true
+    ns.after(5, welcome)
 end)
 
 -- Party chat -------------------------------------------------------------------------------------
@@ -152,7 +189,8 @@ function ns.setSetting(key, value)
         d[key] = value
         if key == "enabled" and not value then ns.stopShare("switched off") end
         if key == "markers" and ns.refreshQuestLog then ns.refreshQuestLog() end
-        if key == "panel" and ns.syncPanelVisibility then ns.syncPanelVisibility() end
+        if (key == "panel" or key == "panelCombat") and ns.syncPanelVisibility then ns.syncPanelVisibility() end
+        if key == "panelScale" and ns.applyPanelScale then ns.applyPanelScale() end
         if key == "minimap" and ns.syncMinimapButton then ns.syncMinimapButton() end
         if key == "markMobs" and ns.refreshMarkers then ns.refreshMarkers() end
         if key == "nearPin" and not value and ns.releasePin then ns.releasePin() end
@@ -166,7 +204,8 @@ function ns.resetSettings()
     for k, v in pairs(ns.defaults) do
         if k ~= "dbVersion" and ns.db[k] ~= v then ns.setSetting(k, v) end
     end
-    ns.db.panelPos = nil
+    ns.db.panelPos, ns.db.panelCollapsed = nil, nil
+    if ns.resetPanelPosition then ns.resetPanelPosition(true) end
     if ns.defaultQuickItems then ns.db.quickItems = ns.defaultQuickItems() end
     ns.print("all settings are back to their defaults (everything on)")
     if ns.refreshSettings then ns.refreshSettings() end

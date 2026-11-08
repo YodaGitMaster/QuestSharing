@@ -1,6 +1,19 @@
 # Changelog
 
 ## 0.2.0
+- **A more beautiful, easier addon.** A four-step start in the README and a welcome in chat (once; after an update, a
+  short "what's new"). The settings window has the game's dialog look, six tabs that each open with one line on what
+  they are for, sections, real check boxes, `< choice >` and `- number +` controls, a grey line under every setting,
+  buttons for actions, and greyed lines while the addon is off. **Set the quick chat key by pressing it.**
+  **Check my setup** and **Show the ring** are one click away.
+- **Party quests window:** a header with the number of quests in common and **Share**, **Post all** (every shared quest
+  in one chat message) and **fold** buttons; names in class colour with a **QS** tag for Quest Sharing users; striped
+  rows; it **hides during combat**, has a **size** setting and a **move back** button.
+- **Quick chat ring:** each dot has the colour of the chat it goes to (party blue, whisper pink, say white, yell red);
+  the middle says where the message goes; three ring sizes.
+- **Map button tooltip** with a live status (party, quests in common, tracker, your key, problems). It used to show a stray
+  `\n` in its text.
+- A **soft sound for good news** (someone accepted your quest, a party member finished one you share), never in combat.
 - **Quick chat ring** (hold a key, point, release or click): a clean ring with short labels, editable messages and
   placeholders, a whisper to the player you target, and `/say` sent on a click or key press (the game forbids it from a
   release); light on the game (messages are only filled in when you point at them); with a stranger the
