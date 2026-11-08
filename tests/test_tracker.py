@@ -180,6 +180,75 @@ def test_it_comes_back_after_a_reload():
     assert g.watched() == [100, 101]
 
 
+# ---- noticing manual changes on clients that send no event (classic style) -------------------------------------------
+def classic_following():
+    g = Game("classic")
+    g.start()
+    g.slash("near on")
+    g.advance(10)
+    return g
+
+
+def pauses(g):
+    return g.printed().count("|cff55ccffQuestSharing:|r tracker follows you: paused for 5 minutes because you changed the tracker (/qs near resume to continue)")
+
+
+def test_a_manual_change_is_noticed_without_any_event():
+    g = classic_following()
+    assert g.watched() == [100, 101, 102] and pauses(g) == 0
+    g.run("WATCHED[200] = true")                                                   # you track a quest from another zone
+    g.advance(6)
+    assert pauses(g) == 1 and 200 in g.watched(), "it pauses instead of undoing your choice"
+    log = len(g.watch_log())
+    g.advance(200)
+    assert len(g.watch_log()) == log, "and stays out of the way for the five minutes"
+    g.advance(120)
+    g.advance(8)
+    assert 200 not in g.watched(), "then it takes over again"
+
+
+def test_untracking_a_quest_by_hand_also_pauses_it():
+    g = classic_following()
+    g.run("WATCHED[101] = nil")
+    g.advance(6)
+    assert pauses(g) == 1 and 101 not in g.watched()
+
+
+def test_our_own_changes_and_the_games_tracking_of_a_new_quest_are_not_mistaken_for_you():
+    g = classic_following()
+    g.advance(30)
+    assert pauses(g) == 0
+    g.run("table.insert(QUESTS, 5, { id = 300, title = 'Fresh', level = 4, objectives = {} }); WATCHED[300] = true")
+    g.fire("QUEST_ACCEPTED", 5, 300)                                               # the game tracks it by itself
+    g.advance(20)
+    assert pauses(g) == 0
+
+
+def test_an_abandoned_quest_leaving_the_log_is_not_a_manual_change():
+    g = classic_following()
+    g.run("table.remove(QUESTS, 4); WATCHED[102] = nil")                           # quest 102 abandoned
+    g.fire("QUEST_REMOVED", 102)
+    g.advance(20)
+    assert pauses(g) == 0
+
+
+def test_the_same_detection_works_on_the_modern_client_without_the_event():
+    g = modern()
+    g.advance(10)
+    g.run("WATCHED[200] = true")
+    g.advance(6)
+    assert pauses(g) == 1 and 200 in g.watched()
+
+
+def test_resume_takes_your_list_as_the_new_starting_point_and_carries_on():
+    g = classic_following()
+    g.run("WATCHED[200] = true")
+    g.advance(6)
+    g.slash("near resume")
+    g.advance(10)
+    assert 200 not in g.watched() and pauses(g) == 1
+
+
 # ---- zone mode and clients without distances --------------------------------------------------------------------------
 def test_zone_mode_tracks_the_quests_of_the_zone_you_are_in():
     g = Game("classic")

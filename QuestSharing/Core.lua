@@ -19,6 +19,7 @@ ns.defaults = {
     announce = true,    -- say in party chat when a quest we share has all its objectives done
     markers = true,     -- mark quests your party shares in the quest log
     panel = true,       -- show the "quests in common" panel while you are in a party
+    minimap = true,     -- the minimap button
     quick = true,       -- the quick chat wheel (hold a key, point, release)
     quickMode = "hold", -- "hold" (open while the key is held) or "toggle" (press to open, click a slot)
     quickChannel = "auto", -- "auto" (party if grouped, else say), "say", "party" or "whisper" (your target)
@@ -66,7 +67,7 @@ frame:SetScript("OnUpdate", function(_, dt)
         if t and now >= t.at then
             table.remove(timers, i)
             local ok, err = pcall(t.fn)
-            if not ok then ns.print("error: " .. tostring(err)) end
+            if not ok then if ns.logError then ns.logError("timer", err) else ns.print("error: " .. tostring(err)) end end
         end
     end
 end)
@@ -82,7 +83,7 @@ end
 frame:SetScript("OnEvent", function(_, event, ...)
     for _, fn in ipairs(handlers[event] or {}) do
         local ok, err = pcall(fn, event, ...)
-        if not ok then ns.print("error in " .. event .. ": " .. tostring(err)) end
+        if not ok then if ns.logError then ns.logError(event, err) else ns.print("error in " .. event .. ": " .. tostring(err)) end end
     end
 end)
 
@@ -148,6 +149,7 @@ function ns.setSetting(key, value)
         if key == "enabled" and not value then ns.stopShare("switched off") end
         if key == "markers" and ns.refreshQuestLog then ns.refreshQuestLog() end
         if key == "panel" and ns.syncPanelVisibility then ns.syncPanelVisibility() end
+        if key == "minimap" and ns.syncMinimapButton then ns.syncMinimapButton() end
         if (key == "nearMode" or key == "nearCount") and d.near and ns.nearEvaluate then ns.nearEvaluate(true) end
     end
     if ns.refreshSettings then ns.refreshSettings() end
@@ -172,9 +174,9 @@ end
 local function status()
     local d = ns.db
     local function f(v) return v and "on" or "off" end
-    ns.print(string.format("%s | auto-share %s | new-quest %s | area %s | gap %ds | chat %s | announce %s | click %s | link %s | mode %s | sync %s | markers %s | panel %s | near %s | quick %s | friends(beta) %s",
+    ns.print(string.format("%s | auto-share %s | new-quest %s | area %s | gap %ds | chat %s | announce %s | click %s | link %s | mode %s | sync %s | markers %s | panel %s | near %s | quick %s | minimap %s | friends(beta) %s",
         d.enabled and "ON" or "OFF", f(d.auto), f(d.shareNew), d.area, d.gap, f(d.chat), f(d.announce), f(d.click), f(d.link),
-        d.mode, f(d.sync), f(d.markers), f(d.panel), f(d.near), f(d.quick), f(d.friends)))
+        d.mode, f(d.sync), f(d.markers), f(d.panel), f(d.near), f(d.quick), f(d.minimap), f(d.friends)))
 end
 
 local help = {
@@ -199,11 +201,14 @@ local help = {
     "/qs friends          (beta) add everybody in your party to your friends list now; /qs friends on|off = automatically",
     "/qs quick            the quick chat wheel: list / add / edit / remove / move / reset the messages (see /qs quick help)",
     "/qs key [KEY]        bind the quick chat wheel to a key, e.g. /qs key V   (/qs key none removes it)",
+    "/qs doctor           a report of what works on this client (opens in a window you can copy from)",
+    "/qs errors [clear]   errors this addon has caused",
+    "/qs minimap on|off   the minimap button",
     "/qs reset            put every setting back to its default (everything on)",
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", verbose = "verbose",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", verbose = "verbose",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"
@@ -224,6 +229,8 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     elseif cmd == "key" then ns.setQuickKey(arg)
     elseif cmd == "friends" then
         if arg == "on" or arg == "off" then ns.setSetting("friends", arg == "on"); status() else ns.addPartyFriends(true) end
+    elseif cmd == "doctor" then ns.doctor()
+    elseif cmd == "errors" then ns.errorsCommand(arg)
     elseif cmd == "reset" then ns.resetSettings()
     elseif cmd == "probe" then ns.probe()
     elseif cmd == "" or cmd == "status" then status()

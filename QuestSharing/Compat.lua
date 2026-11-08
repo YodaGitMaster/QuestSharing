@@ -303,3 +303,23 @@ end
 function C.inInstanceGroup()
     return (IsInGroup and LE_PARTY_CATEGORY_INSTANCE and IsInGroup(LE_PARTY_CATEGORY_INSTANCE)) and true or false
 end
+
+-- Inviting players ---------------------------------------------------------------------------------------
+function C.groupSize()
+    local n = (GetNumGroupMembers and GetNumGroupMembers()) or (GetNumPartyMembers and (GetNumPartyMembers() + 1)) or 1
+    return math.max(n, 1)
+end
+
+function C.isLeader()
+    if not C.inGroup() then return true end
+    if UnitIsGroupLeader then return UnitIsGroupLeader("player") and true or false end
+    return (IsPartyLeader and IsPartyLeader()) and true or false
+end
+
+function C.canInvite() return ((C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit) and true or false end
+
+function C.invite(name)
+    local f = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
+    if not f then return false end
+    return (pcall(f, name))
+end
