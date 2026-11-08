@@ -243,6 +243,47 @@ def test_say_is_not_sent_on_release_but_on_a_click(style):
     assert sent(g) == [("Hey there! o/", "SAY")] and frame.shown is False
 
 
+def test_a_send_the_game_blocks_ends_up_in_the_chat_box_and_in_the_error_log(style):
+    g = game(style)
+    hold_and_release_on(g, 1)
+    click_slot(g, 1)
+    g.run("OPENED = {}")
+    g.fire("ADDON_ACTION_FORBIDDEN", "QuestSharing", "UNKNOWN()")      # what the game says when it blocks the send
+    assert g.eval("OPENED") and g.eval("OPENED[1]") == "/s Hey there! o/", "ready for Enter"
+    assert "press Enter" in "\n".join(g.printed())
+    err = g.eval("NS.db.errors[#NS.db.errors].msg")
+    assert "UNKNOWN()" in err and "quick chat ring to SAY" in err
+
+
+def test_a_blocked_whisper_is_prepared_as_a_whisper(style):
+    g = game(style)
+    g.run('TARGET = { name = "Lia", player = true }')
+    hold_and_release_on(g, 1)
+    g.run("OPENED = {}")
+    g.fire("ADDON_ACTION_FORBIDDEN", "QuestSharing", "UNKNOWN()")
+    assert g.eval("OPENED[1]") == "/w Lia Hey Lia! o/"
+
+
+def test_a_block_that_has_nothing_to_do_with_the_ring_is_only_logged(style):
+    g = game(style)
+    g.run("OPENED = {}")
+    g.fire("ADDON_ACTION_FORBIDDEN", "QuestSharing", "SetSuperTrackedQuestID()")
+    assert g.eval("#OPENED") == 0
+    assert "SetSuperTrackedQuestID()" in g.eval("NS.db.errors[#NS.db.errors].msg")
+    g.fire("ADDON_ACTION_FORBIDDEN", "SomeOtherAddon", "X()")           # another addon's trouble is not ours
+    assert g.eval("#NS.db.errors") == 1
+
+
+def test_an_old_send_is_not_blamed_for_a_later_block(style):
+    g = game(style)
+    hold_and_release_on(g, 1)
+    click_slot(g, 1)
+    g.advance(5)
+    g.run("OPENED = {}")
+    g.fire("ADDON_ACTION_FORBIDDEN", "QuestSharing", "UNKNOWN()")
+    assert g.eval("#OPENED") == 0
+
+
 def test_pressing_the_key_again_says_what_is_pointed_at(style):
     g = game(style)
     hold_and_release_on(g, 7)

@@ -229,6 +229,29 @@ end
 local q = { open = false, hover = nil, cx = 0, cy = 0, openedAt = 0, lastSend = -10, sticky = false, cache = {}, lastDx = nil, lastDy = nil }
 ns.quick = q
 
+-- What we last handed to the game. If the game answers with "blocked" (ADDON_ACTION_FORBIDDEN), we know which message
+-- it was, and the sentence is put into the chat box so you only press Enter.
+local SLASH = { SAY = "/s ", YELL = "/y ", EMOTE = "/e ", PARTY = "/p ", RAID = "/raid ", INSTANCE_CHAT = "/i ", GUILD = "/g " }
+
+local function deliver(text, channel, target)
+    q.last = { text = text, channel = channel, target = target, at = GetTime() }
+    SendChatMessage(text, channel, nil, target)
+end
+
+-- called from Diagnostics when the game blocks one of our calls; true if it was a send from the ring
+function ns.quickBlocked()
+    local l = q.last
+    if not (l and GetTime() - l.at < 1) then return false, nil end
+    q.last = nil
+    local line
+    if l.channel == "INVITE" then line = "/invite " .. tostring(l.target)
+    elseif l.channel == "WHISPER" then line = "/w " .. tostring(l.target) .. " " .. l.text
+    else line = (SLASH[l.channel] or "/s ") .. l.text end
+    if ChatFrame_OpenChat then pcall(ChatFrame_OpenChat, line) end
+    ns.print("quick chat: the game did not let the addon send that. It is in your chat box - press Enter to send it.")
+    return true, l
+end
+
 function ns.quickSend(i)
     local item = items()[i]
     if not item then return false end
@@ -239,15 +262,16 @@ function ns.quickSend(i)
         if not C.canInvite() then ns.print("quick chat: this client has no call to invite players"); return false end
         if C.inGroup() and not C.isLeader() then ns.print("quick chat: only the party leader can invite"); return false end
         if C.groupSize() >= 5 then ns.print("quick chat: your party is full"); return false end
+        q.last = { text = "", channel = "INVITE", target = who, at = GetTime() }
         if not C.invite(who) then ns.print("quick chat: the invite did not go through"); return false end
         local rest = inviteRest(item.text)
-        if rest ~= "" then SendChatMessage(ns.quickResolve(rest), "WHISPER", nil, who) end
+        if rest ~= "" then deliver(ns.quickResolve(rest), "WHISPER", who) end
         q.lastSend = GetTime()
         return true
     end
     local channel, target, why = channelFor()
     if not channel then ns.print("quick chat: " .. tostring(why)); return false end
-    SendChatMessage(ns.quickResolve(item.text), channel, nil, target)
+    deliver(ns.quickResolve(item.text), channel, target)
     q.lastSend = GetTime()
     return true
 end
