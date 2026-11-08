@@ -24,8 +24,10 @@ local REFRESH = 1                 -- seconds between two looks for the nearest q
 -- outside combat by the addon, which may change attributes then)
 local GATE = [[
     if down then return end
+    local kind = self:GetAttribute("qs-kind")
+    if kind == "none" or kind == nil then return end               -- nothing loaded: nothing to hold back
     if self:GetAttribute("qs-gate") == 1 and not IsShiftKeyDown() then
-        if self:GetAttribute("qs-kind") ~= "unit" then return false end
+        if kind ~= "unit" then return false end
         if SecureCmdOptionParse("[@target,harm,nodead] alive; free") == "alive" then return false end
     end
     self:SetAttribute("qs-gate", 1)
@@ -110,21 +112,64 @@ local function resetGate()
     if btn and not inCombat() then btn:SetAttribute("qs-gate", 0) end
 end
 
--- after every click (insecure: only looks and talks): did it ping, or did the anti-spam hold it back?
+-- after every click (insecure: only looks and talks): did it ping, or did the anti-spam hold it back? Always one short
+-- line (at most every 3 seconds), so a press is never a mystery.
+local function say(text)
+    if text == state.lastSaid and GetTime() - state.saidAt < 3 then return end     -- the same line: not again so soon
+    state.saidAt, state.lastSaid = GetTime(), text
+    ns.print(text)
+end
+
 local function afterClick(self, _, down)
     if down then return end
+    state.presses = (state.presses or 0) + 1
     local count = self:GetAttribute("qs-count") or 0
-    if count ~= state.count then
+    if state.kind == "none" or not state.kind then
+        say("nothing to ping: no quest creature in sight (enemy nameplates on?) - /qs ping checks everything")
+    elseif count ~= state.count then
         state.count, state.lastAt = count, GetTime()
+        if state.kind == "unit" then say("ping: " .. tostring(state.name) .. " (attack)")
+        elseif state.kind == "object" then say("ping: the quest object in front of you, if there is one (look here)")
+        else say("nothing to ping: no quest creature in sight (enemy nameplates on?) - /qs ping checks everything") end
         local gap = ns.db.pingGap or 10
         ns.after(gap, function() if GetTime() - state.lastAt >= gap - 0.05 then resetGate() end end)
         if ns.quick and ns.quick.open and ns.quickClose then ns.quickClose() end
         ns.after(0.3, ns.pingRefresh)                          -- the next nearest one, once this press is over
-    elseif GetTime() - state.saidAt > 5 then
-        state.saidAt = GetTime()
-        ns.print(string.format("ping held back: the one you pinged is still alive%s - hold Shift to ping anyway",
+    else
+        say(string.format("ping held back: the one you pinged is still alive%s - hold Shift to ping anyway",
             inCombat() and "" or (" (or wait " .. (ns.db.pingGap or 10) .. " seconds)")))
     end
+end
+
+-- the game tells why a ping failed ("pings are disabled", "too many pings"...): pass it on
+ns.on("PING_SYSTEM_ERROR", function(_, err)
+    state.lastError = tostring(err)
+    ns.print("the game did not send the ping: " .. tostring(err))
+end)
+
+-- /qs ping: every link of the chain, so you can see where it stops
+function ns.pingReport()
+    local out = {}
+    local function line(ok, text) out[#out + 1] = (ok and "[OK] " or "[--] ") .. text end
+    local hasPing = C_Ping ~= nil
+    local enabled = hasPing and (not C_Ping.IsPingSystemEnabled or select(2, pcall(C_Ping.IsPingSystemEnabled)) == true)
+    line(hasPing, "the game's ping system: " .. (hasPing and "here" or "NOT on this client - pings cannot work"))
+    if hasPing then line(enabled, "pings switched on in the game: " .. (enabled and "yes" or "NO (game options > pings, or the party leader turned them off)")) end
+    line(SecureHandlerWrapScript ~= nil and SetBindingClick ~= nil, "secure buttons and click bindings: " .. ((SecureHandlerWrapScript and SetBindingClick) and "yes" or "NO"))
+    line(ns.db.ping and not ns.isBlocked("ping"), "the ping feature: " .. (ns.isBlocked("ping") and "switched off after the game refused it (/reload)" or (ns.db.ping and "on" or "off (/qs ping on)")))
+    line(btn ~= nil, "the ping button: " .. (btn and "ready" or "not made (needs the ping system, outside combat)"))
+    local key = ns.pingKeyName()
+    line(key ~= nil, "ping key: " .. (key or "NOT SET - Settings > Pings & items > Ping key, or /qs pingkey G"))
+    local api = C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest
+    line(api ~= nil, "telling quest creatures apart: " .. (api and "yes" or "NO - this client cannot tell which creatures your quests need"))
+    line(ns.enemyNameplatesOn and ns.enemyNameplatesOn(), "enemy nameplates: " .. ((ns.enemyNameplatesOn and ns.enemyNameplatesOn()) and "on" or "OFF - press V (the addon finds quest creatures through them)"))
+    local name = ns.nearestQuestCreature()
+    line(name ~= nil, "nearest quest creature right now: " .. (name or "none in sight"))
+    local macro = btn and btn:GetAttribute("macrotext") or ""
+    out[#out + 1] = "next press does: " .. ((macro == "" and "nothing") or (string.gsub(macro, "\n", "  +  ")))
+    out[#out + 1] = string.format("presses so far: %d, pings sent: %d%s", state.presses or 0, state.count or 0,
+        state.lastError and (" | the game's last answer: " .. state.lastError) or "")
+    return out
 end
 
 local function build()

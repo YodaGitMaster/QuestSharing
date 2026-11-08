@@ -171,6 +171,9 @@ the game's tracker still tells the party you are done, because that is your own 
      hand icon) gets the game's **"look here"** ping (*Ping quest objects too*, on by default).
    - **Anti-spam:** a new ping only once the creature you pinged is **dead** (or no longer your target), or, outside
      combat, after **5, 10 or 15 seconds** (*Ping again after*, default 10). **Shift** + the key pings anyway.
+   - **Every press says what happened** (pinged, nothing to ping, held back), and the game's own ping errors are
+     shown. **`/qs ping`** checks every step and says where it stops (the ping system, the key, quest creatures,
+     enemy nameplates, what the next press does).
    - A message `@ping` on the quick chat ring is a **ping slot** (`/qs quick add Ping | @ping`): click it outside
      combat.
 
@@ -401,7 +404,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 765 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 770 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -459,13 +462,13 @@ python tests/test_team.py             # 30 tests: picked up a quest someone has,
 python tests/test_where.py            # 24 tests: the star, map icons, a teammate's pin, the pin preferring shared quests
 python tests/test_menu.py             # 36 tests: the right-click menu, Questie's where-to-get-it, the sound-key guard
 python tests/test_done.py             # 20 tests: a quest you finished is never shared, announced or listed
-python tests/test_box.py              # 23 tests: messages into the chat box, refused calls written down and switched off
-python tests/test_ping.py             # 14 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
+python tests/test_box.py              # 24 tests: messages into the chat box, refused calls written down and switched off
+python tests/test_ping.py             # 18 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
 python tests/test_zone.py             # 10 tests: only the quests of where you are (Teldrassil vs Stormwind)
 python tests/test_items.py            # 22 tests: quest item icons in the tracker, the item key and button
 python tests/test_emotes.py           # 24 tests: the emote rings behind the mouse wheel, and editing them
 ```
-Expected: every line ends in `passed` with all tests green (765 in total).
+Expected: every line ends in `passed` with all tests green (770 in total).
 
 ## Files
 | File | Purpose |

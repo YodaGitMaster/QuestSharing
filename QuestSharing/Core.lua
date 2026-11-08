@@ -292,7 +292,7 @@ local help = {
     "/qs itemkey <KEY>    the key that uses the item of your nearest quest (a torch, a flare...); none removes it",
     "/qs items on|off     item icons next to the quests in the tracker, and the quest item button",
     "/qs questie          does Quest Sharing read Questie's quest database? (with a real lookup from your quest log)",
-    "/qs ping on|off      the ping key and the ring's ping slot",
+    "/qs ping             checks every step of the ping key (and says where it stops); /qs ping on|off switches it",
     "/qs mappins on|off   party members running Quest Sharing on my world map (and my position to them)",
     "/qs waypoint on|off  a map pin where a teammate found the quest items",
     "/qs markers on|off   mark shared quests in the quest log",
@@ -321,6 +321,8 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     if cmd == "share" then ns.startShare("manual")
     elseif cmd == "stop" then ns.stopShare("stopped by you")
     elseif cmd == "on" or cmd == "off" then ns.setSetting("enabled", cmd == "on"); status()
+    elseif cmd == "ping" and (arg == "" or arg == "test" or arg == "status") then
+        for _, l in ipairs(ns.pingReport()) do ns.print(l) end
     elseif BOOLS[cmd] then ns.setSetting(BOOLS[cmd], onoff(arg, d[BOOLS[cmd]])); status()
     elseif cmd == "area" and (arg == "zone" or arg == "all") then ns.setSetting("area", arg); status()
     elseif cmd == "gap" and tonumber(arg) then ns.setSetting("gap", math.max(2, tonumber(arg))); status()
