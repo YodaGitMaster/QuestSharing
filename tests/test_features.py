@@ -283,19 +283,88 @@ def test_panel_lines_edge_cases(style):
 def test_panel_window_shows_the_lines_and_remembers_where_it_was_put(style):
     g = quiet_party(style, on_quest={"party1": [100]})
     g.slash("panel on")
-    panel, rows = g.eval("NS._panel()")
+    panel, rows, legend, notes = g.eval("NS._panel()")
     assert g.eval("NS.db.panel") is True and panel.shown
-    texts = [rows[i].text for i in range(1, 4)]
-    assert texts[0] == "Party: Anna" and "Wolves Among Us" in texts[1] and "Anna has it" in texts[1], texts
-    assert rows[3].shown is False, "unused rows are hidden"
-    assert panel.height == 16 + 2 * 14
+    assert legend[1].name.text == "Anna" and legend[1].icon.shown and legend[2].icon.shown is False
+    assert rows[1].shown and rows[1].title.text == "Wolves Among Us" and rows[2].shown is False, "unused rows are hidden"
+    assert panel.height == 52 + 22 + 4
     hello(g, "Anna", "100:0:5/8,1/4")                                         # new data refreshes it by itself
-    g.advance(1)
-    assert "Anna 5/8, 1/4" in rows[2].text
+    g.advance(6)
+    assert rows[1].shown and "Anna: 5/8, 1/4" not in rows[1].title.text
     g.eval("function(p) p.scripts.OnDragStop(p) end")(panel)
     assert tuple(g.eval("NS.db.panelPos").values()) == ("CENTER", 0, 0)
     g.slash("panel off")
     assert panel.shown is False
+
+
+def panel_of(g):
+    g.slash("panel on")
+    g.advance(1)
+    return g.eval("NS._panel()")
+
+
+def test_panel_rows_show_who_has_the_quest_with_class_icons_and_my_progress(style):
+    g = quiet_party(style, ("Anna", "Bob", "Cy"), on_quest={"party1": [100], "party3": [100, 101]})
+    g.run('CLASSES.Anna = "MAGE"; CLASSES.Bob = "PRIEST"; CLASSES.Cy = "WARRIOR"')
+    panel, rows, legend, notes = panel_of(g)
+    assert [legend[i].name.text for i in (1, 2, 3)] == ["Anna", "Bob", "Cy"]
+    assert legend[1].icon.coords[1] == 0.25 and legend[2].icon.coords[1] == 0.5, "each member shows their class"
+    first = rows[1]
+    assert first.title.text == "Wolves Among Us" and first.mine.text == "3/8 +1", "my own progress (and one more open goal)"
+    assert (first.icons[1].shown, first.icons[2].shown, first.icons[3].shown) == (True, False, True), "Anna and Cy have it, Bob does not"
+    assert first.icons[1].coords[1] == 0.25 and first.icons[3].coords[1] == 0
+    second = rows[2]                                                         # Cy also has the finished quest: green
+    assert second.shown and second.title.text == "|cff55ff55Report to Goldshire|r" and second.mine.text == "done"
+    assert second.icons[1].shown is False and second.icons[3].shown is True, "only Cy has the second quest"
+
+
+def test_a_finished_quest_is_green_and_a_member_who_finished_gets_a_check(style):
+    g = quiet_party(style, ("Anna",), on_quest={"party1": [101]})
+    hello(g, "Anna", "101:1:f")
+    panel, rows, legend, notes = panel_of(g)
+    row = [r for r in (rows[1], rows[2]) if "Report to Goldshire" in r.title.text][0]
+    assert row.title.text.startswith("|cff55ff55") and row.mine.text == "done"
+    assert row.checks[1].shown is True
+
+
+def test_clicking_a_row_tells_the_party_how_i_am_doing(style):
+    g = quiet_party(style, ("Anna",), on_quest={"party1": [100]})
+    panel, rows, legend, notes = panel_of(g)
+    g.eval("function(r) r.scripts.OnClick(r, 'LeftButton') end")(rows[1])
+    msgs = g.sent()
+    assert len(msgs) == 1 and msgs[0][1] == "PARTY", msgs
+    assert "Wolves Among Us" in msgs[0][0] and "Wolf slain 3/8" in msgs[0][0] and "Anna has it too" in msgs[0][0]
+    g.eval("function(r) r.scripts.OnClick(r, 'LeftButton') end")(rows[1])
+    assert len(g.sent()) == 1, "a double click does not say it twice"
+    g.advance(2)
+    g.eval("function(r) r.scripts.OnClick(r, 'LeftButton') end")(rows[1])
+    assert len(g.sent()) == 2
+
+
+def test_a_row_has_a_tooltip_with_everybodys_progress(style):
+    g = quiet_party(style, ("Anna", "Bob"), on_quest={"party2": [100]})
+    hello(g, "Anna", "100:0:5/8,1/4")
+    panel, rows, legend, notes = panel_of(g)
+    g.eval("function(r) r.scripts.OnEnter(r) end")(rows[1])
+    lines = list(g.eval("TOOLTIP.lines").values())
+    assert g.eval("TOOLTIP.text") == "Wolves Among Us" and "Anna: 5/8, 1/4" in lines and "Bob: has it" in lines
+    assert any("Click" in l for l in lines)
+
+
+def test_a_long_list_is_cut_with_a_note(style):
+    g = quiet_party(style, ("Anna",))
+    g.run("""for i = 1, 14 do
+        QUESTS[#QUESTS + 1] = { id = 300 + i, title = "Extra " .. i, level = 5, objectives = {} }
+        ON_QUEST["party1"] = ON_QUEST["party1"] or {}
+        ON_QUEST["party1"][300 + i] = true
+    end""")
+    g.fire("QUEST_LOG_UPDATE")
+    panel, rows, legend, notes = panel_of(g)
+    assert all(rows[i].shown for i in range(1, 13)) and notes.text == "+2 more - see the quest log"
+    g.run("for i = 1, 14 do QUESTS[#QUESTS] = nil end")
+    g.fire("QUEST_LOG_UPDATE")
+    g.advance(6)
+    assert notes.shown is False or notes.text != "+2 more - see the quest log"
 
 
 # ---- markers in the quest log ----------------------------------------------------------------------------------------

@@ -34,14 +34,24 @@ A World of Warcraft addon for playing quests together.
    has are finished, it says so in party chat. Synced players also see `Anna finished the objectives of
    [Wolves Among Us]` on their screen when it is their quest.
 
-5. **Shows who shares what.** A star and the names next to shared quests in the game's quest log, and a
-   small movable panel (shown while you are in a party, drag it to move it; `/qs panel` hides it):
+5. **Shows who shares what.** A star and the names next to shared quests in the game's quest log, and a small
+   movable **Party quests** window (shown while you are in a party; drag it to move it; `/qs panel` hides it).
+   It is built to be read at a glance:
 
    ```
-   Party: Anna (addon), Bob
-   * Wolves Among Us: Anna 5/8, 1/4 | Bob has it
-   * Report to Goldshire (done): Anna done
+   Party quests                                   Settings
+   [mage] Anna  [priest] Bob  [warrior] Cy
+   [mage][  ][warrior]  Wolves Among Us                3/8 +1
+   [   ][  ][warrior]   Report to Goldshire (green)      done
    ```
+
+   - The top line shows your party, one **class icon** and name each.
+   - Each row is **one shared quest**: the **class icons of the members who have it** come first (a small green
+     check on an icon means that member finished it), then the quest name (green when you are done), and **your own
+     progress** on the right (`3/8`, `3/8 +1` when more goals are open, or `done`).
+   - **Hover** a row to see everybody's progress; **click** a row and the addon **tells your party how you are
+     doing with that quest** (the quest link, what you still need, and who else has it).
+   - More than 12 shared quests: the rest is summed up as "+N more".
 
 6. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. It fills the
    tracker (the list on the right) with the quests closest to you and **re-checks every 2 seconds as you
@@ -166,7 +176,7 @@ once. Settings saved by an earlier version get the new defaults; every other cho
 | `/qs sync on\|off` | exchange exact quest lists with other Quest Sharing users (default on) |
 | `/qs announce on\|off` | say in party chat when a quest we share is done (default on) |
 | `/qs markers on\|off` | star and names next to shared quests in the quest log (default on) |
-| `/qs panel [on\|off]` | show the "quests in common" panel while in a party (default on); drag it to move it |
+| `/qs panel [on\|off]` | show the "Party quests" window while in a party (default on); drag it to move it, click a row to tell the party your progress |
 | `/qs near [on\|off]` | keep the quest tracker filled with the quests closest to you (default on) |
 | `/qs near N` | how many quests it keeps (default 5) |
 | `/qs near mode auto\|distance\|zone` | `auto` uses distance if your client can measure it, otherwise your zone |
@@ -207,7 +217,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 410 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 424 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -251,7 +261,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 ```
 pip install lupa
 python tests/test_questsharing.py     # 63 tests: sharing, replies, announcements, tracker clicks, commands
-python tests/test_features.py         # 50 tests: sync, completion, panel, quest-log markers
+python tests/test_features.py         # 60 tests: sync, completion, the party quests window, quest-log markers
 python tests/test_triggers.py         # 34 tests: when it shares (once per join / new member / new quest), no nagging
 python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 42 tests: everything on by default, migration, the tabbed settings window
@@ -270,7 +280,7 @@ Expected: every line ends in `passed` with all tests green (406 in total).
 | `QuestSharing/Share.lua` | party detection, the push queue, reading the game's replies, announcing quests in common |
 | `QuestSharing/Sync.lua` | addon-to-addon protocol: hello, full quest list, updates (see the header of the file) |
 | `QuestSharing/Progress.lua` | notices finished quests, announces them, sends changes to synced players |
-| `QuestSharing/Panel.lua` | the "quests in common" panel and the quest-log markers |
+| `QuestSharing/Panel.lua` | the "Party quests" window (class icons, clickable rows) and the quest-log markers |
 | `QuestSharing/Track.lua` | keeps the quest tracker on the quests nearest to you (distance or zone mode) |
 | `QuestSharing/Highlight.lua` | quest icons over creatures on their nameplates, and the game-settings helper |
 | `QuestSharing/Diagnostics.lua` | the error log, `/qs doctor` and the copyable report window |
