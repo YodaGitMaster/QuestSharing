@@ -1,0 +1,9 @@
+<Bindings>
+    <Binding name="QUESTSHARING_QUICKCHAT" header="QUESTSHARING" runOnUp="true">
+        if keystate == "down" then
+            QuestSharing_QuickDown()
+        else
+            QuestSharing_QuickUp()
+        end
+    </Binding>
+</Bindings>

@@ -66,6 +66,23 @@ A World of Warcraft addon for playing quests together.
    <zone>"). The game's answers (added, already a friend, not found, list full, other faction) are read and
    summarised for you.
 
+8. **A quick chat wheel, like in Diablo 4.** Bind a key (Game Menu > Options > Key Bindings > Quest Sharing,
+   or `/qs key V`). **Hold the key**: a wheel of up to 8 messages opens around the mouse. **Point at one and
+   release the key** to say it. A quick tap opens the wheel and keeps it open so you can click a slot
+   instead; Esc or a right click closes it. By default the wheel says:
+
+   > Hey {name}! o/ - Want to quest together here? ({here}) - I need to: {need} - We have these quests in common: {common} - Thanks! - Wait for me, one sec! - Follow me! - Ready when you are!
+
+   Messages are filled in when you send them: `{name}` is the friendly player you target (or "there"),
+   `{here}` your subzone or zone, `{need}` what you still have to do in this area (your unfinished
+   objectives, nearest quest first where the client can measure distance), `{common}` the quests you and
+   your party share, `{quest}` the nearest unfinished quest, `{zone}` the zone. It goes to the party when
+   you are in one, otherwise to everybody nearby (`/qs quick channel auto|say|party|whisper`; `whisper`
+   sends it to your target).
+   **Arrange them as you please:** `/qs quick` lists them; `/qs quick add <text>`, `edit N <text>`,
+   `remove N`, `move N M`, `reset`; or `/qs quick editor` for a small window (click a line, change the text,
+   press Enter, use Up / Down / Delete / Add).
+
 ## Settings window
 **Everything is switched on by default.** To change anything, type `/qs settings` (or click **Settings** on
 the quests-in-common panel, or open *Game Menu > Options > AddOns > Quest Sharing*). Every line is one
@@ -120,6 +137,8 @@ other choice you made is kept.
 | `/qs settings` | open the settings window |
 | `/qs friends` | (beta) add everybody in your party to your friends list now |
 | `/qs friends on\|off` | (beta) do it automatically when a party forms or someone joins (default off) |
+| `/qs key [KEY]` | bind the quick chat wheel to a key, e.g. `/qs key V` or `/qs key ALT-E`; `/qs key none` removes it |
+| `/qs quick ...` | the quick chat messages: `add`, `edit`, `remove`, `move`, `reset`, `editor`, `mode hold\|toggle`, `channel auto\|say\|party\|whisper`, `on\|off` |
 | `/qs reset` | put every setting back to its default (everything on) |
 | `/qs probe` | show what this game client supports |
 
@@ -139,7 +158,7 @@ strings (so it works in any language) and shows them to you.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 247 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 297 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -152,6 +171,11 @@ strings (so it works in any language) and shows them to you.
   addons like Questie carry their own database. On such a client `/qs near` falls back to zone mode.
   `/qs probe` shows `distance to quests: yes/NO` and which mode is in use. Quests whose next step is on
   another continent are ignored.
+- **Quick chat key:** an addon cannot press a key for you, so you choose the key yourself. Pick one you do
+  not need: for example **E is "strafe right" by default**; `/qs key E` tells you what the key used to do
+  before it takes it over. Chat to nearby players (`/say`) is only allowed as the direct result of a key or
+  mouse press, which is exactly what choosing a slot is. The wheel needs a free mouse pointer (not
+  mouse-look). It is untested in the real game: `/qs probe` shows `quick chat wheel: key ...`.
 - **Friends (beta):** the game's friends list is small (about 100) and, on classic-style clients, belongs to
   your realm, so players from other realms can only be added where the client allows it. Adding someone is
   silent for them. Whether `AddFriend` is allowed to an addon on your client is something only the game can
@@ -179,8 +203,9 @@ python tests/test_triggers.py         # 34 tests: when it shares (once per join 
 python tests/test_tracker.py          # 22 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 36 tests: everything on by default, migration, the settings window
 python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
+python tests/test_quick.py            # 50 tests: the quick chat wheel, placeholders, editing, key binding
 ```
-Expected: `63/63`, `50/50`, `34/34`, `22/22`, `36/36` and `42/42 passed`.
+Expected: `63/63`, `50/50`, `34/34`, `22/22`, `36/36`, `42/42` and `50/50 passed`.
 
 ## Files
 | File | Purpose |
@@ -192,6 +217,7 @@ Expected: `63/63`, `50/50`, `34/34`, `22/22`, `36/36` and `42/42 passed`.
 | `QuestSharing/Progress.lua` | notices finished quests, announces them, sends changes to synced players |
 | `QuestSharing/Panel.lua` | the "quests in common" panel and the quest-log markers |
 | `QuestSharing/Track.lua` | keeps the quest tracker on the quests nearest to you (distance or zone mode) |
+| `QuestSharing/Quick.lua`, `QuestSharing/Bindings.xml` | the quick chat wheel, its placeholders, the message editor and the key binding |
 | `QuestSharing/Friends.lua` | (beta) adds party members to your friends list, with safeguards |
 | `QuestSharing/Settings.lua` | the settings window (plain clickable lines, no game UI templates) and the options entry |
 | `QuestSharing/Status.lua` | the status message, tracker / link hooks, `/qs probe` |

@@ -134,6 +134,9 @@ function ns.probe()
     ns.print("friends (beta): add call " .. yn(C.canAddFriend()) .. " | reply messages recognised: " ..
              ns.friendPatternCount() .. " | friends " .. C.friendCount() .. "/" .. C.maxFriends() ..
              " | automatic: " .. (ns.db.friends and "on" or "off"))
+    local bound = GetBindingKey and GetBindingKey("QUESTSHARING_QUICKCHAT")
+    ns.print("quick chat wheel: key " .. tostring(bound or "NOT SET (/qs key V)") .. " | an addon can set keys: " ..
+             yn(SetBinding) .. " | mode " .. tostring(ns.db.quickMode) .. " | sends to " .. tostring(ns.db.quickChannel))
     local peers = 0
     for _ in pairs(ns.peers or {}) do peers = peers + 1 end
     ns.print("sync with other Quest Sharing users: " .. (ns.db.sync and "on" or "off") .. ", message prefix registered: " ..
