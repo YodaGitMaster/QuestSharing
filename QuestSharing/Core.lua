@@ -35,6 +35,9 @@ ns.defaults = {
     mapPins = true,     -- show party members who run Quest Sharing on my world map, and send them where I am
     teamWaypoint = true, -- put a map pin where a teammate says they found the quest items
     coords = true,      -- add where I found / used the quest items to my messages, when someone in the party still needs them
+    ping = true,        -- the ping key / ring slot: Attack ping on the nearest quest creature, "look here" on quest objects
+    pingGap = 10,       -- anti-spam: outside combat a new ping only after this many seconds (or once the last one died)
+    pingObjects = true, -- with no quest creature in sight, ping the quest object you face ("look here")
     sound = true,       -- a soft sound for good news (someone accepted a quest I shared, a party member finished a shared quest)
     panelCombat = true, -- hide the Party quests window during combat
     panelScale = 100,   -- size of the Party quests window, in percent
@@ -280,6 +283,8 @@ local help = {
     "/qs pickup on|off    say when I pick up a quest someone in the party has (let's do it together?)",
     "/qs coords on|off    add where I found the quest items to my messages, when someone still needs them",
     "/qs star on|off      the star over my head while in a party, so people see where I am",
+    "/qs pingkey <KEY>    the key that pings the nearest quest creature (Attack) or quest object (look here); none removes it",
+    "/qs ping on|off      the ping key and the ring's ping slot",
     "/qs mappins on|off   party members running Quest Sharing on my world map (and my position to them)",
     "/qs waypoint on|off  a map pin where a teammate found the quest items",
     "/qs markers on|off   mark shared quests in the quest log",
@@ -297,7 +302,7 @@ local help = {
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", pickup = "pickup", coords = "coords", star = "selfMark", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", pickup = "pickup", coords = "coords", star = "selfMark", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"
@@ -319,6 +324,7 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     elseif cmd == "friends" then
         if arg == "on" or arg == "off" then ns.setSetting("friends", arg == "on"); status() else ns.addPartyFriends(true) end
     elseif cmd == "highlight" then ns.highlightCommand(arg)
+    elseif cmd == "pingkey" then ns.setPingKey(arg)
     elseif cmd == "doctor" then ns.doctor()
     elseif cmd == "errors" then ns.errorsCommand(arg)
     elseif cmd == "reset" then ns.resetSettings()

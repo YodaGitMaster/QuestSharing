@@ -99,6 +99,14 @@ ns.settingRows = {
       desc = "On their nameplates. Needs enemy nameplates switched on in the game." },
     { tab = "tracker", kind = "bool", key = "highlightCVars", label = "Switch on the game settings the highlights need",
       desc = "Enemy nameplates and icons over objects. Switching this off puts your own values back." },
+    { tab = "tracker", kind = "header", label = "Pinging quest targets" },
+    { tab = "tracker", kind = "key", which = "ping", key = nil, label = "Ping key",
+      desc = "Press it: the nearest creature your quests need gets the Attack ping (and becomes your target)." },
+    { tab = "tracker", kind = "choice", key = "pingGap", label = "Ping again after", values = { 5, 10, 15 },
+      names = { [5] = "5 seconds", [10] = "10 seconds", [15] = "15 seconds" },
+      desc = "Or as soon as the one you pinged is dead. Shift + the key pings anyway." },
+    { tab = "tracker", kind = "bool", key = "pingObjects", label = "Ping quest objects too (look here)",
+      desc = "With no quest creature in sight: the thing to pick up or use (gear / hand icon) you are facing." },
     -- Quick chat
     { tab = "quick", kind = "bool", key = "quick", label = "Quick chat ring (hold a key, point, release or click)" },
     { tab = "quick", kind = "key", label = "Key that opens the ring", desc = "Click, then press a key (Esc cancels)." },
@@ -117,7 +125,10 @@ ns.settingRows = {
 
 local function limit(v) if type(v) == "function" then return v() end return v end
 
-local function keyName() return ns.quickKeyName and ns.quickKeyName() end
+local function keyName(row)
+    if row and row.which == "ping" then return ns.pingKeyName and ns.pingKeyName() end
+    return ns.quickKeyName and ns.quickKeyName()
+end
 
 -- a one-line text version of a row (used by the tests and anywhere a plain line is enough)
 function ns.rowText(row)
@@ -130,7 +141,7 @@ function ns.rowText(row)
     elseif row.kind == "number" then
         return string.format("%s: |cff55ccff%d|r", row.label, d[row.key] or 0)
     elseif row.kind == "key" then
-        return row.label .. ": |cff55ccff" .. (keyName() or "not set") .. "|r"
+        return row.label .. ": |cff55ccff" .. (keyName(row) or "not set") .. "|r"
     end
     return "|cffffd100" .. row.label .. "|r"
 end
@@ -156,7 +167,7 @@ function ns.settingsClick(i, button)
     elseif row.kind == "action" then
         row.action()
     elseif row.kind == "key" then
-        ns.captureKey()
+        ns.captureKey(row.which)
     end
     if ns.refreshSettings then ns.refreshSettings() end
 end
@@ -194,8 +205,9 @@ local function stopCapture()
     if capture then capture:EnableKeyboard(false); capture:Hide() end
 end
 
-function ns.captureKey()
+function ns.captureKey(which)
     if InCombatLockdown and InCombatLockdown() then return ns.print("key bindings cannot be changed in combat") end
+    W.captureFor = which
     if not capture then
         local ok, f = pcall(CreateFrame, "Frame", "QuestSharingKeyCapture", UIParent)
         if not (ok and f) then return ns.print("this client does not allow it: use /qs key E") end
@@ -217,7 +229,7 @@ function ns.captureKeyPressed(key)
     if key ~= "ESCAPE" then
         local prefix = ((IsAltKeyDown and IsAltKeyDown()) and "ALT-" or "") .. ((IsControlKeyDown and IsControlKeyDown()) and "CTRL-" or "")
                     .. ((IsShiftKeyDown and IsShiftKeyDown()) and "SHIFT-" or "")
-        ns.setQuickKey(prefix .. key)
+        if W.captureFor == "ping" then ns.setPingKey(prefix .. key) else ns.setQuickKey(prefix .. key) end
     end
     ns.refreshSettings()
 end
@@ -397,7 +409,8 @@ local function paintRow(r, row)
     elseif row.kind == "number" then
         r.value:SetText(S.BLUE .. "-  " .. tostring(d[row.key] or 0) .. "  +|r")
     elseif row.kind == "key" then
-        r.button:SetLabel(W.capturing and (S.GOLD .. "press a key...|r") or (keyName() or (S.RED .. "not set|r")))
+        local mine = W.capturing and (W.captureFor == row.which)
+        r.button:SetLabel(mine and (S.GOLD .. "press a key...|r") or (keyName(row) or (S.RED .. "not set|r")))
         r.button:Show()
     elseif row.kind == "action" then
         r.button:SetLabel(row.button or "Do it")

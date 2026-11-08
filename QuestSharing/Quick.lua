@@ -212,6 +212,8 @@ local function isInvite(text)
     return string.sub(text, 1, 7) == "@invite" and (#text == 7 or string.sub(text, 8, 8) == " ")
 end
 local function inviteRest(text) return (string.gsub(string.sub(text, 8), "^%s+", "")) end
+local function isPing(text) return text == "@ping" or string.sub(text or "", 1, 6) == "@ping " end
+ns.quickIsPing = isPing
 
 -- channel, whisper target (or nil, reason).
 -- "auto": in a party it goes to the party (/p, or /i /raid there); alone, a targeted player gets a whisper (/w),
@@ -258,7 +260,7 @@ local function sendsDirectly() return ns.db.mode == "send" and not ns.isBlocked(
 local function needsClick(i)
     local item = items()[i]
     if not item then return false end
-    if isInvite(item.text) then return true end
+    if isInvite(item.text) or isPing(item.text) then return true end   -- the game wants a real click for these
     if not sendsDirectly() then return false end            -- into the chat box: a release is fine, you press Enter
     local channel = channelFor(item)
     return channel ~= nil and RESTRICTED[channel] == true
@@ -295,6 +297,10 @@ function ns.quickSend(i)
     local item = items()[i]
     if not item then return false end
     if GetTime() - q.lastSend < 1 then return false end      -- no accidental double sends
+    if isPing(item.text) then                                 -- only the secure ping button (a click on it) can ping
+        ns.print("pings work with a click on the ring outside combat, or with your ping key anytime (/qs pingkey <KEY>)")
+        return false
+    end
     if isInvite(item.text) then
         local who = targetWhisperName()
         if not who then ns.print("quick chat: target a player first to invite them"); return false end
@@ -349,7 +355,12 @@ end
 local function middleText(i)
     if q.cache[i] == nil then
         local item = items()[i]
-        if isInvite(item.text) then
+        if isPing(item.text) then
+            local p = ns.ping
+            q.cache[i] = (p and p.kind == "unit" and ("Ping " .. tostring(p.name) .. ": attack!"))
+                or (p and p.kind == "object" and "Ping the quest object you face: look here")
+                or "No quest creature in sight"
+        elseif isInvite(item.text) then
             local rest = inviteRest(item.text)
             q.cache[i] = "Invite to my party" .. (rest ~= "" and (" - " .. ns.quickResolve(rest)) or "")
         else
@@ -364,6 +375,7 @@ local function destination(i)
     local item = items()[i]
     if not item then return nil end
     if isInvite(item.text) then return "INVITE" end
+    if isPing(item.text) then return "YELL" end              -- red, like the game's Attack ping
     local channel, target = channelFor(item)
     return channel, target
 end
@@ -516,12 +528,23 @@ function ns.quickOpen(atCenter)
     for i = 1, MAX_ITEMS do paintSlot(i) end
     paintMiddle()
     f:Show()
+    if ns.quickPlacePing then ns.quickPlacePing() end          -- defined further down
 end
 
 function ns.quickClose()
     q.open, q.hover, q.sticky = false, nil, false
     if frame then frame:Hide() end
+    if ns.pingOverlay then ns.pingOverlay(nil) end            -- the ping button goes back off screen
 end
+
+-- while the ring is open (outside combat), the secure ping button lies over the ring's ping slot
+local function placePingButton()
+    if not (ns.pingOverlay and ns.db.ping) then return end
+    for i, it in ipairs(items()) do
+        if isPing(it.text) and slots[i] then ns.pingOverlay(slots[i].button); return end
+    end
+end
+ns.quickPlacePing = placePingButton
 
 -- a click on a slot: a real mouse click, so even /say is allowed
 function ns.quickClick(i)

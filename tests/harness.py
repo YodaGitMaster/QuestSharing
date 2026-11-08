@@ -82,6 +82,9 @@ local function newObject()
     function o:SetHeight(h) self.height = h end
     function o:SetWidth(w) self.width = w end
     function o:SetVertexColor(r, g, b, a) self.vertex = { r, g, b, a } end
+    function o:SetAttribute(k, v) self.attrs = self.attrs or {}; self.attrs[k] = v end
+    function o:GetAttribute(k) return self.attrs and self.attrs[k] end
+    function o:HookScript(n, fn) self.posthooks = self.posthooks or {}; self.posthooks[n] = self.posthooks[n] or {}; table.insert(self.posthooks[n], fn) end
     function o:SetScale(v) self.scale = v end
     function o:GetScale() return self.scale or 1 end
     function o:EnableKeyboard(v) self.keyboard = v end
@@ -213,6 +216,7 @@ function UnitName(unit)
     if unit == "player" then return "Me" end
     if unit == "target" and TARGET then return TARGET.name end
     if unit == "questnpc" and QUESTNPC then return QUESTNPC.name end
+    if CREATURES and CREATURES[unit] then return CREATURES[unit].name end
 end
 function GetRealZoneText() return ZONE end
 
@@ -367,6 +371,7 @@ function HIGHLIGHT_MODERN()
         if RELATED_ERROR then error("attempt to compare a secret value") end
         return RELATED[unit] == true
     end
+    C_Ping = { IsPingSystemEnabled = function() return PING_ENABLED ~= false end }
     C_SuperTrack = {
         GetSuperTrackedQuestID = function() return SUPER end,
         SetSuperTrackedQuestID = function(id) SUPER = id; SUPER_LOG[#SUPER_LOG + 1] = id end,
@@ -375,6 +380,51 @@ function HIGHLIGHT_MODERN()
         GetCVar = function(n) return CVARS[n] end,
         SetCVar = function(n, v) CVARS[n] = v; CVAR_LOG[#CVAR_LOG + 1] = n .. "=" .. v end,
     }
+end
+
+-- The ping system: secure buttons, their wrapped snippets, click bindings, pings
+PINGS, SOFTINTERACT = {}, nil
+function SecureHandlerWrapScript(frame, script, header, pre) frame.wrapped = frame.wrapped or {}; frame.wrapped[script] = pre end
+function SetBindingClick(key, button, mouse) BINDINGS[key] = "CLICK " .. button .. ":" .. (mouse or "LeftButton"); return true end
+local function optionParse(spec)
+    if spec == "[@target,harm,nodead] alive; free" then
+        return (TARGET and TARGET.hostile and not TARGET.dead) and "alive" or "free"
+    end
+end
+-- a click on a secure button, the way the game does it: the wrapped snippet first (it may say no), then the macro
+function SECURE_CLICK(b, down)
+    local pre = b.wrapped and b.wrapped.OnClick
+    local allowed = true
+    if pre then
+        local fn = assert(loadstring("local self, button, down = ...\n" .. pre))
+        setfenv(fn, { SecureCmdOptionParse = optionParse, IsShiftKeyDown = function() return SHIFT end })
+        allowed = fn(b, "LeftButton", down) ~= false
+    end
+    if allowed and not down and b:GetAttribute("type") == "macro" then
+        for line in string.gmatch(b:GetAttribute("macrotext") or "", "[^\n]+") do
+            local name = string.match(line, "^/targetexact (.+)$")
+            if name then TARGET = { name = name, player = false, hostile = true, dead = false } end
+            if line == "/ping [@target] attack" and TARGET then PINGS[#PINGS + 1] = "attack:" .. TARGET.name end
+            if line == "/ping [@softinteract,exists]" and SOFTINTERACT then PINGS[#PINGS + 1] = "look:" .. SOFTINTERACT end
+        end
+    end
+    for _, fn in ipairs((b.posthooks or {}).OnClick or {}) do fn(b, "LeftButton", down) end
+    return allowed
+end
+function PRESS(b) SECURE_CLICK(b, true); SECURE_CLICK(b, false) end
+-- creatures on nameplates: a name, hostile, alive or dead, how far from the middle of the screen
+CREATURES = {}
+function UnitCanAttack(a, u) return CREATURES[u] ~= nil and CREATURES[u].dead ~= nil end
+function UnitIsDead(u)
+    if u == "target" then return TARGET ~= nil and TARGET.dead == true end
+    return CREATURES[u] ~= nil and CREATURES[u].dead == true
+end
+function CheckInteractDistance(u, i) return CREATURES[u] ~= nil and CREATURES[u].near == true end
+function ADD_CREATURE(unit, name, related, x, y, near)
+    local p = ADD_PLATE(unit, related)
+    CREATURES[unit] = { name = name, dead = false, near = near }
+    p.GetCenter = function() return x or 960, y or 540 end
+    return p
 end
 
 function HIGHLIGHT_CLASSIC()                      -- no nameplate / super-track API on this client, but CVars exist

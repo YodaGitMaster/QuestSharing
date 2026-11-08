@@ -10,6 +10,11 @@
 - **Calls the game refuses are written down and switched off:** the error log says what the addon was doing ("while
   putting the star over your head", "while sharing a quest with the party", ...), and that feature stays off until
   `/reload`, so the error cannot repeat. The star over your head is never set during combat.
+- **Ping the quest target:** a ping key (and an `@ping` slot on the ring) gives the nearest creature your quests need
+  the game's **Attack** ping and makes it your target; with none in sight, the quest object you face gets **"look
+  here"**. Anti-spam: a new ping once the one you pinged is dead (or no longer your target), or after 5 / 10 / 15
+  seconds outside combat; Shift pings anyway. The game allows pings only from your key press, so the addon prepares a
+  secure button outside combat and your key presses it; the anti-spam check runs in the game's secure code.
 - **Fixed "tried to call the protected function SetPassThroughButtons()".** The addon never calls it, but the menu's
   "Open it in the quest log" opened the world map from addon code on clients whose quest log is inside the map; the
   map then built its pins in the addon's name and the game refused. The addon no longer opens the map: there the
