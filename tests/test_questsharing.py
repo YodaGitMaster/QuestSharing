@@ -4,7 +4,7 @@ import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from harness import Game  # noqa: E402
+from harness import Game, OPEN_101  # noqa: E402
 
 STYLES = ("modern", "classic")
 LINK100 = "|cffffff00|Hquest:100:3|h[Wolves Among Us]|h|r"
@@ -75,6 +75,7 @@ def test_status_always_fits_one_chat_message(style):
 # ---- sharing when a party forms ----------------------------------------------------------------------
 def test_joining_a_party_shares_the_zone_quests_one_by_one(style):
     g = Game(style)
+    g.run(OPEN_101)                                   # two quests in progress
     initial = 200 if style == "modern" else 6                         # the player had Westfall's quest open
     g.run(f"SELECTED = {initial}")
     g.start()
@@ -105,6 +106,7 @@ def test_login_inside_a_party_does_not_share(style):
 
 def test_quests_everyone_has_are_not_pushed_but_announced(style):
     g = party_game(style, on_quest={"party1": [100]})
+    g.run(OPEN_101)                                   # two quests in progress
     g.advance(60)
     assert g.pushed() == [101], g.pushed()
     sent = g.sent()
@@ -119,6 +121,7 @@ def test_a_false_from_the_game_is_not_trusted(style):
 
 def test_already_on_that_quest_reply_means_in_common(style):
     g = party_game(style)
+    g.run(OPEN_101)                                   # two quests in progress
     g.advance(5.3)
     assert g.pushed() == [100]
     g.reply("Sharing quest with Anna.")                                 # info only
@@ -131,6 +134,7 @@ def test_already_on_that_quest_reply_means_in_common(style):
 
 def test_accepted_declined_and_the_other_replies(style):
     g = party_game(style, ("Anna", "Bob", "Cy", "Dee"))
+    g.run(OPEN_101)                                   # two quests in progress
     g.advance(5.3)
     for line in ("Anna has accepted your quest.", "Bob has declined your quest.", "Cy has already completed that quest.",
                  "Dee is busy.", "Eve's quest log is full.", "Anna has come online."):
@@ -148,6 +152,7 @@ def test_accepted_declined_and_the_other_replies(style):
 
 def test_replies_belong_to_the_quest_pushed_last(style):
     g = party_game(style)
+    g.run(OPEN_101)                                   # two quests in progress
     g.advance(5.3)
     g.reply("Anna has declined your quest.")                            # about quest 100
     g.advance(4.2)
@@ -215,6 +220,7 @@ def test_leaving_the_party_cancels_and_forgets(style):
 
 def test_a_new_member_triggers_another_round_that_skips_what_everyone_has(style):
     g = party_game(style, on_quest={"party1": [100, 101]})
+    g.run(OPEN_101)                                   # two quests in progress
     g.advance(14)
     assert g.pushed() == []                                              # run 1: everybody already had both
     g.run('ON_QUEST["party2"] = {[100] = true}')
@@ -225,6 +231,7 @@ def test_a_new_member_triggers_another_round_that_skips_what_everyone_has(style)
 
 def test_area_all_shares_every_pushable_quest(style):
     g = Game(style)
+    g.run(OPEN_101)                                   # two quests in progress
     g.start()
     g.slash("area all")
     g.join_party(["Anna"])
@@ -440,6 +447,7 @@ def test_a_client_that_does_not_know_an_event_still_loads(style):
 
 def test_chat_off_keeps_quiet_but_still_shares(style):
     g = party_game(style, on_quest={"party1": [100]})
+    g.run(OPEN_101)                                   # two quests in progress
     g.slash("chat off")
     g.advance(60)
     assert g.sent() == [] and g.pushed() == [101]

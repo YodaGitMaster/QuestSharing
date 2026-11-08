@@ -459,6 +459,11 @@ end
 '''
 
 
+# For tests about the sharing mechanics, which need two quests still in progress: quest 101 is finished by default
+# (and finished quests are never shared, announced or listed), so these tests make it unfinished first.
+OPEN_101 = "local q = BYID(101); q.complete = false; q.objectives[1].finished = false\n"
+
+
 class Game:
     """One Lua world with the mock API and the real addon loaded into it."""
 

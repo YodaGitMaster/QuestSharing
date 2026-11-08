@@ -49,7 +49,7 @@ local function flush()
     local links, names, seen = {}, {}, {}
     for _, id in ipairs(ids) do
         local e = C.findEntry(id)
-        if e and not said[id] and not (ns.saidLately and ns.saidLately(id)) then
+        if e and not C.doneByMe(e) and not said[id] and not (ns.saidLately and ns.saidLately(id)) then
             local with = ns.partyHas(e)
             if #with > 0 and #links < MAX_LINKS then
                 said[id] = true

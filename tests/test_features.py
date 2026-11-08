@@ -6,7 +6,7 @@ import re
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from harness import Game  # noqa: E402
+from harness import Game, OPEN_101  # noqa: E402
 from test_questsharing import LINK100, party_game  # noqa: E402
 
 STYLES = ("modern", "classic")
@@ -141,6 +141,7 @@ def test_sync_updates_removals_and_completions_from_a_peer(style):
 
 def test_sharing_skips_what_synced_players_have_and_announces_it(style):
     g = Game(style)
+    g.run(OPEN_101)                                   # two quests in progress
     g.start()
     g.join_party(["Anna"])
     g.advance(2.5)
@@ -266,10 +267,11 @@ def lines(g):
 
 def test_panel_lines_for_synced_and_plain_members(style):
     g = quiet_party(style, ("Anna", "Bob"), on_quest={"party2": [100]})
+    g.run(OPEN_101)                                   # two quests in progress
     hello(g, "Anna", "100:0:5/8,1/4;101:1:f")
     assert lines(g) == ["Party: Anna (addon), Bob",
                         "* Wolves Among Us: Anna 5/8, 1/4 | Bob has it",
-                        "* Report to Goldshire (done): Anna done"]
+                        "* Report to Goldshire: Anna done"]
 
 
 def test_panel_lines_edge_cases(style):
@@ -309,6 +311,7 @@ def grid(rows, cols, n_members):
 
 def test_the_window_is_a_grid_quest_then_one_column_per_member(style):
     g = quiet_party(style, ("Anna", "Bob"), on_quest={"party1": [100], "party2": [100, 101]})
+    g.run(OPEN_101)                                   # two quests in progress
     panel, rows, cols, notes = panel_of(g)
     assert g.eval("NS.db.panel") is True and panel.shown
     assert plain(panel.questHead.text) == "Quest"
@@ -326,6 +329,7 @@ def test_the_window_is_a_grid_quest_then_one_column_per_member(style):
 
 def test_at_most_five_quests_the_nearest_first(style):
     g = quiet_party(style, ("Anna",))
+    g.run(OPEN_101)                                   # two quests in progress
     g.run("""for i = 1, 6 do
         QUESTS[#QUESTS + 1] = { id = 400 + i, title = "Extra " .. i, level = 5, objectives = {} }
     end""")
@@ -360,14 +364,14 @@ def test_the_list_follows_me_as_i_move_without_jumping_around(style):
 
 
 def test_finished_members_get_a_gold_check_and_unknown_ones_a_question_mark(style):
-    g = quiet_party(style, ("Anna", "Bob"))
+    g = quiet_party(style, ("Anna", "Bob"), pre=OPEN_101)  # 101 in progress for me
     hello(g, "Anna", "101:1:f")                           # Anna runs the addon and finished 101
     g.run("function UnitIsVisible(u) return u ~= 'party2' end")                 # Bob is far away: the game cannot tell
     panel, rows, cols, notes = panel_of(g)
     row = [rows[i] for i in range(1, 6) if rows[i].shown and "Report to Goldshire" in rows[i].title.text][0]
     assert row.cells[1].texture == CHECK and tuple(round(v, 2) for v in list(row.cells[1].vertex.values())[:3]) == (1, 0.82, 0)
     assert row.cells[2].texture == WAIT, "out of range: a question mark, not a wrong X"
-    assert row.title.text.startswith("|cff55ff55") and plain(row.mine.text) == "turn in!", "Anna and I are both done: hand it in"
+    assert not row.title.text.startswith("|cff55ff55"), "I am still on it"
     assert "QS" in plain(cols[1].name.text) and "QS" not in plain(cols[2].name.text)
 
 
@@ -426,11 +430,9 @@ def test_right_click_tells_the_party_how_i_am_doing_and_asks_them(style):
     msg, channel = g.sent()[-1]
     assert channel == "PARTY" and "[Wolves Among Us]" in msg
     assert "I still need Wolf slain 3/8, Wolf Pelt 0/4." in msg and msg.endswith(("What about you?", "How about you?", "And you?"))
-    g.advance(2)
-    ask(row_of(rows, "Report to Goldshire"))
-    assert "I finished it, ready to turn in!" in g.sent()[-1][0]
-    ask(row_of(rows, "Report to Goldshire"))
-    assert len(g.sent()) == 2, "a double click is not said twice"
+    ask(row_of(rows, "Wolves Among Us"))
+    assert len(g.sent()) == 1, "a double click is not said twice"
+    assert not any("Report to Goldshire" in rows[i].title.text for i in range(1, 6) if rows[i].shown), "I finished it: not listed"
     assert g.opened() == [], "it is sent at once: a right click is a click"
 
 
@@ -492,6 +494,7 @@ def test_a_finished_quest_does_not_add_who_else_has_it(style):
 
 def test_the_header_counts_the_shared_quests_and_marks_addon_users(style):
     g = quiet_party(style, ("Anna", "Bob"), on_quest={"party1": [100]})
+    g.run(OPEN_101)                                   # two quests in progress
     hello(g, "Bob", "100:0:1/8")
     panel, rows, cols, notes = panel_of(g)
     assert plain(panel.count.text) == "(1 shared, 4 here)"
@@ -500,6 +503,7 @@ def test_the_header_counts_the_shared_quests_and_marks_addon_users(style):
 
 def test_post_all_puts_the_shared_ones_in_the_chat_box_at_once(style):
     g = quiet_party(style, ("Anna",), on_quest={"party1": [100, 101]})
+    g.run(OPEN_101)                                   # two quests in progress
     panel, rows, cols, notes = panel_of(g)
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(panel.post)
     text = g.eval("EDITBOX.text")
