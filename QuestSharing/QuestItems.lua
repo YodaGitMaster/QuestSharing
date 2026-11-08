@@ -145,7 +145,8 @@ local function paint(b)
     end
     local rangef = (C_Item and C_Item.IsItemInRange) or IsItemInRange
     local inRange = true
-    if rangef and UnitExists and UnitExists("target") then
+    -- never in a fight: the game refuses the range of an item to an enemy there ("protected function UNKNOWN()")
+    if rangef and not inCombat() and UnitExists and UnitExists("target") then
         local ok, r = pcall(rangef, b.itemID, "target")
         if ok and r == false then inRange = false end
     end

@@ -1,53 +1,11 @@
 -- Marker.lua: showing each other where you are.
---   * the star raid icon over my head while in a party, so the others see me. Not in dungeons or raids. It is put on
---     once when the party forms; if someone puts the star on something else, it is left there (no tug of war with the
---     tank), and it comes off when the switch goes off.
 --   * my position to the other Quest Sharing users (every 10 seconds while I move), and theirs as a class icon on my
 --     world map
 --   * a map pin where a teammate says they found the items of a quest I still work on
+-- (There is no raid star over your head any more: the game refuses raid marks set by an addon, even outside combat.)
 local ADDON, ns = ...
 local C = ns.compat
 local key = ns.memberKey
-
--- The star ------------------------------------------------------------------------------------------------------------
-local STAR = 1
-local starSet = false
-
-local function inInstance()
-    if not IsInInstance then return false end
-    local inside = IsInInstance()
-    return inside and true or false
-end
-
-local function wantStar()
-    local d = ns.db
-    return d.enabled and d.selfMark and C.inGroup() and not C.inRaid() and not inInstance()
-end
-
-function ns.syncSelfMark()
-    if not (SetRaidTarget and GetRaidTargetIndex) or ns.isBlocked("star") then return end
-    if InCombatLockdown and InCombatLockdown() then return end          -- never during a fight; again after it
-    if wantStar() then
-        if not starSet then
-            starSet = true
-            if GetRaidTargetIndex("player") ~= STAR then
-                ns.trying("putting the star over your head", "star")
-                pcall(SetRaidTarget, "player", STAR)
-            end
-        end
-    elseif starSet then
-        starSet = false
-        if GetRaidTargetIndex("player") == STAR then
-            ns.trying("taking the star off your head", "star")
-            pcall(SetRaidTarget, "player", 0)
-        end
-    end
-end
-ns.on("PLAYER_REGEN_ENABLED", function() ns.after(1, ns.syncSelfMark) end)
-
-ns.on("GROUP_ROSTER_UPDATE", function() ns.after(1, ns.syncSelfMark) end)
-ns.on("GROUP_JOINED", function() ns.after(1, ns.syncSelfMark) end)
-ns.on("PLAYER_ENTERING_WORLD", function() ns.after(2, ns.syncSelfMark) end)        -- also after entering a dungeon
 
 -- My position to the other Quest Sharing users ---------------------------------------------------------------------------
 local lastSent = { map = nil, x = -1, y = -1, at = -1000 }

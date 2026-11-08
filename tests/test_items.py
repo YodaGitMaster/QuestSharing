@@ -141,6 +141,25 @@ def test_count_and_range_show_on_the_button(style):
     assert tuple(round(v, 1) for v in list(b.icon.vertex.values())[:3]) == (1, 0.3, 0.3), "red: out of range"
 
 
+def test_no_range_check_in_a_fight(style):
+    """The game refuses an item's range to an enemy in combat ("protected function UNKNOWN()", once a second)."""
+    pre = """RANGE_IN_COMBAT = 0
+    local real = IsItemInRange
+    function IsItemInRange(id, unit)
+        if IN_COMBAT then RANGE_IN_COMBAT = RANGE_IN_COMBAT + 1; FIRE("ADDON_ACTION_BLOCKED", "QuestSharing", "UNKNOWN()") end
+        return real(id, unit)
+    end"""
+    g = game(style, "BAGS[0] = { { id = 6001, questID = 100 } }", pre=pre)
+    g.run('TARGET = { name = "Kobold", player = false, hostile = true }; ITEM_IN_RANGE = false')
+    g.advance(1.5)
+    g.run("IN_COMBAT = true")
+    g.fire("PLAYER_REGEN_DISABLED")
+    g.advance(30)
+    assert g.eval("RANGE_IN_COMBAT") == 0, "not once during the fight"
+    assert g.eval("NS.db.errors == nil or #NS.db.errors == 0") is True
+    assert g.eval("NS.questItemButton()").shown is True, "the button stays"
+
+
 def test_no_item_no_button_and_the_switches(style):
     g = game(style)
     assert g.eval("NS.questItemButton()").shown is False

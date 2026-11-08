@@ -7,7 +7,7 @@ A World of Warcraft addon for playing quests together.
    on, except the automatic party chat: **you** decide when to talk.
 2. **Give the quick chat ring a key:** left-click the map button > *General* > **Quick chat key**, click, press the key
    (for example `V`, or `E` if you do not strafe with it).
-3. **Group up.** Your quests of this area are offered to the newcomers (once each), a star goes over your head, and the
+3. **Group up.** Your quests of this area are offered to the newcomers (once each), and the
    **Party quests** window shows your nearest quests with a check or an X for every member. **Left click** a quest to
    offer it, **right click** to tell the party "I still need Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8). What about you?"
 4. **Talk with one key:** hold it, point at *Hello*, *Team up?* ("Doing [your quest] here - anyone want to group up?"
@@ -26,8 +26,13 @@ chat box by itself and says so once. The automatic party messages need "sent at 
 unasked would take your keys while you play).
 
 **When the game refuses something** ("Interface action failed because of an AddOn"), `/qs errors` says what the addon
-was doing at that moment ("while putting the star over your head", "while sharing a quest with the party", ...) and
-that one feature switches itself off until you `/reload`, so the message does not keep coming back.
+was doing at that moment ("while sharing a quest with the party", "while putting a pin on your map", ...) and
+that one feature switches itself off until you `/reload`, so the message does not keep coming back. Its window also
+says **where it came from**: the line of the addon that made the call ("from QuestItems.lua:150 paint"), the real
+name of the function when the game only says `UNKNOWN()`, what the addon was running ("a timer set at
+QuestItems.lua:342", "the event QUEST_LOG_UPDATE"), whether you were in combat, and the stack (what called what).
+When none of the addon's code is on the stack, it says so (the game noticed it later, often "taint") and names what
+the addon ran last. Lua errors keep their stack too.
 
 **One rule everywhere: a quest you have finished is never shared, announced, listed or marked as something to do
 together.** It is not offered to the party, not part of "in common", not on the ring's quest lists, not in the Party
@@ -43,7 +48,15 @@ the game's tracker still tells the party you are done, because that is your own 
    Within one round the quests go out a few seconds apart (`/qs gap`, default 4) so nobody is flooded with
    popups. That spacing applies only inside a round: **nothing is ever repeated on a timer.** A quest is
    offered to each member at most once, and a quest someone **declined** is never offered to them again
-   automatically. `/qs share` is the manual override that repeats everything. If you switch on the party chat
+   automatically. `/qs share` is the manual override that repeats everything.
+
+   **Where the game only lets an addon share from your own click** (it refuses an automatic share: "tried to call
+   the protected function QuestLogPushQuest()"), the addon notices it, says so once and remembers it: a round then
+   waits, and each click on **Share** in the Party quests window (or `/qs share`) offers the next quest; clicking a
+   quest offers that one. *Settings > Sharing > Share only when I click Share* (`/qs shareclick on|off`) shows and
+   changes it. If the game refuses even a share from your click, sharing switches off until you `/reload`.
+
+   If you switch on the party chat
    announcement (**off by default**: *Settings > Sharing > Party chat*), it also tells the party which quests you have
    in common:
 
@@ -153,8 +166,6 @@ the game's tracker still tells the party you are done, because that is your own 
      your party, and *Settings > Party > Move back* finds it if you lost it.
 
 7. **Shows each other where you are.**
-   - **The star over your head** while you are in a party (not in dungeons or raids), so everybody sees you. It is put
-     on once; if someone uses the star on a target, it is left there. `/qs star off` takes it off.
    - **Quest Sharing users on your world map:** a class icon where each of them is (their addons send their position
      every 10 seconds while they move, at most once a minute when they stand still), and yours to them.
    - **A map pin where a teammate found the items** of a quest you still work on, when they right-click it in their
@@ -308,7 +319,7 @@ explanation, and groups its settings in short sections:
 |---|---|
 | **General** | *Getting started*: your **quick chat key** (click, then press the key), **Show the ring**, **Check my setup**. *Basics*: the master switch, how your messages go out, the map button, a soft sound for good news; *Friends* (the beta); reset |
 | **Sharing** | *When I join a party*, *Party chat* (in common, done, picked up a quest someone has, where the items were), *Behind the scenes* (sync, quest-log markers) |
-| **Party** | the Party quests window (show it in a party, hide it in combat, its size, move it back), *Clicking a quest* (what a click on the game's tracker posts) and *Showing where we are* (the star, the map icons, a teammate's pin) |
+| **Party** | the Party quests window (show it in a party, hide it in combat, its size, move it back), *Clicking a quest* (what a click on the game's tracker posts) and *Showing where we are* (the map icons, a teammate's pin) |
 | **Tracker** | *The quest list on the right* (follows you, how many, distance or zone, the pause), *Finding objectives* (the world pin, quest icons over creatures, the game-settings helper)  |
 | **Quick chat** | the ring, its key, hold or toggle, its size, where Auto messages go, and the **message editor** |
 | **Pings & items** | *Pinging quest targets* (the ping key, the anti-spam time, objects too) and *Quest items* (icons in the tracker, the quest item key, the item button) |
@@ -343,7 +354,8 @@ party member running Quest Sharing finishes one you share. Never during combat.
 ## Commands (`/qs` or `/questsharing`)
 | Command | What it does |
 |---|---|
-| `/qs share` | share your quests in this area with the party now, repeating earlier offers and declines |
+| `/qs share` | share your quests in this area with the party now, repeating earlier offers and declines (one quest per use where the game only allows sharing on a click) |
+| `/qs shareclick on\|off` | share only when you click Share (comes on by itself where the game refuses automatic sharing) |
 | `/qs stop` | cancel a share in progress |
 | `/qs on` / `off` | switch the addon on / off |
 | `/qs auto on\|off` | share automatically when you join a party or someone new joins (default on) |
@@ -369,7 +381,7 @@ party member running Quest Sharing finishes one you share. Never during combat.
 | `/qs quick ...` | the quick chat messages: `add [label \|] <text>`, `edit`, `label`, `route`, `remove`, `move`, `reset`, `editor`, `mode hold\|toggle`, `channel auto\|say\|party\|whisper`, `on\|off` |
 | `/qs highlight mobs\|pin\|cvars [on\|off]` | quest icons over creatures / pin the nearest quest / the game-settings helper |
 | `/qs doctor` | a report of what works on this client, in a window you can copy from |
-| `/qs errors [clear]` | errors this addon has caused |
+| `/qs errors [clear]` | errors this addon has caused; the window adds where each came from (line, what was running, stack) |
 | `/qs minimap on\|off` | the minimap button (default on) |
 | `/qs reset` | put every setting back to its default (everything on) |
 | `/qs probe` | show what this game client supports |
@@ -406,7 +418,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 780 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 791 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -461,16 +473,16 @@ python tests/test_highlight.py        # 23 tests: quest icons over creatures, th
 python tests/test_look.py             # 42 tests: the settings window layout, the key capture, welcome, sounds, ring colours
 python tests/test_together.py         # 30 tests: several Quest Sharing users in one party, fewer messages
 python tests/test_team.py             # 30 tests: picked up a quest someone has, where the items were, the message budget
-python tests/test_where.py            # 24 tests: the star, map icons, a teammate's pin, the pin preferring shared quests
+python tests/test_where.py            # 18 tests: no raid mark, map icons, a teammate's pin, the pin preferring shared quests
 python tests/test_menu.py             # 38 tests: the right-click menu, Questie's where-to-get-it, the sound-key guard
 python tests/test_done.py             # 20 tests: a quest you finished is never shared, announced or listed
-python tests/test_box.py              # 24 tests: messages into the chat box, refused calls written down and switched off
-python tests/test_ping.py             # 26 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
+python tests/test_box.py              # 38 tests: messages into the chat box, refused calls written down (line, stack), sharing on your clicks
+python tests/test_ping.py             # 27 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
 python tests/test_zone.py             # 10 tests: only the quests of where you are (Teldrassil vs Stormwind)
-python tests/test_items.py            # 22 tests: quest item icons in the tracker, the item key and button
+python tests/test_items.py            # 24 tests: quest item icons in the tracker, the item key and button
 python tests/test_emotes.py           # 24 tests: the emote rings behind the mouse wheel, and editing them
 ```
-Expected: every line ends in `passed` with all tests green (780 in total).
+Expected: every line ends in `passed` with all tests green (791 in total).
 
 ## Files
 | File | Purpose |
@@ -492,7 +504,7 @@ Expected: every line ends in `passed` with all tests green (780 in total).
 | `QuestSharing/Ping.lua` | the ping key: Attack ping on the nearest quest creature, "look here" on quest objects, anti-spam |
 | `QuestSharing/Menu.lua` | the right-click menu of the Party quests window |
 | `QuestSharing/Questie.lua` | reads Questie's quest database (when installed): where a quest starts, which quests come first |
-| `QuestSharing/Marker.lua` | the star over your head, positions on the world map, a pin where a teammate found the items |
+| `QuestSharing/Marker.lua` | positions on the world map, a pin where a teammate found the items |
 | `QuestSharing/Team.lua` | "picked up a quest someone has - let's do it together?" (once per quest, not for shared ones) |
 | `QuestSharing/Style.lua` | one look for every window (dialog and on-screen frames, buttons, check boxes, chat colours) and the good-news sound |
 | `QuestSharing/Settings.lua` | the tabbed settings window (sections, check boxes, key capture) with the message editor, and the options entry |

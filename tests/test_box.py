@@ -119,41 +119,75 @@ def test_a_refused_send_from_the_menu_also_switches_to_the_chat_box(style):
     assert g.eval("SEND_TRIES") == 1 and g.opened() and g.opened()[-1].startswith("/p "), "now into the chat box"
 
 
-# ---- the star -----------------------------------------------------------------------------------------------------------------
-def test_the_star_waits_for_the_end_of_combat(style):
-    g = Game(style)
+# A client that only lets an addon share from your own click: the push is refused unless HW (a click or key) is set
+CLICK_ONLY = """PUSH_CALLS, PUSHED = 0, {}
+function QuestLogPushQuest()
+    PUSH_CALLS = PUSH_CALLS + 1
+    if not HW then return FIRE("ADDON_ACTION_BLOCKED", "QuestSharing", "QuestLogPushQuest()") end
+    PUSHED[#PUSHED + 1] = SELECTED or true
+end"""
+
+
+def click(g, what):
+    g.run("HW = true")
+    try:
+        g.slash(what) if isinstance(what, str) else what()
+    finally:
+        g.run("HW = false")
+
+
+def test_a_refused_automatic_share_switches_to_sharing_on_your_clicks(style):
+    g = Game(style, CLICK_ONLY)
     g.start()
-    g.run("IN_COMBAT = true")
+    g.run("PRINTED = {}")
     g.join_party(["Anna"])
-    g.advance(3)
-    assert g.eval("RAID_ICONS.player") is None, "never during a fight"
-    g.run("IN_COMBAT = false")
-    g.fire("PLAYER_REGEN_ENABLED")
-    g.advance(2)
-    assert g.eval("RAID_ICONS.player") == 1
+    g.advance(40)
+    assert g.eval("PUSH_CALLS") == 1 and len(g.eval("PUSHED")) == 0, "one try on a timer, refused"
+    assert g.eval("NS.db.shareByClick") is True and g.eval("NS.isBlocked('share')") is False
+    text = "\n".join(g.printed())
+    assert "only lets the addon share a quest when you click" in text and "quest(s) to offer: click" in text
+    assert "switched off until you reload" not in text
+    assert not g.eval("NS.offered[100]"), "not marked as offered: it was refused"
+    g.advance(60)
+    assert g.eval("PUSH_CALLS") == 1, "it waits for your click, it does not try again by itself"
+    click(g, "share")
+    assert len(g.eval("PUSHED")) == 1, "your click shares the next quest at once"
+    g.advance(30)
+    assert len(g.eval("PUSHED")) == 1, "one quest per click"
+    click(g, "share")
+    assert len(g.eval("PUSHED")) == 2
 
 
-def test_a_refused_star_is_written_down_and_not_tried_again(style):
-    pre = """RAID_CALLS = 0
-    function SetRaidTarget(u, i) RAID_CALLS = RAID_CALLS + 1; FIRE("ADDON_ACTION_BLOCKED", "QuestSharing", "UNKNOWN()") end"""
-    g = Game(style, pre)
+def test_sharing_on_your_clicks_is_remembered_and_can_be_switched_off(style):
+    g = Game(style, CLICK_ONLY)
+    g.start()
+    g.slash("shareclick on")
+    g.join_party(["Anna"])
+    g.advance(40)
+    assert g.eval("PUSH_CALLS") == 0, "known already: no refused try at all"
+    click(g, "share")
+    assert len(g.eval("PUSHED")) == 1
+    g.advance(200)
+    assert g.eval("NS.isSharing()") is False, "nobody clicked for 2 minutes: the round ends"
+    g.slash("shareclick off")
+    assert g.eval("NS.db.shareByClick") is False
+
+
+def test_clicking_a_quest_shares_it_while_a_round_waits_for_clicks(style):
+    g = Game(style, CLICK_ONLY)
     g.start()
     g.join_party(["Anna"])
-    g.advance(3)
-    assert g.eval("RAID_CALLS") == 1
-    err = g.eval("NS.db.errors[#NS.db.errors].msg")
-    assert "UNKNOWN()" in err and "while putting the star over your head" in err, err
-    assert "switched off until you reload" in "\n".join(g.printed())
-    g.leave_party()
-    g.advance(3)
-    g.join_party(["Anna", "Bob"])
-    g.advance(5)
-    assert g.eval("RAID_CALLS") == 1, "no second try, no second error"
+    g.advance(40)
+    assert g.eval("NS.isSharing()") is True and len(g.eval("PUSHED")) == 0, "waiting for a click"
+    g.run("PRINTED = {}")
+    click(g, lambda: g.eval("NS.offerQuest")(g.eval("NS.compat.findEntry(100)")))
+    assert len(g.eval("PUSHED")) == 1 and "offered" in "\n".join(g.printed())
+    assert g.eval("NS.offered[100] ~= nil") is True
 
 
-def test_a_refused_quest_share_stops_sharing_until_reload(style):
+def test_a_share_refused_even_from_your_click_switches_sharing_off(style):
     pre = """PUSH_CALLS = 0
-    function QuestLogPushQuest() PUSH_CALLS = PUSH_CALLS + 1; FIRE("ADDON_ACTION_BLOCKED", "QuestSharing", "UNKNOWN()") end"""
+    function QuestLogPushQuest() PUSH_CALLS = PUSH_CALLS + 1; FIRE("ADDON_ACTION_BLOCKED", "QuestSharing", "QuestLogPushQuest()") end"""
     g = Game(style, pre)
     g.start()
     g.join_party(["Anna"])
@@ -161,32 +195,125 @@ def test_a_refused_quest_share_stops_sharing_until_reload(style):
     assert g.eval("PUSH_CALLS") == 1 and "while sharing a quest with the party" in g.eval("NS.db.errors[#NS.db.errors].msg")
     g.run("PRINTED = {}")
     g.slash("share")
-    assert g.eval("PUSH_CALLS") == 1 and "refused by the game earlier" in "\n".join(g.printed())
+    assert g.eval("PUSH_CALLS") == 2 and g.eval("NS.isBlocked('share')") is True
+    assert "refuses sharing quests even when you click" in "\n".join(g.printed())
+    g.run("PRINTED = {}")
+    g.slash("share")
+    assert g.eval("PUSH_CALLS") == 2 and "refused by the game earlier" in "\n".join(g.printed())
 
 
 def test_when_two_things_happened_at_once_both_are_written_and_nothing_is_switched_off(style):
     g = Game(style)
     g.start()
-    g.eval("NS.trying")("one thing", "star")
+    g.eval("NS.trying")("one thing", "waypoint")
     g.eval("NS.trying")("another thing", "pin")
     g.fire("ADDON_ACTION_BLOCKED", "QuestSharing", "UNKNOWN()")
     err = g.eval("NS.db.errors[#NS.db.errors].msg")
     assert "while one thing, then another thing" in err
-    assert g.eval("NS.isBlocked('star')") is False and g.eval("NS.isBlocked('pin')") is False
+    assert g.eval("NS.isBlocked('waypoint')") is False and g.eval("NS.isBlocked('pin')") is False
 
 
 def test_a_block_long_after_our_calls_is_not_blamed_on_them(style):
     g = Game(style)
     g.start()
-    g.eval("NS.trying")("putting the star over your head", "star")
+    g.eval("NS.trying")("putting a pin on your map", "waypoint")
     g.advance(5)
     g.fire("ADDON_ACTION_BLOCKED", "QuestSharing", "UNKNOWN()")
-    assert "while" not in g.eval("NS.db.errors[#NS.db.errors].msg") and g.eval("NS.isBlocked('star')") is False
+    assert "while" not in g.eval("NS.db.errors[#NS.db.errors].msg") and g.eval("NS.isBlocked('waypoint')") is False
+
+
+# ---- what made the refused call: the line, what was running, the stack ------------------------------------------------
+def last_error(g):
+    e = g.eval("NS.db.errors[#NS.db.errors]")
+    return e.msg, "\n".join(e.detail.values()) if e.detail else ""
+
+
+def test_a_refused_call_names_the_line_that_made_it_and_what_was_running(style):
+    pre = """function QuestLogPushQuest() FIRE("ADDON_ACTION_BLOCKED", "QuestSharing", "UNKNOWN()") end"""
+    g = Game(style, pre)
+    g.start()
+    g.join_party(["Anna"])
+    g.advance(40)
+    msg, detail = last_error(g)
+    assert re.search(r"UNKNOWN\(\) from Compat\.lua:\d+ push \(while sharing a quest with the party\)", msg), msg
+    assert re.search(r"running: a timer set at Share\.lua:\d+", detail), detail
+    assert "in combat: no" in detail and "stack (newest call first):" in detail
+    assert re.search(r"  Compat\.lua:\d+: in function 'push'\n  Share\.lua:\d+: in function 'pushOne'", detail), detail
+
+
+def test_the_game_s_own_stack_lines_are_made_readable_and_name_the_function(style):
+    """The game's lines: '[string "@Interface/AddOns/..."]:35: in function `x'' or 'Interface/AddOns/...:35: in ...'."""
+    older = '[string "=[C]"]:-1: in function `SendChatMessage\'\n[string "@Interface/AddOns/QuestSharing/Core.lua"]:198: in function `say\'\n'
+    g0 = Game(style)
+    g0.start()
+    g0.run("function debugstack() return [==[" + older + "]==] end")
+    g0.fire("ADDON_ACTION_BLOCKED", "QuestSharing", "UNKNOWN()")
+    assert last_error(g0)[0] == "tried to call the protected function SendChatMessage() from Core.lua:198 say", last_error(g0)
+    stack = ("[C]: in function `SetRaidTarget'\n"
+             '[string "@Interface/AddOns/QuestSharing/Marker.lua"]:35: in function `syncSelfMark\'\n'
+             "Interface/AddOns/QuestSharing/Core.lua:104: in function <Interface/AddOns/QuestSharing/Core.lua:96>\n"
+             '[string "@Interface/AddOns/Blizzard_ObjectiveTracker/Tracker.lua"]:10: in function <...>\n')
+    g = Game(style)
+    g.start()
+    g.run("function debugstack() return [==[" + stack + "]==] end")
+    g.fire("ADDON_ACTION_BLOCKED", "QuestSharing", "UNKNOWN()")
+    msg, detail = last_error(g)
+    assert msg == "tried to call the protected function SetRaidTarget() from Marker.lua:35 syncSelfMark", msg
+    for want in ("  [C]: in function `SetRaidTarget'", "  Marker.lua:35: in function `syncSelfMark'",
+                 "  Core.lua:104: in function <Core.lua:96>", "  Blizzard_ObjectiveTracker/Tracker.lua:10: in function"):
+        assert want in detail, (want, detail)
+
+
+def test_a_refusal_with_none_of_our_code_on_the_stack_says_so(style):
+    g = Game(style)
+    g.start()
+    g.advance(3)
+    g.run("IN_COMBAT = true")
+    g.fire("ADDON_ACTION_BLOCKED", "QuestSharing", "UNKNOWN()")
+    msg, detail = last_error(g)
+    assert msg == "tried to call the protected function UNKNOWN()", msg
+    assert "running: no timer or event of the addon" in detail and re.search(r"the addon last ran a timer set at \w+\.lua:\d+", detail)
+    assert "in combat: yes" in detail and "no Quest Sharing line on the stack" in detail
+
+
+def test_other_addons_refusals_are_not_ours(style):
+    g = Game(style)
+    g.start()
+    g.fire("ADDON_ACTION_BLOCKED", "SomeOtherAddon", "UNKNOWN()")
+    assert g.eval("NS.db.errors == nil or #NS.db.errors == 0") is True and g.eval("NS.blockedStack") is None
+
+
+def test_lua_errors_in_timers_and_events_keep_their_stack(style):
+    g = Game(style)
+    g.start()
+    g.run("NS.after(0, function() local t = nil; return t.x end)")
+    g.advance(0.5)
+    msg, detail = last_error(g)
+    assert "attempt to index" in msg and "stack (newest call first):" in detail and re.search(r"Core\.lua:\d+", detail), detail
+    g.run('NS.on("QS_TEST_EVENT", function() error("boom in an event") end)')
+    g.fire("QS_TEST_EVENT")
+    msg, detail = last_error(g)
+    assert "boom in an event" in msg and "stack (newest call first):" in detail
+
+
+def test_the_errors_window_has_the_details_and_the_chat_stays_short(style):
+    pre = """function QuestLogPushQuest() FIRE("ADDON_ACTION_BLOCKED", "QuestSharing", "UNKNOWN()") end"""
+    g = Game(style, pre)
+    g.start()
+    g.join_party(["Anna"])
+    g.advance(40)
+    g.run("PRINTED = {}")
+    g.slash("errors")
+    chat = "\n".join(g.printed())
+    assert "from Compat.lua:" in chat and "stack (newest call first)" not in chat and "the window has the details" in chat
+    text = g.eval("NS._reportWindow()")[1].text
+    assert text.startswith("Quest Sharing ") and "running: a timer set at Share.lua:" in text and "  Compat.lua:" in text
 
 
 # ---- calls the addon must never make (the game refuses them, or makes Blizzard code do it in our name) ----------------
 NEVER = ["SetPassThroughButtons", "SetPropagateMouseClicks", "SetPropagateMouseMotion", "QuestMapFrame_OpenToQuestDetails",
-         "ToggleWorldMap", "OpenWorldMap", "AddDataProvider", "AcquirePin"]
+         "ToggleWorldMap", "OpenWorldMap", "AddDataProvider", "AcquirePin",
+         "SetRaidTarget"]                                       # raid marks: refused even outside combat
 NEVER_TEXT = ["WorldMapFrame:Show", "ShowUIPanel(WorldMapFrame", "ShowUIPanel, WorldMapFrame"]
 
 

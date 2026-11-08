@@ -77,11 +77,13 @@ function ns.nearestQuestCreature()
     local ok, plates = pcall(C_NamePlate.GetNamePlates)
     if not (ok and plates) then return nil end
     local first
+    local measure = CheckInteractDistance and not inCombat()   -- in a fight the game refuses distances to enemies
     for _, plate in ipairs(plates) do
         local unit = unitOf(plate)
         local name = questCreature(unit)
         if name then
-            local okD, close = pcall(CheckInteractDistance or function() return false end, unit, 4)
+            local okD, close = false, false
+            if measure then okD, close = pcall(CheckInteractDistance, unit, 4) end
             if okD and close then return name end                            -- within ~28 yards
             first = first or name
         end

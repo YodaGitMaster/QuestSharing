@@ -1,5 +1,5 @@
-"""Showing each other where you are: the star over my head, positions on the world map, a pin where a teammate found the
-items, the world pin preferring a quest we share, and the ring's group-up line.        python tests/test_where.py"""
+"""Showing each other where you are: positions on the world map, a pin where a teammate found the items,
+the world pin preferring a quest we share, and the ring's group-up line.        python tests/test_where.py"""
 import pathlib
 import sys
 
@@ -32,48 +32,13 @@ def peer(g, name="Anna", listed="999:0:1/2"):
     g.peer(name, "L|1|1|" + listed)
 
 
-# ---- the star over my head -----------------------------------------------------------------------------------------
-def test_the_star_goes_on_me_in_a_party(style):
+# ---- no raid mark: the game refuses raid marks set by an addon, even outside combat ------------------------------------
+def test_no_raid_mark_is_ever_put_on_me(style):
     g = party(style)
-    assert g.eval("RAID_ICONS.player") == 1
-
-
-def test_the_star_is_never_taken_back_from_someone_who_used_it(style):
-    g = party(style)
-    g.run("RAID_ICONS.player = nil; RAID_ICONS.target = 1")          # the tank put the star on a mob
     g.join_party(["Anna", "Bob"])
-    g.advance(3)
-    assert g.eval("RAID_ICONS.player") is None, "no tug of war"
-
-
-def test_no_star_alone_in_a_raid_or_in_a_dungeon(style):
-    alone = Game(style)
-    alone.start()
-    alone.advance(3)
-    assert alone.eval("RAID_ICONS.player") is None
-    g = party(style)
-    g.run("IN_INSTANCE = true")
-    g.fire("PLAYER_ENTERING_WORLD")
-    g.advance(3)
-    assert g.eval("RAID_ICONS.player") is None, "taken off inside a dungeon: the tank may need it"
-    g.run("IN_INSTANCE = false")
-    g.fire("PLAYER_ENTERING_WORLD")
-    g.advance(3)
-    assert g.eval("RAID_ICONS.player") == 1, "and back outside"
-    r = Game(style)
-    r.start()
-    r.run("RAID = true")
-    r.join_party(["Anna"])
-    r.advance(3)
-    assert r.eval("RAID_ICONS.player") is None
-
-
-def test_switching_it_off_takes_the_star_off(style):
-    g = party(style)
-    g.slash("star off")
-    assert g.eval("RAID_ICONS.player") is None and g.eval("NS.db.selfMark") is False
-    g.slash("star on")
-    assert g.eval("RAID_ICONS.player") == 1
+    g.advance(5)
+    assert g.eval("RAID_ICONS.player") is None
+    assert g.eval("NS.db.errors == nil or #NS.db.errors == 0") is True
 
 
 # ---- my position to the other Quest Sharing users --------------------------------------------------------------------

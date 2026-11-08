@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.3
+- **Fixed "tried to call the protected function UNKNOWN()" during fights** (once a second): the quest item icons turn
+  red when your target is out of range, and asked the game for that range in combat too, which the game refuses for
+  enemies. The range is now only checked outside combat. The ping key's "within about 28 yards" check is also never
+  made in combat (`/qs ping` could do it there).
+- **The star over your head is gone:** the game refuses raid marks set by an addon, even outside combat ("while
+  putting the star over your head"). The setting and `/qs star` are removed.
+- **Sharing on your clicks where the game refuses automatic sharing** ("tried to call the protected function
+  QuestLogPushQuest()"): the first refused share switches the addon to it, says so once and remembers it. A round then
+  waits, and each click on **Share** in the Party quests window (or `/qs share`) offers the next quest; clicking a quest
+  offers that one. A refused quest is no longer counted as offered. *Settings > Sharing > Share only when I click Share*
+  / `/qs shareclick on|off`. Only if the game refuses a share from your click too, sharing is off until `/reload`.
+- **Errors say where they came from.** A call the game refuses is written down with the line of the addon that made
+  it ("tried to call the protected function UNKNOWN() from QuestItems.lua:150 paint"), the function's real name when
+  the game's stack has it, what the addon was running ("a timer set at QuestItems.lua:342", "the event
+  QUEST_LOG_UPDATE"), whether you were in combat, the game's event (ADDON_ACTION_BLOCKED or _FORBIDDEN), and the stack. With none of the addon's code on the stack, it says so
+  and names what the addon ran last. Lua errors in timers, events and frame scripts keep their stack too. `/qs errors`
+  stays short in the chat; its window (and the `/qs doctor` report) has the details to copy.
+
 ## 0.3.2
 - **Fixed "NamePlateX:GetCenter(): Can't measure restricted regions"** (shown when a fight starts or ends): to find
   the "nearest" quest creature, the ping key measured nameplates on screen, which the game forbids around combat.
