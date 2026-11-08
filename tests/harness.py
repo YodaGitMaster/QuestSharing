@@ -37,11 +37,19 @@ UISpecialFrames = {}
 OPTIONS_ADDED = {}
 TOOLTIP = {}
 GameTooltip = {
-    SetOwner = function() end,
+    SetOwner = function() TOOLTIP.lines = {} end,
     SetText = function(_, t) TOOLTIP.text = t end,
+    AddLine = function(_, t) TOOLTIP.lines = TOOLTIP.lines or {}; TOOLTIP.lines[#TOOLTIP.lines + 1] = t end,
     Show = function() TOOLTIP.shown = true end,
     Hide = function() TOOLTIP.shown = false end,
 }
+CLASSES = {}
+CLASS_ICON_TCOORDS = { WARRIOR = { 0, 0.25, 0, 0.25 }, MAGE = { 0.25, 0.5, 0, 0.25 }, PRIEST = { 0.5, 0.75, 0.25, 0.5 } }
+function UnitClass(unit)
+    local n = UnitName(unit)
+    local c = CLASSES[n] or "WARRIOR"
+    return c, c
+end
 function GetTime() return NOW end
 
 ADDON_SENT, PREFIXES = {}, {}
@@ -61,6 +69,7 @@ local function newObject()
     function o:CreateFontString() return newObject() end
     function o:CreateTexture() return newObject() end
     function o:SetTexture(path) self.texture = path end
+    function o:SetTexCoord(...) self.coords = { ... } end
     function o:GetWidth() return self.width or 100 end
     function o:GetHeight() return self.height or 20 end
     function o:SetPoint(p, rel, rp, x, y) self.point = { p, rel, rp, x or 0, y or 0 } end
@@ -71,7 +80,7 @@ local function newObject()
                             "RegisterForDrag", "SetJustifyH", "StartMoving", "StopMovingOrSizing", "SetAllPoints",
                             "ClearAllPoints", "SetFontObject", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "SetFocus",
                             "SetMultiLine", "HighlightText", "SetFrameLevel", "RegisterForClicks", "SetHighlightTexture", "SetVertexColor",
-                            "SetAlpha", "SetColorTexture", "SetJustifyV", "SetWordWrap",
+                            "SetAlpha", "SetColorTexture", "SetDesaturated", "SetNormalFontObject", "SetJustifyV", "SetWordWrap",
                             }) do
         o[name] = function() end
     end

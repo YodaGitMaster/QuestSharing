@@ -102,8 +102,8 @@ def test_the_panel_shows_only_while_in_a_party(style):
     assert panel_shown(g) is False, "no party, no panel"
     g.join_party(["Anna"])
     g.advance(2)
-    panel, rows = g.eval("NS._panel()")
-    assert panel.shown is True and rows[1].text == "Party: Anna"
+    panel, rows, legend, notes = g.eval("NS._panel()")
+    assert panel.shown is True and legend[1].name.text == "Anna" and notes.text == "No quests in common yet."
     g.leave_party()
     g.advance(2)
     assert panel_shown(g) is False
@@ -280,7 +280,7 @@ def test_the_panels_settings_link_opens_the_window(style):
     g = fresh(style)
     g.join_party(["Anna"])
     g.advance(2)
-    panel, _ = g.eval("NS._panel()")
+    panel = g.eval("NS._panel()")[0]
     g.eval("function(f) f.scripts.OnMouseUp(f, 'LeftButton') end")(panel.settingsLink)
     assert window(g).win.shown is True
 
