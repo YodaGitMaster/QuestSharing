@@ -82,13 +82,17 @@ A World of Warcraft addon for playing quests together.
    **release the key** or **click** it. By default the ring has:
    *Hello - Team up? - What I need - Same quests? - Thanks - Wait - Follow me - Invite*.
 
-   **Where it goes.** Every message has its own route:
-   - **auto** (most messages): in a **party** it goes to the party (`/p`; `/i` in a dungeon group). Not in a party: a
-     **player you target** gets a **whisper** (`/w`, and `{name}` is their name), and with nobody targeted it is `/s`.
-   - **nearby** (*Hello* and *Team up?* by default, shown with `/s` in the editor): greetings are for the people
-     around you, so they **never go to the party chat**: a targeted player gets a `/w`, otherwise it is `/s`.
-   Switch a message with the **Goes to** button in `/qs settings > Quick chat`, or `/qs quick route N auto|nearby`.
-   `/qs quick channel say|party|whisper` forces one channel for everything.
+   **Where it goes.** Every message has its **own channel**. In `/qs settings > Quick chat`, click a message and pick
+   one in the **Channel** row under it (the list shows each message's channel), or type `/qs quick route N <channel>`:
+
+   | Channel | Goes to |
+   |---|---|
+   | **Auto** (most messages) | in a party the party (`/p`; `/i` in a dungeon group); not in a party a whisper to the player you target (`/w`, and `{name}` is their name); nobody targeted `/s` |
+   | **Nearby** (*Hello* and *Team up?*) | a whisper to the player you target, otherwise `/s`: greetings never go to the party chat |
+   | **/s Say**, **/y Yell**, **/p Party**, **/w Whisper** | always that channel (Whisper = the player you target) |
+
+   The setting *Auto messages go to* (or `/qs quick channel auto|say|party|whisper`) changes only the messages left on
+   Auto.
    `/qs quick channel auto|say|party|whisper` changes that.
 
    **Why `/say` needs a click.** The game only lets an addon say things to everybody nearby (`/say`, `/yell`,
@@ -222,7 +226,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 442 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 448 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -271,11 +275,11 @@ python tests/test_triggers.py         # 34 tests: when it shares (once per join 
 python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 42 tests: everything on by default, migration, the tabbed settings window
 python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
-python tests/test_quick.py            # 113 tests: the quick chat ring, placeholders, editing, key binding, performance
+python tests/test_quick.py            # 119 tests: the quick chat ring, placeholders, editing, key binding, performance
 python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
 python tests/test_highlight.py        # 22 tests: quest icons over creatures, the world pin, the game-settings helper
 ```
-Expected: every line ends in `passed` with all tests green (442 in total).
+Expected: every line ends in `passed` with all tests green (448 in total).
 
 ## Files
 | File | Purpose |

@@ -4,10 +4,12 @@
 --   middle. Release the key to say it, or click it. The messages and their short labels are yours to change
 --   (/qs settings > Quick chat).
 --
--- Where it goes (each message has its own route, "auto" or "nearby"):
+-- Where it goes: each message has its own channel (chosen in /qs settings > Quick chat, or /qs quick route N ...):
 --   auto    in a party -> the party (/p);  otherwise a targeted player -> a whisper (/w);  otherwise /say
+--           (the "Quick chat says it to" setting can change what auto means)
 --   nearby  a targeted player -> a whisper (/w);  otherwise /say - never the party chat. Greetings ("Hello", "Team up?")
 --           are for people around you, so they use this.
+--   say /s, yell /y, party /p, whisper /w (your target): always that channel
 --
 -- The game only lets an addon say things to everybody nearby (/say, /yell, /emote) as the direct result of a key PRESS
 -- or a mouse CLICK, never from a key RELEASE. So for those (and for @invite) a release keeps the ring open on your
@@ -207,9 +209,23 @@ local function inviteRest(text) return (string.gsub(string.sub(text, 8), "^%s+",
 -- channel, whisper target (or nil, reason).
 -- "auto": in a party it goes to the party (/p, or /i /raid there); alone, a targeted player gets a whisper (/w),
 -- and with nobody targeted it is /s.
+ns.QUICK_ROUTES = { "auto", "nearby", "say", "yell", "party", "whisper" }
+ns.QUICK_ROUTE_TAG = { auto = "auto", nearby = "/w or /s", say = "/s", yell = "/y", party = "/p", whisper = "/w" }
+ns.QUICK_ROUTE_INFO = {
+    auto = "party if I am in one, else /w my target, else /s",
+    nearby = "/w my target, else /s - never the party",
+    say = "/s everybody nearby", yell = "/y everybody around", party = "/p the party only", whisper = "/w the player I target",
+}
+local VALID_ROUTE = {}
+for _, r in ipairs(ns.QUICK_ROUTES) do VALID_ROUTE[r] = true end
+
 local function channelFor(item)
-    local mode = ns.db.quickChannel
+    local route = item and item.channel
+    if not VALID_ROUTE[route or ""] then route = "auto" end
+    -- a channel chosen for this message wins; "auto" messages follow the general setting
+    local mode = (route == "auto") and ns.db.quickChannel or route
     local who = targetWhisperName()
+    if mode == "yell" then return "YELL" end
     if mode == "say" then return "SAY" end
     if mode == "party" then
         if C.inGroup() then return C.channel() end
@@ -219,7 +235,7 @@ local function channelFor(item)
         if who then return "WHISPER", who end
         return nil, nil, "target a player first to whisper them"
     end
-    if item and item.channel == "nearby" then              -- greetings: the people around you, not the party chat
+    if mode == "nearby" then                               -- greetings: the people around you, not the party chat
         if who then return "WHISPER", who end
         return "SAY"
     end
@@ -555,11 +571,12 @@ function ns.quickLabel(i, label)
     return i
 end
 
--- where one message goes: "auto" or "nearby"
+-- where one message goes: auto, nearby, say, yell, party or whisper
 function ns.quickRoute(i, route)
     local list = items()
+    route = string.lower(clean(route))
     if not list[i] then return ns.print("quick chat: there is no message " .. tostring(i)) end
-    if route ~= "auto" and route ~= "nearby" then return ns.print("quick chat: route is auto or nearby") end
+    if not VALID_ROUTE[route] then return ns.print("quick chat: the channel is one of: " .. table.concat(ns.QUICK_ROUTES, ", ")) end
     list[i].channel = route                                  -- "auto" is stored too, so old saves are not "fixed" again
     return i
 end
@@ -583,7 +600,10 @@ function ns.quickReset() ns.db.quickItems = ns.defaultQuickItems() end
 local function listItems()
     local list = items()
     if #list == 0 then ns.print("quick chat: no messages (/qs quick add <text>)") end
-    for i, it in ipairs(list) do ns.print(string.format("%d. [%s]%s %s", i, it.label, it.channel == "nearby" and " (nearby)" or "", it.text)) end
+    for i, it in ipairs(list) do
+        local tag = ns.QUICK_ROUTE_TAG[it.channel or "auto"] or "auto"
+        ns.print(string.format("%d. [%s] (%s) %s", i, it.label, tag, it.text))
+    end
     ns.print("placeholders: {name} {here} {zone} {need} {mine} {common} {shared} {quest}   |   '@invite <text>' invites your target and whispers <text>")
 end
 
@@ -608,7 +628,7 @@ function ns.quickCommand(arg)
     elseif sub == "channel" and (rest == "auto" or rest == "say" or rest == "party" or rest == "whisper") then ns.setSetting("quickChannel", rest)
     elseif sub == "editor" then ns.toggleSettings(true, "quick")
     else
-        ns.print("/qs quick [list] | add [label |] <text> | edit N <text> | label N <label> | route N auto|nearby | remove N | move N M | reset | on|off | mode hold|toggle | channel auto|say|party|whisper | editor | open")
+        ns.print("/qs quick [list] | add [label |] <text> | edit N <text> | label N <label> | route N auto|nearby|say|yell|party|whisper | remove N | move N M | reset | on|off | mode hold|toggle | channel auto|say|party|whisper | editor | open")
     end
     if ns.refreshSettings then ns.refreshSettings() end
 end

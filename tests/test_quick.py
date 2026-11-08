@@ -301,19 +301,60 @@ def test_a_message_can_be_switched_between_auto_and_nearby(style):
     g.slash("quick route 1 auto")
     pick(g, 1)
     assert sent(g)[-1][1] == "PARTY"
-    assert "(nearby)" in "\n".join(g.printed()) and g.eval("NS.db.quickItems[1].channel") == "auto"
+    assert "(/w or /s)" in "\n".join(g.printed()) and g.eval("NS.db.quickItems[1].channel") == "auto"
     g.slash("quick route 1 sideways")
     assert g.eval("NS.db.quickItems[1].channel") == "auto", "an unknown route changes nothing"
+    assert "one of: auto, nearby, say, yell, party, whisper" in "\n".join(g.printed())
     g.run("NS.quickItems()")
     assert g.eval("NS.db.quickItems[1].channel") == "auto", "and the old-save upgrade does not undo your choice"
 
 
-def test_the_global_channel_setting_still_overrides_every_route(style):
+def test_the_general_setting_only_changes_messages_left_on_auto(style):
     g = game(style)
     g.join_party(["Anna"])
-    g.slash("quick channel party")
+    g.slash("quick channel say")
+    pick(g, 3)                                                   # "What I need" is on auto: follows the setting
+    assert sent(g)[-1][1] == "SAY"
+    g.advance(2)
+    g.slash("quick route 1 party")                               # a channel chosen for the message wins
     pick(g, 1)
-    assert sent(g)[-1][1] == "PARTY", "forcing the channel wins over a message's own route"
+    assert sent(g)[-1][1] == "PARTY"
+
+
+def test_every_channel_can_be_chosen_for_a_message(style):
+    g = game(style)
+    g.join_party(["Anna"])
+    target(g, "Lia")
+    expect = {"say": ("SAY", None), "yell": ("YELL", None), "party": ("PARTY", None), "whisper": ("WHISPER", "Lia"),
+              "nearby": ("WHISPER", "Lia"), "auto": ("PARTY", None)}
+    for route, (channel, who) in expect.items():
+        g.slash(f"quick route 5 {route}")                        # 5 = "Thanks"
+        g.advance(2)
+        pick(g, 5)
+        assert sent(g)[-1] == ("Thanks!", channel), route
+        assert g.eval("SENT[#SENT].target") == who, route
+
+
+def test_a_fixed_channel_that_cannot_be_used_says_why(style):
+    g = game(style)                                              # no party, no target
+    g.slash("quick route 5 party")
+    g.run("PRINTED = {}")
+    pick(g, 5)
+    assert sent(g) == [] and "not in a party" in "\n".join(g.printed())
+    g.slash("quick route 5 whisper")
+    g.advance(2)
+    g.run("PRINTED = {}")
+    pick(g, 5)
+    assert sent(g) == [] and "target a player first" in "\n".join(g.printed())
+
+
+def test_yell_also_waits_for_a_click(style):
+    g = game(style)
+    g.slash("quick route 5 yell")
+    hold_and_release_on(g, 5)
+    assert sent(g) == [] and g.wheel()[0].shown is True, "the game only allows /y from a press or a click"
+    click_slot(g, 5)
+    assert sent(g) == [("Thanks!", "YELL")]
 
 
 def test_saved_messages_from_before_routes_get_them_for_the_greetings(style):
@@ -324,15 +365,24 @@ def test_saved_messages_from_before_routes_get_them_for_the_greetings(style):
     assert g.eval("NS.db.quickItems[3].channel") == "nearby", "an old plain-text default too"
 
 
-def test_the_editor_button_flips_the_route_of_the_selected_message(style):
+def test_the_editor_shows_and_sets_the_channel_of_the_selected_message(style):
     g = game(style)
     g.slash("quick editor")
+    ed = g.eval("NS._settingsWindow().ed")
+    assert all(c.frame.shown is False for c in ed.routeButtons.values()), "no message selected: no channel row"
     g.eval("NS.editorSelect")(3)
+    titles = [c.text.text for c in ed.routeButtons.values()]
+    assert len(titles) == 6 and titles[0].startswith("|cffffd100[Auto"), "the current channel is highlighted"
+    assert "party if I am in one" in ed.routeText.text
+    party = [c for c in ed.routeButtons.values() if c.route == "party"][0]
+    g.eval("function(f) f.scripts.OnMouseUp(f, 'LeftButton') end")(party.frame)       # one click on "/p Party"
+    assert g.eval("NS.db.quickItems[3].channel") == "party"
+    assert party.text.text.startswith("|cffffd100[/p Party") and "/p the party only" in ed.routeText.text
+    assert ed.lines[3].text.text.endswith("|cff88ccff/p|r|r"), "the list shows each message's channel"
+    g.eval("NS.editorRoute")()                                   # no argument: the next one
+    assert g.eval("NS.db.quickItems[3].channel") == "whisper"
     g.eval("NS.editorRoute")()
-    assert g.eval("NS.db.quickItems[3].channel") == "nearby"
-    assert "nearby" in g.eval("NS._settingsWindow().ed.routeText.text")
-    g.eval("NS.editorRoute")()
-    assert g.eval("NS.db.quickItems[3].channel") == "auto" and "auto" in g.eval("NS._settingsWindow().ed.routeText.text")
+    assert g.eval("NS.db.quickItems[3].channel") == "auto"
 
 
 def test_a_send_the_game_blocks_ends_up_in_the_chat_box_and_in_the_error_log(style):
@@ -556,19 +606,19 @@ def test_channels(style):
     g.join_party(["Anna"])
     g.slash("quick channel say")
     g.advance(2)
-    pick(g, 1)
+    pick(g, 3)
     assert sent(g)[-1][1] == "SAY"
     g.slash("quick channel party")
     g.leave_party()
     g.advance(2)
     g.run("PRINTED = {}")
-    pick(g, 1)
+    pick(g, 3)
     assert "not in a party" in "\n".join(g.printed())
     g.slash("quick channel whisper")
     g.run("TARGET = nil")
     g.advance(2)
     g.run("PRINTED = {}")
-    pick(g, 1)
+    pick(g, 3)
     assert "target a player first to whisper" in "\n".join(g.printed())
 
 
@@ -683,7 +733,7 @@ def test_the_editor_lives_in_the_quick_chat_tab(style):
     W = g.eval("NS._settingsWindow()")
     ed = W.ed
     assert W.win.shown is True and W.tab == "quick" and ed.frame.shown is True
-    assert ed.lines[1].text.text == "|cffffffff1.  [Hello]  Hey {name}! o/  |cff88ccff/s|r|r" and ed.lines[8].frame.shown is True
+    assert ed.lines[1].text.text == "|cffffffff1.  [Hello]  Hey {name}! o/  |cff88ccff/w or /s|r|r" and ed.lines[8].frame.shown is True
     g.eval("function(l) l.frame.scripts.OnMouseUp(l.frame, 'LeftButton') end")(ed.lines[3])
     assert ed.labelBox.text == "What I need" and ed.textBox.text == "I need to: {need}" and ed.lines[3].text.text.startswith("|cffffd100")
     assert "Looks like:" in ed.preview.text and "Wolf slain 3/8" in ed.preview.text

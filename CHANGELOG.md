@@ -13,8 +13,9 @@
   progress; hover for everybody's progress, click to tell the party how you are doing.
 - Long messages are cut without breaking a quest link or an accented letter, and a `|` you type is escaped: the game
   refuses all three otherwise. The Party quests window first opens on the left instead of mid-screen.
-- Quick chat messages have a route: **auto** (party, else `/w`, else `/s`) or **nearby** (`/w` to your target, else `/s`,
-  never party chat). *Hello* and *Team up?* are nearby by default; `/qs quick route N auto|nearby` or the editor button.
+- Every quick chat message has its own channel, picked in the editor (a Channel row under the selected message) or with
+  `/qs quick route N auto|nearby|say|yell|party|whisper`. *Hello* and *Team up?* are Nearby (`/w` your target, else
+  `/s`, never the party); the rest is Auto (party, else `/w`, else `/s`).
 - Quick chat "auto" goes to the party first (`/p`), then a whisper to a targeted player (`/w`), then `/s`.
 - If the game blocks a send from the ring ("protected function UNKNOWN()"), the sentence is put in your chat box so you
   only press Enter, and `/qs errors` says which message was blocked;
