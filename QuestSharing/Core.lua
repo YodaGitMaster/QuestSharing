@@ -42,6 +42,7 @@ ns.defaults = {
     itemButton = true,  -- a small movable button with the item of your nearest quest
     sound = true,       -- a soft sound for good news (someone accepted a quest I shared, a party member finished a shared quest)
     panelCombat = true, -- hide the Party quests window during combat
+    panelSolo = true,   -- show the Party quests window when you are not in a party too (your quests of the zone)
     panelScale = 100,   -- size of the Party quests window, in percent
     quickSize = "normal", -- size of the quick chat ring: "small", "normal" or "large"
 }
@@ -53,10 +54,10 @@ for k, v in pairs(ns.defaults) do ns.db[k] = v end        -- until the saved var
 -- Right before such a call we note what we are doing. If the game then blocks something, the error log says what it
 -- was, and that one feature switches itself off until /reload, so the message cannot keep coming back.
 ns.recentCalls, ns.blockedFeatures = {}, {}
-function ns.trying(what, feature)
+function ns.trying(what, feature, retry)          -- retry: what to type into the chat box if the game refuses
     local now = GetTime and GetTime() or 0
     local list = ns.recentCalls
-    list[#list + 1] = { what = what, feature = feature, at = now }
+    list[#list + 1] = { what = what, feature = feature, at = now, retry = retry }
     while #list > 6 or (list[1] and now - list[1].at > 2) do table.remove(list, 1) end
 end
 function ns.isBlocked(feature) return feature ~= nil and ns.blockedFeatures[feature] == true end
@@ -229,7 +230,7 @@ function ns.setSetting(key, value)
         d[key] = value
         if key == "enabled" and not value then ns.stopShare("switched off") end
         if key == "markers" and ns.refreshQuestLog then ns.refreshQuestLog() end
-        if (key == "panel" or key == "panelCombat") and ns.syncPanelVisibility then ns.syncPanelVisibility() end
+        if (key == "panel" or key == "panelCombat" or key == "panelSolo") and ns.syncPanelVisibility then ns.syncPanelVisibility() end
         if key == "panelScale" and ns.applyPanelScale then ns.applyPanelScale() end
         if (key == "selfMark" or key == "enabled") and ns.syncSelfMark then ns.syncSelfMark() end
         if key == "mapPins" and ns.refreshMapPins then ns.refreshMapPins() end
@@ -308,7 +309,7 @@ local help = {
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", pickup = "pickup", coords = "coords", star = "selfMark", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", star = "selfMark", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"

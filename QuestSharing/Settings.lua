@@ -73,6 +73,8 @@ ns.settingRows = {
     { tab = "party", kind = "header", label = "The Party quests window" },
     { tab = "party", kind = "bool", key = "panel", label = "Show the Party quests window while in a party",
       desc = "Your nearest quests (scroll for the rest of the zone) and who has them. Left click: offer it. Right click: tell the party." },
+    { tab = "party", kind = "bool", key = "panelSolo", label = "Show it when I am not in a party too",
+      desc = "Your nearest quests of the zone and your progress (no member columns): handy on your own." },
     { tab = "party", kind = "bool", key = "panelCombat", label = "Hide it during combat", desc = "It comes back when the fight is over." },
     { tab = "party", kind = "number", key = "panelScale", label = "Size (%)", min = 70, max = 150, step = 10 },
     { tab = "party", kind = "action", label = "Put it back where it started", button = "Move back",
