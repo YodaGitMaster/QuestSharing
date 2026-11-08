@@ -13,7 +13,7 @@ local INTERVAL = 2          -- seconds between two looks
 local STICKY = 0.6          -- a quest that is already tracked counts as this much of its real squared distance
 local PAUSE = 300           -- seconds to leave the tracker alone after you changed it yourself
 
-local state = { sig = nil, pausedUntil = 0, ownChange = -100, lastAccept = -100, ticker = nil, soon = nil }
+local state = { active = false, sig = nil, pausedUntil = 0, ownChange = -100, lastAccept = -100, ticker = nil, soon = nil }
 
 local function mode()
     local m = ns.db.nearMode
@@ -83,7 +83,7 @@ end
 -- row, so a short detour does not reshuffle the list
 function ns.nearEvaluate(force)
     local d = ns.db
-    if not (d.near and C.canWatch()) then return end
+    if not (d.near and state.active and C.canWatch()) then return end      -- 'active' = the startup snapshot is done
     if GetTime() < state.pausedUntil then return end
     if InCombatLockdown and InCombatLockdown() then return end
     if IsInInstance and IsInInstance() then return end
@@ -128,20 +128,26 @@ function ns.setNear(on)
         return ns.print("this client has no calls to change the quest tracker, so this feature is not available")
     end
     if on then
+        local already = d.near and d.nearSaved                    -- already running: keep the ORIGINAL list to restore
         d.near = true
-        d.nearSaved = d.nearSaved or {}
-        local saved = {}
-        for id in pairs(C.watchedSet()) do saved[#saved + 1] = id end
-        d.nearSaved = saved                                      -- what to put back when switched off
+        if not already then
+            local saved = {}
+            for id in pairs(C.watchedSet()) do saved[#saved + 1] = id end
+            d.nearSaved = saved                                  -- what to put back when switched off
+        end
         state.pausedUntil, state.sig = 0, nil
+        state.active = true
         ns.nearEvaluate(true)
         startTicker()
         ns.print(string.format("tracker follows you: %s mode, %d quest(s). /qs near off puts your old list back (%s)",
             mode(), math.min(d.nearCount or 5, C.maxWatch()),
             mode() == "zone" and (C.hasDistance() and "zone mode was asked for" or "this client cannot measure distance, so it uses the quests of your zone") or "distance mode"))
+        if ns.refreshSettings then ns.refreshSettings() end
     else
         d.near = false
+        state.active = false
         stopTicker()
+        if ns.refreshSettings then ns.refreshSettings() end
         local entries = C.entries()
         local wanted = {}
         for _, id in ipairs(d.nearSaved or {}) do wanted[id] = true end
@@ -160,9 +166,8 @@ function ns.nearCommand(arg)
     elseif arg == "on" then ns.setNear(true)
     elseif arg == "off" then ns.setNear(false)
     elseif n then
-        d.nearCount = math.max(1, math.min(math.floor(n), C.maxWatch()))
+        ns.setSetting("nearCount", math.max(1, math.min(math.floor(n), C.maxWatch())))
         ns.print("the tracker keeps " .. d.nearCount .. " quest(s)")
-        if d.near then ns.nearEvaluate(true) end
     elseif arg == "now" then
         state.pausedUntil = 0
         ns.nearEvaluate(true)
@@ -173,9 +178,8 @@ function ns.nearCommand(arg)
     elseif string.match(arg, "^mode") then
         local m = string.match(arg, "^mode%s+(%a+)")
         if m == "auto" or m == "distance" or m == "zone" then
-            d.nearMode = m
+            ns.setSetting("nearMode", m)
             ns.print("mode: " .. m .. " (in use: " .. mode() .. ")")
-            if d.near then ns.nearEvaluate(true) end
         else
             ns.print("/qs near mode auto|distance|zone   (in use: " .. mode() .. ")")
         end
@@ -205,6 +209,19 @@ ns.on("QUEST_WATCH_LIST_CHANGED", function()
     ns.print("tracker follows you: paused for 5 minutes because you changed the tracker (/qs near resume to continue)")
 end)
 
+-- "near" is on by default: after the loading screen (the quest log needs a moment), remember the player's own
+-- list once, then start following
 ns.on("PLAYER_ENTERING_WORLD", function()
-    if ns.db.near then startTicker() end
+    if not ns.db.near then return end
+    ns.after(5, function()
+        if not (ns.db.near and C.canWatch()) then return end
+        if ns.db.nearSaved == nil then
+            local saved = {}
+            for id in pairs(C.watchedSet()) do saved[#saved + 1] = id end
+            ns.db.nearSaved = saved
+        end
+        state.active = true
+        ns.nearEvaluate(true)
+        startTicker()
+    end)
 end)

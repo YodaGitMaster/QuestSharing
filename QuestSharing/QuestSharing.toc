@@ -12,4 +12,5 @@ Sync.lua
 Progress.lua
 Panel.lua
 Track.lua
+Settings.lua
 Status.lua

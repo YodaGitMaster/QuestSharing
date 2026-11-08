@@ -130,6 +130,7 @@ function ns.probe()
     end
     ns.print("tracker control (/qs near): " .. yn(C.canWatch()) .. " | distance to quests: " .. yn(C.hasDistance()) ..
              " | mode in use: " .. ns.nearMode() .. " | tracker holds up to " .. C.maxWatch())
+    ns.print("settings window: /qs settings | entry in the game's options: " .. yn(ns.hooks.optionsEntry))
     local peers = 0
     for _ in pairs(ns.peers or {}) do peers = peers + 1 end
     ns.print("sync with other Quest Sharing users: " .. (ns.db.sync and "on" or "off") .. ", message prefix registered: " ..

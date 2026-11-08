@@ -85,6 +85,17 @@ local function ensurePanel()
         local point, _, _, x, y = self:GetPoint()
         ns.db.panelPos = { point, x, y }
     end)
+    -- a small "Settings" link in the corner
+    local link = CreateFrame("Frame", nil, f)
+    link:SetWidth(60)
+    link:SetHeight(14)
+    link:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -6)
+    link:EnableMouse(true)
+    link:SetScript("OnMouseUp", function() if ns.toggleSettings then ns.toggleSettings() end end)
+    local linkText = link:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    linkText:SetPoint("RIGHT", link, "RIGHT", 0, 0)
+    linkText:SetText("|cff55ccffSettings|r")
+    f.settingsLink = link
     rows = {}
     for i = 1, MAX_ROWS do
         local fs = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -124,8 +135,18 @@ function ns.showPanel(show)
     if show then f:Show(); ns.refreshPanel(); ns.after(2, tick) else f:Hide() end
 end
 
-ns.on("PLAYER_ENTERING_WORLD", function() if ns.db.panel then ns.showPanel(true) end end)
-ns.on("GROUP_ROSTER_UPDATE", function() ns.after(1, ns.refreshPanel) end)
+-- the setting means "show the panel while I am in a party"
+function ns.syncPanelVisibility()
+    if ns.db.panel and C.inGroup() then
+        ns.showPanel(true)
+    elseif panel and panel:IsShown() then
+        panel:Hide()
+    end
+end
+
+ns.on("PLAYER_ENTERING_WORLD", function() ns.after(1, ns.syncPanelVisibility) end)
+ns.on("GROUP_ROSTER_UPDATE", function() ns.after(1, function() ns.syncPanelVisibility(); ns.refreshPanel() end) end)
+ns.on("GROUP_JOINED", function() ns.after(1, ns.syncPanelVisibility) end)
 
 -- Quest log markers -------------------------------------------------------------------------------------
 local function marked(text) return text and string.find(text, "UI-RaidTargetingIcon_1", 1, true) end
