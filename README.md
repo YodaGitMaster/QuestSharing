@@ -57,6 +57,15 @@ A World of Warcraft addon for playing quests together.
      during combat and inside instances.
    - Note this fills the tracker list. It does not touch the single highlighted "waypoint" quest.
 
+7. **(Beta) Adds the people you group with to your friends list.** `/qs friends` adds everybody in your
+   party now. `/qs friends on` also does it automatically when a party forms or someone joins; this is
+   **off by default** because it changes a list that matters to you. Safeguards: people already on your
+   list and ignored players are skipped; players from another realm are skipped where the client cannot
+   add them; random dungeon-finder groups are skipped in automatic mode; automatic mode never fills the
+   last 5 friend slots; and the adds go out one every 1.5 seconds. Each add gets a note ("Quest Sharing:
+   <zone>"). The game's answers (added, already a friend, not found, list full, other faction) are read and
+   summarised for you.
+
 ## Settings window
 **Everything is switched on by default.** To change anything, type `/qs settings` (or click **Settings** on
 the quests-in-common panel, or open *Game Menu > Options > AddOns > Quest Sharing*). Every line is one
@@ -109,6 +118,8 @@ other choice you made is kept.
 | `/qs near mode auto\|distance\|zone` | `auto` uses distance if your client can measure it, otherwise your zone |
 | `/qs near now` / `resume` | refresh now / end a pause early |
 | `/qs settings` | open the settings window |
+| `/qs friends` | (beta) add everybody in your party to your friends list now |
+| `/qs friends on\|off` | (beta) do it automatically when a party forms or someone joins (default off) |
 | `/qs reset` | put every setting back to its default (everything on) |
 | `/qs probe` | show what this game client supports |
 
@@ -128,7 +139,7 @@ strings (so it works in any language) and shows them to you.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 205 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 247 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -141,6 +152,10 @@ strings (so it works in any language) and shows them to you.
   addons like Questie carry their own database. On such a client `/qs near` falls back to zone mode.
   `/qs probe` shows `distance to quests: yes/NO` and which mode is in use. Quests whose next step is on
   another continent are ignored.
+- **Friends (beta):** the game's friends list is small (about 100) and, on classic-style clients, belongs to
+  your realm, so players from other realms can only be added where the client allows it. Adding someone is
+  silent for them. Whether `AddFriend` is allowed to an addon on your client is something only the game can
+  tell: `/qs probe` shows `friends (beta): add call yes/NO`, and `/qs friends` reports what the game answers.
 - **Sync only works between players who both run Quest Sharing.** Everyone else is handled by the
   share-and-read-the-reply method. Messages are small, spaced 0.4 s apart, and only go to your party.
 - **Sharing pops up a window on each member's screen** for every quest they don't have; that is how WoW
@@ -163,8 +178,9 @@ python tests/test_features.py         # 50 tests: sync, completion, panel, quest
 python tests/test_triggers.py         # 34 tests: when it shares (once per join / new member / new quest), no nagging
 python tests/test_tracker.py          # 22 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 36 tests: everything on by default, migration, the settings window
+python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
 ```
-Expected: `63/63`, `50/50`, `34/34`, `22/22` and `36/36 passed`.
+Expected: `63/63`, `50/50`, `34/34`, `22/22`, `36/36` and `42/42 passed`.
 
 ## Files
 | File | Purpose |
@@ -176,6 +192,7 @@ Expected: `63/63`, `50/50`, `34/34`, `22/22` and `36/36 passed`.
 | `QuestSharing/Progress.lua` | notices finished quests, announces them, sends changes to synced players |
 | `QuestSharing/Panel.lua` | the "quests in common" panel and the quest-log markers |
 | `QuestSharing/Track.lua` | keeps the quest tracker on the quests nearest to you (distance or zone mode) |
+| `QuestSharing/Friends.lua` | (beta) adds party members to your friends list, with safeguards |
 | `QuestSharing/Settings.lua` | the settings window (plain clickable lines, no game UI templates) and the options entry |
 | `QuestSharing/Status.lua` | the status message, tracker / link hooks, `/qs probe` |
 | `tests/` | the Lua 5.1 test harness with a WoW API mock, and the two test files |

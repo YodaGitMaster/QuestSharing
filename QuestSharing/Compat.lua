@@ -153,8 +153,8 @@ function C.members()
     local n = (GetNumSubgroupMembers and GetNumSubgroupMembers()) or (GetNumPartyMembers and GetNumPartyMembers()) or 0
     for i = 1, n do
         local unit = "party" .. i
-        local name = UnitName(unit)
-        if name then out[#out + 1] = { unit = unit, name = name } end
+        local name, realm = UnitName(unit)
+        if name then out[#out + 1] = { unit = unit, name = name, realm = realm } end
     end
     return out
 end
@@ -248,4 +248,58 @@ end
 function C.distanceSq(e)
     local ok, d, onContinent = pcall(C_QuestLog.GetDistanceSqToQuest, e.questID)
     if ok and d and onContinent ~= false then return d end
+end
+
+-- Friends list ----------------------------------------------------------------------------------------
+function C.canAddFriend()
+    return ((C_FriendList and C_FriendList.AddFriend) or AddFriend) and true or false
+end
+
+-- "Name" for players on your realm, "Name-Realm" for the others
+function C.fullName(m)
+    if m.realm and m.realm ~= "" then return m.name .. "-" .. m.realm end
+    return m.name
+end
+
+-- true if the call went through (the game answers later with a system message)
+function C.addFriend(name, note)
+    local add = (C_FriendList and C_FriendList.AddFriend) or AddFriend
+    if not add then return false end
+    if pcall(add, name, note) then return true end
+    return (pcall(add, name))
+end
+
+function C.friendCount()
+    if C_FriendList and C_FriendList.GetNumFriends then return C_FriendList.GetNumFriends() or 0 end
+    return (GetNumFriends and GetNumFriends()) or 0
+end
+
+function C.maxFriends() return MAX_FRIENDS or 100 end
+
+local function shortName(n) return string.lower(string.match(tostring(n or ""), "^([^-]+)") or "") end
+
+function C.isFriend(name)
+    if C_FriendList and C_FriendList.GetFriendInfo then          -- modern: look up by name
+        local ok, r = pcall(C_FriendList.GetFriendInfo, name)
+        return ok and r ~= nil and r ~= false
+    end
+    if GetFriendInfo and GetNumFriends then                       -- classic: the list is read by position
+        local want = shortName(name)
+        for i = 1, GetNumFriends() do
+            local n = GetFriendInfo(i)
+            if n and shortName(n) == want then return true end
+        end
+    end
+    return false
+end
+
+function C.isIgnored(name)
+    local f = (C_FriendList and C_FriendList.IsIgnored) or IsIgnored
+    if not f then return false end
+    local ok, r = pcall(f, name)
+    return ok and r and true or false
+end
+
+function C.inInstanceGroup()
+    return (IsInGroup and LE_PARTY_CATEGORY_INSTANCE and IsInGroup(LE_PARTY_CATEGORY_INSTANCE)) and true or false
 end
