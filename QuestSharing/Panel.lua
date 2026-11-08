@@ -16,6 +16,7 @@ ns.hooks = ns.hooks or {}
 -- Data model (no frames involved) ---------------------------------------------------------------------
 -- " <star> Anna +1" for a quest the party shares, "" otherwise
 function ns.markerText(e)
+    if C.doneByMe(e) then return "" end
     local names = ns.partyHas(e)
     if #names == 0 then return "" end
     return " " .. STAR .. " " .. names[1] .. ((#names > 1) and (" +" .. (#names - 1)) or "")
@@ -52,7 +53,7 @@ function ns.panelData()
                 end
             end
         end
-        if #who > 0 then data.quests[#data.quests + 1] = { e = e, who = who } end
+        if #who > 0 and not C.doneByMe(e) then data.quests[#data.quests + 1] = { e = e, who = who } end
     end
     return data
 end
@@ -134,6 +135,9 @@ function ns.panelGrid(entries)
         m.addon = ns.peers[key(m.name)] and true or false
     end
     local grid = { members = members, rows = {}, shared = 0 }
+    local open = {}                                                    -- finished quests: nothing to do together
+    for _, e in ipairs(entries) do if not C.doneByMe(e) then open[#open + 1] = e end end
+    entries = open
     local list, inList = ns.nearestQuests(entries, NEAREST), {}
     grid.near = #list
     for _, e in ipairs(list) do inList[e.questID] = true end
@@ -152,10 +156,6 @@ function ns.panelGrid(entries)
             if st == "has" or st == "done" then any = true end
         end
         if any then grid.shared = grid.shared + 1 end
-        -- everybody who has it is done (and so am I): time to hand it in together
-        local done, busy = 0, 0
-        for _, st in ipairs(row.cells) do if st == "done" then done = done + 1 elseif st == "has" then busy = busy + 1 end end
-        row.allDone = e.complete and done > 0 and busy == 0
         grid.rows[#grid.rows + 1] = row
     end
     return grid
@@ -265,7 +265,6 @@ local function rowTooltip(row)
     GameTooltip:SetText(row.entry.title)
     GameTooltip:AddLine("Me: " .. (ns.panelMine(row.entry) ~= "" and ns.panelMine(row.entry) or "in progress"))
     for _, w in ipairs(row.who or {}) do GameTooltip:AddLine(w.m.name .. ": " .. w.text) end
-    if row.allDone then GameTooltip:AddLine(S.GREEN .. "Everyone who has it is done - time to turn it in!|r") end
     local where = ns.questie and ns.questie.available() and ns.questie.whereText(row.entry.questID)
     if where then GameTooltip:AddLine(S.BLUE .. "It " .. where .. "|r") end
     GameTooltip:AddLine(S.GREY .. "Left click: offer it to whoever does not have it|r")
@@ -450,8 +449,7 @@ function ns.refreshPanel()
             local done = data.e.complete
             row.title:SetText((done and "|cff55ff55" or "|cffffffff") .. data.e.title .. "|r")
             local mine = ns.panelMine(data.e)
-            if data.allDone then row.mine:SetText(S.GOLD .. "turn in!|r")
-            else row.mine:SetText(mine == "done" and (S.GREEN .. "done|r") or (S.GREY .. mine .. "|r")) end
+            row.mine:SetText(S.GREY .. mine .. "|r")
             for j = 1, MAX_MEMBERS do
                 local st = members[j] and data.cells[j]
                 if st then paintCell(row.cells[j], st) else row.cells[j]:Hide() end

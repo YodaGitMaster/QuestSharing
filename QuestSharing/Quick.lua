@@ -154,7 +154,7 @@ end
 local function commonLinks()
     local links = {}
     for _, e in ipairs(C.entries()) do
-        if #ns.partyHas(e) > 0 and #links < 4 then links[#links + 1] = C.link(e) end
+        if not C.doneByMe(e) and #links < 4 and #ns.partyHas(e) > 0 then links[#links + 1] = C.link(e) end
     end
     if #links == 0 then return nil end
     return table.concat(links, ", ")

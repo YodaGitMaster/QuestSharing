@@ -4,7 +4,7 @@ import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from harness import Game  # noqa: E402
+from harness import Game, OPEN_101  # noqa: E402
 
 STYLES = ("modern", "classic")
 WORLD_MAP = """
@@ -161,6 +161,7 @@ def test_in_a_party_the_pin_goes_to_the_nearest_quest_we_share(style):
     if style != "modern":
         return                                                        # no distances on the classic client
     g = Game(style)
+    g.run(OPEN_101)                                   # two quests in progress
     g.start()
     g.slash("auto off")
     g.run('ON_QUEST["party1"] = {[101] = true}')

@@ -171,7 +171,7 @@ local function step()
     local e = C.findEntry(q.questID)            -- it may have been abandoned or turned in meanwhile
     local delay = 0.1
     -- look again right before: another Quest Sharing user may have offered it meanwhile, or the player took it
-    local still = e and decide(e, C.members(), run.force) == "push"
+    local still = e and not C.doneByMe(e) and decide(e, C.members(), run.force) == "push"
     if e and C.pushable(e) and still then
         run.current = e.questID
         ns.pushOne(e)
@@ -188,7 +188,7 @@ local function inCommon(r)
     local links, names, seen = {}, {}, {}
     for _, e in ipairs(r.entries) do
         local with = commonNames(e)
-        if #with > 0 and not saidLately(e.questID) then
+        if #with > 0 and not saidLately(e.questID) and not C.doneByMe(e) then
             links[#links + 1] = C.link(e)
             for _, n in ipairs(with) do if not seen[n] then seen[n] = true; names[#names + 1] = n end end
         end
@@ -246,6 +246,7 @@ function ns.offerQuest(e)
     if not e then return false end
     if not C.inGroup() then ns.print("you are not in a party"); return false end
     if C.inRaid() then ns.print("quests can only be shared in a 5-player party, not in a raid"); return false end
+    if C.doneByMe(e) then ns.print("you have finished " .. C.link(e) .. " - it is not offered"); return false end
     if not C.pushable(e) then ns.print(C.link(e) .. " cannot be shared: the game does not allow it for this quest"); return false end
     if run then ns.print("quests are being shared right now - try again in a few seconds"); return false end
     local lacking = {}
@@ -314,7 +315,9 @@ function ns.startShare(reason, opts)
 
     local entries = {}
     for _, e in ipairs(C.entries()) do
-        if opts.only then
+        if C.doneByMe(e) then
+            -- finished: nothing to do together, so it is not offered (nor listed as "in common")
+        elseif opts.only then
             if opts.only[e.questID] then entries[#entries + 1] = e end
         elseif d.area == "all" or C.inArea(e) then
             entries[#entries + 1] = e

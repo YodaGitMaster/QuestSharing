@@ -4,7 +4,12 @@ import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from harness import Game  # noqa: E402
+from harness import Game as _Game, OPEN_101  # noqa: E402
+
+
+def Game(style="modern", pre="", **kw):
+    """These tests are about how sharing works: two quests in progress (100 and 101)."""
+    return _Game(style, OPEN_101 + pre, **kw)
 
 STYLES = ("modern", "classic")
 

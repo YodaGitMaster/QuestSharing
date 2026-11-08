@@ -180,7 +180,7 @@ evaluatePin = function(entries, force)
         if dist then
             if e.questID == cur and state.pinned == cur then dist = dist * STICKY end      -- hysteresis
             if not best or dist < bestD or (dist == bestD and e.questID < best.questID) then best, bestD = e, dist end
-            if grouped and #ns.partyHas(e) > 0 and (not shared or dist < sharedD) then shared, sharedD = e, dist end
+            if grouped and not C.doneByMe(e) and #ns.partyHas(e) > 0 and (not shared or dist < sharedD) then shared, sharedD = e, dist end
         end
     end
     if shared then best, bestD = shared, sharedD end

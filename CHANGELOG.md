@@ -1,6 +1,10 @@
 # Changelog
 
 ## 0.2.0
+- **A quest you finished is never shared, announced, listed or marked as something to do together** (one rule,
+  `C.doneByMe`, used by the sharing rounds, `/qs share`, the left-click offer, "in common", the ring's `{shared}` /
+  `{common}`, the Party quests window and Post all, the quest-log star and the map pin's preference). Clicking it in the
+  game's tracker still says you are done. The "turn in!" hint is gone with it.
 - **Right click opens a small menu** on a Party quests line: tell the party how I am doing, offer it, **tell them where
   to get it** (with Questie: quest giver, zone, coordinates and the quests that come first; or the item and who drops
   it), focus it on my map, open it in the quest log. Grey lines say why they cannot be used.
@@ -11,8 +15,8 @@
 - **You decide when to talk:** the automatic party chat ("in common", "done", "picked up") is **off by default** (and
   switched off once for existing settings). **Party quests window:** scroll down for all your quests in the zone below
   the 5 nearest; **left click offers** the quest to whoever does not have it; **right click tells the party** "I still
-  need Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8). What about you?" or "I finished it, ready to turn in! What about you?";
-  a grey dash for members who cannot take it; "turn in!" when everybody who has it is done; a note in raids.
+  need Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8). What about you?";
+  a grey dash for members who cannot take it; a note in raids.
 - **Showing each other where you are:** the star over your head in a party (not in dungeons, never taken back from a
   tank), Quest Sharing users as class icons on your world map, a map pin where a teammate found the items, and the
   quest marker preferring the nearest quest you share. The ring's *Team up?* says "Doing [your quest] here - anyone

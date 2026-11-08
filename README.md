@@ -17,6 +17,11 @@ Hover the map button any time for a quick status (party, tracker, your key, prob
 
 ## What it does
 
+**One rule everywhere: a quest you have finished is never shared, announced, listed or marked as something to do
+together.** It is not offered to the party, not part of "in common", not on the ring's quest lists, not in the Party
+quests window, not starred in the quest log, and not preferred by the map pin as a quest you share. (Clicking it in
+the game's tracker still tells the party you are done, because that is your own choice.)
+
 1. **Shares your quests, once, at three moments only:**
    - when you **join or form a party** (your quests in the current area),
    - when a **new member joins** (only what that person has not been offered yet),
@@ -116,12 +121,11 @@ Hover the map button any time for a quick status (party, tracker, your key, prob
      - **Focus it on my map** (the game's quest marker and arrow; the nearest-quest pin waits a minute),
      - **Open it in the quest log**.
    - **Tell the party how I am doing** sends at once:
-     `[Wolves Among Us] - I still need Wolf slain 3/8, Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8). What about you?` or
-     `[Report to Goldshire] - I finished it, ready to turn in! What about you?`. The spot is added only for things you
+     `[Wolves Among Us] - I still need Wolf slain 3/8, Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8). What about you?`. The spot is added only for things you
      collect or use, and only while someone in the party still needs them; Quest Sharing users also get a pin there on
      their map.
    - A **grey dash** means that member **cannot take** the quest (did it before, quest log full, not eligible), so you
-     do not keep offering it. When everybody who has it is done, your progress says **turn in!**
+     do not keep offering it. Quests you have finished are not listed at all.
    - **Hover** a row for everybody's status and progress (and, with Questie, where the quest starts).
    - In a raid the window says so: the game only lets quests be shared in a 5-player party.
    - **Share** offers your quests of this area to the party now. **Post all** puts your progress on the quests someone
@@ -337,7 +341,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 637 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 657 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -394,8 +398,9 @@ python tests/test_together.py         # 30 tests: several Quest Sharing users in
 python tests/test_team.py             # 30 tests: picked up a quest someone has, where the items were, the message budget
 python tests/test_where.py            # 24 tests: the star, map icons, a teammate's pin, the pin preferring shared quests
 python tests/test_menu.py             # 24 tests: the right-click menu, Questie's where-to-get-it, the sound-key guard
+python tests/test_done.py             # 20 tests: a quest you finished is never shared, announced or listed
 ```
-Expected: every line ends in `passed` with all tests green (637 in total).
+Expected: every line ends in `passed` with all tests green (657 in total).
 
 ## Files
 | File | Purpose |

@@ -85,6 +85,10 @@ function C.objectives(e)
     return out
 end
 
+-- Have I finished this quest (objectives done, ready to hand in)? Such a quest is never shared, announced, listed or
+-- marked as something to do together: there is nothing left to do together.
+function C.doneByMe(e) return e and e.complete == true end
+
 function C.link(e)
     local l
     if GetQuestLink then l = GetQuestLink(C.modern and e.questID or e.index) end
