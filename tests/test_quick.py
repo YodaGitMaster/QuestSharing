@@ -449,9 +449,19 @@ def test_channels(style):
     assert sent(g)[-1][1] == "INSTANCE_CHAT"
     g.run("INSTANCE_GROUP = false")
     g.advance(2)
-    target(g, "Lia")                                             # a targeted player always gets a whisper in auto
+    target(g, "Lia")                                             # in a party the party comes first, target or not
     pick(g, 1)
+    assert sent(g)[-1][1] == "PARTY"
+    g.leave_party()
+    g.advance(2)
+    pick(g, 1)                                                   # alone with a target: /w
     assert sent(g)[-1] == ("Hey Lia! o/", "WHISPER")
+    g.run("TARGET = nil")
+    g.advance(2)
+    pick(g, 1)                                                   # alone, nobody targeted: /s
+    assert sent(g)[-1][1] == "SAY"
+    target(g, "Lia")
+    g.join_party(["Anna"])
     g.slash("quick channel say")
     g.advance(2)
     pick(g, 1)

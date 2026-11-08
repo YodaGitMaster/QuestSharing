@@ -4,7 +4,7 @@
 --   middle. Release the key to say it, or click it. The messages and their short labels are yours to change
 --   (/qs settings > Quick chat).
 --
--- Where it goes:  a player targeted -> a whisper to them;  otherwise your party;  otherwise everybody nearby (/say).
+-- Where it goes:  in a party -> the party (/p);  otherwise a targeted player -> a whisper (/w);  otherwise /say.
 --
 -- The game only lets an addon say things to everybody nearby (/say, /yell, /emote) as the direct result of a key PRESS
 -- or a mouse CLICK, never from a key RELEASE. So for those (and for @invite) a release keeps the ring open on your
@@ -198,7 +198,9 @@ local function isInvite(text)
 end
 local function inviteRest(text) return (string.gsub(string.sub(text, 8), "^%s+", "")) end
 
--- channel, whisper target (or nil, reason). A targeted player always gets a whisper in "auto".
+-- channel, whisper target (or nil, reason).
+-- "auto": in a party it goes to the party (/p, or /i /raid there); alone, a targeted player gets a whisper (/w),
+-- and with nobody targeted it is /s.
 local function channelFor()
     local mode = ns.db.quickChannel
     local who = targetWhisperName()
@@ -211,8 +213,8 @@ local function channelFor()
         if who then return "WHISPER", who end
         return nil, nil, "target a player first to whisper them"
     end
-    if who then return "WHISPER", who end                 -- auto: you picked someone, so it is for them
-    if C.inGroup() then return C.channel() end
+    if C.inGroup() then return C.channel() end            -- auto: the party comes first
+    if who then return "WHISPER", who end                 -- not in a party: you picked someone, so it is for them
     return "SAY"
 end
 
@@ -235,7 +237,8 @@ local SLASH = { SAY = "/s ", YELL = "/y ", EMOTE = "/e ", PARTY = "/p ", RAID = 
 
 local function deliver(text, channel, target)
     q.last = { text = text, channel = channel, target = target, at = GetTime() }
-    SendChatMessage(text, channel, nil, target)
+    local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
+    send(text, channel, nil, target)
 end
 
 -- called from Diagnostics when the game blocks one of our calls; true if it was a send from the ring
