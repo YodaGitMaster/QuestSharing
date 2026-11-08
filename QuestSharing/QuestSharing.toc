@@ -12,6 +12,7 @@ Sync.lua
 Progress.lua
 Panel.lua
 Track.lua
+Highlight.lua
 Friends.lua
 Quick.lua
 Diagnostics.lua

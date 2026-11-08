@@ -99,6 +99,18 @@ A World of Warcraft addon for playing quests together.
     caused (also kept between sessions). If something misbehaves in your game, paste the `/qs doctor` report
     into a GitHub issue.
 
+12. **Quest objectives are easier to find.**
+    - **Quest icons over creatures:** every creature that is part of one of your quests gets a gold quest icon
+      above its nameplate (the game itself tells the addon which creatures those are).
+    - **The nearest quest is pinned in the world:** while "tracker follows me" is on, the game's own
+      highlighted-quest marker (waypoint) follows the closest quest as you move. A quest only takes over after
+      it has been the clear winner twice in a row, and if you pin a quest yourself it steps aside for 5 minutes.
+      Switching it off gives back the quest you had pinned.
+    - **Optional game-settings helper** (`/qs highlight cvars on`, off by default because it changes game
+      settings): turns on enemy nameplates (the icons need them) and the game's icons over objects you can
+      interact with. Switching it off puts your own values back.
+    - `/qs highlight mobs|pin|cvars [on|off]`; the same switches are in `/qs settings`.
+
 ## Settings window
 **Everything is switched on by default.** To change anything, type `/qs settings` (or the minimap button, or click **Settings** on
 the quests-in-common panel, or open *Game Menu > Options > AddOns > Quest Sharing*). Every line is one
@@ -157,6 +169,7 @@ other choice you made is kept.
 | `/qs friends on\|off` | (beta) do it automatically when a party forms or someone joins (default off) |
 | `/qs key [KEY]` | bind the quick chat wheel to a key, e.g. `/qs key V` or `/qs key ALT-E`; `/qs key none` removes it |
 | `/qs quick ...` | the quick chat messages: `add`, `edit`, `remove`, `move`, `reset`, `editor`, `mode hold\|toggle`, `channel auto\|say\|party\|whisper`, `on\|off` |
+| `/qs highlight mobs\|pin\|cvars [on\|off]` | quest icons over creatures / pin the nearest quest / the game-settings helper |
 | `/qs doctor` | a report of what works on this client, in a window you can copy from |
 | `/qs errors [clear]` | errors this addon has caused |
 | `/qs minimap on\|off` | the minimap button (default on) |
@@ -177,9 +190,17 @@ Yes. The game answers every share with a system message per member: accepted, de
 already completed, busy, quest log full, and so on. The addon reads them by the game's own message
 strings (so it works in any language) and shows them to you.
 
+## About your game client
+The API documentation lists **World of Warcraft: Forever 1.60.1** as a client that "shares Mainline WoW's UI
+architecture, including the vast majority of APIs available in 12.1.5". So the modern calls this addon uses
+(`C_QuestLog`, `C_NamePlate`, `C_SuperTrack`, distances to quests, ...) are documented for it. The classic-style
+fallbacks stay in for other clients. Very recent clients also hide some values from addons in combat and in
+instances ("secret values"); everything that reads such a value is wrapped so it fails quietly instead of
+breaking. `/qs doctor` tells you exactly what works on your copy.
+
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 351 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 372 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -197,6 +218,11 @@ strings (so it works in any language) and shows them to you.
   before it takes it over. Chat to nearby players (`/say`) is only allowed as the direct result of a key or
   mouse press, which is exactly what choosing a slot is. The wheel needs a free mouse pointer (not
   mouse-look). It is untested in the real game: `/qs probe` shows `quick chat wheel: key ...`.
+- **Quest icons over creatures** only appear where the game shows nameplates: enemy nameplates must be on
+  (`/qs highlight cvars on` does that), and creatures farther away than your nameplate distance have none.
+  Objects (items on the ground, chests) are not creatures, so they get no icon from this addon; the helper
+  above turns on the game's own icon for objects you are close to. The pin uses the game's quest marker; I could
+  not confirm from the documentation exactly how that marker looks on your client.
 - **Friends (beta):** the game's friends list is small (about 100) and, on classic-style clients, belongs to
   your realm, so players from other realms can only be added where the client allows it. Adding someone is
   silent for them. Whether `AddFriend` is allowed to an addon on your client is something only the game can
@@ -226,8 +252,9 @@ python tests/test_settings.py         # 36 tests: everything on by default, migr
 python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
 python tests/test_quick.py            # 63 tests: the quick chat wheel, placeholders, editing, key binding
 python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
+python tests/test_highlight.py        # 21 tests: quest icons over creatures, the world pin, the game-settings helper
 ```
-Expected: `63/63`, `50/50`, `34/34`, `28/28`, `36/36`, `42/42`, `63/63` and `35/35 passed`.
+Expected: `63/63`, `50/50`, `34/34`, `28/28`, `36/36`, `42/42`, `63/63`, `35/35` and `21/21 passed`.
 
 ## Files
 | File | Purpose |
@@ -239,6 +266,7 @@ Expected: `63/63`, `50/50`, `34/34`, `28/28`, `36/36`, `42/42`, `63/63` and `35/
 | `QuestSharing/Progress.lua` | notices finished quests, announces them, sends changes to synced players |
 | `QuestSharing/Panel.lua` | the "quests in common" panel and the quest-log markers |
 | `QuestSharing/Track.lua` | keeps the quest tracker on the quests nearest to you (distance or zone mode) |
+| `QuestSharing/Highlight.lua` | quest icons over creatures on their nameplates, and the game-settings helper |
 | `QuestSharing/Diagnostics.lua` | the error log, `/qs doctor` and the copyable report window |
 | `QuestSharing/MinimapButton.lua` | the minimap button |
 | `build_release.py`, `CHANGELOG.md` | builds `dist/QuestSharing-<version>.zip` and the release notes |

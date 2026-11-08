@@ -13,7 +13,16 @@ local INTERVAL = 2          -- seconds between two looks
 local STICKY = 0.6          -- a quest that is already tracked counts as this much of its real squared distance
 local PAUSE = 300           -- seconds to leave the tracker alone after you changed it yourself
 
-local state = { active = false, expected = nil, sig = nil, pausedUntil = 0, ownChange = -100, lastAccept = -100, ticker = nil, soon = nil }
+local state = { pinned = nil, pinSaved = nil, pinSeen = nil, pinPausedUntil = 0, active = false, expected = nil, sig = nil, pausedUntil = 0, ownChange = -100, lastAccept = -100, ticker = nil, soon = nil }
+
+local dcache = {}             -- each quest's distance, measured once per look (the tracker and the pin share it)
+local function distOf(e)
+    local v = dcache[e.questID]
+    if v == nil then v = C.distanceSq(e) or false; dcache[e.questID] = v end
+    return v or nil
+end
+
+local evaluatePin          -- defined further down (the pin); declared here because nearEvaluate calls it
 
 local function mode()
     local m = ns.db.nearMode
@@ -25,7 +34,7 @@ ns.nearMode = mode
 local function chooseDistance(entries, current, n)
     local ranked = {}
     for _, e in ipairs(entries) do
-        local d = C.distanceSq(e)
+        local d = distOf(e)
         if d then
             if current[e.questID] then d = d * STICKY end        -- hysteresis: do not swap for a small gain
             ranked[#ranked + 1] = { e = e, d = d }
@@ -84,11 +93,13 @@ end
 function ns.nearEvaluate(force)
     local d = ns.db
     if not (d.near and state.active and C.canWatch()) then return end      -- 'active' = the startup snapshot is done
-    if GetTime() < state.pausedUntil then return end
-    if state.pausedUntil > 0 and state.expected == nil and GetTime() >= state.pausedUntil then state.pausedUntil = 0 end
     if InCombatLockdown and InCombatLockdown() then return end
     if IsInInstance and IsInInstance() then return end
     local entries = C.entries()
+    dcache = {}
+    evaluatePin(entries, force)                                            -- the pin has its own pause
+    if GetTime() < state.pausedUntil then return end
+    if state.pausedUntil > 0 and state.expected == nil and GetTime() >= state.pausedUntil then state.pausedUntil = 0 end
     local current = C.watchedSet()
     local now = GetTime()
     if state.expected then
@@ -125,6 +136,54 @@ function ns.nearEvaluate(force)
     for id in pairs(chosen) do wanted[id] = true end
     apply(wanted, current, byIdMap(entries))
     remember(wanted)
+end
+
+-- Pinning the nearest quest as the game's own highlighted quest (the waypoint marker in the world) -----------
+function ns.canPin()
+    return (C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID and C_SuperTrack.GetSuperTrackedQuestID) and true or false
+end
+
+evaluatePin = function(entries, force)
+    local d = ns.db
+    if not (d.nearPin and ns.canPin() and mode() == "distance") then return end
+    local now = GetTime()
+    if now < state.pinPausedUntil then return end
+    local cur = C_SuperTrack.GetSuperTrackedQuestID() or 0
+    if state.pinned and cur ~= state.pinned then
+        if now - state.lastAccept < 10 then
+            state.pinned = nil                                    -- the game pins a quest you just accepted: that is fine
+        else
+            state.pinPausedUntil, state.pinned, state.pinSeen = now + PAUSE, nil, nil
+            ns.print("pin: paused for 5 minutes because you chose another quest (/qs near resume to continue)")
+            return
+        end
+    end
+    local best, bestD
+    for _, e in ipairs(entries) do
+        local dist = distOf(e)
+        if dist then
+            if e.questID == cur and state.pinned == cur then dist = dist * STICKY end      -- hysteresis
+            if not best or dist < bestD or (dist == bestD and e.questID < best.questID) then best, bestD = e, dist end
+        end
+    end
+    if not best or best.questID == cur then
+        state.pinSeen = nil
+        if best then state.pinned = cur end
+        return
+    end
+    if not force and state.pinSeen ~= best.questID then state.pinSeen = best.questID; return end    -- seen twice in a row
+    state.pinSeen = nil
+    if state.pinSaved == nil then state.pinSaved = cur end
+    if pcall(C_SuperTrack.SetSuperTrackedQuestID, best.questID) then state.pinned = best.questID end
+end
+
+-- give the game's highlighted quest back to whatever it was before we started pinning
+function ns.releasePin()
+    if ns.canPin() and state.pinned and (C_SuperTrack.GetSuperTrackedQuestID() or 0) == state.pinned
+       and state.pinSaved and state.pinSaved ~= 0 then
+        pcall(C_SuperTrack.SetSuperTrackedQuestID, state.pinSaved)
+    end
+    state.pinned, state.pinSaved, state.pinSeen, state.pinPausedUntil = nil, nil, nil, 0
 end
 
 -- On / off ---------------------------------------------------------------------------------------------
@@ -168,6 +227,7 @@ function ns.setNear(on)
     else
         d.near = false
         state.active = false
+        ns.releasePin()
         stopTicker()
         if ns.refreshSettings then ns.refreshSettings() end
         local entries = C.entries()
@@ -194,7 +254,7 @@ function ns.nearCommand(arg)
         state.pausedUntil, state.expected = 0, nil
         ns.nearEvaluate(true)
     elseif arg == "resume" then
-        state.pausedUntil, state.expected = 0, nil
+        state.pausedUntil, state.expected, state.pinPausedUntil = 0, nil, 0
         ns.print("tracker follows you: resumed")
         ns.nearEvaluate(true)
     elseif string.match(arg, "^mode") then

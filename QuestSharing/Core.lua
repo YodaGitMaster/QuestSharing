@@ -24,6 +24,9 @@ ns.defaults = {
     quickMode = "hold", -- "hold" (open while the key is held) or "toggle" (press to open, click a slot)
     quickChannel = "auto", -- "auto" (party if grouped, else say), "say", "party" or "whisper" (your target)
     friends = false,    -- (BETA, off) add the people you group with to your friends list automatically
+    markMobs = true,    -- a quest icon above the nameplate of creatures that are part of your quests
+    nearPin = true,     -- the game's own waypoint marker follows the nearest quest (with "near")
+    highlightCVars = false, -- (off) also switch on the game settings these need (enemy nameplates, object icons)
     near = true,        -- keep the quest tracker filled with the quests closest to you
     nearCount = 5,      -- how many quests the tracker keeps while "near" is on
     nearMode = "auto",  -- "auto" (distance if the client can measure it, else zone), "distance" or "zone"
@@ -150,6 +153,9 @@ function ns.setSetting(key, value)
         if key == "markers" and ns.refreshQuestLog then ns.refreshQuestLog() end
         if key == "panel" and ns.syncPanelVisibility then ns.syncPanelVisibility() end
         if key == "minimap" and ns.syncMinimapButton then ns.syncMinimapButton() end
+        if key == "markMobs" and ns.refreshMarkers then ns.refreshMarkers() end
+        if key == "nearPin" and not value and ns.releasePin then ns.releasePin() end
+        if key == "highlightCVars" and ns.setHighlightCVars then ns.setHighlightCVars(value) end
         if (key == "nearMode" or key == "nearCount") and d.near and ns.nearEvaluate then ns.nearEvaluate(true) end
     end
     if ns.refreshSettings then ns.refreshSettings() end
@@ -201,6 +207,7 @@ local help = {
     "/qs friends          (beta) add everybody in your party to your friends list now; /qs friends on|off = automatically",
     "/qs quick            the quick chat wheel: list / add / edit / remove / move / reset the messages (see /qs quick help)",
     "/qs key [KEY]        bind the quick chat wheel to a key, e.g. /qs key V   (/qs key none removes it)",
+    "/qs highlight        quest creature markers / pin the nearest quest / game settings helper (mobs|pin|cvars [on|off])",
     "/qs doctor           a report of what works on this client (opens in a window you can copy from)",
     "/qs errors [clear]   errors this addon has caused",
     "/qs minimap on|off   the minimap button",
@@ -229,6 +236,7 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     elseif cmd == "key" then ns.setQuickKey(arg)
     elseif cmd == "friends" then
         if arg == "on" or arg == "off" then ns.setSetting("friends", arg == "on"); status() else ns.addPartyFriends(true) end
+    elseif cmd == "highlight" then ns.highlightCommand(arg)
     elseif cmd == "doctor" then ns.doctor()
     elseif cmd == "errors" then ns.errorsCommand(arg)
     elseif cmd == "reset" then ns.resetSettings()
