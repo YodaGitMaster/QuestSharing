@@ -266,7 +266,7 @@ local function rowTooltip(row)
     GameTooltip:AddLine("Me: " .. (ns.panelMine(row.entry) ~= "" and ns.panelMine(row.entry) or "in progress"))
     for _, w in ipairs(row.who or {}) do GameTooltip:AddLine(w.m.name .. ": " .. w.text) end
     local where = ns.questie and ns.questie.available() and ns.questie.whereText(row.entry.questID)
-    if where then GameTooltip:AddLine(S.BLUE .. "It " .. where .. "|r") end
+    if where then GameTooltip:AddLine(S.BLUE .. "It " .. where .. "|r", 1, 1, 1, true) end          -- wraps: it can be long
     GameTooltip:AddLine(S.GREY .. "Left click: offer it to whoever does not have it|r")
     GameTooltip:AddLine(S.GREY .. "Right click: more (tell the party, where to get it, focus on the map...)|r")
     GameTooltip:Show()

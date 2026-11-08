@@ -12,10 +12,12 @@ STYLES = ("modern", "classic")
 DATA = """
 QUESTIE_QUESTS = {
     [100] = { name = "Wolves Among Us", startedBy = { { 197 } }, preQuestSingle = { 783 } },
-    [783] = { name = "A Threat Within" },
+    [783] = { name = "A Threat Within", startedBy = { { 823 } }, preQuestSingle = { 7 } },
+    [7] = { name = "Kobold Camp Cleanup" },
     [101] = { name = "Report to Goldshire", startedBy = { nil, nil, { 5000 } } },
 }
 QUESTIE_NPCS = { [197] = { name = "Marshal McBride", spawns = { [12] = { { 48.92, 41.61 } } } },
+                 [823] = { name = "Deputy Willem", spawns = { [12] = { { 48.17, 42.94 } } } },
                  [6] = { name = "Kobold Vermin", spawns = { [12] = { { 40.1, 80.2 } } } } }
 QUESTIE_ITEMS = { [5000] = { name = "A Torn Letter", npcDrops = { 6 } } }
 local function getter(t) return function(id, key) local r = t[id]; return r and r[key] end end
@@ -133,7 +135,15 @@ def test_with_questie_the_party_hears_where_a_quest_starts(style):
         msg, channel = g.sent()[-1]
         assert channel == "PARTY"
         assert msg.startswith("Bob: ") and "[Wolves Among Us]" in msg, msg
-        assert msg.endswith('starts at Marshal McBride in Elwynn Forest (48.9, 41.6), after "A Threat Within".'), msg
+        assert msg.endswith('starts at Marshal McBride in Elwynn Forest (48.9, 41.6), after "A Threat Within" '
+                            '(from Deputy Willem in Elwynn Forest (48.2, 42.9)), 1 more step before that.'), msg
+
+
+def test_the_steps_before_are_counted_without_looping(style):
+    g = party(style, pre=QUESTIE_12)
+    assert g.eval("NS.questie.stepsBefore")(100) == 2, "A Threat Within, then Kobold Camp Cleanup"
+    g.run("QUESTIE_QUESTS[7].preQuestSingle = { 100 }")         # a broken chain that loops back
+    assert g.eval("NS.questie.stepsBefore")(100) <= 10
 
 
 def test_a_quest_that_starts_from_an_item_says_who_drops_it(style):
