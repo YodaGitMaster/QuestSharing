@@ -253,10 +253,13 @@ end
 
 -- Does sending this need a real key press / click (rather than a key release)?
 local RESTRICTED = { SAY = true, YELL = true, EMOTE = true }
+local function sendsDirectly() return ns.db.mode == "send" and not ns.isBlocked("chat") end
+
 local function needsClick(i)
     local item = items()[i]
     if not item then return false end
     if isInvite(item.text) then return true end
+    if not sendsDirectly() then return false end            -- into the chat box: a release is fine, you press Enter
     local channel = channelFor(item)
     return channel ~= nil and RESTRICTED[channel] == true
 end
@@ -299,15 +302,22 @@ function ns.quickSend(i)
         if C.inGroup() and not C.isLeader() then ns.print("quick chat: only the party leader can invite"); return false end
         if C.groupSize() >= 5 then ns.print("quick chat: your party is full"); return false end
         q.last = { text = "", channel = "INVITE", target = who, at = GetTime() }
+        ns.trying("inviting your target to the party")
         if not C.invite(who) then ns.print("quick chat: the invite did not go through"); return false end
         local rest = inviteRest(item.text)
-        if rest ~= "" then deliver(ns.quickResolve(rest), "WHISPER", who) end
+        if rest ~= "" then
+            if sendsDirectly() then deliver(ns.quickResolve(rest), "WHISPER", who) else C.openChat(ns.quickResolve(rest), "WHISPER", who) end
+        end
         q.lastSend = GetTime()
         return true
     end
     local channel, target, why = channelFor(item)
     if not channel then ns.print("quick chat: " .. tostring(why)); return false end
-    deliver(ns.quickResolve(item.text), channel, target)
+    local text = ns.quickResolve(item.text)
+    if sendsDirectly() or not C.openChat(text, channel, target) then
+        ns.trying("sending a quick chat message (" .. tostring(channel) .. ")", "chat")
+        deliver(text, channel, target)
+    end
     q.lastSend = GetTime()
     return true
 end
@@ -389,7 +399,8 @@ local function paintMiddle()
     if not centerText then return end
     if q.hover then
         centerText:SetText("|cffffd100" .. shorten(middleText(q.hover), 120) .. "|r\n" .. destinationLine(q.hover))
-        if q.sticky then hintText:SetText("click it (or press the key again) to say it")
+        if not sendsDirectly() and not needsClick(q.hover) then hintText:SetText("release or click: it goes into your chat box - press Enter")
+        elseif q.sticky then hintText:SetText("click it (or press the key again) to say it")
         elseif needsClick(q.hover) then hintText:SetText("release: keeps it open - click to say it")
         else hintText:SetText("release or click to send") end
     else
@@ -581,6 +592,7 @@ function ns.setQuickKey(key)
         if ns.PROTECTED_KEYS[before] then
             return ns.print(key .. " is the game's \"" .. ns.PROTECTED_KEYS[before] .. "\" key - pick another one (nothing was changed)")
         end
+        ns.trying("setting the quick chat key")
         if not SetBinding(key, ACTION) then return ns.print("could not bind " .. key .. " (is that a valid key name?)") end
         if before ~= "" and before ~= ACTION then
             ns.print(key .. " used to do: " .. before .. " (it now opens the quick chat wheel; /qs key none and rebind it in Key Bindings to undo)")

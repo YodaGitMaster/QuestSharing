@@ -41,7 +41,34 @@ local function blocked(_, addon, fn)
     if addon ~= ADDON then return end
     local ours, l
     if ns.quickBlocked then ours, l = ns.quickBlocked() end
-    local what = ours and (" (while sending from the quick chat ring to " .. tostring(l.channel) .. (l.channel == "WHISPER" and (" " .. tostring(l.target)) or "") .. ")") or ""
+    local what = ""
+    if ours then
+        if not ns.blockedFeatures.chat then
+            ns.blockedFeatures.chat = true
+            ns.db.mode = "box"                                      -- the next ones go straight into the chat box
+        end
+        what = " (while sending from the quick chat ring to " .. tostring(l.channel) .. (l.channel == "WHISPER" and (" " .. tostring(l.target)) or "") .. ")"
+    else
+        -- what did we just try? (noted by ns.trying right before every call the game may refuse)
+        local now, recent = GetTime(), {}
+        for _, c in ipairs(ns.recentCalls or {}) do if now - c.at <= 1 then recent[#recent + 1] = c end end
+        if #recent > 0 then
+            local names = {}
+            for _, c in ipairs(recent) do names[#names + 1] = c.what end
+            what = " (while " .. table.concat(names, ", then ") .. ")"
+            local only = (#recent == 1) and recent[1] or nil
+            if only and only.feature == "chat" and not ns.blockedFeatures.chat then
+                ns.blockedFeatures.chat = true
+                ns.db.mode = "box"
+                ns.print("this game does not let addons send chat messages: from now on your messages go into the " ..
+                    "chat box - just press Enter. (The automatic party messages cannot work here.)")
+            elseif only and only.feature and not ns.blockedFeatures[only.feature] then
+                ns.blockedFeatures[only.feature] = true                   -- no second try: no second error
+                ns.print("the game does not let the addon do this here: " .. only.what ..
+                    ". It is switched off until you reload (/reload); /qs errors has the details.")
+            end
+        end
+    end
     ns.logError("BLOCKED by the game", "tried to call the protected function " .. tostring(fn) .. what)
 end
 ns.on("ADDON_ACTION_FORBIDDEN", blocked)

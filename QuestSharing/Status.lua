@@ -86,7 +86,12 @@ function ns.askParty(e)
     lastAsk.id, lastAsk.at = e.questID, GetTime()
     local msg = ns.questionMessage(e)
     if not C.inGroup() then ns.print(msg .. "  (not sent: you are not in a party)"); return false end
-    SendChatMessage(msg, C.channel())
+    if ns.db.mode == "send" and not ns.isBlocked("chat") then
+        ns.trying("sending your status to the party", "chat")
+        SendChatMessage(msg, C.channel())
+    else
+        ns.addToChatBox(msg, C.link(e))                       -- typed into the chat box for you: press Enter
+    end
     local s = ns.spots and ns.spots[e.questID]
     if s and s.map and ns.spotShort(e) ~= "" and ns.syncUpdate then       -- Quest Sharing users get a map pin there
         ns.syncUpdate(string.format("S|%d|%d|%.4f|%.4f|%s", e.questID, s.map, s.x, s.y, s.what or ""))
@@ -97,8 +102,11 @@ end
 -- Delivery ------------------------------------------------------------------------------------------
 function ns.deliver(msg)
     local mode = ns.db.mode
-    if mode == "send" and C.inGroup() then
+    if mode == "send" and C.inGroup() and not ns.isBlocked("chat") then
+        ns.trying("sending your status to the party", "chat")
         SendChatMessage(msg, C.channel())
+    elseif mode == "send" and C.inGroup() and ChatFrame_OpenChat then
+        ns.addToChatBox(msg)
     elseif mode == "box" and ChatFrame_OpenChat then
         ChatFrame_OpenChat((C.inGroup() and C.slashFor(C.channel()) or "") .. msg)
     else
@@ -135,7 +143,9 @@ local lastShare = { id = nil, at = -10 }
 function ns.shareStatus(e)
     if not e then return false end
     local mode = ns.db.mode
-    if mode == "box" and ChatFrame_OpenChat then return ns.addToChatBox(ns.statusMessage(e, true), C.link(e)) end
+    if (mode == "box" or (mode == "send" and ns.isBlocked("chat"))) and ChatFrame_OpenChat then
+        return ns.addToChatBox(ns.statusMessage(e, true), C.link(e))
+    end
     if mode == "send" and lastShare.id == e.questID and GetTime() - lastShare.at < 1 then return false end   -- a double click
     lastShare.id, lastShare.at = e.questID, GetTime()
     ns.deliver(ns.statusMessage(e))

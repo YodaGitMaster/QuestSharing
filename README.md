@@ -17,6 +17,18 @@ Hover the map button any time for a quick status (party, tracker, your key, prob
 
 ## What it does
 
+**Your messages go into the chat box, and you press Enter.** Some game clients do not let addons send chat messages
+at all (the game says "tried to call the protected function UNKNOWN()"), but typing into the chat box always works.
+So everything the addon writes for you (the quick chat ring, the right-click menu, quest clicks, Post all) is typed
+into the chat box with the right channel set (`/p`, `/s`, `/w Name`, ...). *Settings > General > My messages* (or
+`/qs mode send`) sends at once instead where the game allows it; if the game refuses, the addon switches back to the
+chat box by itself and says so once. The automatic party messages need "sent at once" (typing them into your chat box
+unasked would take your keys while you play).
+
+**When the game refuses something** ("Interface action failed because of an AddOn"), `/qs errors` says what the addon
+was doing at that moment ("while putting the star over your head", "while sharing a quest with the party", ...) and
+that one feature switches itself off until you `/reload`, so the message does not keep coming back.
+
 **One rule everywhere: a quest you have finished is never shared, announced, listed or marked as something to do
 together.** It is not offered to the party, not part of "in common", not on the ring's quest lists, not in the Party
 quests window, not starred in the quest log, and not preferred by the map pin as a quest you share. (Clicking it in
@@ -290,7 +302,7 @@ party member running Quest Sharing finishes one you share. Never during combat.
 | `/qs chat on\|off` | announce quests in common in party chat (default on) |
 | `/qs click on\|off` | clicking a tracked quest fills the chat box (default on) |
 | `/qs link on\|off` | shift-click links get the status appended (default on) |
-| `/qs mode box\|send\|print` | what a click does: **box** fills the chat box and you press Enter (default, so a stray click never spams), **send** sends straight away, **print** only shows it to you |
+| `/qs mode box\|send\|print` | how your messages go out (the ring, the menu, quest clicks): **box** types them into the chat box and you press Enter (default; works on every client), **send** sends straight away where the game allows it, **print** only shows them to you |
 | `/qs sync on\|off` | exchange exact quest lists with other Quest Sharing users (default on) |
 | `/qs announce on\|off` | say in party chat when a quest we share is done (default on) |
 | `/qs markers on\|off` | star and names next to shared quests in the quest log (default on) |
@@ -343,7 +355,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 659 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 681 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -401,8 +413,9 @@ python tests/test_team.py             # 30 tests: picked up a quest someone has,
 python tests/test_where.py            # 24 tests: the star, map icons, a teammate's pin, the pin preferring shared quests
 python tests/test_menu.py             # 26 tests: the right-click menu, Questie's where-to-get-it, the sound-key guard
 python tests/test_done.py             # 20 tests: a quest you finished is never shared, announced or listed
+python tests/test_box.py              # 22 tests: messages into the chat box, refused calls written down and switched off
 ```
-Expected: every line ends in `passed` with all tests green (659 in total).
+Expected: every line ends in `passed` with all tests green (681 in total).
 
 ## Files
 | File | Purpose |

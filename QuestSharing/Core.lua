@@ -44,6 +44,18 @@ ns.db = {}
 for k, v in pairs(ns.defaults) do ns.db[k] = v end        -- until the saved variables are loaded
 
 -- Output -----------------------------------------------------------------------------------------
+-- Calls the game may refuse ("Interface action failed because of an AddOn", "protected function UNKNOWN()") ----------
+-- Right before such a call we note what we are doing. If the game then blocks something, the error log says what it
+-- was, and that one feature switches itself off until /reload, so the message cannot keep coming back.
+ns.recentCalls, ns.blockedFeatures = {}, {}
+function ns.trying(what, feature)
+    local now = GetTime and GetTime() or 0
+    local list = ns.recentCalls
+    list[#list + 1] = { what = what, feature = feature, at = now }
+    while #list > 6 or (list[1] and now - list[1].at > 2) do table.remove(list, 1) end
+end
+function ns.isBlocked(feature) return feature ~= nil and ns.blockedFeatures[feature] == true end
+
 -- the version from the .toc file
 do
     local f = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
@@ -129,7 +141,7 @@ end)
 
 -- A friendly hello the first time (and a short "what's new" after an update). Once per version, a few seconds after
 -- login so it is not buried under the login messages.
-local WHATS_NEW = "the Party quests window is a grid (check or X per member, your 5 nearest quests, right click for a menu), Questie's where-to-get-it, a star over your head and teammates on your map, and the automatic party chat is off: you decide when to talk"
+local WHATS_NEW = "your messages now go into the chat box - just press Enter (this game does not let addons send them), and anything the game refuses is written in /qs errors and switched off"
 local greeted = false
 local function welcome()
     local d = ns.db
@@ -175,7 +187,10 @@ local outbox, sending = {}, false
 local function pump()
     local msg = table.remove(outbox, 1)
     if not msg then sending = false; return end
-    if C.inGroup() then SendChatMessage(msg, C.channel()) end
+    if C.inGroup() and not ns.isBlocked("chat") then
+        ns.trying("sending an automatic party message", "chat")
+        SendChatMessage(msg, C.channel())
+    end
     ns.after(2, pump)
 end
 
@@ -186,6 +201,9 @@ local spent = {}
 ns.dropped = 0
 function ns.say(msg, always)
     if not always and not ns.db.chat then return false end
+    -- an automatic message cannot be typed into your chat box (that would take your keys while you play): it needs
+    -- "My messages: sent at once", and a game that allows it
+    if ns.db.mode ~= "send" or ns.isBlocked("chat") then return false end
     local now = GetTime()
     while spent[1] and now - spent[1] > WINDOW do table.remove(spent, 1) end
     if #spent >= BUDGET then ns.dropped = ns.dropped + 1; return false end

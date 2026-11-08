@@ -122,6 +122,8 @@ local function step()
     run.current = m
     run.sent[key(m.name)] = true
     local note = string.sub("Quest Sharing: " .. (C.zone() or ""), 1, 48)
+    if ns.isBlocked("friends") then return ns.stopFriends() end
+    ns.trying("adding a friend", "friends")
     if not C.addFriend(C.fullName(m), note) then run.results[key(m.name)] = "error" end
     run.timer = ns.after(GAP, step)
 end

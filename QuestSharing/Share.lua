@@ -162,6 +162,7 @@ local function step()
     if not run then return end
     if not C.inGroup() then return ns.stopShare("you left the party") end
     local q = table.remove(run.queue, 1)
+    if ns.isBlocked("share") then return ns.stopShare("the game refused it") end
     if not q then
         run.finishing = true
         run.timer = ns.after(run.grace, finish)
@@ -235,6 +236,7 @@ end
 -- push one quest to the party now, and tell the other Quest Sharing users so they do not offer it again
 function ns.pushOne(e)
     lastPush = { id = e.questID, at = GetTime() }
+    ns.trying("sharing a quest with the party", "share")
     C.push(e)
     ns.markOffered(e.questID)
     if ns.syncUpdate then ns.syncUpdate("O|" .. e.questID) end
@@ -307,6 +309,7 @@ function ns.startShare(reason, opts)
     opts = opts or {}
     local quiet = opts.only ~= nil
     if not d.enabled then return not quiet and ns.print("the addon is switched off (/qs on)") end
+    if ns.isBlocked("share") then return not quiet and ns.print("sharing quests was refused by the game earlier: /reload to try again") end
     if run then return not quiet and ns.print("already sharing (/qs stop to cancel)") end
     if not C.inGroup() then return not quiet and ns.print("you are not in a party") end
     if C.inRaid() then return not quiet and ns.print("quests can only be shared in a 5-player party, not a raid") end
