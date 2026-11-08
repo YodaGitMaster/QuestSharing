@@ -284,6 +284,7 @@ local help = {
     "/qs coords on|off    add where I found the quest items to my messages, when someone still needs them",
     "/qs star on|off      the star over my head while in a party, so people see where I am",
     "/qs pingkey <KEY>    the key that pings the nearest quest creature (Attack) or quest object (look here); none removes it",
+    "/qs questie          does Quest Sharing read Questie's quest database? (with a real lookup from your quest log)",
     "/qs ping on|off      the ping key and the ring's ping slot",
     "/qs mappins on|off   party members running Quest Sharing on my world map (and my position to them)",
     "/qs waypoint on|off  a map pin where a teammate found the quest items",
@@ -325,6 +326,7 @@ SlashCmdList["QUESTSHARING"] = function(msg)
         if arg == "on" or arg == "off" then ns.setSetting("friends", arg == "on"); status() else ns.addPartyFriends(true) end
     elseif cmd == "highlight" then ns.highlightCommand(arg)
     elseif cmd == "pingkey" then ns.setPingKey(arg)
+    elseif cmd == "questie" then for _, l in ipairs((ns.questie.report())) do ns.print(l) end
     elseif cmd == "doctor" then ns.doctor()
     elseif cmd == "errors" then ns.errorsCommand(arg)
     elseif cmd == "reset" then ns.resetSettings()

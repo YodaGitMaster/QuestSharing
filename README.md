@@ -306,7 +306,8 @@ party member running Quest Sharing finishes one you share. Never during combat.
 2. Start the game; on the character screen click **AddOns** and make sure **Quest Sharing** is ticked
    (tick **Load out of date AddOns** if the game says it is out of date).
 3. Optional: install **Questie** too. Quest Sharing only reads its quest database (where quests start, which
-   quests come first) for "Tell them where to get it"; everything else works without it.
+   quests come first) for "Tell them where to get it"; everything else works without it. Type `/qs questie` to check it:
+   it says whether Questie is loaded, how its data is read, and looks up a few quests of your quest log.
 4. In game type `/qs probe`. It tells you what your game client supports. **If something looks wrong,
    open an issue at https://github.com/YodaGitMaster/QuestSharing/issues and paste that output.**
 
@@ -376,7 +377,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 707 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 715 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -432,13 +433,13 @@ python tests/test_look.py             # 42 tests: the settings window layout, th
 python tests/test_together.py         # 30 tests: several Quest Sharing users in one party, fewer messages
 python tests/test_team.py             # 30 tests: picked up a quest someone has, where the items were, the message budget
 python tests/test_where.py            # 24 tests: the star, map icons, a teammate's pin, the pin preferring shared quests
-python tests/test_menu.py             # 28 tests: the right-click menu, Questie's where-to-get-it, the sound-key guard
+python tests/test_menu.py             # 36 tests: the right-click menu, Questie's where-to-get-it, the sound-key guard
 python tests/test_done.py             # 20 tests: a quest you finished is never shared, announced or listed
 python tests/test_box.py              # 23 tests: messages into the chat box, refused calls written down and switched off
 python tests/test_ping.py             # 13 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
 python tests/test_zone.py             # 10 tests: only the quests of where you are (Teldrassil vs Stormwind)
 ```
-Expected: every line ends in `passed` with all tests green (707 in total).
+Expected: every line ends in `passed` with all tests green (715 in total).
 
 ## Files
 | File | Purpose |

@@ -10,6 +10,10 @@
 - **Calls the game refuses are written down and switched off:** the error log says what the addon was doing ("while
   putting the star over your head", "while sharing a quest with the party", ...), and that feature stays off until
   `/reload`, so the error cannot repeat. The star over your head is never set during combat.
+- **`/qs questie`** says whether Quest Sharing can read Questie's quest database on your client: is Questie (and
+  QuestieDB) loaded, which way it is read (QuestieDB of Questie 12, LibQuestieDB, or the older Questie), is it ready,
+  and a real lookup on the first quests of your quest log. Also reads `LibQuestieDB.Quest.Get` when the short global
+  names are missing. `/qs doctor` names the way it is read.
 - **Fixed: quests from far away in Teldrassil** (Stormwind quests in the Party quests window, also with "by zone").
   The Party quests window now lists only the quests of the zone you are in (the 5 nearest first, then the rest of the
   zone) and is never filled up with quests from elsewhere. The tracker and the map pin take a quest of another zone

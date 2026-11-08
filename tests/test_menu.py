@@ -192,6 +192,51 @@ def test_a_questie_that_looks_different_is_handled(style):
     assert g.eval("NS.questie.whereText(100)") is None and len(g.eval("NS.db.errors") or {}) == 0
 
 
+# ---- /qs questie: does it work here? -------------------------------------------------------------------------------------
+LIB_ONLY = DATA + """
+LibQuestieDB = { Quest = { Get = getter(QUESTIE_QUESTS) }, Npc = { Get = getter(QUESTIE_NPCS) },
+                 Item = { Get = getter(QUESTIE_ITEMS) }, Object = { Get = getter({}) } }
+C_Map.GetAreaInfo = function(id) return ({ [12] = "Elwynn Forest" })[id] end
+"""
+LOADED = 'LOADED_ADDONS = { Questie = true, QuestieDB = true }; function IsAddOnLoaded(n) return LOADED_ADDONS[n] == true end\n'
+
+
+def report(g):
+    g.run("PRINTED = {}")
+    g.slash("questie")
+    return "\n".join(plain(l) for l in g.printed())
+
+
+def test_slash_questie_proves_it_with_a_quest_from_your_log(style):
+    for pre, how in ((QUESTIE_12, "QuestieDB (Questie 12 and newer)"), (LIB_ONLY, "LibQuestieDB"),
+                     (QUESTIE_11, "Questie's own database (older Questie)")):
+        g = party(style, pre=LOADED + pre)
+        text = report(g)
+        assert "Questie addon: loaded | QuestieDB (its database): loaded" in text, text
+        assert "reading: " + how in text, (how, text)
+        assert "[Wolves Among Us]|h starts at Marshal McBride in Elwynn Forest (48.9, 41.6)" in text, text
+        assert "Questie works with Quest Sharing." in text
+
+
+def test_slash_questie_says_what_is_missing(style):
+    g = party(style, pre="LOADED_ADDONS = {}; function IsAddOnLoaded(n) return LOADED_ADDONS[n] == true end")
+    text = report(g)
+    assert "Questie addon: NOT loaded" in text and "no Questie database found" in text
+    g2 = party(style, pre=LOADED + "Questie = { started = false }; QuestieLoader = { ImportModule = function() return {} end }")
+    assert "still starting" in report(g2)
+
+
+def test_slash_questie_when_questie_knows_none_of_your_quests(style):
+    g = party(style, pre=LOADED + "QuestDB = { Get = function() return nil end }")
+    text = report(g)
+    assert "Questie has no start for this quest" in text and "send me this report" in text
+
+
+def test_the_doctor_names_where_questie_is_read_from(style):
+    g = party(style, pre=LOADED + QUESTIE_12)
+    assert "[OK] Questie: found (QuestieDB)" in "\n".join(g.eval("NS.doctorLines()").values())
+
+
 # ---- the game's sound keys are never taken ---------------------------------------------------------------------------------
 def test_the_quick_chat_never_takes_the_sound_keys(style):
     g = party(style)
