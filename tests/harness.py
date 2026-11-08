@@ -58,13 +58,16 @@ local function newObject()
     function o:SetText(t) self.text = t end
     function o:GetText() return self.text end
     function o:CreateFontString() return newObject() end
+    function o:CreateTexture() return newObject() end
     function o:SetPoint(p, rel, rp, x, y) self.point = { p, rel, rp, x or 0, y or 0 } end
     function o:GetPoint() return unpack(self.point) end
     function o:SetHeight(h) self.height = h end
     function o:SetWidth(w) self.width = w end
     for _, name in ipairs({ "SetBackdrop", "SetBackdropColor", "SetFrameStrata", "SetMovable", "EnableMouse",
                             "RegisterForDrag", "SetJustifyH", "StartMoving", "StopMovingOrSizing", "SetAllPoints",
-                            "ClearAllPoints", "SetFontObject", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "SetFocus" }) do
+                            "ClearAllPoints", "SetFontObject", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "SetFocus",
+                            "SetMultiLine", "HighlightText", "SetFrameLevel", "RegisterForClicks", "SetHighlightTexture",
+                            "SetTexture" }) do
         o[name] = function() end
     end
     return o
@@ -77,6 +80,20 @@ function CreateFrame()
 end
 
 UI_SCALE, CURSOR = 1, { x = 960, y = 540 }
+Minimap = newObject()
+function Minimap:GetWidth() return 140 end
+function Minimap:GetCenter() return 800, 400 end
+function Minimap:GetEffectiveScale() return UI_SCALE end
+function date(fmt) return "12:34:56" end
+function GetAddOnMetadata(addon, field) if field == "Version" then return "0.2.0" end end
+ERROR_HANDLER = function(msg) ERROR_SEEN = msg end
+function geterrorhandler() return ERROR_HANDLER end
+function seterrorhandler(h) ERROR_HANDLER = h end
+function RAISE(msg) return ERROR_HANDLER(msg) end
+INVITED, LEADER = {}, true
+function InviteUnit(name) INVITED[#INVITED + 1] = name end
+function UnitIsGroupLeader(u) return LEADER end
+function GetNumGroupMembers() return #GROUP.members > 0 and (#GROUP.members + 1) or 0 end
 UIParent = newObject()
 function UIParent:GetEffectiveScale() return UI_SCALE end
 function GetCursorPosition() return CURSOR.x * UI_SCALE, CURSOR.y * UI_SCALE end
@@ -393,6 +410,9 @@ class Game:
 
     def watch_log(self):
         return list(self.lua.eval("WATCH_LOG").values())
+
+    def invited(self):
+        return list(self.lua.eval("INVITED").values())
 
     def cursor(self, x, y):
         self.run(f"CURSOR.x, CURSOR.y = {x}, {y}")

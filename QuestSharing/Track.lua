@@ -13,7 +13,7 @@ local INTERVAL = 2          -- seconds between two looks
 local STICKY = 0.6          -- a quest that is already tracked counts as this much of its real squared distance
 local PAUSE = 300           -- seconds to leave the tracker alone after you changed it yourself
 
-local state = { active = false, sig = nil, pausedUntil = 0, ownChange = -100, lastAccept = -100, ticker = nil, soon = nil }
+local state = { active = false, expected = nil, sig = nil, pausedUntil = 0, ownChange = -100, lastAccept = -100, ticker = nil, soon = nil }
 
 local function mode()
     local m = ns.db.nearMode
@@ -85,24 +85,46 @@ function ns.nearEvaluate(force)
     local d = ns.db
     if not (d.near and state.active and C.canWatch()) then return end      -- 'active' = the startup snapshot is done
     if GetTime() < state.pausedUntil then return end
+    if state.pausedUntil > 0 and state.expected == nil and GetTime() >= state.pausedUntil then state.pausedUntil = 0 end
     if InCombatLockdown and InCombatLockdown() then return end
     if IsInInstance and IsInInstance() then return end
     local entries = C.entries()
     local current = C.watchedSet()
+    local now = GetTime()
+    if state.expected then
+        if now - state.lastAccept < 10 then
+            state.expected = nil                                   -- the game tracks a new quest by itself: accept that
+        else
+            local inLog, changed = {}, false
+            for _, e in ipairs(entries) do inLog[e.questID] = true end
+            for id in pairs(current) do if not state.expected[id] then changed = true end end
+            for id in pairs(state.expected) do if inLog[id] and not current[id] then changed = true end end
+            if changed then                                        -- someone else changed the tracker: you did
+                state.pausedUntil, state.expected, state.sig = now + PAUSE, nil, nil
+                ns.print("tracker follows you: paused for 5 minutes because you changed the tracker (/qs near resume to continue)")
+                return
+            end
+        end
+    end
     local n = math.max(1, math.min(d.nearCount or 5, C.maxWatch()))
     local chosen = (mode() == "distance") and chooseDistance(entries, current, n) or chooseZone(entries, current, n)
 
     local add, remove = {}, {}
     for id, e in pairs(chosen) do if not current[id] then add[#add + 1] = e end end
     for id in pairs(current) do if not chosen[id] then remove[#remove + 1] = id end end
-    if #add == 0 and #remove == 0 then state.sig = nil; return end
+    local function remember(set)
+        state.expected = {}
+        for id in pairs(set) do state.expected[id] = true end
+    end
+    if #add == 0 and #remove == 0 then state.sig = nil; remember(current); return end
 
     local sig = signature(add, remove)
-    if not force and state.sig ~= sig then state.sig = sig; return end
+    if not force and state.sig ~= sig then state.sig = sig; remember(current); return end
     state.sig = nil
     local wanted = {}
     for id in pairs(chosen) do wanted[id] = true end
     apply(wanted, current, byIdMap(entries))
+    remember(wanted)
 end
 
 -- On / off ---------------------------------------------------------------------------------------------
@@ -135,7 +157,7 @@ function ns.setNear(on)
             for id in pairs(C.watchedSet()) do saved[#saved + 1] = id end
             d.nearSaved = saved                                  -- what to put back when switched off
         end
-        state.pausedUntil, state.sig = 0, nil
+        state.pausedUntil, state.sig, state.expected = 0, nil, nil
         state.active = true
         ns.nearEvaluate(true)
         startTicker()
@@ -169,10 +191,10 @@ function ns.nearCommand(arg)
         ns.setSetting("nearCount", math.max(1, math.min(math.floor(n), C.maxWatch())))
         ns.print("the tracker keeps " .. d.nearCount .. " quest(s)")
     elseif arg == "now" then
-        state.pausedUntil = 0
+        state.pausedUntil, state.expected = 0, nil
         ns.nearEvaluate(true)
     elseif arg == "resume" then
-        state.pausedUntil = 0
+        state.pausedUntil, state.expected = 0, nil
         ns.print("tracker follows you: resumed")
         ns.nearEvaluate(true)
     elseif string.match(arg, "^mode") then
@@ -205,7 +227,7 @@ ns.on("QUEST_WATCH_LIST_CHANGED", function()
     if not ns.db.near then return end
     local now = GetTime()
     if now - state.ownChange < 3 or now - state.lastAccept < 3 then return end
-    state.pausedUntil = now + PAUSE
+    state.pausedUntil, state.expected = now + PAUSE, nil
     ns.print("tracker follows you: paused for 5 minutes because you changed the tracker (/qs near resume to continue)")
 end)
 

@@ -1,0 +1,18 @@
+# Changelog
+
+## 0.2.0
+- **Quick chat wheel** (hold a key, point, release) with editable messages and placeholders; with a stranger the
+  message is a question that links your quests of the area; an `@invite` action invites your target to your party
+- **Tracker follows you**: keeps the quest tracker on the nearest quests (distance mode, or zone mode on clients that
+  cannot measure distance); notices when you change the tracker yourself, with or without game events
+- **Settings window** (`/qs settings`), minimap button, entry in the game's options; everything on by default
+- **Friends (beta)**: add the people you group with to your friends list, with safeguards
+- Sharing happens once per member: when you join a party, when someone new joins, and when you accept a quest;
+  a quest someone declined is never offered to them again automatically
+- Addon-to-addon sync of exact quest lists and progress; "quest finished" announcements; a quests-in-common panel and
+  quest log markers
+- `/qs doctor` (a report you can copy) and `/qs errors` (an error log) for problems on a real game client
+
+## 0.1.0
+- First release: shares your quests with a new party, announces the quests you have in common, reads the game's
+  accepted / declined / already-on-it replies, and posts a friendly status when you click a tracked quest

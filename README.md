@@ -88,8 +88,19 @@ A World of Warcraft addon for playing quests together.
    `remove N`, `move N M`, `reset`; or `/qs quick editor` for a small window (click a line, change the text,
    press Enter, use Up / Down / Delete / Add).
 
+9. **A minimap button.** Left click opens the settings window, right click shows or hides the
+   quests-in-common panel, drag it around the minimap edge to move it (`/qs minimap off` hides it).
+10. **An "Invite" action on the wheel.** A message that starts with `@invite` invites the player you target to
+    your party and whispers them the rest of the text. The last default wheel slot is
+    `@invite Sending you a party invite - let's quest together!`. It checks first that you have a target, are
+    the party leader (if you are in one) and that the party is not full.
+11. **Built-in help for problems.** `/qs doctor` shows what works on your client and opens the report in a
+    window where the text is already selected (Ctrl+C to copy it). `/qs errors` shows any error the addon has
+    caused (also kept between sessions). If something misbehaves in your game, paste the `/qs doctor` report
+    into a GitHub issue.
+
 ## Settings window
-**Everything is switched on by default.** To change anything, type `/qs settings` (or click **Settings** on
+**Everything is switched on by default.** To change anything, type `/qs settings` (or the minimap button, or click **Settings** on
 the quests-in-common panel, or open *Game Menu > Options > AddOns > Quest Sharing*). Every line is one
 click:
 
@@ -110,6 +121,8 @@ other at once. Settings saved by an earlier version get the new defaults (tracke
 other choice you made is kept.
 
 ## Install
+**Easiest:** download `QuestSharing-<version>.zip` from the GitHub *Releases* page, unzip it and drop the
+`QuestSharing` folder into `Interface\AddOns`. Or:
 1. Copy the folder `QuestSharing` (the one containing `QuestSharing.toc`, not this README's folder) into
    the game's `Interface\AddOns` folder, so you have `...\AddOns\QuestSharing\QuestSharing.toc`.
 2. Start the game; on the character screen click **AddOns** and make sure **Quest Sharing** is ticked
@@ -144,6 +157,9 @@ other choice you made is kept.
 | `/qs friends on\|off` | (beta) do it automatically when a party forms or someone joins (default off) |
 | `/qs key [KEY]` | bind the quick chat wheel to a key, e.g. `/qs key V` or `/qs key ALT-E`; `/qs key none` removes it |
 | `/qs quick ...` | the quick chat messages: `add`, `edit`, `remove`, `move`, `reset`, `editor`, `mode hold\|toggle`, `channel auto\|say\|party\|whisper`, `on\|off` |
+| `/qs doctor` | a report of what works on this client, in a window you can copy from |
+| `/qs errors [clear]` | errors this addon has caused |
+| `/qs minimap on\|off` | the minimap button (default on) |
 | `/qs reset` | put every setting back to its default (everything on) |
 | `/qs probe` | show what this game client supports |
 
@@ -163,7 +179,7 @@ strings (so it works in any language) and shows them to you.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 310 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 351 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -205,12 +221,13 @@ pip install lupa
 python tests/test_questsharing.py     # 63 tests: sharing, replies, announcements, tracker clicks, commands
 python tests/test_features.py         # 50 tests: sync, completion, panel, quest-log markers
 python tests/test_triggers.py         # 34 tests: when it shares (once per join / new member / new quest), no nagging
-python tests/test_tracker.py          # 22 tests: the tracker follows you (distance and zone modes)
+python tests/test_tracker.py          # 28 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 36 tests: everything on by default, migration, the settings window
 python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
 python tests/test_quick.py            # 63 tests: the quick chat wheel, placeholders, editing, key binding
+python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
 ```
-Expected: `63/63`, `50/50`, `34/34`, `22/22`, `36/36`, `42/42` and `63/63 passed`.
+Expected: `63/63`, `50/50`, `34/34`, `28/28`, `36/36`, `42/42`, `63/63` and `35/35 passed`.
 
 ## Files
 | File | Purpose |
@@ -222,6 +239,9 @@ Expected: `63/63`, `50/50`, `34/34`, `22/22`, `36/36`, `42/42` and `63/63 passed
 | `QuestSharing/Progress.lua` | notices finished quests, announces them, sends changes to synced players |
 | `QuestSharing/Panel.lua` | the "quests in common" panel and the quest-log markers |
 | `QuestSharing/Track.lua` | keeps the quest tracker on the quests nearest to you (distance or zone mode) |
+| `QuestSharing/Diagnostics.lua` | the error log, `/qs doctor` and the copyable report window |
+| `QuestSharing/MinimapButton.lua` | the minimap button |
+| `build_release.py`, `CHANGELOG.md` | builds `dist/QuestSharing-<version>.zip` and the release notes |
 | `QuestSharing/Quick.lua`, `QuestSharing/Bindings.xml` | the quick chat wheel, its placeholders, the message editor and the key binding |
 | `QuestSharing/Friends.lua` | (beta) adds party members to your friends list, with safeguards |
 | `QuestSharing/Settings.lua` | the settings window (plain clickable lines, no game UI templates) and the options entry |

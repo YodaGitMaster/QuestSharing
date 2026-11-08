@@ -30,6 +30,7 @@ ns.settingRows = {
     { kind = "bool", key = "sync", label = "Sync quest lists with other Quest Sharing users",
       tip = "Exact \"who has what\" for party members who also run the addon." },
     { kind = "bool", key = "markers", label = "Mark shared quests in the quest log" },
+    { kind = "bool", key = "minimap", label = "Minimap button (left click: settings, right click: panel)" },
     { kind = "bool", key = "panel", label = "Show the \"quests in common\" panel while in a party" },
     { kind = "bool", key = "near", label = "Tracker follows me (shows the nearest quests)",
       tip = "Fills the quest tracker with the quests closest to you. Switching it off puts your old list back." },

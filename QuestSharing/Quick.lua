@@ -4,6 +4,7 @@
 --   A quick tap keeps the wheel open so you can click a slot instead; Esc closes it.
 -- The messages are a list you can change (/qs quick, or the editor in /qs settings). They may contain
 -- placeholders that fill themselves in when you send them:
+--   (a message starting with @invite invites your target to your party and whispers them the rest of the text)
 --   {name} the friendly player you target (or "there")      {here} your subzone / zone
 --   {need} what you still have to do in this area            {common} quests you and your party have in common
 --   {mine} links to your unfinished quests of this area       {quest} the nearest unfinished quest of this area
@@ -27,7 +28,7 @@ local DEFAULT_ITEMS = {
     "Thanks!",
     "Wait for me, one sec!",
     "Follow me!",
-    "Ready when you are!",
+    "@invite Sending you a party invite - let's quest together!",
 }
 
 function ns.defaultQuickItems()
@@ -173,6 +174,21 @@ local function pickChannel()
     return "SAY"
 end
 
+local function isInvite(text)
+    return string.sub(text, 1, 7) == "@invite" and (#text == 7 or string.sub(text, 8, 8) == " ")
+end
+
+local function inviteRest(text) return (string.gsub(string.sub(text, 8), "^%s+", "")) end
+
+-- what the wheel shows for a message
+local function displayText(text)
+    if isInvite(text) then
+        local rest = inviteRest(text)
+        return "Invite: " .. (rest ~= "" and ns.quickResolve(rest) or "party invite")
+    end
+    return ns.quickResolve(text)
+end
+
 local q = { open = false, hover = nil, cx = 0, cy = 0, openedAt = 0, lastSend = -10, sticky = false }
 ns.quick = q
 
@@ -180,6 +196,18 @@ function ns.quickSend(i)
     local text = items()[i]
     if not text then return false end
     if GetTime() - q.lastSend < 1 then return false end   -- no accidental double sends
+    if isInvite(text) then
+        local who = targetName()
+        if not who then ns.print("quick chat: target a player first to invite them"); return false end
+        if not C.canInvite() then ns.print("quick chat: this client has no call to invite players"); return false end
+        if C.inGroup() and not C.isLeader() then ns.print("quick chat: only the party leader can invite"); return false end
+        if C.groupSize() >= 5 then ns.print("quick chat: your party is full"); return false end
+        if not C.invite(who) then ns.print("quick chat: the invite did not go through"); return false end
+        local rest = inviteRest(text)
+        if rest ~= "" then SendChatMessage(ns.quickResolve(rest), "WHISPER", nil, who) end
+        q.lastSend = GetTime()
+        return true
+    end
     local channel, target = pickChannel()
     if not channel then return false end
     SendChatMessage(ns.quickResolve(text), channel, nil, target)
@@ -216,14 +244,14 @@ local function paint()
     for i = 1, MAX_ITEMS do
         local fs = labels[i]
         if list[i] then
-            local text = shorten(ns.quickResolve(list[i]), 30)
+            local text = shorten(displayText(list[i]), 30)
             fs:SetText((q.hover == i and "|cffffd100> " or "|cffffffff") .. text .. "|r")
             fs:Show()
         else
             fs:Hide()
         end
     end
-    preview:SetText(q.hover and ("|cffffd100" .. shorten(ns.quickResolve(list[q.hover] or ""), 110) .. "|r") or "|cff888888point and release|r")
+    preview:SetText(q.hover and ("|cffffd100" .. shorten(displayText(list[q.hover] or ""), 110) .. "|r") or "|cff888888point and release|r")
 end
 
 function ns.quickUpdateHover()
@@ -338,7 +366,7 @@ local function listItems()
     local list = items()
     if #list == 0 then ns.print("quick chat: no messages (/qs quick add <text>)") end
     for i, t in ipairs(list) do ns.print(string.format("%d. %s", i, t)) end
-    ns.print("placeholders: {name} {here} {zone} {need} {mine} {common} {shared} {quest}")
+    ns.print("placeholders: {name} {here} {zone} {need} {mine} {common} {shared} {quest}   |   '@invite <text>' invites your target and whispers <text>")
 end
 
 function ns.quickAdd(text)
