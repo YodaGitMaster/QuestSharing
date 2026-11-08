@@ -1,6 +1,7 @@
 """A mock of the WoW API (modern and classic quest styles) plus a loader for the real addon files,
 run in a Lua 5.1 interpreter (the same Lua version the game uses).   Needs:  pip install lupa"""
 import pathlib
+import re
 
 from lupa.lua51 import LuaRuntime
 
@@ -108,7 +109,7 @@ function Minimap:GetWidth() return 140 end
 function Minimap:GetCenter() return 800, 400 end
 function Minimap:GetEffectiveScale() return UI_SCALE end
 function date(fmt) return "12:34:56" end
-function GetAddOnMetadata(addon, field) if field == "Version" then return "0.2.0" end end
+function GetAddOnMetadata(addon, field) if field == "Version" then return ADDON_VERSION end end
 ERROR_HANDLER = function(msg) ERROR_SEEN = msg end
 function geterrorhandler() return ERROR_HANDLER end
 function seterrorhandler(h) ERROR_HANDLER = h end
@@ -464,11 +465,16 @@ end
 OPEN_101 = "local q = BYID(101); q.complete = false; q.objectives[1].finished = false\n"
 
 
+# the addon's version, from its .toc (so a new version needs no test changes)
+VERSION = re.search(r"^## Version:\s*(\S+)", (pathlib.Path(__file__).resolve().parent.parent / "QuestSharing" / "QuestSharing.toc").read_text(), re.M).group(1)
+
+
 class Game:
     """One Lua world with the mock API and the real addon loaded into it."""
 
     def __init__(self, style="modern", pre="", fresh=False):
         self.lua = LuaRuntime(unpack_returned_tuples=True)
+        self.lua.execute('ADDON_VERSION = "%s"' % VERSION)
         self.lua.execute(MOCK)
         self.lua.execute("DEFAULT_QUESTS()")
         self.lua.execute("MODERN_API()" if style == "modern" else "CLASSIC_API()")
@@ -557,7 +563,7 @@ class Game:
         """World entered, not grouped yet. Unless fresh=True the saved settings start with the tracker and the
         panel off, as in the first versions, so the older tests keep testing what they were written for."""
         if not self.fresh:
-            self.run('QuestSharingDB = { near = false, panel = false, dbVersion = 3, welcomed = "0.2.0", chat = true, announce = true, pickup = true }')
+            self.run('QuestSharingDB = { near = false, panel = false, dbVersion = 3, welcomed = "%s", chat = true, announce = true, pickup = true }' % VERSION)
         self.fire("ADDON_LOADED", "QuestSharing")
         self.fire("PLAYER_ENTERING_WORLD")
 

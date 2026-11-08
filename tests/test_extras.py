@@ -7,7 +7,7 @@ import zipfile
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
-from harness import Game  # noqa: E402
+from harness import Game, VERSION  # noqa: E402
 
 STYLES = ("modern", "classic")
 CENTER = (500, 400)
@@ -85,7 +85,7 @@ def test_doctor_reports_what_works_on_a_classic_style_client():
     win, box = g.eval("NS._reportWindow()")
     text = box.text
     assert win.shown is True and text == "\n".join(g.eval("NS.doctorLines()").values())
-    assert "Quest Sharing 0.2.0 | game interface 16001 | classic quest API | 4 quests (3 in Elwynn Forest)" in text
+    assert f"Quest Sharing {VERSION} | game interface 16001 | classic quest API | 4 quests (3 in Elwynn Forest)" in text
     assert "[OK] share quests: push call yes, 9 reply messages recognised" in text
     assert "[--] click a tracked quest" in text and "shift-click links still work" in text
     assert "[OK] tracker follows you: zone mode (this client cannot measure distance)" in text
@@ -265,7 +265,7 @@ def test_the_minimap_tooltip(style):
 def test_the_release_zip_is_ready_to_install():
     import build_release
     zpath, ver, names = build_release.build()
-    assert ver == "0.2.0" and zpath.name == "QuestSharing-0.2.0.zip"
+    assert ver == VERSION and zpath.name == f"QuestSharing-{VERSION}.zip"
     with zipfile.ZipFile(zpath) as z:
         inside = set(z.namelist())
     assert all(n.startswith("QuestSharing/") for n in inside), "one folder to drop into AddOns"
@@ -275,7 +275,7 @@ def test_the_release_zip_is_ready_to_install():
     assert "QuestSharing/Bindings.xml" in inside and "QuestSharing/QuestSharing.toc" in inside
     assert not any("test" in n or n.endswith(".py") for n in inside), "no tests in the install package"
     notes = (zpath.parent / "RELEASE_NOTES.md").read_text()
-    assert "Quick chat ring" in notes and "0.1.0" not in notes
+    assert "Quick chat ring" in notes and "## " not in notes, "only this version's section"
 
 
 if __name__ == "__main__":
