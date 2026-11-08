@@ -38,7 +38,11 @@ end
 -- When the game blocks something we tried ("Interface action failed because of an AddOn") it fires these events
 -- with the name of the protected function. Writing it down tells us exactly what was blocked.
 local function blocked(_, addon, fn)
-    if addon == ADDON then ns.logError("BLOCKED by the game", "tried to call the protected function " .. tostring(fn)) end
+    if addon ~= ADDON then return end
+    local ours, l
+    if ns.quickBlocked then ours, l = ns.quickBlocked() end
+    local what = ours and (" (while sending from the quick chat ring to " .. tostring(l.channel) .. (l.channel == "WHISPER" and (" " .. tostring(l.target)) or "") .. ")") or ""
+    ns.logError("BLOCKED by the game", "tried to call the protected function " .. tostring(fn) .. what)
 end
 ns.on("ADDON_ACTION_FORBIDDEN", blocked)
 ns.on("ADDON_ACTION_BLOCKED", blocked)

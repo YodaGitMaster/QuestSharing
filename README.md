@@ -207,7 +207,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 406 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 410 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -256,7 +256,7 @@ python tests/test_triggers.py         # 34 tests: when it shares (once per join 
 python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 42 tests: everything on by default, migration, the tabbed settings window
 python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
-python tests/test_quick.py            # 89 tests: the quick chat ring, placeholders, editing, key binding, performance
+python tests/test_quick.py            # 93 tests: the quick chat ring, placeholders, editing, key binding, performance
 python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
 python tests/test_highlight.py        # 22 tests: quest icons over creatures, the world pin, the game-settings helper
 ```
