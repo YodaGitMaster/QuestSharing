@@ -10,8 +10,9 @@
 --   * Anti-spam: a new ping only once the creature you pinged last is dead or no longer your target. A small secure
 --     snippet checks that, so it also works during combat. Outside combat the ping also unlocks after the time chosen
 --     in the settings (5 / 10 / 15 seconds). Shift + the key pings anyway.
---   * The game gives addons no distance to enemies: "nearest" is a quest creature within about 28 yards, the one
---     closest to the middle of your screen.
+--   * The game gives addons no distance to enemies, and nameplates may not be measured (restricted regions). So
+--     "nearest" is: your target if it is a quest creature, then the creature the game soft-targets in front of you, then
+--     your mouseover, then one within about 28 yards, then any quest creature in sight.
 local ADDON, ns = ...
 local C = ns.compat
 
@@ -51,33 +52,34 @@ local function unitOf(plate)
     return plate.namePlateUnitToken or plate.unitToken or (plate.UnitFrame and plate.UnitFrame.unit)
 end
 
+local function questCreature(unit)
+    if not (unit and UnitExists and UnitExists(unit)) then return nil end
+    local okR, related = pcall(C_QuestLog.UnitIsRelatedToActiveQuest, unit)
+    if not (okR and related == true) then return nil end
+    if not (UnitCanAttack and UnitCanAttack("player", unit)) or (UnitIsDead and UnitIsDead(unit)) then return nil end
+    return UnitName(unit)
+end
+
 function ns.nearestQuestCreature()
-    if not (C_NamePlate and C_NamePlate.GetNamePlates and C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest) then return nil end
+    if not (C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest) then return nil end
+    for _, u in ipairs({ "target", "softenemy", "mouseover" }) do        -- what you are already looking at comes first
+        local name = questCreature(u)
+        if name then return name end
+    end
+    if not (C_NamePlate and C_NamePlate.GetNamePlates) then return nil end
     local ok, plates = pcall(C_NamePlate.GetNamePlates)
     if not (ok and plates) then return nil end
-    local cx, cy = 0, 0
-    if UIParent then cx, cy = UIParent:GetWidth() / 2, UIParent:GetHeight() / 2 end
-    local best, bestScore
+    local first
     for _, plate in ipairs(plates) do
         local unit = unitOf(plate)
-        if unit then
-            local okR, related = pcall(C_QuestLog.UnitIsRelatedToActiveQuest, unit)
-            local hostile = UnitCanAttack and UnitCanAttack("player", unit)
-            local dead = UnitIsDead and UnitIsDead(unit)
-            if okR and related == true and hostile and not dead then
-                local name = UnitName(unit)
-                if name then
-                    local px, py = cx, cy
-                    if plate.GetCenter then px, py = plate:GetCenter() end
-                    local score = (px - cx) ^ 2 + (py - cy) ^ 2
-                    local okD, close = pcall(CheckInteractDistance or function() return false end, unit, 4)
-                    if okD and close then score = score - 1e9 end              -- within ~28 yards comes first
-                    if not bestScore or score < bestScore then best, bestScore = name, score end
-                end
-            end
+        local name = questCreature(unit)
+        if name then
+            local okD, close = pcall(CheckInteractDistance or function() return false end, unit, 4)
+            if okD and close then return name end                            -- within ~28 yards
+            first = first or name
         end
     end
-    return best
+    return first
 end
 
 -- What the button will do on the next press -------------------------------------------------------------------------------
@@ -163,8 +165,8 @@ local function tick()
     ns.after(REFRESH, tick)
 end
 ns.after(2, tick)
-ns.on("PLAYER_REGEN_ENABLED", function() resetGate(); ns.pingRefresh() end)
-ns.on("PLAYER_REGEN_DISABLED", function() ns.pingRefresh() end)            -- the last chance before combat locks it
+-- after a fight: open the gate and look again a moment later (right at the edge of combat the game restricts a lot)
+ns.on("PLAYER_REGEN_ENABLED", function() ns.after(1, function() resetGate(); ns.pingRefresh() end) end)
 
 -- The key --------------------------------------------------------------------------------------------------------------------
 function ns.pingKeyName()

@@ -214,9 +214,16 @@ function ns.layoutTrackerItems()
                 icons[used] = b
                 setItem(b, it.id)
                 b.questID = qid
-                b:ClearAllPoints()
-                b:SetPoint("TOPRIGHT", lb, "TOPRIGHT", 10, -2)          -- where the game puts its own item button
-                b:Show()
+                -- at the spot where the game puts its own item button, but anchored to the screen, not to the tracker's
+                -- button: a secure button tied to the tracker's frames could tangle with the tracker during a fight
+                local right, top = lb.GetRight and lb:GetRight(), lb.GetTop and lb:GetTop()
+                if right and top then
+                    local k = (lb.GetEffectiveScale and lb:GetEffectiveScale() or 1) / (UIParent:GetEffectiveScale() or 1)
+                    ns.trying("placing a quest item icon", "items")
+                    b:ClearAllPoints()
+                    b:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", right * k + 10, top * k - 2)
+                    b:Show()
+                end
             end
         end
     end

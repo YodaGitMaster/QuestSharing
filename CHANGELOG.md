@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.2
+- **Fixed "NamePlateX:GetCenter(): Can't measure restricted regions"** (shown when a fight starts or ends): to find
+  the "nearest" quest creature, the ping key measured nameplates on screen, which the game forbids around combat.
+  Now it never measures them: your target first (if it is a quest creature), then the creature the game soft-targets
+  in front of you, then your mouseover, then one within about 28 yards; and nothing is refreshed as combat starts.
+- **Fixed "protected function UNKNOWN()" in fights:** the quest icons over creatures were written onto the game's
+  nameplates ("Lua Taint: QuestSharing"). They are now the addon's own frames, kept in its own list and only placed
+  over the nameplates; none are made during a fight (new nameplates get theirs right after it). The quest item icons
+  in the tracker are placed at a spot on the screen instead of being tied to the tracker's own buttons.
+
 ## 0.3.1
 - **Your messages go into the chat box and you press Enter**, by default. Some game clients do not let addons send
   chat messages at all ("tried to call the protected function UNKNOWN()"); typing into the chat box always works.

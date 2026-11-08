@@ -64,8 +64,9 @@ def test_a_usable_item_named_by_an_objective_gets_an_icon_next_to_its_quest(styl
     track(g, 100, 700)
     assert shown_icons(g) == [(700, "item:6000")], shown_icons(g)
     icons = g.eval("NS._trackerItemIcons()")
-    same = g.eval("(function() return NS._trackerItemIcons()[1].point[2] == WATCHFRAME_LINKBUTTONS[2] end)()")
-    assert same is True and icons[1].point[1] == "TOPRIGHT", "where the game puts its own item buttons"
+    p = icons[1].point
+    assert (p[1], p[3], p[4], p[5]) == ("TOPRIGHT", "BOTTOMLEFT", 1510, 698), "where the game puts its own item buttons"
+    assert g.eval("NS._trackerItemIcons()[1].point[2] == UIParent") is True, "anchored to the screen, not to the tracker"
 
 
 def test_the_bag_says_which_quest_an_item_belongs_to(style):

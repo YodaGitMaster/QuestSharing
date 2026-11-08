@@ -22,7 +22,7 @@ def printed(g):
 
 
 def marker(g, unit):
-    return g.plate(unit).QuestSharingMarker
+    return g.eval(f"NS.markerFor(PLATES.{unit})")
 
 
 # ---- quest icons over creatures ----------------------------------------------------------------------------------
@@ -32,6 +32,7 @@ def test_a_quest_creature_gets_a_marker_and_other_creatures_do_not():
     m = marker(g, "nameplate1")
     assert m.shown is True and m.texture.texture == BADGE
     assert (m.point[1], m.point[4], m.point[5]) == ("BOTTOM", 0, 2), "above the top of the nameplate"
+    assert g.eval("NS.markerFor(PLATES.nameplate1).point[2] == PLATES.nameplate1.UnitFrame") is True
     assert marker(g, "nameplate2") is None
 
 
@@ -49,7 +50,7 @@ def test_the_marker_goes_away_when_the_objective_is_done_and_comes_back():
 
 def test_a_removed_nameplate_loses_its_marker_and_a_recycled_one_is_reused():
     g = game()
-    g.run('ADD_PLATE("nameplate1", true); SAVED_PLATE = PLATES.nameplate1; SAVED_MARKER = PLATES.nameplate1.QuestSharingMarker')
+    g.run('ADD_PLATE("nameplate1", true); SAVED_PLATE = PLATES.nameplate1; SAVED_MARKER = NS.markerFor(PLATES.nameplate1)')
     m = marker(g, "nameplate1")
     g.run('REMOVE_PLATE("nameplate1")')
     assert m.shown is False, "the creature went away"
@@ -60,7 +61,24 @@ def test_a_removed_nameplate_loses_its_marker_and_a_recycled_one_is_reused():
     g.fire("UNIT_QUEST_LOG_CHANGED", "player")
     g.advance(0.7)
     assert marker(g, "nameplate1").shown is True
-    assert g.eval("PLATES.nameplate1.QuestSharingMarker == SAVED_MARKER") is True, "the same marker frame is reused"
+    assert g.eval("NS.markerFor(PLATES.nameplate1) == SAVED_MARKER") is True, "the same marker frame is reused"
+    assert g.eval("rawget(PLATES.nameplate1, 'QuestSharingMarker')") is None, "nothing is written onto the game's nameplate"
+
+
+def test_icons_are_our_own_frames_and_combat_never_touches_a_nameplate():
+    g = game()
+    g.run('ADD_PLATE("nameplate1", true)')
+    frames_before = len(g.eval("FRAMES"))
+    g.run("IN_COMBAT = true")
+    g.run('ADD_PLATE("nameplate2", true)')                          # a creature that shows up during the fight
+    g.advance(3)
+    assert marker(g, "nameplate2") is None and len(g.eval("FRAMES")) == frames_before, "nothing is made in combat"
+    assert marker(g, "nameplate1").shown is True, "existing icons stay (they are ours: showing them is not restricted)"
+    assert len(g.eval("NS.db.errors") or {}) == 0
+    g.run("IN_COMBAT = false")
+    g.fire("PLAYER_REGEN_ENABLED")
+    g.advance(1.5)
+    assert marker(g, "nameplate2").shown is True, "and after the fight it gets its icon"
 
 
 def test_markers_can_be_switched_off_and_on():
