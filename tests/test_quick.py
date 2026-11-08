@@ -243,6 +243,67 @@ def test_say_is_not_sent_on_release_but_on_a_click(style):
     assert sent(g) == [("Hey there! o/", "SAY")] and frame.shown is False
 
 
+def test_greetings_go_to_the_people_around_you_not_to_the_party(style):
+    g = game(style)
+    g.join_party(["Anna"])
+    pick(g, 1)                                                   # "Hello" is a nearby message: /s even in a party
+    assert sent(g)[-1] == ("Hey there! o/", "SAY")
+    g.advance(2)
+    pick(g, 2)                                                   # "Team up?"
+    assert sent(g)[-1][1] == "SAY"
+    g.advance(2)
+    target(g, "Lia")                                             # but a player you target is whispered
+    pick(g, 1)
+    assert sent(g)[-1] == ("Hey Lia! o/", "WHISPER")
+    g.advance(2)
+    pick(g, 3)                                                   # "What I need" still follows the party
+    assert sent(g)[-1][1] == "PARTY"
+
+
+def test_a_message_can_be_switched_between_auto_and_nearby(style):
+    g = game(style)
+    g.join_party(["Anna"])
+    g.slash("quick route 3 nearby")
+    pick(g, 3)
+    assert sent(g)[-1][1] == "SAY", "now it is nearby"
+    g.advance(2)
+    g.slash("quick route 1 auto")
+    pick(g, 1)
+    assert sent(g)[-1][1] == "PARTY"
+    assert "(nearby)" in "\n".join(g.printed()) and g.eval("NS.db.quickItems[1].channel") == "auto"
+    g.slash("quick route 1 sideways")
+    assert g.eval("NS.db.quickItems[1].channel") == "auto", "an unknown route changes nothing"
+    g.run("NS.quickItems()")
+    assert g.eval("NS.db.quickItems[1].channel") == "auto", "and the old-save upgrade does not undo your choice"
+
+
+def test_the_global_channel_setting_still_overrides_every_route(style):
+    g = game(style)
+    g.join_party(["Anna"])
+    g.slash("quick channel party")
+    pick(g, 1)
+    assert sent(g)[-1][1] == "PARTY", "forcing the channel wins over a message's own route"
+
+
+def test_saved_messages_from_before_routes_get_them_for_the_greetings(style):
+    g = game(style)
+    g.run('NS.db.quickItems = { { label = "Hello", text = "Hey {name}! o/" }, { label = "Mine", text = "Hi all" }, "Want to quest together here? ({here})" }')
+    g.run("NS.quickItems()")
+    assert g.eval("NS.db.quickItems[1].channel") == "nearby" and g.eval("NS.db.quickItems[2].channel") is None
+    assert g.eval("NS.db.quickItems[3].channel") == "nearby", "an old plain-text default too"
+
+
+def test_the_editor_button_flips_the_route_of_the_selected_message(style):
+    g = game(style)
+    g.slash("quick editor")
+    g.eval("NS.editorSelect")(3)
+    g.eval("NS.editorRoute")()
+    assert g.eval("NS.db.quickItems[3].channel") == "nearby"
+    assert "nearby" in g.eval("NS._settingsWindow().ed.routeText.text")
+    g.eval("NS.editorRoute")()
+    assert g.eval("NS.db.quickItems[3].channel") == "auto" and "auto" in g.eval("NS._settingsWindow().ed.routeText.text")
+
+
 def test_a_send_the_game_blocks_ends_up_in_the_chat_box_and_in_the_error_log(style):
     g = game(style)
     hold_and_release_on(g, 1)
@@ -437,28 +498,28 @@ def test_the_invite_slot_invites_and_whispers(style):
 # ---- where it goes ------------------------------------------------------------------------------------------------------------
 def test_channels(style):
     g = game(style)
-    pick(g, 1)                                                   # no party, no target
-    assert sent(g)[-1] == ("Hey there! o/", "SAY")
+    pick(g, 3)                                                   # "What I need" is an auto message; no party, no target
+    assert sent(g)[-1][1] == "SAY"
     g.advance(2)
     g.join_party(["Anna"])
-    pick(g, 1)
+    pick(g, 3)
     assert sent(g)[-1][1] == "PARTY"
     g.advance(2)
     g.run("INSTANCE_GROUP = true")
-    pick(g, 1)
+    pick(g, 3)
     assert sent(g)[-1][1] == "INSTANCE_CHAT"
     g.run("INSTANCE_GROUP = false")
     g.advance(2)
     target(g, "Lia")                                             # in a party the party comes first, target or not
-    pick(g, 1)
+    pick(g, 3)
     assert sent(g)[-1][1] == "PARTY"
     g.leave_party()
     g.advance(2)
-    pick(g, 1)                                                   # alone with a target: /w
-    assert sent(g)[-1] == ("Hey Lia! o/", "WHISPER")
+    pick(g, 3)                                                   # alone with a target: /w
+    assert sent(g)[-1][1] == "WHISPER" and g.eval("SENT[#SENT].target") == "Lia"
     g.run("TARGET = nil")
     g.advance(2)
-    pick(g, 1)                                                   # alone, nobody targeted: /s
+    pick(g, 3)                                                   # alone, nobody targeted: /s
     assert sent(g)[-1][1] == "SAY"
     target(g, "Lia")
     g.join_party(["Anna"])
@@ -591,7 +652,7 @@ def test_the_editor_lives_in_the_quick_chat_tab(style):
     W = g.eval("NS._settingsWindow()")
     ed = W.ed
     assert W.win.shown is True and W.tab == "quick" and ed.frame.shown is True
-    assert ed.lines[1].text.text == "|cffffffff1.  [Hello]  Hey {name}! o/|r" and ed.lines[8].frame.shown is True
+    assert ed.lines[1].text.text == "|cffffffff1.  [Hello]  Hey {name}! o/  |cff88ccff/s|r|r" and ed.lines[8].frame.shown is True
     g.eval("function(l) l.frame.scripts.OnMouseUp(l.frame, 'LeftButton') end")(ed.lines[3])
     assert ed.labelBox.text == "What I need" and ed.textBox.text == "I need to: {need}" and ed.lines[3].text.text.startswith("|cffffd100")
     assert "Looks like:" in ed.preview.text and "Wolf slain 3/8" in ed.preview.text

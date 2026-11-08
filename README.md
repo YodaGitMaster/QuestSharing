@@ -82,8 +82,13 @@ A World of Warcraft addon for playing quests together.
    **release the key** or **click** it. By default the ring has:
    *Hello - Team up? - What I need - Same quests? - Thanks - Wait - Follow me - Invite*.
 
-   **Where it goes.** In a **party** it goes to the party (`/p`; `/i` in a dungeon group). Not in a party: a **player
-   you target** gets a **whisper** (`/w`, and `{name}` is their name), and with nobody targeted it is `/s`.
+   **Where it goes.** Every message has its own route:
+   - **auto** (most messages): in a **party** it goes to the party (`/p`; `/i` in a dungeon group). Not in a party: a
+     **player you target** gets a **whisper** (`/w`, and `{name}` is their name), and with nobody targeted it is `/s`.
+   - **nearby** (*Hello* and *Team up?* by default, shown with `/s` in the editor): greetings are for the people
+     around you, so they **never go to the party chat**: a targeted player gets a `/w`, otherwise it is `/s`.
+   Switch a message with the **Goes to** button in `/qs settings > Quick chat`, or `/qs quick route N auto|nearby`.
+   `/qs quick channel say|party|whisper` forces one channel for everything.
    `/qs quick channel auto|say|party|whisper` changes that.
 
    **Why `/say` needs a click.** The game only lets an addon say things to everybody nearby (`/say`, `/yell`,
@@ -185,7 +190,7 @@ once. Settings saved by an earlier version get the new defaults; every other cho
 | `/qs friends` | (beta) add everybody in your party to your friends list now |
 | `/qs friends on\|off` | (beta) do it automatically when a party forms or someone joins (default off) |
 | `/qs key [KEY]` | bind the quick chat wheel to a key, e.g. `/qs key V` or `/qs key ALT-E`; `/qs key none` removes it |
-| `/qs quick ...` | the quick chat messages: `add [label \|] <text>`, `edit`, `label`, `remove`, `move`, `reset`, `editor`, `mode hold\|toggle`, `channel auto\|say\|party\|whisper`, `on\|off` |
+| `/qs quick ...` | the quick chat messages: `add [label \|] <text>`, `edit`, `label`, `route`, `remove`, `move`, `reset`, `editor`, `mode hold\|toggle`, `channel auto\|say\|party\|whisper`, `on\|off` |
 | `/qs highlight mobs\|pin\|cvars [on\|off]` | quest icons over creatures / pin the nearest quest / the game-settings helper |
 | `/qs doctor` | a report of what works on this client, in a window you can copy from |
 | `/qs errors [clear]` | errors this addon has caused |
@@ -217,7 +222,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 426 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 436 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -266,11 +271,11 @@ python tests/test_triggers.py         # 34 tests: when it shares (once per join 
 python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 42 tests: everything on by default, migration, the tabbed settings window
 python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
-python tests/test_quick.py            # 93 tests: the quick chat ring, placeholders, editing, key binding, performance
+python tests/test_quick.py            # 107 tests: the quick chat ring, placeholders, editing, key binding, performance
 python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
 python tests/test_highlight.py        # 22 tests: quest icons over creatures, the world pin, the game-settings helper
 ```
-Expected: every line ends in `passed` with all tests green (426 in total).
+Expected: every line ends in `passed` with all tests green (436 in total).
 
 ## Files
 | File | Purpose |

@@ -11,6 +11,8 @@
   status you share by clicking). It is still said for quests you are working on.
 - **Party quests window redesigned**: a row of class icons for who has each quest, the quest name, and your own
   progress; hover for everybody's progress, click to tell the party how you are doing.
+- Quick chat messages have a route: **auto** (party, else `/w`, else `/s`) or **nearby** (`/w` to your target, else `/s`,
+  never party chat). *Hello* and *Team up?* are nearby by default; `/qs quick route N auto|nearby` or the editor button.
 - Quick chat "auto" goes to the party first (`/p`), then a whisper to a targeted player (`/w`), then `/s`.
 - If the game blocks a send from the ring ("protected function UNKNOWN()"), the sentence is put in your chat box so you
   only press Enter, and `/qs errors` says which message was blocked;

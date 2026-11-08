@@ -147,7 +147,8 @@ function ns.editorRefresh()
         local line = ed.lines[i]
         if list[i] then
             local hot = (ed.selected == i)
-            line.text:SetText(string.format("%s%d.  [%s]  %s|r", hot and "|cffffd100" or "|cffffffff", i, list[i].label, shorten(list[i].text, 58)))
+            line.text:SetText(string.format("%s%d.  [%s]  %s%s|r", hot and "|cffffd100" or "|cffffffff", i, list[i].label,
+                shorten(list[i].text, 52), list[i].channel == "nearby" and "  |cff88ccff/s|r" or ""))
             line.frame:Show()
         else
             line.frame:Hide()
@@ -156,6 +157,9 @@ function ns.editorRefresh()
     local item = ed.selected and list[ed.selected]
     ed.labelBox:SetText(item and item.label or "")
     ed.textBox:SetText(item and item.text or "")
+    if ed.routeText then
+        ed.routeText:SetText(item and (item.channel == "nearby" and "|cff55ccff[Goes to: nearby (/w target, else /s)]|r" or "|cff55ccff[Goes to: auto (party, else /w, else /s)]|r") or "")
+    end
     ed.preview:SetText(item and ("|cff888888Looks like:|r " .. shorten(ns.quickResolve(item.text), 110)) or "|cff888888Click a message above to edit it.|r")
 end
 
@@ -180,6 +184,11 @@ function ns.editorSave(label, text)
     end
     ns.editorRefresh()
 end
+function ns.editorRoute()
+    local item = ed.selected and ns.quickItems()[ed.selected]
+    if item then ns.quickRoute(ed.selected, item.channel == "nearby" and "auto" or "nearby") end
+    ns.editorRefresh()
+end
 function ns.editorReset() ns.quickReset(); ed.selected = nil; ns.editorRefresh() end
 
 local function buildEditor(parent)
@@ -197,6 +206,11 @@ local function buildEditor(parent)
         t:SetPoint("LEFT", line, "LEFT", 0, 0)
         ed.lines[i] = { frame = line, text = t }
     end
+    local route = clickable(f, 250, 16, function() ns.editorRoute() end)
+    route:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
+    ed.routeText = route:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    ed.routeText:SetPoint("RIGHT", route, "RIGHT", 0, 0)
+    ed.route = route
     local cap1 = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     cap1:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -172)
     cap1:SetText("Label (on the ring, 14 letters)")
