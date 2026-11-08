@@ -133,7 +133,9 @@ the game's tracker still tells the party you are done, because that is your own 
        Within" (from Deputy Willem in Elwynn Forest (48.2, 42.9)), 1 more step before that.` (Also "starts from the item
        ..., dropped by ..." when an item starts it.)
      - **Focus it on my map** (the game's quest marker and arrow; the nearest-quest pin waits a minute),
-     - **Open it in the quest log**.
+     - **Open it in the quest log** (the old quest log window). Where the quest log is inside the world map, this is
+       **Select it in the quest log**: the addon never opens the map itself (the game would refuse part of that in the
+       addon's name: "protected function SetPassThroughButtons()"), so you press L or M.
    - **Tell the party how I am doing** sends at once:
      `[Wolves Among Us] - I still need Wolf slain 3/8, Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8). What about you?`. The spot is added only for things you
      collect or use, and only while someone in the party still needs them; Quest Sharing users also get a pin there on
@@ -355,7 +357,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 681 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 684 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -411,11 +413,11 @@ python tests/test_look.py             # 42 tests: the settings window layout, th
 python tests/test_together.py         # 30 tests: several Quest Sharing users in one party, fewer messages
 python tests/test_team.py             # 30 tests: picked up a quest someone has, where the items were, the message budget
 python tests/test_where.py            # 24 tests: the star, map icons, a teammate's pin, the pin preferring shared quests
-python tests/test_menu.py             # 26 tests: the right-click menu, Questie's where-to-get-it, the sound-key guard
+python tests/test_menu.py             # 28 tests: the right-click menu, Questie's where-to-get-it, the sound-key guard
 python tests/test_done.py             # 20 tests: a quest you finished is never shared, announced or listed
-python tests/test_box.py              # 22 tests: messages into the chat box, refused calls written down and switched off
+python tests/test_box.py              # 23 tests: messages into the chat box, refused calls written down and switched off
 ```
-Expected: every line ends in `passed` with all tests green (681 in total).
+Expected: every line ends in `passed` with all tests green (684 in total).
 
 ## Files
 | File | Purpose |

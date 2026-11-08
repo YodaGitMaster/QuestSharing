@@ -184,6 +184,28 @@ def test_a_block_long_after_our_calls_is_not_blamed_on_them(style):
     assert "while" not in g.eval("NS.db.errors[#NS.db.errors].msg") and g.eval("NS.isBlocked('star')") is False
 
 
+# ---- calls the addon must never make (the game refuses them, or makes Blizzard code do it in our name) ----------------
+NEVER = ["SetPassThroughButtons", "SetPropagateMouseClicks", "SetPropagateMouseMotion", "QuestMapFrame_OpenToQuestDetails",
+         "ToggleWorldMap", "OpenWorldMap", "AddDataProvider", "AcquirePin"]
+NEVER_TEXT = ["WorldMapFrame:Show", "ShowUIPanel(WorldMapFrame", "ShowUIPanel, WorldMapFrame"]
+
+
+def test_the_addon_never_calls_what_makes_the_game_refuse_it():
+    """Not even through pcall(name, ...): the bare name may not appear in the code (comments aside)."""
+    root = pathlib.Path(__file__).resolve().parent.parent / "QuestSharing"
+    found = []
+    for f in sorted(root.glob("*.lua")):
+        for n, line in enumerate(f.read_text().splitlines(), 1):
+            code = line.split("--", 1)[0]                       # comments may name them
+            for bad in NEVER:
+                if re.search(r"\b" + bad + r"\b", code):
+                    found.append(f"{f.name}:{n}: {bad}")
+            for bad in NEVER_TEXT:
+                if bad in code:
+                    found.append(f"{f.name}:{n}: {bad}")
+    assert found == [], found
+
+
 if __name__ == "__main__":
     import inspect
     failed = total = 0

@@ -77,7 +77,7 @@ def test_right_click_opens_a_small_menu_for_that_quest(style):
     menu, lines = open_menu(g)
     assert menu.shown is True and plain(menu.title.text) == "Wolves Among Us"
     assert [plain(b.text) for b in lines] == ["Tell the party how I am doing", "Offer it to the party", "Tell them where to get it",
-                                             "Focus it on my map", "Open it in the quest log"]
+                                             "Focus it on my map", "Select it in the quest log"]
     assert "QuestSharingMenu" in list(g.eval("UISpecialFrames").values()), "Esc closes it"
 
 
@@ -116,14 +116,29 @@ def test_focus_it_on_my_map(style):
 
 
 def test_open_it_in_the_quest_log(style):
-    pre = "OPENED_LOG = nil; function QuestMapFrame_OpenToQuestDetails(id) OPENED_LOG = id end; QuestLogFrame = CreateFrame('Frame'); QuestLogFrame.shown = false; function ShowUIPanel(f) f.shown = true end"
+    pre = "QuestLogFrame = CreateFrame('Frame'); QuestLogFrame.shown = false; function ShowUIPanel(f) f.shown = true end"
     g = party(style, pre=pre)
     menu, lines = open_menu(g)
     pick(g, lines, "Open it in the quest log")
+    assert g.eval("QuestLogFrame.shown") is True, "the old quest log window opens at the quest"
+
+
+def test_a_quest_log_inside_the_world_map_is_never_opened_by_the_addon(style):
+    """Opening the map from addon code makes the game refuse SetPassThroughButtons() in the addon's name."""
+    pre = """MAP_OPENED = nil
+    function QuestMapFrame_OpenToQuestDetails(id) MAP_OPENED = id end
+    function ToggleWorldMap() MAP_OPENED = true end
+    function OpenWorldMap() MAP_OPENED = true end
+    SELECTED = nil
+    if C_QuestLog then C_QuestLog.SetSelectedQuest = function(id) SELECTED = id end end"""
+    g = party(style, pre=pre)
+    menu, lines = open_menu(g)
+    labels = [plain(b.text) for b in lines]
+    assert "Select it in the quest log" in labels and "Open it in the quest log" not in labels
+    pick(g, lines, "Select it in the quest log")
+    assert g.eval("MAP_OPENED") is None, "the map is left to you"
     if style == "modern":
-        assert g.eval("OPENED_LOG") == 100
-    else:
-        assert g.eval("QuestLogFrame.shown") is True
+        assert g.eval("SELECTED") == 100 and "open your quest log (L)" in "\n".join(g.printed())
 
 
 # ---- Questie: where to get it ---------------------------------------------------------------------------------------------

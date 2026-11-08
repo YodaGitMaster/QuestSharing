@@ -57,13 +57,22 @@ function ns.focusQuest(e)
     return ok
 end
 
+-- The old quest log window is opened at the quest. A quest log that lives inside the WORLD MAP is never opened from
+-- addon code: the map would then build its pins in the addon's name and the game refuses part of that
+-- ("tried to call the protected function SetPassThroughButtons()"). There the quest is selected and you open it.
+function ns.mapQuestLog() return QuestLogFrame == nil end
+
 function ns.openInLog(e)
-    ns.trying("opening the quest log")
-    if C.modern and QuestMapFrame_OpenToQuestDetails then return (pcall(QuestMapFrame_OpenToQuestDetails, e.questID)) end
     if QuestLogFrame and ShowUIPanel then
+        ns.trying("opening the quest log")
         pcall(ShowUIPanel, QuestLogFrame)
         if QuestLog_SetSelection and e.index then pcall(QuestLog_SetSelection, e.index) end
         if QuestLog_Update then pcall(QuestLog_Update) end
+        return true
+    end
+    if C_QuestLog and C_QuestLog.SetSelectedQuest then
+        pcall(C_QuestLog.SetSelectedQuest, e.questID)
+        ns.print(C.link(e) .. " is selected: open your quest log (L) or the map (M) to see it")
         return true
     end
     ns.print("this client has no quest log to open")
@@ -85,7 +94,7 @@ function ns.questMenuItems(e)
         (not qOk and "needs the Questie addon") or (not inParty and "you are not in a party") or (#missing == 0 and "everybody has it")
         or (not ns.whereMessage(e) and "Questie does not know where it starts") or nil)
     add("Focus it on my map", function() ns.focusQuest(e) end, (not (ns.canPin and ns.canPin())) and "not on this client" or nil)
-    add("Open it in the quest log", function() ns.openInLog(e) end, nil)
+    add(ns.mapQuestLog() and "Select it in the quest log" or "Open it in the quest log", function() ns.openInLog(e) end, nil)
     return items
 end
 
