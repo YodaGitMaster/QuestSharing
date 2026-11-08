@@ -18,13 +18,19 @@ A World of Warcraft addon for playing quests together.
 
    It also shows you, privately, who accepted, declined or already finished each quest you shared.
 
-2. **Posts your progress when you click a quest in the tracker:**
+2. **Puts your progress in the chat box when you click a quest** in the game's tracker (the list on the right) or a
+   row of the Party quests window. **Click more quests and they are added**, not replaced, so you send them all with
+   one Enter:
 
-   > /p {star} [Wolves Among Us] - still need: Wolf slain 3/8, Wolf Pelt 0/4 (Anna has it too!)
-   > /p [Report to Goldshire] - I'm done with this one, ready to turn in!
+   > /p [Wolves Among Us] - still need: Wolf slain 3/8, Wolf Pelt 0/4 (Anna has it too!) + [Report to Goldshire] - I'm done with this one, ready to turn in!
 
-   The star and the names appear only when a party member has that quest. Shift-clicking a quest link into
-   the chat box appends the same status.
+   - The names appear only when a party member has that quest, and not once you have finished it.
+   - A quest already in the box is not added twice. Anything you typed first stays; your status goes after it.
+   - One chat message holds 255 letters; when the next one does not fit, the addon says so instead of cutting it.
+     Press Enter, then click again.
+   - Enter or Esc closes the box; the next click starts a new message.
+   - `/qs mode send` sends it to the party at once instead (then the game shows a star when the party has the quest);
+     `/qs mode print` only shows it to you. Shift-clicking a quest link into the chat box adds the status too.
 
 3. **Talks to other Quest Sharing users (sync).** Party members who also run the addon exchange their
    exact quest lists and objective progress in the background. For them "who has what" is exact instead
@@ -49,8 +55,8 @@ A World of Warcraft addon for playing quests together.
    - Each row is **one shared quest**: the **class icons of the members who have it** come first (a small green
      check on an icon means that member finished it), then the quest name (green when you are done), and **your own
      progress** on the right (`3/8`, `3/8 +1` when more goals are open, or `done`).
-   - **Hover** a row to see everybody's progress; **click** a row and the addon **tells your party how you are
-     doing with that quest** (the quest link, what you still need, and who else has it).
+   - **Hover** a row to see everybody's progress; **click** a row and **your status for that quest goes into the chat box**, exactly like a click on
+     the game's tracker (click more rows to add them).
    - More than 12 shared quests: the rest is summed up as "+N more".
 
 6. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. It fills the
@@ -185,7 +191,7 @@ once. Settings saved by an earlier version get the new defaults; every other cho
 | `/qs sync on\|off` | exchange exact quest lists with other Quest Sharing users (default on) |
 | `/qs announce on\|off` | say in party chat when a quest we share is done (default on) |
 | `/qs markers on\|off` | star and names next to shared quests in the quest log (default on) |
-| `/qs panel [on\|off]` | show the "Party quests" window while in a party (default on); drag it to move it, click a row to tell the party your progress |
+| `/qs panel [on\|off]` | show the "Party quests" window while in a party (default on); drag it to move it, click a row to put your progress in the chat box |
 | `/qs near [on\|off]` | keep the quest tracker filled with the quests closest to you (default on) |
 | `/qs near N` | how many quests it keeps (default 5) |
 | `/qs near mode auto\|distance\|zone` | `auto` uses distance if your client can measure it, otherwise your zone |
@@ -226,7 +232,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 448 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 453 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -269,7 +275,7 @@ breaking. `/qs doctor` tells you exactly what works on your copy.
 ## Tests
 ```
 pip install lupa
-python tests/test_questsharing.py     # 63 tests: sharing, replies, announcements, tracker clicks, commands
+python tests/test_questsharing.py     # 68 tests: sharing, replies, announcements, tracker clicks, commands
 python tests/test_features.py         # 62 tests: sync, completion, the party quests window, quest-log markers
 python tests/test_triggers.py         # 34 tests: when it shares (once per join / new member / new quest), no nagging
 python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
@@ -279,7 +285,7 @@ python tests/test_quick.py            # 119 tests: the quick chat ring, placehol
 python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
 python tests/test_highlight.py        # 22 tests: quest icons over creatures, the world pin, the game-settings helper
 ```
-Expected: every line ends in `passed` with all tests green (448 in total).
+Expected: every line ends in `passed` with all tests green (453 in total).
 
 ## Files
 | File | Purpose |

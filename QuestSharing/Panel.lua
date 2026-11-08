@@ -86,15 +86,11 @@ function ns.panelMine(e)
     return txt .. (open > 1 and (" +" .. (open - 1)) or "")
 end
 
--- Tell the party how YOU are doing with a quest (what a click on a row does)
+-- A click on a row does what a click on the game's tracker does: your status for that quest goes into the chat box,
+-- added to what is already there (click several quests, then press Enter once)
 function ns.sharePanelQuest(e)
     if not e then return false end
-    if not C.inGroup() then ns.print("you are not in a party") return false end
-    if ns.panelLastShare and GetTime() - ns.panelLastShare < 1 then return false end      -- no accidental double clicks
-    ns.panelLastShare = GetTime()
-    SendChatMessage(ns.statusMessage(e), C.channel())
-    ns.print("told the party how you are doing with " .. e.title)
-    return true
+    return ns.shareStatus(e)
 end
 
 -- The panel frame -------------------------------------------------------------------------------------
@@ -121,7 +117,7 @@ local function rowTooltip(row)
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
     GameTooltip:SetText(row.entry.title)
     for _, w in ipairs(row.who or {}) do GameTooltip:AddLine(w.m.name .. ": " .. w.text) end
-    GameTooltip:AddLine("Click: tell the party how I am doing")
+    GameTooltip:AddLine("Click: add how I am doing to the chat box (click more quests to add them too)")
     GameTooltip:Show()
 end
 

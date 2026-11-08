@@ -162,7 +162,14 @@ end
 
 function SendChatMessage(msg, channel, lang, target) SENT[#SENT + 1] = { msg = msg, channel = channel, target = target } end
 DEFAULT_CHAT_FRAME = { AddMessage = function(_, m) PRINTED[#PRINTED + 1] = m end }
-function ChatFrame_OpenChat(text) OPENED[#OPENED + 1] = text end
+function ChatFrame_OpenChat(text)
+    OPENED[#OPENED + 1] = text
+    -- like the game: the box opens, a "/p " in front switches it to party chat and is not part of the text
+    local chan, rest = string.match(text, "^(/%a+) (.*)$")
+    EDITBOX.text = rest or text
+    EDITBOX.chat = chan or "/s"
+    ACTIVE_BOX = EDITBOX
+end
 SlashCmdList = {}
 function IsShiftKeyDown() return SHIFT end
 function IsControlKeyDown() return CTRL end
@@ -184,6 +191,9 @@ function GetRealZoneText() return ZONE end
 -- chat edit box for the shift-click link hook
 EDITBOX = { text = "" }
 function EDITBOX:Insert(t) self.text = self.text .. t end
+function EDITBOX:SetText(t) self.text = t end
+function EDITBOX:GetText() return self.text end
+function CLOSE_CHAT() ACTIVE_BOX = nil; EDITBOX.text = "" end
 ACTIVE_BOX = nil
 function ChatEdit_GetActiveWindow() return ACTIVE_BOX end
 function ChatEdit_InsertLink(text) if ACTIVE_BOX then ACTIVE_BOX:Insert(text) end return true end
