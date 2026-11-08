@@ -191,14 +191,14 @@ def test_quest_log_changes_are_sent_to_synced_players(style):
     g = quiet_party(style)
     hello(g, "Anna", "100:0:3/8,0/4")
     g.advance(3)
-    base = len(g.addon_sent())
+    base = len([m for m in g.addon_sent() if not m.startswith("M|")])
     g.run('BYID(100).objectives[1].text = "Wolf slain: 5/8"; BYID(100).objectives[1].numFulfilled = 5')
     g.run("table.remove(QUESTS, 4)")                                        # quest 102 abandoned
     g.run("QUESTS[#QUESTS+1] = { id = 300, title = 'New', level = 4, objectives = {} }")
     g.fire("QUEST_LOG_UPDATE")
     g.fire("QUEST_LOG_UPDATE")                                              # bursts are folded into one look
     g.advance(4)
-    sent = g.addon_sent()[base:]
+    sent = [m for m in g.addon_sent() if not m.startswith("M|")][base:]
     assert "P|100:0:5/8,0/4" in sent and "R|102" in sent and "P|300:0:" in sent, sent
     assert len(sent) == 3, sent
 
@@ -367,7 +367,7 @@ def test_finished_members_get_a_gold_check_and_unknown_ones_a_question_mark(styl
     row = [rows[i] for i in range(1, 6) if rows[i].shown and "Report to Goldshire" in rows[i].title.text][0]
     assert row.cells[1].texture == CHECK and tuple(round(v, 2) for v in list(row.cells[1].vertex.values())[:3]) == (1, 0.82, 0)
     assert row.cells[2].texture == WAIT, "out of range: a question mark, not a wrong X"
-    assert row.title.text.startswith("|cff55ff55") and plain(row.mine.text) == "done", "my own finished quest is green"
+    assert row.title.text.startswith("|cff55ff55") and plain(row.mine.text) == "turn in!", "Anna and I are both done: hand it in"
     assert "QS" in plain(cols[1].name.text) and "QS" not in plain(cols[2].name.text)
 
 
@@ -386,26 +386,92 @@ def test_my_own_progress_is_next_to_the_quest(style):
     assert plain(row.mine.text) == "3/8 +1"
 
 
-def test_clicking_rows_adds_my_status_to_the_chat_box_like_the_tracker(style):
-    g = quiet_party(style, ("Anna",), on_quest={"party1": [100, 101]})
+def row_of(rows, title):
+    return [rows[i] for i in range(1, 6) if rows[i].shown and title in rows[i].title.text][0]
+
+
+def test_left_click_offers_the_quest_to_whoever_does_not_have_it(style):
+    g = quiet_party(style, ("Anna", "Bob"), on_quest={"party1": [100]})
+    panel, rows, cols, notes = panel_of(g)
+    g.run("PUSHED = {}; PRINTED = {}")
+    g.eval("function(r) r.scripts.OnClick(r, 'LeftButton') end")(row_of(rows, "Wolves Among Us"))
+    assert g.pushed() == [100] and "offered" in "\n".join(g.printed()) and "to Bob" in "\n".join(g.printed())
+    assert g.sent() == [], "offering is a popup, not a chat message"
+
+
+def test_left_click_explains_when_it_cannot_offer(style):
+    g = quiet_party(style, ("Anna",), on_quest={"party1": [100]})
     panel, rows, cols, notes = panel_of(g)
     click = g.eval("function(r) r.scripts.OnClick(r, 'LeftButton') end")
-    first = [rows[i] for i in range(1, 6) if rows[i].shown and "Wolves Among Us" in rows[i].title.text][0]
-    second = [rows[i] for i in range(1, 6) if rows[i].shown and "Report to Goldshire" in rows[i].title.text][0]
-    click(first)
-    assert g.sent() == [], "nothing is sent behind your back: it waits in the chat box"
-    opened = g.opened()
-    assert len(opened) == 1 and opened[0].startswith("/p ") and "{rt1}" not in opened[0]
-    assert "Wolves Among Us" in opened[0] and "Wolf slain 3/8" in opened[0] and "Anna has it too" in opened[0]
-    click(second)
-    text = g.eval("EDITBOX.text")
-    assert " + " in text and "Wolves Among Us" in text and "Report to Goldshire" in text, "added, not replaced"
-    click(first)
-    assert g.eval("EDITBOX.text") == text, "a quest already in the box is not added again"
-    g.slash("mode send")
-    g.run("CLOSE_CHAT()")
-    click(first)
-    assert len(g.sent()) == 1 and g.sent()[0][1] == "PARTY", "the same setting as the tracker click"
+    g.run("PUSHED = {}; PRINTED = {}")
+    click(row_of(rows, "Wolves Among Us"))
+    assert g.pushed() == [] and "everybody in the party has" in "\n".join(g.printed())
+    click(row_of(rows, "A Personal Quest"))
+    assert g.pushed() == [] and "cannot be shared" in "\n".join(g.printed())
+
+
+def test_right_click_tells_the_party_how_i_am_doing_and_asks_them(style):
+    g = quiet_party(style, ("Anna",), on_quest={"party1": [100, 101]})
+    panel, rows, cols, notes = panel_of(g)
+    ask = g.eval("function(r) r.scripts.OnClick(r, 'RightButton') end")
+    ask(row_of(rows, "Wolves Among Us"))
+    msg, channel = g.sent()[-1]
+    assert channel == "PARTY" and "[Wolves Among Us]" in msg
+    assert "I still need Wolf slain 3/8, Wolf Pelt 0/4." in msg and msg.endswith(("What about you?", "How about you?", "And you?"))
+    g.advance(2)
+    ask(row_of(rows, "Report to Goldshire"))
+    assert "I finished it, ready to turn in!" in g.sent()[-1][0]
+    ask(row_of(rows, "Report to Goldshire"))
+    assert len(g.sent()) == 2, "a double click is not said twice"
+    assert g.opened() == [], "it is sent at once: a right click is a click"
+
+
+def test_the_question_carries_where_i_found_the_items(style):
+    g = quiet_party(style, ("Anna",), on_quest={"party1": [100]})
+    hello(g, "Anna", "100:0:5/8,1/4")
+    g.run("local q = BYID(100); q.objectives[2].numFulfilled = 2; q.objectives[2].text = 'Wolf Pelt: 2/4'")
+    g.fire("QUEST_LOG_UPDATE")
+    g.advance(2)
+    panel, rows, cols, notes = panel_of(g)
+    g.eval("function(r) r.scripts.OnClick(r, 'RightButton') end")(row_of(rows, "Wolves Among Us"))
+    assert "Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8)." in g.sent()[-1][0]
+    g.advance(1)
+    assert any(m.startswith("S|100|1429|0.4230|0.6180|Wolf Pelt") for m in g.addon_sent()), "addon users get a map pin there"
+
+
+def test_members_who_cannot_take_it_get_a_dash(style):
+    g = quiet_party(style, ("Anna",))
+    g.run("NS.known[100] = { anna = 'done' }")              # "Anna has already completed that quest"
+    panel, rows, cols, notes = panel_of(g)
+    assert row_of(rows, "Wolves Among Us").cells[1].texture == "Interface\\Buttons\\UI-MinusButton-Up"
+
+
+def test_scroll_down_for_the_rest_of_the_zone(style):
+    g = quiet_party(style, ("Anna",))
+    g.run("""for i = 1, 4 do
+        table.insert(QUESTS, 5, { id = 400 + i, title = "Zone Quest " .. i, level = 5, objectives = {} })
+    end""")                                                  # all in Elwynn Forest (before the Westfall header)
+    g.fire("QUEST_LOG_UPDATE")
+    panel, rows, cols, notes = panel_of(g)
+    first = [t for t, _ in grid(rows, cols, 1)]
+    assert len(first) == 5 and "scroll down: " in notes.text and "more in Elwynn Forest" in notes.text
+    g.eval("function(f) f.scripts.OnMouseWheel(f, -1) end")(panel)
+    after = [t for t, _ in grid(rows, cols, 1)]
+    assert after != first and after[:4] == first[1:], "one row further down"
+    for _ in range(10):
+        g.eval("function(f) f.scripts.OnMouseWheel(f, -1) end")(panel)
+    assert "scroll up" in notes.text
+    for _ in range(10):
+        g.eval("function(f) f.scripts.OnMouseWheel(f, 1) end")(panel)
+    assert [t for t, _ in grid(rows, cols, 1)] == first
+
+
+def test_in_a_raid_it_says_why_nothing_is_shared(style):
+    g = quiet_party(style, ("Anna",))
+    panel, rows, cols, notes = panel_of(g)
+    g.run("RAID = true")
+    g.eval("NS.refreshPanel")()
+    assert "not in a raid" in notes.text
 
 
 def test_a_finished_quest_does_not_add_who_else_has_it(style):
@@ -420,7 +486,7 @@ def test_the_header_counts_the_shared_quests_and_marks_addon_users(style):
     g = quiet_party(style, ("Anna", "Bob"), on_quest={"party1": [100]})
     hello(g, "Bob", "100:0:1/8")
     panel, rows, cols, notes = panel_of(g)
-    assert plain(panel.count.text) == "(1 of 4 shared)"
+    assert plain(panel.count.text) == "(1 shared, 4 here)"
     assert "QS" not in cols[1].name.text and plain(cols[2].name.text) == "Bob QS", "Bob runs Quest Sharing too"
 
 
@@ -509,7 +575,7 @@ def test_a_row_has_a_tooltip_with_everybodys_status(style):
     g.eval("function(r) r.scripts.OnEnter(r) end")(row)
     lines = list(g.eval("TOOLTIP.lines").values())
     assert g.eval("TOOLTIP.text") == "Wolves Among Us" and "Anna: 5/8, 1/4" in lines and "Bob: has it" in lines
-    assert any("Click" in l for l in lines)
+    assert any("Left click: offer it" in l for l in lines) and any("Right click: tell the party" in l for l in lines)
 
 
 def test_the_window_is_as_wide_as_the_party(style):

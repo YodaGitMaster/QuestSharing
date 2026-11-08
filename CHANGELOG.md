@@ -1,6 +1,15 @@
 # Changelog
 
 ## 0.2.0
+- **You decide when to talk:** the automatic party chat ("in common", "done", "picked up") is **off by default** (and
+  switched off once for existing settings). **Party quests window:** scroll down for all your quests in the zone below
+  the 5 nearest; **left click offers** the quest to whoever does not have it; **right click tells the party** "I still
+  need Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8). What about you?" or "I finished it, ready to turn in! What about you?";
+  a grey dash for members who cannot take it; "turn in!" when everybody who has it is done; a note in raids.
+- **Showing each other where you are:** the star over your head in a party (not in dungeons, never taken back from a
+  tank), Quest Sharing users as class icons on your world map, a map pin where a teammate found the items, and the
+  quest marker preferring the nearest quest you share. The ring's *Team up?* says "Doing [your quest] here - anyone
+  want to group up?" in /s.
 - **The Party quests window is a grid:** *Quest | member 1 | member 2 ...*, with a check (has it), a gold check (has it
   and finished it), an X (does not have it) or a ? (the game cannot tell: out of range, offline) under each member.
   It always shows **your 5 nearest quests**, re-sorted every few seconds as you move; a quest only moves up when it is

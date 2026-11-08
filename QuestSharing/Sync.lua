@@ -8,6 +8,8 @@
 --   R|questID             a quest was removed (abandoned or turned in)
 --   C|questID             all objectives of a quest are done
 --   O|questID             I just offered this quest to the party (so the others do not offer it again)
+--   M|map|x|y             where I am (map id, 0..1), every 10 seconds while I move: a class icon on your world map
+--   S|questID|map|x|y|what  where I found the items of a quest (sent with a right-click question): a map pin for you
 -- objectives = comma separated  have/need  (counted)  or  f / u  (finished / unfinished, not counted)
 local ADDON, ns = ...
 local C = ns.compat
@@ -160,6 +162,12 @@ local function handle(sender, text)
     elseif kind == "R" then
         local id = tonumber(rest)
         if id then peer.quests[id] = nil; changed() end
+    elseif kind == "M" then
+        local map, x, y = string.match(rest, "^(%d+)|([%d%.]+)|([%d%.]+)$")
+        if map and ns.onPeerPosition then ns.onPeerPosition(peer, tonumber(map), tonumber(x), tonumber(y)) end
+    elseif kind == "S" then
+        local id, map, x, y, what = string.match(rest, "^(%d+)|(%d+)|([%d%.]+)|([%d%.]+)|?(.*)$")
+        if id and ns.onPeerSpot then ns.onPeerSpot(peer, tonumber(id), tonumber(map), tonumber(x), tonumber(y), what) end
     elseif kind == "O" then                                       -- they offered it: nobody else needs to
         local id = tonumber(rest)
         if id and ns.markOffered then ns.markOffered(id) end

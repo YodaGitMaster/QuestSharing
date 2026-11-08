@@ -52,6 +52,48 @@ function ns.statusMessage(e, forBox)
     return msg
 end
 
+-- What a right click on a quest in the Party quests window says to the party: where I am with it, where the items
+-- were, and a question so the others answer.   "[Wolves Among Us] - I still need Wolf slain 3/8, Wolf Pelt 2/4
+-- (Wolf Pelt at 42.3, 61.8). What about you?"   /   "[Report to Goldshire] - I finished it, ready to turn in! What about you?"
+local ASK = { " What about you?", " How about you?", " And you?" }
+function ns.questionMessage(e)
+    local objs = C.objectives(e)
+    local open, allDone = {}, #objs > 0
+    for _, o in ipairs(objs) do
+        if not o.finished then
+            allDone = false
+            open[#open + 1] = (o.have and o.need) and string.format("%s %d/%d", o.name or o.text, o.have, o.need) or o.text
+        end
+    end
+    local link, ask = C.link(e), ns.pick(ASK)
+    local body
+    if e.complete or allDone then
+        body = " - I finished it, ready to turn in!"
+    elseif #open > 0 then
+        body = " - I still need " .. table.concat(open, ", ") .. (ns.spotShort and ns.spotShort(e) or "") .. "."
+    else
+        body = " - still working on it."
+    end
+    local msg = link .. body .. ask
+    if #msg > 255 then msg = link .. C.safeCut(body, 255 - #link - #ask) .. ask end
+    return msg
+end
+
+local lastAsk = { id = nil, at = -10 }
+function ns.askParty(e)
+    if not e then return false end
+    if lastAsk.id == e.questID and GetTime() - lastAsk.at < 1.5 then return false end        -- a double click
+    lastAsk.id, lastAsk.at = e.questID, GetTime()
+    local msg = ns.questionMessage(e)
+    if not C.inGroup() then ns.print(msg .. "  (not sent: you are not in a party)"); return false end
+    SendChatMessage(msg, C.channel())
+    local s = ns.spots and ns.spots[e.questID]
+    if s and s.map and ns.spotShort(e) ~= "" and ns.syncUpdate then       -- Quest Sharing users get a map pin there
+        ns.syncUpdate(string.format("S|%d|%d|%.4f|%.4f|%s", e.questID, s.map, s.x, s.y, s.what or ""))
+    end
+    return true
+end
+
 -- Delivery ------------------------------------------------------------------------------------------
 function ns.deliver(msg)
     local mode = ns.db.mode

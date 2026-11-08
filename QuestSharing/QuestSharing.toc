@@ -12,6 +12,7 @@ Share.lua
 Sync.lua
 Progress.lua
 Team.lua
+Marker.lua
 Panel.lua
 Track.lua
 Highlight.lua

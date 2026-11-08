@@ -32,8 +32,8 @@ local function noteProgress(old, cur)
         local was = old.objs[j]
         local moved = was and ((o.have and was.have and o.have > was.have) or (o.finished and not was.finished))
         if moved and PICK[o.type or ""] then
-            local _, x, y = C.playerPos()
-            if x then ns.spots[cur.entry.questID] = { what = o.name or o.text, x = x, y = y, zone = C.zone(), at = GetTime() } end
+            local map, x, y = C.playerPos()
+            if x then ns.spots[cur.entry.questID] = { what = o.name or o.text, map = map, x = x, y = y, zone = C.zone(), at = GetTime() } end
         end
     end
 end
@@ -46,6 +46,14 @@ function ns.someoneStillNeeds(e)
         if not (rec and rec.complete) then return true end
     end
     return false
+end
+
+-- " (Wolf Pelt at 42.3, 61.8)", or "" when there is nothing useful to add (for the question you ask the party)
+function ns.spotShort(e)
+    if not ns.db.coords then return "" end
+    local s = ns.spots[e.questID]
+    if not s or not ns.someoneStillNeeds(e) then return "" end
+    return string.format(" (%s at %.1f, %.1f)", s.what, s.x * 100, s.y * 100)
 end
 
 -- " - Wolf Pelt: 42.3, 61.8 in Elwynn Forest", or "" when there is nothing useful to add

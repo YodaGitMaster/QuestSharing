@@ -3,19 +3,19 @@ local ADDON, ns = ...
 local C = ns.compat
 
 ns.defaults = {
-    dbVersion = 2,
+    dbVersion = 3,
     enabled = true,     -- master switch
     auto = true,        -- share automatically when you join / form a party, or a new member joins
     shareNew = true,    -- also share a quest once when you accept it while in a party
     area = "zone",      -- which quests to share: "zone" (the zone you are in) or "all"
     gap = 4,            -- seconds between two shared quests inside one round (so the party is not flooded with popups)
     settle = 5,         -- seconds to wait after the party forms before sharing
-    chat = true,        -- announce quests in common in party chat
+    chat = false,       -- (off) announce quests in common in party chat
     click = true,       -- clicking a tracked quest fills the chat box with a status message
     link = true,        -- shift-clicking a quest link in the chat box also appends the status
     mode = "box",       -- what a click does: "box" (fill the chat box), "send" (send now), "print" (only show it to you)
     sync = true,        -- talk to other players' Quest Sharing addons (exact quest lists and progress)
-    announce = true,    -- say in party chat when a quest we share has all its objectives done
+    announce = false,   -- (off) say in party chat when a quest we share has all its objectives done
     markers = true,     -- mark quests your party shares in the quest log
     panel = true,       -- show the "quests in common" panel while you are in a party
     minimap = true,     -- the minimap button
@@ -30,7 +30,10 @@ ns.defaults = {
     nearCount = 5,      -- how many quests the tracker keeps while "near" is on
     nearPause = 10,     -- seconds the tracker and the pin leave your choice alone after you change the tracker yourself
     nearMode = "auto",  -- "auto" (distance if the client can measure it, else zone), "distance" or "zone"
-    pickup = true,      -- say in party chat when I pick up a quest someone in the party has ("let's do it together?")
+    pickup = false,     -- (off) say in party chat when I pick up a quest someone in the party has ("let's do it together?")
+    selfMark = true,    -- put the star raid icon over my head while in a party (not in dungeons), so people see where I am
+    mapPins = true,     -- show party members who run Quest Sharing on my world map, and send them where I am
+    teamWaypoint = true, -- put a map pin where a teammate says they found the quest items
     coords = true,      -- add where I found / used the quest items to my messages, when someone in the party still needs them
     sound = true,       -- a soft sound for good news (someone accepted a quest I shared, a party member finished a shared quest)
     panelCombat = true, -- hide the Party quests window during combat
@@ -111,11 +114,15 @@ ns.on("ADDON_LOADED", function(_, name)
     for k, v in pairs(ns.defaults) do
         if QuestSharingDB[k] == nil then QuestSharingDB[k] = v end
     end
-    if savedVersion < ns.defaults.dbVersion then
+    if savedVersion < 2 then
         -- earlier versions saved "near" and "panel" as off; the new defaults have them on
         QuestSharingDB.near, QuestSharingDB.panel = true, true
-        QuestSharingDB.dbVersion = ns.defaults.dbVersion
     end
+    if savedVersion < 3 then
+        -- the automatic party chat is off now: you speak when you want to (right click a quest in the Party quests window)
+        QuestSharingDB.chat, QuestSharingDB.announce, QuestSharingDB.pickup = false, false, false
+    end
+    QuestSharingDB.dbVersion = ns.defaults.dbVersion
     ns.db = QuestSharingDB
     if ns.refreshSettings then ns.refreshSettings() end
 end)
@@ -201,6 +208,8 @@ function ns.setSetting(key, value)
         if key == "markers" and ns.refreshQuestLog then ns.refreshQuestLog() end
         if (key == "panel" or key == "panelCombat") and ns.syncPanelVisibility then ns.syncPanelVisibility() end
         if key == "panelScale" and ns.applyPanelScale then ns.applyPanelScale() end
+        if (key == "selfMark" or key == "enabled") and ns.syncSelfMark then ns.syncSelfMark() end
+        if key == "mapPins" and ns.refreshMapPins then ns.refreshMapPins() end
         if key == "minimap" and ns.syncMinimapButton then ns.syncMinimapButton() end
         if key == "markMobs" and ns.refreshMarkers then ns.refreshMarkers() end
         if key == "nearPin" and not value and ns.releasePin then ns.releasePin() end
@@ -252,6 +261,9 @@ local help = {
     "/qs announce on|off  say in party chat when a quest we share has all its objectives done",
     "/qs pickup on|off    say when I pick up a quest someone in the party has (let's do it together?)",
     "/qs coords on|off    add where I found the quest items to my messages, when someone still needs them",
+    "/qs star on|off      the star over my head while in a party, so people see where I am",
+    "/qs mappins on|off   party members running Quest Sharing on my world map (and my position to them)",
+    "/qs waypoint on|off  a map pin where a teammate found the quest items",
     "/qs markers on|off   mark shared quests in the quest log",
     "/qs panel [on|off]   show / hide the \"quests in common\" panel (drag it to move it)",
     "/qs near [on|off]    keep the tracker (right-hand list) filled with the quests closest to you",
@@ -267,7 +279,7 @@ local help = {
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", pickup = "pickup", coords = "coords",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", pickup = "pickup", coords = "coords", star = "selfMark", mappins = "mapPins", waypoint = "teamWaypoint",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"
