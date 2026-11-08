@@ -135,8 +135,9 @@ function ns.panelGrid(entries)
         m.addon = ns.peers[key(m.name)] and true or false
     end
     local grid = { members = members, rows = {}, shared = 0 }
-    local open = {}                                                    -- finished quests: nothing to do together
-    for _, e in ipairs(entries) do if not C.doneByMe(e) then open[#open + 1] = e end end
+    -- only quests of the zone you are in (never filled up with quests from elsewhere), and not finished ones
+    local open = {}
+    for _, e in ipairs(entries) do if not C.doneByMe(e) and C.inArea(e) then open[#open + 1] = e end end
     entries = open
     local list, inList = ns.nearestQuests(entries, NEAREST), {}
     grid.near = #list
@@ -469,7 +470,7 @@ function ns.refreshPanel()
     local note
     if C.inRaid() then note = "Quests can only be shared in a 5-player party, not in a raid."
     elseif not grid then note = "You are not in a party."
-    elseif #rows == 0 then note = "You have no quests right now."
+    elseif #rows == 0 then note = "You have no quests to do in " .. C.zone() .. "."
     elseif #rows > GRID_ROWS then
         local below = #rows - GRID_ROWS - offset
         note = below > 0 and (S.GREY .. "scroll down: " .. below .. " more in " .. C.zone() .. "|r")
