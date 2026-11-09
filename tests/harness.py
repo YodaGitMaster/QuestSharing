@@ -91,6 +91,11 @@ local function newObject()
     function o:GetScale() return self.scale or 1 end
     function o:EnableKeyboard(v) self.keyboard = v end
     function o:SetNormalTexture(t) self.normal = t end
+    -- scroll frames: one child, a position and a range (tests set scrollRange)
+    function o:SetScrollChild(c) self.scrollChild = c end
+    function o:SetVerticalScroll(v) self.vscroll = v end
+    function o:GetVerticalScroll() return self.vscroll or 0 end
+    function o:GetVerticalScrollRange() return self.scrollRange or 0 end
     for _, name in ipairs({ "SetBackdrop", "SetBackdropColor", "SetFrameStrata", "SetMovable", "EnableMouse",
                             "RegisterForDrag", "SetJustifyH", "StartMoving", "StopMovingOrSizing", "SetAllPoints",
                             "ClearAllPoints", "SetFontObject", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "SetFocus",

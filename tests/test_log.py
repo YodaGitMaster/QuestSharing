@@ -176,6 +176,44 @@ def test_slash_log_shows_it_in_a_window_and_clear_empties_it(style):
     assert len(log(g)) <= 3 and "debug log cleared" in "\n".join(g.printed())
 
 
+def test_the_window_scrolls_and_has_select_all_switch_clear_and_close(style):
+    g = on(style)
+    g.run("for i = 1, 900 do NS.log('t', 'a long log, line ' .. i) end")
+    g.slash("log")
+    win, box = g.eval("NS._reportWindow()")
+    assert g.eval("(function() local w, b = NS._reportWindow(); return w.scroll.scrollChild == b end)()") is True, \
+        "the text lies inside a scroll frame: it stays in the window"
+    g.run("NS._reportWindow().scroll.scrollRange = 5000")
+    g.eval("function(s) s.scripts.OnMouseWheel(s, -1) end")(win.scroll)
+    assert win.scroll.vscroll == 60, "the mouse wheel scrolls"
+    for b in ("selectAll", "showLog", "showErrors", "clear", "close"):
+        assert win[b] is not None, b
+    g.run("PRINTED = {}")
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.selectAll)
+    assert "press Cmd+C (Mac) or Ctrl+C (Windows)" in "\n".join(g.printed())
+    g.eval("NS.logError")("x", "something broke")
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.showErrors)
+    assert "something broke" in box.text and "errors" in win.title.text and win.clear.shown is True
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.clear)
+    assert len(g.eval("NS.db.errors")) == 0 and "no errors recorded" in box.text
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.showLog)
+    assert "a long log, line 900" in box.text and "debug log" in win.title.text
+    g.slash("doctor")
+    assert win.clear.shown is False, "nothing to clear in the doctor's report"
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.close)
+    assert win.shown is False
+
+
+def test_the_settings_have_buttons_for_the_log_and_the_errors(style):
+    g = quick_game(style)
+    labels = [g.eval(f"NS.settingRows[{i}].label") for i in range(1, int(g.eval("#NS.settingRows")) + 1)]
+    assert "Show the debug log" in labels and "Show the errors" in labels
+    row = next(i for i in range(1, len(labels) + 1) if labels[i - 1] == "Show the errors")
+    g.eval(f"NS.settingRows[{row}].action")()
+    win, box = g.eval("NS._reportWindow()")
+    assert win.shown is True and "no errors recorded" in box.text
+
+
 def test_slash_log_when_it_is_off_says_how_to_switch_it_on(style):
     g = quick_game(style)
     g.run("PRINTED = {}")

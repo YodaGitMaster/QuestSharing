@@ -86,16 +86,57 @@ def test_say_and_whisper_also_go_into_the_chat_box_without_an_extra_click(style)
     assert "chat box" in hint.text or hint.text == ""
 
 
-def test_a_refused_send_from_the_ring_goes_into_the_chat_box_and_switches_sending_at_once_off(style):
+def test_a_refused_send_from_the_ring_marks_only_that_channel(style):
     g = fresh_party(style, pre=REFUSE_CHAT)
     g.run("PRINTED = {}")
-    ring(g, 3)
+    ring(g, 3)                                                       # "What I need" -> the party: refused
     assert g.opened() and g.opened()[-1].startswith("/p I need to: "), "the refused message is in your chat box"
-    assert g.eval("NS.db.quickSend") is False
-    assert "does not let the addon send from the ring" in "\n".join(g.printed())
+    assert g.eval("NS.db.chatRefused.PARTY") is True and g.eval("NS.db.quickSend") is True, "the switch stays on"
+    assert "does not let addons send to PARTY here" in "\n".join(g.printed())
     g.advance(2)
     ring(g, 3)
-    assert g.eval("SEND_TRIES") == 1 and len(g.opened()) == 2, "straight into the chat box now: no second try"
+    assert g.eval("SEND_TRIES") == 1 and len(g.opened()) == 2, "the party: straight into the chat box now, no second try"
+    g.advance(2)
+    g.run('TARGET = { name = "Lia", player = true }')
+    ring(g, 5)                                                       # "Thanks" to Lia (not in the party): a whisper
+    assert g.eval("SEND_TRIES") == 2, "another channel is still tried at once"
+    g.slash("quick send off")
+    g.slash("quick send on")                                         # you ask for it again: another try for all
+    assert g.eval("next(NS.db.chatRefused) == nil") is True
+
+
+def ring_click(g, slot):
+    """Open the ring and click a slot (a real click: the game would allow /s from it, if it allowed /s at all)."""
+    g.eval("NS.quickOpen")()
+    g.advance(0.6)
+    g.eval("NS.quickClick")(slot)
+
+
+def test_the_game_refusing_say_from_a_click_does_not_stop_whispers(style):
+    """Reported: after /s was refused once, Hello to a targeted player went into the chat box too."""
+    pre = """SEND_TRIES, SENT_OK = 0, {}
+    local function send(msg, channel, _, target)
+        SEND_TRIES = SEND_TRIES + 1
+        if channel == "SAY" or channel == "YELL" then return FIRE("ADDON_ACTION_BLOCKED", "QuestSharing", "send()") end
+        SENT_OK[#SENT_OK + 1] = channel .. ":" .. tostring(target)
+    end
+    SendChatMessage = send
+    if C_ChatInfo then C_ChatInfo.SendChatMessage = send end"""
+    g = Game(style, pre, fresh=True)
+    g.fire("ADDON_LOADED", "QuestSharing")
+    g.fire("PLAYER_ENTERING_WORLD")
+    g.slash("auto off")
+    g.run("OPENED = {}; PRINTED = {}")
+    ring_click(g, 5)                                                       # alone, nobody picked: "Thanks" in /s, a click
+    assert g.eval("NS.db.chatRefused.SAY") is True and g.opened()[-1] == "/s Thanks!"
+    g.advance(2)
+    g.run('TARGET = { name = "Gronn", player = true }')
+    ring_click(g, 1)                                                       # Hello -> a whisper to Gronn: sent at once
+    assert list(g.eval("SENT_OK").values()) == ["WHISPER:Gronn"], "the whisper still goes out at once"
+    g.advance(2)
+    g.run("TARGET = nil; OPENED = {}")
+    ring_click(g, 5)
+    assert g.opened() == ["/s Thanks!"] and g.eval("SEND_TRIES") == 2, "/s now goes into the chat box without trying"
 
 
 def test_the_menus_messages_go_into_the_chat_box_too(style):
@@ -126,7 +167,7 @@ def test_a_refused_send_switches_to_the_chat_box_and_says_so_once(style):
     g.slash("mode send")
     ring(g, 3)
     assert g.eval("SEND_TRIES") == 1
-    assert g.eval("NS.db.mode") == "box" and "press Enter" in "\n".join(g.printed())
+    assert g.eval("NS.db.chatRefused.PARTY") is True and "press Enter" in "\n".join(g.printed())
     assert g.opened(), "the refused message itself lands in the chat box"
     g.advance(2)
     g.run("OPENED = {}")

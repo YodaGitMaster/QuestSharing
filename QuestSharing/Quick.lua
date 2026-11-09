@@ -341,7 +341,16 @@ end
 -- Does sending this need a real key press / click (rather than a key release)?
 local RESTRICTED = { SAY = true, YELL = true, EMOTE = true }
 -- sent at once: the ring's own switch (Settings > Quick chat), or "My messages: sent at once"; never once the game refused it
-local function sendsDirectly() return (ns.db.quickSend or ns.db.mode == "send") and not ns.isBlocked("chat") end
+-- the game refused this channel for addons (remembered): it always goes into the chat box, the others still go at once
+local function refusedChannel(channel)
+    return channel ~= nil and type(ns.db.chatRefused) == "table" and ns.db.chatRefused[channel] == true
+end
+ns.chatRefusedChannel = refusedChannel
+
+local function sendsDirectly(channel)
+    if not (ns.db.quickSend or ns.db.mode == "send") or ns.isBlocked("chat") then return false end
+    return not refusedChannel(channel)
+end
 
 -- a message that cannot be sent from a release can still go into the chat box (you press Enter); invites and pings cannot
 local function boxable(i)
@@ -354,8 +363,8 @@ local function needsClick(i)
     if not item then return false end
     if isEmote(item.text) then return false end
     if isInvite(item.text) or isPing(item.text) then return true end   -- the game wants a real click for these
-    if not sendsDirectly() then return false end            -- into the chat box: a release is fine, you press Enter
     local channel = channelFor(item)
+    if not sendsDirectly(channel) then return false end     -- into the chat box: a release is fine, you press Enter
     return channel ~= nil and RESTRICTED[channel] == true
 end
 
@@ -396,9 +405,10 @@ function ns.quickSend(i, toBox)
             tostring(item and (item.label or item.text) or "?"), tostring(item and item.channel or "auto"),
             toBox and ", released on a click-only message" or "",
             p and (p.whisper .. (p.inGroup and " (in my group)" or "")) or "nobody picked",
-            sendsDirectly() and "yes" or "no"))
+            sendsDirectly(item and channelFor(item)) and "yes" or "no"))
     end
     local ok = sendOne(i, toBox)
+    if ok then q.lastSlot, q.lastPage = i, page end            -- a different message or emote may follow right away
     ns.log("ring", ok and "done" or "nothing sent")
     chosen = nil                                             -- the next ring picks the person again
     return ok
@@ -407,7 +417,10 @@ end
 sendOne = function(i, toBox)
     local item = ringItems()[i]
     if not item then return false end
-    if GetTime() - q.lastSend < 1 then return false end      -- no accidental double sends
+    if i == q.lastSlot and page == q.lastPage and GetTime() - q.lastSend < 1 then   -- the same one twice by accident
+        ns.log("ring", "the same message again within a second: not sent twice")
+        return false
+    end
     if isEmote(item.text) then
         local token = emoteToken(item.text)
         local typed = "/" .. string.lower(token)
@@ -435,7 +448,7 @@ sendOne = function(i, toBox)
         if not C.invite(who) then ns.print("quick chat: the invite did not go through"); return false end
         local rest = inviteRest(item.text)
         if rest ~= "" then
-            if sendsDirectly() then deliver(ns.quickResolve(rest), "WHISPER", who) else C.openChat(ns.quickResolve(rest), "WHISPER", who) end
+            if sendsDirectly("WHISPER") then deliver(ns.quickResolve(rest), "WHISPER", who) else C.openChat(ns.quickResolve(rest), "WHISPER", who) end
         end
         q.lastSend = GetTime()
         return true
@@ -443,7 +456,7 @@ sendOne = function(i, toBox)
     local channel, target, why = channelFor(item)
     if not channel then ns.print("quick chat: " .. tostring(why)); return false end
     local text = ns.quickResolve(item.text)
-    if (sendsDirectly() and not toBox) or not C.openChat(text, channel, target) then
+    if (sendsDirectly(channel) and not toBox) or not C.openChat(text, channel, target) then
         ns.trying("sending a quick chat message (" .. tostring(channel) .. ")", "chat")
         deliver(text, channel, target)
     end
@@ -537,7 +550,9 @@ local function paintMiddle()
     if not centerText then return end
     if q.hover then
         centerText:SetText("|cffffd100" .. shorten(middleText(q.hover), 120) .. "|r\n" .. destinationLine(q.hover))
-        if not sendsDirectly() and not needsClick(q.hover) then hintText:SetText("release or click: it goes into your chat box - press Enter")
+        local ch = destination(q.hover)
+        if refusedChannel(ch) then hintText:SetText("into your chat box - press Enter (the game does not let addons send this here)")
+        elseif not sendsDirectly(ch) and not needsClick(q.hover) then hintText:SetText("release or click: it goes into your chat box - press Enter")
         elseif q.sticky then hintText:SetText("click it (or press the key again) to say it")
         elseif needsClick(q.hover) and boxable(q.hover) then hintText:SetText("click: said at once - release: into your chat box (Enter)")
         elseif needsClick(q.hover) then hintText:SetText("release: keeps it open - click it")

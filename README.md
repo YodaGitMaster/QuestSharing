@@ -248,8 +248,14 @@ the game's tracker still tells the party you are done, because that is your own 
    the message at once*, or `/qs quick send on|off`; on by default). Off: it goes into the chat box and you press
    Enter. Messages to everybody nearby (`/s`, `/y`) only go out at once from a **click** on the slot, because the game
    wants a real click for those; **releasing the key on them puts them in your chat box** (press Enter), so a release
-   always does something. If the game refuses a message from the ring, it goes into your chat box instead and the
-   switch turns itself off (switch it back on and `/reload` to try again).
+   always does something. **If the game refuses a channel** (some game clients do not let addons post in `/s` at all,
+   not even from a click), that message goes into your chat box instead and the addon remembers it **for that channel
+   only**: from then on `/s` messages go straight into your chat box (press Enter), while whispers and party messages
+   still go out at once. The ring's hint says so ("the game does not let addons send this here"). Ticking *Send the
+   message at once* again gives the refused channels another try.
+
+   Different messages and emotes can follow each other right away (*Hug*, then *Salute*); only the **same** slot
+   picked twice within a second is held back, so a double click never sends it twice.
 
    **The player a message is for** is your **target** if it is a friendly player, otherwise the friendly player
    **under your mouse when you open the ring** (the one you highlight). The middle of the ring shows where the message
@@ -325,7 +331,10 @@ the game's tracker still tells the party you are done, because that is your own 
     its stack. The same line again becomes one line with a count; the newest 3000 lines are kept. The game saves it
     with the addon's settings when you `/reload` or log out, in
     `WTF/Account/<account>/SavedVariables/QuestSharing.lua` (the `QuestSharingLog` part). `/qs log` (or **Show the
-    debug log**) shows the newest lines in a window you can copy from; `/qs log clear` empties it.
+    debug log**) shows the newest 1000 lines in a window; `/qs errors` (or **Show the errors**) the errors. The window
+    **scrolls** (mouse wheel), however long the text, and has buttons: **Select all** (then Cmd+C on a Mac, Ctrl+C on
+    Windows: the game gives addons no way to copy by themselves), **Debug log** / **Errors** to switch between them,
+    **Clear** and **Close**.
 
 16. **Quest objectives are easier to find.**
     - **Quest icons over creatures:** every creature that is part of one of your quests gets a gold quest icon
@@ -376,8 +385,11 @@ party member running Quest Sharing finishes one you share. Never during combat.
 3. Optional: install **Questie** too. Quest Sharing only reads its quest database (where quests start, which
    quests come first) for "Tell them where to get it", and on clients where the game cannot say which creatures your
    quests need, it adds their names (only when Questie's language is the game's: names on screen are in the game's
-   language). Everything else works without it. Type `/qs questie` to check it: it says whether Questie is loaded, how
-   its data is read, the language of its names, and looks up a few quests of your quest log.
+   language). Everything else works without it. **Questie 12 comes as two folders, `Questie` and `QuestieDB`** (its
+   quest data): copy **both** into `Interface/AddOns`. Type `/qs questie` to check it: it says, for each of the two,
+   whether it is loaded (with its version) or why not (not installed, switched off in the AddOns list, marked out of
+   date, a folder with another name such as `Questie-master`), what to do about it, how the data is read, the language
+   of its names, and looks up a few quests of your quest log.
 4. In game type `/qs probe`. It tells you what your game client supports. **If something looks wrong,
    open an issue at https://github.com/YodaGitMaster/QuestSharing/issues and paste that output.**
 
@@ -450,7 +462,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 850 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 866 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -506,16 +518,16 @@ python tests/test_look.py             # 42 tests: the settings window layout, th
 python tests/test_together.py         # 30 tests: several Quest Sharing users in one party, fewer messages
 python tests/test_team.py             # 30 tests: picked up a quest someone has, where the items were, the message budget
 python tests/test_where.py            # 18 tests: no raid mark, map icons, a teammate's pin, the pin preferring shared quests
-python tests/test_menu.py             # 52 tests: the right-click menu, Questie's where-to-get-it and chain, the sound-key guard
+python tests/test_menu.py             # 60 tests: the right-click menu, Questie's where-to-get-it and chain, the sound-key guard
 python tests/test_done.py             # 20 tests: a quest you finished is never shared, announced or listed
-python tests/test_box.py              # 44 tests: messages into the chat box, refused calls written down (line, stack), sharing on your clicks
+python tests/test_box.py              # 46 tests: messages into the chat box, refused calls written down (line, stack), sharing on your clicks
 python tests/test_ping.py             # 27 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
 python tests/test_zone.py             # 10 tests: only the quests of where you are (Teldrassil vs Stormwind)
 python tests/test_items.py            # 24 tests: quest item icons in the tracker, the item key and button
-python tests/test_emotes.py           # 24 tests: the emote rings behind the mouse wheel, and editing them
-python tests/test_log.py              # 31 tests: the debug log: every action and its outcome, kept small, /qs log
+python tests/test_emotes.py           # 26 tests: the emote rings behind the mouse wheel, and editing them
+python tests/test_log.py              # 35 tests: the debug log: every action and its outcome, kept small, the log window
 ```
-Expected: every line ends in `passed` with all tests green (850 in total).
+Expected: every line ends in `passed` with all tests green (866 in total).
 
 ## Files
 | File | Purpose |

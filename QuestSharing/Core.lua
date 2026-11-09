@@ -104,6 +104,12 @@ function ns.trying(what, feature, retry)          -- retry: what to type into th
     while #list > 6 or (list[1] and now - list[1].at > 2) do table.remove(list, 1) end
 end
 function ns.isBlocked(feature) return feature ~= nil and ns.blockedFeatures[feature] == true end
+-- may the addon send to this channel at once? (not after the game refused chat, or refused this channel from the ring)
+function ns.chatAllowed(channel)
+    if ns.isBlocked("chat") then return false end
+    local r = ns.db and ns.db.chatRefused
+    return not (channel and type(r) == "table" and r[channel])
+end
 
 -- the version from the .toc file
 do
@@ -306,7 +312,7 @@ local outbox, sending = {}, false
 local function pump()
     local msg = table.remove(outbox, 1)
     if not msg then sending = false; return end
-    if C.inGroup() and not ns.isBlocked("chat") then
+    if C.inGroup() and ns.chatAllowed(C.channel()) then
         ns.trying("sending an automatic party message", "chat")
         ns.log("chat", "automatic message to " .. tostring(C.channel()) .. ": " .. msg)
         SendChatMessage(msg, C.channel())
@@ -323,7 +329,7 @@ function ns.say(msg, always)
     if not always and not ns.db.chat then return false end
     -- an automatic message cannot be typed into your chat box (that would take your keys while you play): it needs
     -- "My messages: sent at once", and a game that allows it
-    if ns.db.mode ~= "send" or ns.isBlocked("chat") then return false end
+    if ns.db.mode ~= "send" or not ns.chatAllowed(C.channel()) then return false end
     local now = GetTime()
     while spent[1] and now - spent[1] > WINDOW do table.remove(spent, 1) end
     if #spent >= BUDGET then ns.dropped = ns.dropped + 1; return false end
@@ -345,6 +351,13 @@ function ns.setSetting(key, value)
     else
         d[key] = value
         if key == "debug" and value and ns.logSession then ns.logSession("debug log on") end
+        if key == "quickSend" and value then               -- you ask for it again: refused channels get another try
+            if type(d.chatRefused) == "table" and next(d.chatRefused) then
+                d.chatRefused = {}
+                ns.print("quick chat: channels the game refused before get another try")
+            end
+            ns.blockedFeatures.chat = nil
+        end
         if key == "enabled" and not value then ns.stopShare("switched off") end
         if key == "markers" and ns.refreshQuestLog then ns.refreshQuestLog() end
         if (key == "panel" or key == "panelCombat" or key == "panelSolo") and ns.syncPanelVisibility then ns.syncPanelVisibility() end
