@@ -31,6 +31,7 @@ ns.defaults = {
     nearCount = 5,      -- how many quests the tracker keeps while "near" is on
     nearPause = 10,     -- seconds the tracker and the pin leave your choice alone after you change the tracker yourself
     nearMode = "auto",  -- "auto" (distance if the client can measure it, else zone), "distance" or "zone"
+    debug = false,      -- the debug log: every action and its outcome (QuestSharingLog, saved on /reload or logout)
     shareByClick = false, -- share only on my clicks (set by itself when the game refuses an automatic share)
     pickup = false,     -- (off) say in party chat when I pick up a quest someone in the party has ("let's do it together?")
     mapPins = true,     -- show party members who run Quest Sharing on my world map, and send them where I am
@@ -54,8 +55,49 @@ for k, v in pairs(ns.defaults) do ns.db[k] = v end        -- until the saved var
 -- Calls the game may refuse ("Interface action failed because of an AddOn", "protected function UNKNOWN()") ----------
 -- Right before such a call we note what we are doing. If the game then blocks something, the error log says what it
 -- was, and that one feature switches itself off until /reload, so the message cannot keep coming back.
+-- The debug log (Settings > General > Debug log, /qs debug on|off) -------------------------------------------------
+-- Every action and its outcome, errors or not, one line each: "12:34:56 ring: "Thanks!" -> WHISPER Lia (sent)".
+-- Kept in QuestSharingLog, which the game writes to WTF/Account/<account>/SavedVariables/QuestSharing.lua when you
+-- /reload or log out. Off (the default): nothing is kept and nothing is spent. The same line again becomes one line
+-- with a count ("(x5)"); the oldest lines go once there are more than LOG_MAX.
+local LOG_MAX = 3000
+ns.LOG_MAX = LOG_MAX
+function ns.logging() return ns.db ~= nil and ns.db.debug == true end
+-- the visible text of game markup: links as their [name], no colours or icons
+local function visible(s)
+    if not string.find(s, "|", 1, true) then return s end
+    s = string.gsub(s, "|H.-|h(.-)|h", "%1")
+    s = string.gsub(s, "|c%x%x%x%x%x%x%x%x", "")
+    s = string.gsub(s, "|r", "")
+    s = string.gsub(s, "|T.-|t", "")
+    return s
+end
+
+-- kind "" : a line of its own (the details under an error)
+function ns.log(kind, text)
+    if not (ns.db and ns.db.debug) then return end
+    if type(QuestSharingLog) ~= "table" then QuestSharingLog = {} end
+    local L = QuestSharingLog
+    local line = visible((kind and kind ~= "") and (tostring(kind) .. ": " .. tostring(text)) or tostring(text))
+    if L.lastText == line and #L > 0 then
+        L.repeats = (L.repeats or 1) + 1
+        L[#L] = L.lastStamp .. " " .. line .. " (x" .. L.repeats .. ")"
+        return
+    end
+    local stamp = date and date("%H:%M:%S") or "?"
+    L[#L + 1] = stamp .. " " .. line
+    L.lastText, L.lastStamp, L.repeats = line, stamp, 1
+    if #L > LOG_MAX + 300 then                                   -- drop the oldest in one go, not one by one
+        local keep, n = {}, #L
+        for i = n - LOG_MAX + 1, n do keep[#keep + 1] = L[i] end
+        for i = n, 1, -1 do L[i] = nil end
+        for i = 1, #keep do L[i] = keep[i] end
+    end
+end
+
 ns.recentCalls, ns.blockedFeatures = {}, {}
 function ns.trying(what, feature, retry)          -- retry: what to type into the chat box if the game refuses
+    ns.log("call", what)
     local now = GetTime and GetTime() or 0
     local list = ns.recentCalls
     list[#list + 1] = { what = what, feature = feature, at = now, retry = retry }
@@ -74,6 +116,7 @@ function ns.print(...)
     local parts = {}
     for i = 1, select("#", ...) do parts[#parts + 1] = tostring((select(i, ...))) end
     local msg = "|cff55ccffQuest Sharing:|r " .. table.concat(parts, " ")
+    if ns.db and ns.db.debug then ns.log("shown", table.concat(parts, " ")) end   -- what you were told goes in too
     if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then DEFAULT_CHAT_FRAME:AddMessage(msg) else print(msg) end
 end
 
@@ -265,6 +308,7 @@ local function pump()
     if not msg then sending = false; return end
     if C.inGroup() and not ns.isBlocked("chat") then
         ns.trying("sending an automatic party message", "chat")
+        ns.log("chat", "automatic message to " .. tostring(C.channel()) .. ": " .. msg)
         SendChatMessage(msg, C.channel())
     end
     ns.after(2, pump)
@@ -294,10 +338,13 @@ function ns.clearOutbox() outbox = {}; sending = false end
 -- Settings: one place that changes a setting and does whatever that setting needs ---------------------------
 function ns.setSetting(key, value)
     local d = ns.db
+    if key == "debug" and not value then ns.log("setting", "debug = false (the log stops here)") end
+    ns.log("setting", tostring(key) .. " = " .. tostring(value))
     if key == "near" then
         ns.setNear(value)                         -- saves / restores the tracker list itself
     else
         d[key] = value
+        if key == "debug" and value and ns.logSession then ns.logSession("debug log on") end
         if key == "enabled" and not value then ns.stopShare("switched off") end
         if key == "markers" and ns.refreshQuestLog then ns.refreshQuestLog() end
         if (key == "panel" or key == "panelCombat" or key == "panelSolo") and ns.syncPanelVisibility then ns.syncPanelVisibility() end
@@ -357,6 +404,8 @@ local help = {
     "/qs pickup on|off    say when I pick up a quest someone in the party has (let's do it together?)",
     "/qs coords on|off    add where I found the quest items to my messages, when someone still needs them",
     "/qs shareclick on|off share only when I click Share (on by itself where the game refuses automatic sharing)",
+    "/qs debug on|off     the debug log: every action and its outcome, saved to the addon's file on /reload or logout",
+    "/qs log [clear]      show the debug log in a window you can copy from (clear empties it)",
     "/qs pingkey <KEY>    the key that pings the nearest quest creature (Attack) or quest object (look here); none removes it",
     "/qs itemkey <KEY>    the key that uses the item of your nearest quest (a torch, a flare...); none removes it",
     "/qs items on|off     item icons next to the quests in the tracker, and the quest item button",
@@ -379,11 +428,12 @@ local help = {
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", shareclick = "shareByClick", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", shareclick = "shareByClick", debug = "debug", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"
 SlashCmdList["QUESTSHARING"] = function(msg)
+    ns.log("command", "/qs " .. tostring(msg or ""))
     local cmd, arg = string.match(msg or "", "^(%S*)%s*(.-)%s*$")
     cmd = string.lower(cmd or "")
     local d = ns.db
@@ -408,6 +458,7 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     elseif cmd == "questie" then for _, l in ipairs((ns.questie.report())) do ns.print(l) end
     elseif cmd == "doctor" then ns.doctor()
     elseif cmd == "errors" then ns.errorsCommand(arg)
+    elseif cmd == "log" then ns.logCommand(arg)
     elseif cmd == "reset" then ns.resetSettings()
     elseif cmd == "probe" then ns.probe()
     elseif cmd == "" or cmd == "status" then status()

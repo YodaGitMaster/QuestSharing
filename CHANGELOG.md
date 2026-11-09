@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.6
+- **A debug log of everything, not only errors** (*Settings > General > Debug log*, `/qs debug on|off`, off by
+  default). Every action and its outcome, one line each with the time: what you picked on the ring, who it was for
+  and where it went (sent, chat box, nothing and why), each ping press, each quest share and its answer, every call the
+  game may refuse, your `/qs` commands and setting changes, everything the addon told you, the game's own answers
+  (system messages and errors), combat / target / party / zone changes, quests accepted or turned in, and every error
+  with its stack. It starts with a line saying what the session is (versions, language, Questie). Repeats are counted
+  on one line, the newest 3000 lines are kept. Saved as `QuestSharingLog` in the addon's SavedVariables file on
+  `/reload` or logout; `/qs log` (or *Show the debug log*) shows it in a window to copy, `/qs log clear` empties it.
+- **Trace back the chain** (right click a quest in the Party quests window; needs Questie): one chat line with the
+  level the quest needs, every quest before it from the first one, where the first one starts and where this one
+  starts ("(or 1 other)" / "(+2 more)" where other quests lead there too or are needed). Always one chat message (255
+  letters): a long chain keeps its first step and shortens the middle to "(5 more)". In a party it goes to the party,
+  alone only to you. For when someone does not have a quest you have: what they need first, and where.
+- *Friends* moved to the *Party* tab of the settings (room for *Debugging* in *General*).
+- Fixed: a quest share that went through, followed within a second by some other call the game refused, switched
+  sharing off (found with the new log). The "Auto messages go to" choices describe the 0.3.5 routing.
+
 ## 0.3.5
 - **The quick chat ring always does something on a release.** `/s` and `/y` only go out at once from a click (the
   game wants a real click for them); a release used to leave the ring open waiting for one, so "Hello", "Team up?" or

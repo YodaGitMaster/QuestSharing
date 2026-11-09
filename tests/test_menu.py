@@ -63,7 +63,7 @@ def row(g, title):
 def open_menu(g, title="Wolves Among Us"):
     g.eval("function(r) r.scripts.OnClick(r, 'RightButton') end")(row(g, title))
     menu, lines = g.eval("NS._questMenu()")
-    return menu, [lines[i] for i in range(1, 7) if lines[i].shown]
+    return menu, [lines[i] for i in range(1, 9) if lines[i].shown]
 
 
 def pick(g, lines, label):
@@ -77,7 +77,7 @@ def test_right_click_opens_a_small_menu_for_that_quest(style):
     menu, lines = open_menu(g)
     assert menu.shown is True and plain(menu.title.text) == "Wolves Among Us"
     assert [plain(b.text) for b in lines] == ["Tell the party how I am doing", "Offer it to the party", "Tell them where to get it",
-                                             "Focus it on my map", "Select it in the quest log"]
+                                             "Trace back the chain", "Focus it on my map", "Select it in the quest log"]
     assert "QuestSharingMenu" in list(g.eval("UISpecialFrames").values()), "Esc closes it"
 
 
@@ -165,6 +165,84 @@ def test_a_quest_that_starts_from_an_item_says_who_drops_it(style):
     g = party(style, pre=QUESTIE_12)
     text = g.eval("NS.questie.whereText")(101)
     assert text == "starts from the item A Torn Letter, dropped by Kobold Vermin in Elwynn Forest (40.1, 80.2)", text
+
+
+# ---- Trace back the chain: one chat line, from QuestieDB ---------------------------------------------------------------
+def unlink(s):
+    return re.sub(r"\|H[^|]*\|h(.*?)\|h", r"\1", plain(s or ""))
+
+
+def chain(g, qid=100):
+    return unlink(g.eval("NS.chainMessage")(g.eval(f"NS.compat.findEntry({qid})")))
+
+
+def test_the_chain_is_one_line_from_the_first_quest_to_this_one(style):
+    for pre in (QUESTIE_12, QUESTIE_11):
+        g = party(style, pre=LOADED + pre)
+        g.run("QUESTIE_QUESTS[7].startedBy = { { 823 } }; QUESTIE_QUESTS[100].requiredLevel = 5")
+        line = chain(g)
+        assert "\n" not in line and len(g.eval("NS.chainMessage")(g.eval("NS.compat.findEntry(100)"))) <= 255
+        assert line == ('[Wolves Among Us] (level 5+): 2 quests before it: "Kobold Camp Cleanup" at Deputy Willem in '
+                        'Elwynn Forest 48.2, 42.9 > "A Threat Within" > then this one at Marshal McBride in Elwynn Forest '
+                        '48.9, 41.6'), line
+
+
+def test_a_quest_with_nothing_before_it_says_where_it_starts(style):
+    g = party(style, pre=LOADED + QUESTIE_12)
+    g.run("QUESTS[#QUESTS + 1] = { id = 101, title = 'Report to Goldshire', level = 2, objectives = {} }")
+    line = chain(g, 101)
+    assert line == ("[Report to Goldshire]: no quests before it, starts at the item A Torn Letter, dropped by Kobold Vermin "
+                    "in Elwynn Forest 40.1, 80.2"), line
+
+
+def test_other_quests_that_also_lead_there_are_counted(style):
+    g = party(style, pre=LOADED + QUESTIE_12)
+    g.run("QUESTIE_QUESTS[100].preQuestSingle = { 783, 784 }")           # either one is enough
+    assert '"A Threat Within" (or 1 other) > then this one' in chain(g), chain(g)
+    g.run("QUESTIE_QUESTS[100].preQuestSingle = nil; QUESTIE_QUESTS[100].preQuestGroup = { 783, 785, 786 }")
+    assert '"A Threat Within" (+2 more) > then this one' in chain(g), chain(g)
+
+
+def test_a_long_chain_still_fits_in_one_chat_line(style):
+    g = party(style, pre=LOADED + QUESTIE_12)
+    g.run("""for i = 1, 20 do
+        QUESTIE_QUESTS[1000 + i] = { name = "A rather long quest name in a chain, part " .. i,
+                                     preQuestSingle = (i > 1) and { 1000 + i - 1 } or nil }
+    end
+    QUESTIE_QUESTS[1001].startedBy = { { 823 } }
+    QUESTIE_QUESTS[100].preQuestSingle = { 1020 }""")
+    raw = g.eval("NS.chainMessage")(g.eval("NS.compat.findEntry(100)"))
+    line = unlink(raw)
+    assert len(raw) <= 255, len(raw)
+    assert line.startswith('[Wolves Among Us]: 20 quests before it: "A rather long quest name in a chain, part 1" at Deputy '
+                           'Willem in Elwynn Forest 48.2, 42.9 > ('), "where it all starts is always kept: " + line
+    assert " more) > " in line and line.endswith("then this one at Marshal McBride in Elwynn Forest 48.9, 41.6"), line
+
+
+def test_a_chain_that_loops_back_does_not_hang(style):
+    g = party(style, pre=LOADED + QUESTIE_12)
+    g.run("QUESTIE_QUESTS[7].preQuestSingle = { 100 }")
+    assert "quests before it" in chain(g)
+
+
+def test_in_a_party_the_chain_goes_to_the_party_and_alone_only_to_you(style):
+    g = party(style, pre=LOADED + QUESTIE_12)
+    menu, lines = open_menu(g)
+    pick(g, lines, "Trace back the chain")
+    msg, channel = g.sent()[-1]
+    assert channel == "PARTY" and "2 quests before it" in unlink(msg), g.sent()
+    g.leave_party()
+    g.advance(2)
+    g.run("SENT = {}; PRINTED = {}")
+    g.eval("NS.traceBack")(g.eval("NS.compat.findEntry(100)"))
+    assert g.sent() == [] and "2 quests before it" in unlink("\n".join(g.printed()))
+
+
+def test_without_questie_the_line_is_grey_and_says_why(style):
+    g = party(style)
+    menu, lines = open_menu(g)
+    b = next(b for b in lines if "Trace back the chain" in plain(b.text))
+    assert b.text.startswith("|cff9d9d9d") and "needs the Questie addon" in (b.tipText or "")
 
 
 def test_the_tooltip_says_where_it_starts(style):

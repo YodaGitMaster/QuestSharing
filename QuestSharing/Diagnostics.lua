@@ -15,6 +15,10 @@ function ns.logError(source, msg, detail)
     local list = ns.db.errors
     msg = tostring(msg)
     if type(detail) == "table" and #detail == 0 then detail = nil end
+    if ns.logging() then                                         -- the debug log gets every error, with its details
+        ns.log("ERROR " .. tostring(source), msg)
+        for _, d in ipairs(detail or {}) do ns.log("", "    " .. tostring(d)) end
+    end
     local last = list[#list]
     if last and last.msg == msg then
         last.count, last.at = (last.count or 1) + 1, stamp()
@@ -120,6 +124,8 @@ local function blocked(event, addon, fn)
                 ns.db.mode = "box"
                 ns.print("this game does not let addons send chat messages: from now on your messages go into the " ..
                     "chat box - just press Enter. (The automatic party messages cannot work here.)")
+            elseif only and only.feature == "share" then
+                -- not while a share ran (that is caught exactly, above): something else the game refused, sharing stays
             elseif only and only.feature and not ns.blockedFeatures[only.feature] and only.retry then
                 ns.blockedFeatures[only.feature] = true                   -- next time straight into the chat box
                 if ChatFrame_OpenChat then pcall(ChatFrame_OpenChat, only.retry) end
@@ -221,6 +227,83 @@ function ns.errorsCommand(arg)
     ns.reportWindow("Quest Sharing - errors", full)
 end
 
+-- The debug log: what the game did around the addon, the session header, /qs log ---------------------------------------
+local function plainText(s) return (string.gsub(string.gsub(tostring(s or ""), "|c%x%x%x%x%x%x%x%x", ""), "|r", "")) end
+
+-- one line saying what this session is: version, game, language, Questie
+function ns.logSession(why)
+    if not ns.logging() then return end
+    if type(QuestSharingLog) == "table" then QuestSharingLog.lastText = nil end
+    local _, build, _, iface = GetBuildInfo()
+    local who = (UnitName and UnitName("player")) or "?"
+    local realm = GetRealmName and GetRealmName() or "?"
+    ns.log("session", string.format("%s - Quest Sharing %s | game %s (%s) | %s quest API | language %s | Questie: %s | %s-%s",
+        why, tostring(ns.version), tostring(iface), tostring(build), C.modern and "modern" or "classic",
+        tostring(GetLocale and GetLocale() or "?"), tostring(ns.questie and ns.questie.source() or "none"), who, realm))
+end
+
+local lastMembers, lastTarget = nil, nil
+local function members()
+    local names = {}
+    for _, m in ipairs(C.members()) do names[#names + 1] = m.name end
+    return table.concat(names, ", ")
+end
+local function questName(id)
+    local e = id and C.findEntry and C.findEntry(id)
+    return e and e.title and ('"' .. e.title .. '"') or ("quest " .. tostring(id))
+end
+
+ns.on("PLAYER_LOGIN", function() ns.logSession("login") end)
+ns.on("PLAYER_REGEN_DISABLED", function() ns.log("event", "combat starts") end)
+ns.on("PLAYER_REGEN_ENABLED", function() ns.log("event", "combat ends") end)
+ns.on("ZONE_CHANGED_NEW_AREA", function() ns.log("event", "zone: " .. tostring(C.zone())) end)
+ns.on("GROUP_ROSTER_UPDATE", function()
+    if not ns.logging() then return end
+    local now = C.inGroup() and members() or ""
+    if now ~= lastMembers then
+        lastMembers = now
+        ns.log("event", now == "" and "no party" or ((C.inRaid() and "raid: " or "party: ") .. now))
+    end
+end)
+ns.on("PLAYER_TARGET_CHANGED", function()
+    if not ns.logging() then return end
+    local t = "nothing"
+    if UnitExists and UnitExists("target") then
+        local n = UnitName("target") or "?"
+        local kind = (UnitIsPlayer and UnitIsPlayer("target")) and "player" or "creature"
+        local side = (UnitIsFriend and UnitIsFriend("player", "target")) and "friendly" or "not friendly"
+        t = n .. " (" .. kind .. ", " .. side .. ")"
+    end
+    if t ~= lastTarget then lastTarget = t; ns.log("event", "target: " .. t) end
+end)
+ns.on("QUEST_ACCEPTED", function(_, a, b) ns.log("event", "quest accepted: " .. questName(b or a)) end)
+ns.on("QUEST_TURNED_IN", function(_, id) ns.log("event", "quest turned in: " .. tostring(id)) end)
+ns.on("QUEST_REMOVED", function(_, id) ns.log("event", "quest removed: " .. tostring(id)) end)
+-- the game's own answers: "No player named ... is currently playing", share replies, "You can't do that yet"
+ns.on("CHAT_MSG_SYSTEM", function(_, msg) ns.log("game says", plainText(msg)) end)
+ns.on("UI_ERROR_MESSAGE", function(_, a, b) ns.log("game error", plainText(type(b) == "string" and b or a)) end)
+
+-- /qs log: the newest lines in a window you can copy from; the whole log is in the file
+local SHOW = 600
+function ns.logCommand(arg)
+    if arg == "clear" then
+        QuestSharingLog = {}
+        ns.logSession("log cleared")
+        return ns.print("debug log cleared")
+    end
+    local L = type(QuestSharingLog) == "table" and QuestSharingLog or {}
+    if #L == 0 then
+        return ns.print(ns.logging() and "the debug log is empty so far" or
+            "the debug log is off: Settings > General > Debug log, or /qs debug on")
+    end
+    local out = { string.format("Quest Sharing %s - debug log (%s): the newest %d of %d lines; all of them are in " ..
+        "WTF/Account/<account>/SavedVariables/QuestSharing.lua after /reload or logout", tostring(ns.version),
+        ns.logging() and "on" or "off", math.min(SHOW, #L), #L), "" }
+    for i = math.max(1, #L - SHOW + 1), #L do out[#out + 1] = L[i] end
+    ns.print(string.format("debug log: %d lines (%s) - the window has them: Ctrl+A, Ctrl+C", #L, ns.logging() and "on" or "off"))
+    ns.reportWindow("Quest Sharing - debug log", out)
+end
+
 -- /qs doctor ---------------------------------------------------------------------------------------------------------
 local function version()
     local f = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
@@ -277,6 +360,8 @@ function ns.doctorLines()
         flags[#flags + 1] = k .. "=" .. (d[k] and "on" or "off")
     end
     out[#out + 1] = "settings: " .. table.concat(flags, " ") .. string.format(" area=%s gap=%s mode=%s channel=%s", d.area, tostring(d.gap), d.quickMode, d.quickChannel)
+    out[#out + 1] = "debug log: " .. (ns.logging() and "on" or "off") .. ", " ..
+        tostring(type(QuestSharingLog) == "table" and #QuestSharingLog or 0) .. " lines (/qs log)"
     for _, l in ipairs(ns.errorLines(true)) do out[#out + 1] = "error: " .. l end
     return out
 end

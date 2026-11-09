@@ -369,6 +369,7 @@ local SLASH = { SAY = "/s ", YELL = "/y ", EMOTE = "/e ", PARTY = "/p ", RAID = 
 local function deliver(text, channel, target)
     q.last = { text = text, channel = channel, target = target, at = GetTime() }
     local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
+    ns.log("chat", "sent to " .. tostring(channel) .. (target and (" " .. tostring(target)) or "") .. ": " .. tostring(text))
     send(text, channel, nil, target)
 end
 
@@ -389,7 +390,16 @@ end
 local sendOne
 -- toBox: a release on a message the game only sends from a click (/s, /y): it goes into the chat box instead
 function ns.quickSend(i, toBox)
+    if ns.logging() then
+        local item, p = ringItems()[i], currentPerson()
+        ns.log("ring", string.format('slot %s "%s" (channel %s)%s; for: %s; sends at once: %s', tostring(i),
+            tostring(item and (item.label or item.text) or "?"), tostring(item and item.channel or "auto"),
+            toBox and ", released on a click-only message" or "",
+            p and (p.whisper .. (p.inGroup and " (in my group)" or "")) or "nobody picked",
+            sendsDirectly() and "yes" or "no"))
+    end
     local ok = sendOne(i, toBox)
+    ns.log("ring", ok and "done" or "nothing sent")
     chosen = nil                                             -- the next ring picks the person again
     return ok
 end

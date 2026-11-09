@@ -149,6 +149,14 @@ the game's tracker still tells the party you are done, because that is your own 
        before that: `Bob: [Wolves Among Us] starts at Marshal McBride in Elwynn Forest (48.9, 41.6), after "A Threat
        Within" (from Deputy Willem in Elwynn Forest (48.2, 42.9)), 1 more step before that.` (Also "starts from the item
        ..., dropped by ..." when an item starts it.)
+     - **Trace back the chain** (with Questie): **one chat line** with the level it needs, every quest that comes
+       before it from the first one, where that **first** quest starts, and where this one starts:
+       `[Wolves Among Us] (level 5+): 2 quests before it: "Kobold Camp Cleanup" at Deputy Willem in Elwynn Forest 48.2,
+       42.9 > "A Threat Within" > then this one at Marshal McBride in Elwynn Forest 48.9, 41.6`. "(or 1 other)" means
+       another quest leads there too, "(+2 more)" that more quests are needed. It always fits one chat message: in a
+       long chain the middle steps become "(5 more)", the first one stays. In a party it goes to the party (sent at
+       once or into the chat box, like your other messages); alone it is shown only to you. Use it when a party member
+       does not have a quest you have: they see which quest they still need first and where to get it.
      - **Focus it on my map** (the game's quest marker and arrow; the nearest-quest pin waits a minute),
      - **Open it in the quest log** (the old quest log window). Where the quest log is inside the world map, this is
        **Select it in the quest log**: the addon never opens the map itself (the game would refuse part of that in the
@@ -308,6 +316,17 @@ the game's tracker still tells the party you are done, because that is your own 
     caused (also kept between sessions). If something misbehaves in your game, paste the `/qs doctor` report
     into a GitHub issue.
 
+    **The debug log** (*Settings > General > Debug log*, or `/qs debug on|off`; off by default) writes down **every
+    action and its outcome**, errors or not, one line each with the time: what you picked on the ring, who it was
+    for and where it went ("chat: sent to WHISPER Lia: Thanks!", "chat box: /s Hey there! o/"), each ping press,
+    each quest share and its answer ("offered", "refused by the game"), every call the game may refuse, your `/qs`
+    commands and setting changes, everything the addon told you, the game's own answers ("No player named ... is
+    currently playing"), combat, target, party and zone changes, quests accepted or turned in, and every error with
+    its stack. The same line again becomes one line with a count; the newest 3000 lines are kept. The game saves it
+    with the addon's settings when you `/reload` or log out, in
+    `WTF/Account/<account>/SavedVariables/QuestSharing.lua` (the `QuestSharingLog` part). `/qs log` (or **Show the
+    debug log**) shows the newest lines in a window you can copy from; `/qs log clear` empties it.
+
 16. **Quest objectives are easier to find.**
     - **Quest icons over creatures:** every creature that is part of one of your quests gets a gold quest icon
       above its nameplate (the game itself tells the addon which creatures those are).
@@ -328,9 +347,9 @@ explanation, and groups its settings in short sections:
 
 | Tab | What is on it |
 |---|---|
-| **General** | *Getting started*: your **quick chat key** (click, then press the key), **Show the ring**, **Check my setup**. *Basics*: the master switch, how your messages go out, the map button, a soft sound for good news; *Friends* (the beta); reset |
+| **General** | *Getting started*: your **quick chat key** (click, then press the key), **Show the ring**, **Check my setup**. *Basics*: the master switch, how your messages go out, the map button, a soft sound for good news; *Debugging*: the debug log and **Show the debug log**; reset |
 | **Sharing** | *When I join a party*, *Party chat* (in common, done, picked up a quest someone has, where the items were), *Behind the scenes* (sync, quest-log markers) |
-| **Party** | the Party quests window (show it in a party, hide it in combat, its size, move it back), *Clicking a quest* (what a click on the game's tracker posts) and *Showing where we are* (the map icons, a teammate's pin) |
+| **Party** | the Party quests window (show it in a party, hide it in combat, its size, move it back), *Clicking a quest* (what a click on the game's tracker posts) *Showing where we are* (the map icons, a teammate's pin) and *Friends* (the beta) |
 | **Tracker** | *The quest list on the right* (follows you, how many, distance or zone, the pause), *Finding objectives* (the world pin, quest icons over creatures, the game-settings helper)  |
 | **Quick chat** | the ring, its key, hold or toggle, its size, where Auto messages go, and the **message editor** |
 | **Pings & items** | *Pinging quest targets* (the ping key, the anti-spam time, objects too) and *Quest items* (icons in the tracker, the quest item key, the item button) |
@@ -393,6 +412,8 @@ party member running Quest Sharing finishes one you share. Never during combat.
 | `/qs highlight mobs\|pin\|cvars [on\|off]` | quest icons over creatures / pin the nearest quest / the game-settings helper |
 | `/qs doctor` | a report of what works on this client, in a window you can copy from |
 | `/qs errors [clear]` | errors this addon has caused; the window adds where each came from (line, what was running, stack) |
+| `/qs debug on\|off` | the debug log: every action and its outcome, saved to the addon's file on `/reload` or logout (default off) |
+| `/qs log [clear]` | show the debug log in a window you can copy from; `clear` empties it |
 | `/qs minimap on\|off` | the minimap button (default on) |
 | `/qs reset` | put every setting back to its default (everything on) |
 | `/qs probe` | show what this game client supports |
@@ -429,7 +450,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 803 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 850 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -485,15 +506,16 @@ python tests/test_look.py             # 42 tests: the settings window layout, th
 python tests/test_together.py         # 30 tests: several Quest Sharing users in one party, fewer messages
 python tests/test_team.py             # 30 tests: picked up a quest someone has, where the items were, the message budget
 python tests/test_where.py            # 18 tests: no raid mark, map icons, a teammate's pin, the pin preferring shared quests
-python tests/test_menu.py             # 38 tests: the right-click menu, Questie's where-to-get-it, the sound-key guard
+python tests/test_menu.py             # 52 tests: the right-click menu, Questie's where-to-get-it and chain, the sound-key guard
 python tests/test_done.py             # 20 tests: a quest you finished is never shared, announced or listed
-python tests/test_box.py              # 42 tests: messages into the chat box, refused calls written down (line, stack), sharing on your clicks
+python tests/test_box.py              # 44 tests: messages into the chat box, refused calls written down (line, stack), sharing on your clicks
 python tests/test_ping.py             # 27 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
 python tests/test_zone.py             # 10 tests: only the quests of where you are (Teldrassil vs Stormwind)
 python tests/test_items.py            # 24 tests: quest item icons in the tracker, the item key and button
 python tests/test_emotes.py           # 24 tests: the emote rings behind the mouse wheel, and editing them
+python tests/test_log.py              # 31 tests: the debug log: every action and its outcome, kept small, /qs log
 ```
-Expected: every line ends in `passed` with all tests green (803 in total).
+Expected: every line ends in `passed` with all tests green (850 in total).
 
 ## Files
 | File | Purpose |
