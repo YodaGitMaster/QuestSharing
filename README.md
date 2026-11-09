@@ -272,6 +272,20 @@ the game's tracker still tells the party you are done, because that is your own 
    addons, the emote is typed into the chat box instead (`/bow`, press Enter), and so are the next ones. (There is no
    "stop" emote in the game; *Wait* is the closest.)
 
+   **Only emotes your game has are on the ring** (the addon reads the game's own list of emotes). After each emote the
+   addon waits for the game's answer ("You dance."); without one it says so ("the game did not show /hug, 1.2 s after
+   the emote before"): the game may hold back emotes done quickly one after another, so try it again in a moment.
+   A quick flick onto a message sends it; only a tap with nothing pointed at keeps the ring open for a click.
+
+   **Test the whole ring:** `/qs quick test` (or **Test the ring** in the log window) runs every slot of every ring,
+   one every 3 seconds, and shows what the game really did: emotes are done for real and the game's line awaited
+   ("You dance."); messages are **whispered to yourself** (nobody else gets them) and the game's "To you" awaited.
+   Pings and invites are skipped. The window lists `[OK]` / `[--]` for each slot with the game's answer, ready to
+   copy. `/qs quick test emotes` or `messages` runs only those, `/qs quick test fast` runs the emotes back to back (to
+   see whether the game holds quick ones back), `/qs quick test stop` ends it. Emotes are seen by players near you.
+   A refusal during the test is only reported, nothing is switched off for it. The game's own chat log is another
+   way to check: `/chatlog` writes every chat line to `Logs/WoWChatLog.txt` in your game folder.
+
    **Where it goes.** Every message has its **own channel**. In `/qs settings > Quick chat`, click a message and pick
    one in the **Channel** row under it (the list shows each message's channel), or type `/qs quick route N <channel>`:
 
@@ -327,7 +341,7 @@ the game's tracker still tells the party you are done, because that is your own 
     for and where it went ("chat: sent to WHISPER Lia: Thanks!", "chat box: /s Hey there! o/"), each ping press,
     each quest share and its answer ("offered", "refused by the game"), every call the game may refuse, your `/qs`
     commands and setting changes, everything the addon told you, the game's own answers ("No player named ... is
-    currently playing"), combat, target, party and zone changes, quests accepted or turned in, and every error with
+    currently playing"), your own chat as the game showed it ("you whispered Lia: Thanks!"), combat, target, party and zone changes, quests accepted or turned in, and every error with
     its stack. The same line again becomes one line with a count; the newest 3000 lines are kept. The game saves it
     with the addon's settings when you `/reload` or log out, in
     `WTF/Account/<account>/SavedVariables/QuestSharing.lua` (the `QuestSharingLog` part). `/qs log` (or **Show the
@@ -464,7 +478,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 866 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 892 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -513,7 +527,7 @@ python tests/test_triggers.py         # 34 tests: when it shares (once per join 
 python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
 python tests/test_settings.py         # 44 tests: everything on by default, migration, the tabbed settings window
 python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
-python tests/test_quick.py            # 127 tests: the quick chat ring, placeholders, editing, key binding, performance
+python tests/test_quick.py            # 131 tests: the quick chat ring, placeholders, editing, key binding, performance
 python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
 python tests/test_highlight.py        # 23 tests: quest icons over creatures, the world pin, the game-settings helper
 python tests/test_look.py             # 42 tests: the settings window layout, the key capture, welcome, sounds, ring colours
@@ -526,10 +540,11 @@ python tests/test_box.py              # 46 tests: messages into the chat box, re
 python tests/test_ping.py             # 27 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
 python tests/test_zone.py             # 10 tests: only the quests of where you are (Teldrassil vs Stormwind)
 python tests/test_items.py            # 24 tests: quest item icons in the tracker, the item key and button
-python tests/test_emotes.py           # 26 tests: the emote rings behind the mouse wheel, and editing them
+python tests/test_emotes.py           # 34 tests: the emote rings behind the mouse wheel, editing them, only the ones that work
+python tests/test_ringtest.py         # 14 tests: /qs quick test: every slot run, checked against what the game did
 python tests/test_log.py              # 35 tests: the debug log: every action and its outcome, kept small, the log window
 ```
-Expected: every line ends in `passed` with all tests green (866 in total).
+Expected: every line ends in `passed` with all tests green (892 in total).
 
 ## Files
 | File | Purpose |

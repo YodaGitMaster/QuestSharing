@@ -222,6 +222,78 @@ def test_different_emotes_can_follow_each_other_right_away_but_the_same_one_is_n
     emote(4)
     assert list(g.eval("EMOTED").values())[-1] == "SALUTE" and len(g.eval("EMOTED")) == 3
 
+
+def fun_ring(g):
+    pages = g.eval("NS.quickPageList()")
+    fun = next(i for i in range(1, 9) if pages[i] and pages[i].title == "Fun")
+    g.run("NS.db.quickPage = %d" % fun)
+
+
+def ring_labels(g):
+    g.eval("NS.quickOpen")()
+    labels = [it.label for it in g.eval("NS.quickRingItems()").values()]
+    g.eval("NS.quickClose")()
+    return labels
+
+
+def test_emotes_this_game_does_not_have_are_left_off_the_ring(style):
+    """Reported: some ring items do nothing - an emote the game does not have is not offered at all."""
+    g = game(style)
+    fun_ring(g)
+    g.run("""local i = 0
+    for t in string.gmatch("AGREE AMAZE ANGRY APPLAUD BOW CHEER CHICKEN DANCE FLEX LAUGH ROAR SALUTE TRAIN WAVE", "%u+") do
+        i = i + 1; _G["EMOTE" .. i .. "_TOKEN"] = t
+    end
+    for j = 1, 120 do _G["EMOTE" .. (100 + j) .. "_TOKEN"] = "FILLER" .. j end     -- a real list is long
+    NS.quickResetEmoteList()""")
+    labels = ring_labels(g)
+    assert "Hug" not in labels and "Salute" in labels and len(labels) == 7, labels
+
+
+def test_without_the_game_s_list_nothing_is_left_out(style):
+    g = game(style)
+    fun_ring(g)
+    assert len(ring_labels(g)) == 8
+
+
+def log_text(g):
+    L = g.eval("QuestSharingLog")
+    return "\n".join(L[i] for i in range(1, int(g.eval("#QuestSharingLog")) + 1))
+
+
+def test_an_emote_the_game_does_not_answer_is_said_and_stays_on_the_ring(style):
+    """Reported: some emotes work sometimes, not always - the game may hold back quick ones, so none is taken away."""
+    g = game(style)
+    fun_ring(g)
+    g.slash("debug on")
+    g.run('EMOTE_SILENT.HUG = true')
+    def hug():
+        g.eval("NS.quickOpen")()
+        slot = next(i for i, it in enumerate(g.eval("NS.quickRingItems()").values(), 1) if it.label == "Hug")
+        g.eval("NS.quickClick")(slot)
+        g.advance(2.5)
+    g.run("PRINTED = {}")
+    g.eval("NS.quickOpen")()
+    g.eval("NS.quickClick")(4)                                     # Salute first
+    g.advance(1.2)
+    hug()
+    assert "the game did not show /hug (1.2 s after the emote before)" in "\n".join(g.printed()), g.printed()
+    assert "emote: /hug: no answer from the game (1.2 s after the emote before)" in log_text(g), log_text(g)
+    hug()
+    hug()
+    assert "Hug" in ring_labels(g), "still on the ring: it may work a moment later"
+    assert sum("the game did not show" in l for l in g.printed()) == 1, "said at most every 10 seconds"
+
+
+def test_an_emote_the_game_answers_is_written_down_as_done(style):
+    g = game(style)
+    fun_ring(g)
+    g.slash("debug on")
+    g.eval("NS.quickOpen")()
+    g.eval("NS.quickClick")(4)                                     # Salute
+    g.advance(2.5)
+    assert "emote: /salute: the game did it (You salute.)" in log_text(g), log_text(g)
+
 if __name__ == "__main__":
     import inspect
     failed = total = 0

@@ -136,6 +136,7 @@ function ns.cleanStack(raw, max)
     if type(raw) ~= "string" then return out end
     for line in string.gmatch(raw, "[^\n]+") do
         line = string.gsub(line, '%[string "@?([^"]*)"%]', "%1")
+        line = string.gsub(line, "^%[([^%]]+%.lua)%]", "%1")              -- "[Quick.lua]:382:" (newer clients)
         line = string.gsub(line, "^=?%[C%]:?%-?%d*:", "[C]:")              -- "=[C]:-1: in function ..." -> "[C]: in ..."
         line = string.gsub(line, "Interface[/\\]AddOns[/\\]", "")
         line = string.gsub(line, "Interface[/\\]FrameXML[/\\]", "FrameXML/")

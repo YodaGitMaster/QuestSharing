@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.8
+- **Test the whole ring: `/qs quick test`** (or *Test the ring* in the log window). Every slot of every ring is run,
+  one every 3 seconds, and checked against what the game really did: emotes are done and the game's line ("You
+  dance.") awaited; messages are whispered to yourself (nobody else gets them) and the game's "To you" awaited; pings
+  and invites are skipped. A window lists `[OK]` / `[--]` per slot with the game's answer and where the message goes on
+  the ring. `emotes` / `messages` run only those, `fast` runs the emotes back to back (does the game hold quick ones
+  back?), `stop` ends it. A refusal during the test changes nothing.
+- The debug log writes your own chat as the game showed it ("you whispered Lia: Thanks!", "you told the party:
+  ...", "You dance."): the proof that what the ring did really happened.
+- **Only emotes your game has are on the ring** (the addon reads the game's own emote list).
+- **"Something works sometimes, not always" on the ring:** letting go of the key within a quarter second of opening
+  the ring kept it open and did nothing, even when you were pointing at a message: a quick flick onto a message now
+  sends it (only a tap with nothing pointed at keeps the ring open for a click). Letting go in the middle is written in
+  the debug log.
+- **Emotes the game does not show are said.** After each emote the addon waits for the game's answer ("You dance.")
+  and writes it in the debug log; without one it says "the game did not show /hug (1.2 s after the emote before)" (at
+  most every 10 seconds): the game may hold back emotes done quickly one after another. The emote stays on the ring.
+- **Errors name the line on newer clients too.** Their stack lines read `[Quick.lua]:382`, which the error log did
+  not recognise: it said "no Quest Sharing line on the stack" (taint) for a plain refused send from a ring click.
+  The send is also called by its own name now, so a refusal says `SendChatMessage`.
+
 ## 0.3.7
 - **Optional: Questie, with its quest data QuestieDB.** *Tell them where to get it* and *Trace back the chain* need
   Questie 12 **and** QuestieDB: two folders in one download. Get it from

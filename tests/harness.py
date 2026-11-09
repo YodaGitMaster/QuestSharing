@@ -138,7 +138,12 @@ end
 INVITED, LEADER = {}, true
 function InviteUnit(name) INVITED[#INVITED + 1] = name end
 EMOTED = {}
-function DoEmote(token, target) EMOTED[#EMOTED + 1] = token end
+-- like the game: an emote is answered with a line ("You dance."), unless EMOTE_SILENT[token] (it does nothing)
+EMOTE_SILENT = {}
+function DoEmote(token, target)
+    EMOTED[#EMOTED + 1] = token
+    if not EMOTE_SILENT[token] then FIRE("CHAT_MSG_TEXT_EMOTE", "You " .. string.lower(token) .. ".", "Me") end
+end
 function UnitIsGroupLeader(u) return LEADER end
 function GetNumGroupMembers() return #GROUP.members > 0 and (#GROUP.members + 1) or 0 end
 UIParent = newObject()
