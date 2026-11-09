@@ -386,7 +386,9 @@ party member running Quest Sharing finishes one you share. Never during combat.
    quests come first) for "Tell them where to get it", and on clients where the game cannot say which creatures your
    quests need, it adds their names (only when Questie's language is the game's: names on screen are in the game's
    language). Everything else works without it. **Questie 12 comes as two folders, `Questie` and `QuestieDB`** (its
-   quest data): copy **both** into `Interface/AddOns`. Type `/qs questie` to check it: it says, for each of the two,
+   quest data): download the `Questie-v...+v....zip` under *Assets* of
+   [Questie's latest release](https://github.com/Questie/Questie/releases/latest) (not "Source code") and copy **both**
+   folders into `Interface/AddOns`. QuestieDB alone: [QuestieDB's releases](https://github.com/Questie/QuestieDB/releases/latest). Type `/qs questie` to check it: it says, for each of the two,
    whether it is loaded (with its version) or why not (not installed, switched off in the AddOns list, marked out of
    date, a folder with another name such as `Questie-master`), what to do about it, how the data is read, the language
    of its names, and looks up a few quests of your quest log.
