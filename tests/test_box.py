@@ -326,6 +326,14 @@ def test_a_refused_call_names_the_line_that_made_it_and_what_was_running(style):
 def test_the_game_s_own_stack_lines_are_made_readable_and_name_the_function(style):
     """The game's lines: '[string "@Interface/AddOns/..."]:35: in function `x'' or 'Interface/AddOns/...:35: in ...'."""
     older = '[string "=[C]"]:-1: in function `SendChatMessage\'\n[string "@Interface/AddOns/QuestSharing/Core.lua"]:198: in function `say\'\n'
+    newer = "[C]: in function 'send'\n[Interface/AddOns/QuestSharing/Quick.lua]:382: in function <Interface/AddOns/QuestSharing/Quick.lua:378>\n"
+    gn = Game(style)
+    gn.start()
+    gn.run("function debugstack() return [==[" + newer + "]==] end")
+    gn.fire("ADDON_ACTION_BLOCKED", "QuestSharing", "UNKNOWN()")
+    msg, detail = last_error(gn)
+    assert msg == "tried to call the protected function send() from Quick.lua:382", msg      # reported: "[Quick.lua]:382"
+    assert "no Quest Sharing line on the stack" not in detail and "  Quick.lua:382: in function <Quick.lua:378>" in detail
     g0 = Game(style)
     g0.start()
     g0.run("function debugstack() return [==[" + older + "]==] end")

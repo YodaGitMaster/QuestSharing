@@ -160,13 +160,86 @@ end
 ns.quickListFor = listFor
 
 local page = 1                       -- which ring is showing
-local function ringItems() return listFor(page) or items() end
-ns.quickRingItems = ringItems
 function ns.quickPage() local p = ns.quickPageList()[page]; return page, p and p.title end
 
 local function isEmote(text) return string.sub(text or "", 1, 7) == "@emote " end
 local function emoteToken(text) return string.upper(string.match(text or "", "^@emote%s+(%S+)") or "") end
 ns.quickIsEmote = isEmote
+
+-- The emotes THIS game has, from its own lists (every /command it registers). nil when it gives none: nothing is
+-- left out then.
+local clientSet
+local function clientEmotes()
+    if clientSet ~= nil then return clientSet or nil end
+    local set, n = {}, 0
+    for i = 1, 1000 do
+        local tok = _G["EMOTE" .. i .. "_TOKEN"]
+        if type(tok) == "string" then set[string.upper(tok)] = true; n = n + 1 end
+    end
+    for _, list in ipairs({ _G.EmoteList, _G.TextEmoteSpeechList }) do
+        if type(list) == "table" then
+            for _, tok in ipairs(list) do if type(tok) == "string" then set[string.upper(tok)] = true; n = n + 1 end end
+        end
+    end
+    clientSet = (n >= 100) and set or false
+    return clientSet or nil
+end
+function ns.quickResetEmoteList() clientSet = nil end       -- for the tests
+
+-- Is it on the ring? Left out: an emote this game does not have.
+local function playable(item)
+    if not (item and isEmote(item.text)) then return true end
+    local tok = emoteToken(item.text)
+    local set = clientEmotes()
+    return not set or set[tok] == true
+end
+ns.quickPlayable = playable
+
+local function ringItems()
+    local list = listFor(page) or items()
+    for i, it in ipairs(list) do
+        if not playable(it) then                              -- copy only when something is left out
+            local out = {}
+            for j = 1, i - 1 do out[#out + 1] = list[j] end
+            for j = i + 1, #list do if playable(list[j]) then out[#out + 1] = list[j] end end
+            return out
+        end
+    end
+    return list
+end
+ns.quickRingItems = ringItems
+
+-- Did the emote do anything? The game answers an emote with a line ("You dance."). No answer is said (at most every
+-- 10 seconds) and written down with the time since the emote before it: the game may hold back emotes done quickly
+-- one after another. Nothing is taken off the ring for it: the same emote may work a moment later.
+local pendingEmote, lastEmoteAt, toldSilentAt = nil, nil, -100
+local function emoteAnswered(text)
+    if not pendingEmote then return end
+    local tok = pendingEmote.token
+    pendingEmote = nil
+    ns.log("emote", "/" .. string.lower(tok) .. ": the game did it (" .. tostring(text) .. ")")
+end
+ns.on("CHAT_MSG_TEXT_EMOTE", function(_, text, sender)
+    local me = UnitName and UnitName("player")
+    if pendingEmote and me and type(sender) == "string" and string.match(sender, "^[^-]+") == me then emoteAnswered(text) end
+end)
+local function watchEmote(tok)
+    local now = GetTime()
+    local mine = { token = tok, at = now, gap = lastEmoteAt and (now - lastEmoteAt) or nil }
+    lastEmoteAt = now
+    pendingEmote = mine
+    ns.after(2, function()
+        if pendingEmote ~= mine then return end               -- answered (or another emote since)
+        pendingEmote = nil
+        local after = mine.gap and string.format("%.1f s after the emote before", mine.gap) or "the first emote"
+        ns.log("emote", "/" .. string.lower(tok) .. ": no answer from the game (" .. after .. ")")
+        if GetTime() - toldSilentAt > 10 then
+            toldSilentAt = GetTime()
+            ns.print("quick chat: the game did not show /" .. string.lower(tok) .. " (" .. after .. "). It may hold back " ..
+                "emotes done quickly one after another; try it again in a moment.")
+        end
+    end)
+end
 
 -- The person a message is for ----------------------------------------------------------------------------------
 -- Your target if it is a friendly player, else the friendly player under your mouse when the ring opened (the one you
@@ -377,9 +450,10 @@ local SLASH = { SAY = "/s ", YELL = "/y ", EMOTE = "/e ", PARTY = "/p ", RAID = 
 
 local function deliver(text, channel, target)
     q.last = { text = text, channel = channel, target = target, at = GetTime() }
-    local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
     ns.log("chat", "sent to " .. tostring(channel) .. (target and (" " .. tostring(target)) or "") .. ": " .. tostring(text))
-    send(text, channel, nil, target)
+    -- called by name (not through a local), so a refusal's stack says "SendChatMessage"
+    if C_ChatInfo and C_ChatInfo.SendChatMessage then C_ChatInfo.SendChatMessage(text, channel, nil, target)
+    else SendChatMessage(text, channel, nil, target) end
 end
 
 -- called from Diagnostics when the game blocks one of our calls; true if it was a send from the ring
@@ -426,6 +500,7 @@ sendOne = function(i, toBox)
         local typed = "/" .. string.lower(token)
         if DoEmote and not ns.isBlocked("emote") then
             ns.trying("doing the emote " .. typed, "emote", typed)      -- refused: the chat box gets it, the next ones too
+            watchEmote(token)                                       -- listen first: the answer may come right away
             pcall(DoEmote, token)
         else
             C.openChat(typed)
@@ -463,6 +538,166 @@ sendOne = function(i, toBox)
     q.lastSend = GetTime()
     return true
 end
+
+-- The ring test (/qs quick test [emotes|messages] [fast]) ---------------------------------------------------------------
+-- Runs every slot of every ring and checks what the game really did: an emote is done and the game's line ("You
+-- dance.") awaited; a message is whispered TO YOURSELF (nobody else gets it) and the game's "To <you>:" awaited. Pings
+-- and invites are skipped (they need your click / a player). Normal: one step every 3 seconds (well away from any
+-- limit the game may have); "fast": back to back, to see whether the game holds quick emotes back. A refusal here is
+-- only reported: nothing is switched off for it. The result: one line per slot in a window, and in the debug log.
+local test
+local function myName() return UnitName and UnitName("player") end
+local function fromMe(sender)
+    local n = myName()
+    return n ~= nil and type(sender) == "string" and string.match(sender, "^[^-]+") == n
+end
+
+local function plainLine(s)                                    -- links as their [name], no colours: easy to copy
+    s = string.gsub(tostring(s), "|H.-|h(.-)|h", "%1")
+    return (string.gsub(string.gsub(s, "|c%x%x%x%x%x%x%x%x", ""), "|r", ""))
+end
+
+local function testLine(r, ok, why)
+    if r.ok ~= nil then return end
+    r.ok = ok
+    r.line = plainLine((ok and "[OK] " or "[--] ") .. r.name .. ": " .. why)
+    ns.log("ring test", r.line)
+end
+
+local function testFinish(reason)
+    if not test then return end
+    local t = test
+    test = nil
+    for _, w in ipairs(t.waits) do testLine(w.r, false, w.kind == "emote" and "no answer from the game" or "the game did not show it") end
+    local ok, tried = 0, 0
+    for _, r in ipairs(t.results) do
+        if r.ok ~= nil then tried = tried + 1; if r.ok then ok = ok + 1 end end
+    end
+    local out = { string.format("Quest Sharing %s - ring test%s: %d of %d worked%s", tostring(ns.version),
+        t.fast and " (fast)" or "", ok, tried, reason and (" - " .. reason) or ""),
+        "Emotes: done for real, the game's line awaited. Messages: whispered to yourself, the game's \"To you\" awaited.", "" }
+    for _, r in ipairs(t.results) do out[#out + 1] = r.line end
+    ns.print(out[1] .. " - the window has every line")
+    ns.reportWindow("Quest Sharing - ring test", out)
+end
+
+local function testWait(kind, r)
+    local w = { kind = kind, r = r }
+    test.waits[#test.waits + 1] = w
+    local mine = test
+    ns.after(2.5, function()
+        if test ~= mine then return end
+        for i, x in ipairs(test.waits) do
+            if x == w then
+                table.remove(test.waits, i)
+                testLine(r, false, kind == "emote" and "no answer from the game" or "the game did not show it")
+                return
+            end
+        end
+    end)
+    return w
+end
+
+local function testResolve(kind, why)
+    if not test then return end
+    for i, w in ipairs(test.waits) do                          -- the oldest one waiting for this kind of answer
+        if w.kind == kind then
+            table.remove(test.waits, i)
+            testLine(w.r, true, why)
+            return
+        end
+    end
+end
+ns.on("CHAT_MSG_TEXT_EMOTE", function(_, text, sender)
+    if test and fromMe(sender) then testResolve("emote", "the game did it (" .. tostring(text) .. ")") end
+end)
+ns.on("CHAT_MSG_WHISPER_INFORM", function(_, text, to)
+    if test and fromMe(to) then testResolve("chat", "the game showed it (" .. tostring(text) .. ")") end
+end)
+local function testRefused()
+    if not (test and test.sending) then return end
+    test.sending.refused = true
+end
+ns.on("ADDON_ACTION_BLOCKED", testRefused)
+ns.on("ADDON_ACTION_FORBIDDEN", testRefused)
+
+local function testStep()
+    if not test then return end
+    if InCombatLockdown and InCombatLockdown() then return testFinish("stopped: a fight started") end
+    local s = table.remove(test.queue, 1)
+    if not s then
+        if #test.waits > 0 and not test.draining then        -- the last answers may still come
+            test.draining = true
+            return ns.after(2.6, testStep)
+        end
+        return testFinish()
+    end
+    local it = s.item
+    local r = { name = string.format('%s %d "%s"', s.title, s.slot, tostring(it.label or it.text)) }
+    test.results[#test.results + 1] = r
+    local skip
+    if isPing(it.text) then skip = "a ping needs your click"
+    elseif isInvite(it.text) then skip = "an invite needs a player"
+    elseif isEmote(it.text) and test.only == "messages" then skip = "an emote (only messages tested)"
+    elseif not isEmote(it.text) and test.only == "emotes" then skip = "a message (only emotes tested)" end
+    if skip then
+        r.line = "[  ] " .. r.name .. ": skipped (" .. skip .. ")"
+        return testStep()                                       -- nothing was done: straight on
+    end
+    if isEmote(it.text) then
+        local tok = emoteToken(it.text)
+        if not playable(it) then
+            testLine(r, false, "this game has no /" .. string.lower(tok))
+        else
+            testWait("emote", r)
+            pcall(DoEmote, tok)
+        end
+    else
+        local text = ns.quickResolve(it.text)
+        local ch, target = channelFor(it)
+        local real = ch and (ch .. (target and (" " .. target) or "")) or "nowhere"
+        if refusedChannel(ch) then real = real .. ", which this game refused: the chat box" end
+        r.name = r.name .. " (on the ring: " .. real .. ")"
+        testWait("chat", r)
+        test.sending = r
+        ns.log("ring test", "whispering yourself: " .. text)
+        pcall(function()
+            if C_ChatInfo and C_ChatInfo.SendChatMessage then C_ChatInfo.SendChatMessage(text, "WHISPER", nil, myName())
+            else SendChatMessage(text, "WHISPER", nil, myName()) end
+        end)
+        test.sending = nil
+        if r.refused then
+            for i, w in ipairs(test.waits) do if w.r == r then table.remove(test.waits, i); break end end
+            testLine(r, false, "the game refused the addon's whisper (from the test's timer: a click may still work)")
+        end
+    end
+    ns.after(test.gap, testStep)
+end
+
+function ns.quickTest(arg)
+    arg = string.lower(arg or "")
+    if string.find(arg, "stop", 1, true) then
+        if test then testFinish("stopped by you") else ns.print("no ring test is running") end
+        return
+    end
+    if test then return ns.print("the ring test is running (/qs quick test stop)") end
+    if InCombatLockdown and InCombatLockdown() then return ns.print("not during a fight") end
+    if not myName() then return ns.print("the ring test needs your character in the world") end
+    local only = (string.find(arg, "emote", 1, true) and "emotes") or (string.find(arg, "message", 1, true) and "messages") or nil
+    local fast = string.find(arg, "fast", 1, true) ~= nil
+    if fast and not only then only = "emotes" end              -- fast is about emotes held back
+    test = { queue = {}, results = {}, waits = {}, gap = fast and 0.6 or 3, fast = fast, only = only }
+    for pg, pageInfo in ipairs(ns.quickPageList()) do
+        for i, it in ipairs(listFor(pg) or {}) do
+            test.queue[#test.queue + 1] = { title = pageInfo.title or ("ring " .. pg), slot = i, item = it }
+        end
+    end
+    ns.log("ring test", string.format("start: %d slots%s%s", #test.queue, only and (", " .. only .. " only") or "", fast and ", fast" or ""))
+    ns.print(string.format("ring test: %d slots, one every %s s (%s). Emotes are seen by players near you; messages are " ..
+        "whispered to yourself. /qs quick test stop ends it.", #test.queue, tostring(test.gap), only or "emotes and messages"))
+    testStep()
+end
+function ns.quickTestRunning() return test ~= nil end
 
 -- Ring geometry ------------------------------------------------------------------------------------------------------
 -- Slot number (1 = top, clockwise) for a mouse offset (dx, dy) from the ring's centre, or nil in the middle.
@@ -738,10 +973,14 @@ function ns.quickKey(state)
         return
     end
     if d.quickMode == "toggle" or not q.open then return end                -- toggle mode waits for a click
-    if GetTime() - q.openedAt < TAP then q.sticky = true; paintMiddle(); return end   -- a tap: stay open for a click
     ns.quickUpdateHover()
     local i = q.hover
-    if not i then ns.quickClose(); return end
+    if not i then
+        if GetTime() - q.openedAt < TAP then q.sticky = true; paintMiddle(); return end   -- a tap: stay open for a click
+        ns.log("ring", "let go in the middle: nothing chosen")
+        ns.quickClose()
+        return
+    end                                                   -- pointing at one: even a quick flick counts
     if needsClick(i) then                                 -- /say, /yell: the game wants a click to send them
         if boxable(i) then                                -- a release still does something: into the chat box
             ns.quickClose()
@@ -892,6 +1131,7 @@ function ns.quickCommand(arg)
     elseif sub == "remove" and n1 then if ns.quickRemove(tonumber(n1)) then listItems() end
     elseif sub == "move" and n1 then if ns.quickMove(tonumber(n1), tonumber(n2)) then listItems() end
     elseif sub == "reset" then ns.quickReset(); listItems()
+    elseif sub == "test" then ns.quickTest(rest)
     elseif sub == "mode" and (rest == "hold" or rest == "toggle") then ns.setSetting("quickMode", rest)
     elseif sub == "send" and (rest == "on" or rest == "off") then
         ns.setSetting("quickSend", rest == "on")
@@ -899,7 +1139,7 @@ function ns.quickCommand(arg)
     elseif sub == "channel" and (rest == "auto" or rest == "say" or rest == "party" or rest == "whisper") then ns.setSetting("quickChannel", rest)
     elseif sub == "editor" then ns.toggleSettings(true, "quick")
     else
-        ns.print("/qs quick [list] | add [label |] <text> | edit N <text> | label N <label> | route N auto|nearby|say|yell|party|whisper | remove N | move N M | reset | on|off | send on|off | mode hold|toggle | channel auto|say|party|whisper | editor | open")
+        ns.print("/qs quick [list] | add [label |] <text> | edit N <text> | label N <label> | route N auto|nearby|say|yell|party|whisper | remove N | move N M | reset | test [emotes|messages] [fast] [stop] | on|off | send on|off | mode hold|toggle | channel auto|say|party|whisper | editor | open")
     end
     if ns.refreshSettings then ns.refreshSettings() end
 end

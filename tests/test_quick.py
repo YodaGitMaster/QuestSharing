@@ -260,6 +260,31 @@ def test_alone_with_nobody_picked_every_message_does_something_on_release(style)
         assert g.wheel()[0].shown is False
 
 
+def test_a_quick_flick_onto_a_message_sends_it(style):
+    """Reported: "something works sometimes, not" - letting go within a quarter second kept the ring open."""
+    g = game(style)
+    target(g, "Lia")
+    open_wheel(g)
+    point_slot(g, 5)                                             # Thanks, straight away
+    key_up(g)                                                    # no time passed: a flick, not a tap
+    assert sent(g) == [("Thanks!", "WHISPER")] and g.wheel()[0].shown is False
+
+
+def test_a_tap_without_pointing_keeps_the_ring_open_and_letting_go_in_the_middle_is_written_down(style):
+    g = game(style)
+    g.slash("debug on")
+    open_wheel(g)
+    key_up(g)                                                    # a tap in the middle: stays open for a click
+    assert g.wheel()[0].shown is True and sent(g) == []
+    g.eval("NS.quickClose")()
+    open_wheel(g)
+    g.advance(0.6)
+    key_up(g)                                                    # held, let go in the middle: nothing, but logged
+    L = g.eval("QuestSharingLog")
+    log = "\n".join(L[i] for i in range(1, int(g.eval("#QuestSharingLog")) + 1))
+    assert g.wheel()[0].shown is False and "ring: let go in the middle: nothing chosen" in log
+
+
 # ---- the key and the ring ---------------------------------------------------------------------------------------------------
 def test_with_a_player_targeted_releasing_whispers_them(style):
     g = game(style)

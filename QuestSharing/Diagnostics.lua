@@ -223,6 +223,10 @@ function ns.reportWindow(title, lines, kind)
             elseif win.kind == "errors" then ns.errorsCommand("clear"); ns.errorsCommand(nil, true) end
         end, "Empties the list shown")
         f.clear:SetPoint("LEFT", f.showErrors, "RIGHT", 8, 0)
+        f.test = button("Test the ring", 110, function() ns.quickTest() end,
+            "Runs every slot of every ring and shows what the game really did (/qs quick test). Emotes are seen by " ..
+            "players near you; messages are whispered to yourself.")
+        f.test:SetPoint("LEFT", f.clear, "RIGHT", 8, 0)
         f.close = button("Close", 70, function() f:Hide() end)
         f.close:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 12)
         if UISpecialFrames then table.insert(UISpecialFrames, "QuestSharingReport") end
@@ -332,6 +336,18 @@ end)
 ns.on("QUEST_ACCEPTED", function(_, a, b) ns.log("event", "quest accepted: " .. questName(b or a)) end)
 ns.on("QUEST_TURNED_IN", function(_, id) ns.log("event", "quest turned in: " .. tostring(id)) end)
 ns.on("QUEST_REMOVED", function(_, id) ns.log("event", "quest removed: " .. tostring(id)) end)
+-- what the game really showed of your own chat: the proof that a message went out (and where)
+local function mine(sender)
+    local me = UnitName and UnitName("player")
+    return me ~= nil and type(sender) == "string" and string.match(sender, "^[^-]+") == me
+end
+ns.on("CHAT_MSG_WHISPER_INFORM", function(_, msg, to) ns.log("game shows", "you whispered " .. tostring(to) .. ": " .. plainText(msg)) end)
+for ev, what in pairs({ CHAT_MSG_SAY = "you said", CHAT_MSG_YELL = "you yelled", CHAT_MSG_PARTY = "you told the party",
+                        CHAT_MSG_PARTY_LEADER = "you told the party", CHAT_MSG_RAID = "you told the raid",
+                        CHAT_MSG_INSTANCE_CHAT = "you told the group", CHAT_MSG_EMOTE = "your emote" }) do
+    ns.on(ev, function(_, msg, sender) if mine(sender) then ns.log("game shows", what .. ": " .. plainText(msg)) end end)
+end
+ns.on("CHAT_MSG_TEXT_EMOTE", function(_, msg, sender) if mine(sender) then ns.log("game shows", plainText(msg)) end end)
 -- the game's own answers: "No player named ... is currently playing", share replies, "You can't do that yet"
 ns.on("CHAT_MSG_SYSTEM", function(_, msg) ns.log("game says", plainText(msg)) end)
 ns.on("UI_ERROR_MESSAGE", function(_, a, b) ns.log("game error", plainText(type(b) == "string" and b or a)) end)
