@@ -1,6 +1,11 @@
 # Changelog
 
 ## 0.3.7
+- **Optional: Questie, with its quest data QuestieDB.** *Tell them where to get it* and *Trace back the chain* need
+  Questie 12 **and** QuestieDB: two folders in one download. Get it from
+  [Questie's releases](https://github.com/Questie/Questie/releases/latest): take the `Questie-v...+v....zip` under
+  *Assets* (not "Source code") and copy **both** folders, `Questie` and `QuestieDB`, into `Interface/AddOns`. QuestieDB
+  on its own: [QuestieDB's releases](https://github.com/Questie/QuestieDB/releases/latest). `/qs questie` checks it.
 - **A channel the game refuses no longer stops the whole ring.** Some clients do not let addons post in `/s` at all,
   not even from a click ("tried to call the protected function send()" from a click on the ring). One such refusal
   used to switch off sending at once for everything, for the whole session, even after ticking the box again: whispers
