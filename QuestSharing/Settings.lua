@@ -12,9 +12,9 @@ local S = ns.style
 local ON, OFF = "|cff55ff55[ON] |r", "|cffff5555[OFF]|r"
 
 ns.settingTabs = {
-    { id = "general", title = "General",      intro = "Start here: set your quick chat key, check that everything works." },
+    { id = "general", title = "General",      intro = "Start here: set your quick chat key, check that everything works; the debug log." },
     { id = "sharing", title = "Sharing",      intro = "What happens when you group up, and what a click on a quest does." },
-    { id = "party",   title = "Party",        intro = "The Party quests window, what a click posts, and showing each other where you are." },
+    { id = "party",   title = "Party",        intro = "The Party quests window, what a click posts, showing each other where you are, friends." },
     { id = "tracker", title = "Tracker",      intro = "Keep the quests near you in sight, and find the creatures you need." },
     { id = "quick",   title = "Quick chat",   intro = "Hold your key, point at a message, let go. Pick a message below to edit it." },
     { id = "actions", title = "Pings & items", intro = "One key pings your quest target for the party, one uses your quest item." },
@@ -39,11 +39,11 @@ ns.settingRows = {
       desc = "Some game clients do not let addons send chat messages; in the chat box you just press Enter." },
     { tab = "general", kind = "bool", key = "sound", label = "A soft sound for good news",
       desc = "When someone accepts a quest you shared, or a party member finishes one you share. Never in combat." },
-    { tab = "general", kind = "header", label = "Friends" },
-    { tab = "general", kind = "bool", key = "friends", label = "(beta) Add people I group with to my friends list",
-      desc = "Automatic. Skips friends, ignored players and random-dungeon groups." },
-    { tab = "general", kind = "action", label = "Add my party to my friends now", button = "Add",
-      desc = "Once, for the party you are in (the same as /qs friends).", action = function() ns.addPartyFriends(true) end },
+    { tab = "general", kind = "header", label = "Debugging" },
+    { tab = "general", kind = "bool", key = "debug", label = "Debug log: write down every action and its outcome",
+      desc = "Saved to the addon's file on /reload or logout (SavedVariables/QuestSharing.lua)." },
+    { tab = "general", kind = "action", label = "Show the debug log", button = "Show",
+      desc = "The newest lines in a window you can copy from (/qs log).", action = function() ns.logCommand() end },
     { tab = "general", kind = "action", label = "Reset everything to the defaults", button = "Reset",
       desc = "Every setting and your quick chat messages.", action = function() ns.resetSettings() end },
     -- Sharing
@@ -90,6 +90,11 @@ ns.settingRows = {
       desc = "A class icon where each of them is, and your position to them." },
     { tab = "party", kind = "bool", key = "teamWaypoint", label = "A map pin where a teammate found the quest items",
       desc = "When they tell the party where the items were, for a quest you still work on." },
+    { tab = "party", kind = "header", label = "Friends" },
+    { tab = "party", kind = "bool", key = "friends", label = "(beta) Add people I group with to my friends list",
+      desc = "Automatic. Skips friends, ignored players and random-dungeon groups." },
+    { tab = "party", kind = "action", label = "Add my party to my friends now", button = "Add",
+      desc = "Once, for the party you are in (the same as /qs friends).", action = function() ns.addPartyFriends(true) end },
     -- Tracker
     { tab = "tracker", kind = "header", label = "The quest list on the right" },
     { tab = "tracker", kind = "bool", key = "near", label = "Tracker follows me (shows the nearest quests)",
@@ -116,7 +121,7 @@ ns.settingRows = {
     { tab = "quick", kind = "choice", key = "quickSize", label = "Ring size", values = { "small", "normal", "large" },
       names = { small = "small", normal = "normal", large = "large" } },
     { tab = "quick", kind = "choice", key = "quickChannel", label = "Auto messages go to", values = { "auto", "say", "party", "whisper" },
-      names = { auto = "the party if I am in one, else my target (whisper), else nearby", say = "everybody nearby", party = "the party only", whisper = "the player I target" } },
+      names = { auto = "a player I pick outside my party (whisper), else the party, else nearby", say = "everybody nearby", party = "the party only", whisper = "the player I pick" } },
     -- Pings & items
     { tab = "actions", kind = "header", label = "Pinging quest targets" },
     { tab = "actions", kind = "key", which = "ping", key = nil, label = "Ping key",

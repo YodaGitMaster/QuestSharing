@@ -2,6 +2,7 @@
 --   Tell the party how I am doing    "I still need Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8). What about you?"
 --   Offer it to the party            the quest popup, for whoever does not have it (the same as a left click)
 --   Tell them where to get it        with Questie: "Bob: [quest] starts at Marshal Dughan in Elwynn Forest (42.1, 65.9)"
+--   Trace back the chain             with Questie, one line: every quest before it, where the first and this one start
 --   Focus it on my map               the game's quest marker and arrow on this quest
 --   Open it in the quest log
 -- A line that cannot be used right now is grey and says why. Our own small frame (not the game's dropdown menus,
@@ -42,6 +43,28 @@ function ns.tellWhere(e)
         SendChatMessage(msg, C.channel())
     else
         ns.addToChatBox(msg, C.link(e))                       -- typed into the chat box for you: press Enter
+    end
+    return true
+end
+
+-- "[Wolves Among Us] (level 5+): 2 quests before it: "A Threat Within" at ... > ... > then this one at ..." (one line)
+function ns.chainMessage(e)
+    local q = ns.questie
+    local text = q and q.available() and q.chainText and q.chainText(e.questID, C.link(e))
+    return text and C.safeCut(text, 255) or nil
+end
+
+-- In a party: to the party (sent at once or into the chat box, like the other messages); alone: only shown to you
+function ns.traceBack(e)
+    local msg = ns.chainMessage(e)
+    if not msg then ns.print("Questie does not know this quest (or Questie is not installed)"); return false end
+    ns.log("trace", msg)
+    if not C.inGroup() then ns.print(msg); return true end
+    if ns.db.mode == "send" and not ns.isBlocked("chat") then
+        ns.trying("telling the party the chain of a quest", "chat")
+        SendChatMessage(msg, C.channel())
+    else
+        ns.addToChatBox(msg, C.link(e))
     end
     return true
 end
@@ -93,6 +116,8 @@ function ns.questMenuItems(e)
     add("Tell them where to get it", function() ns.tellWhere(e) end,
         (not qOk and "needs the Questie addon") or (not inParty and "you are not in a party") or (#missing == 0 and "everybody has it")
         or (not ns.whereMessage(e) and "Questie does not know where it starts") or nil)
+    add("Trace back the chain", function() ns.traceBack(e) end,
+        (not qOk and "needs the Questie addon") or (not ns.chainMessage(e) and "Questie does not know this quest") or nil)
     add("Focus it on my map", function() ns.focusQuest(e) end, (not (ns.canPin and ns.canPin())) and "not on this client" or nil)
     add(ns.mapQuestLog() and "Select it in the quest log" or "Open it in the quest log", function() ns.openInLog(e) end, nil)
     return items
@@ -107,7 +132,7 @@ local function build()
     if not f then return nil end
     f:SetFrameStrata("FULLSCREEN_DIALOG")
     lines = {}
-    for i = 1, 6 do
+    for i = 1, 8 do
         local b = S.button(f, "", WIDTH - 16, function() ns.questMenuPick(i) end)
         b:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -26 - (i - 1) * (LINE_H + 2))
         lines[i] = b

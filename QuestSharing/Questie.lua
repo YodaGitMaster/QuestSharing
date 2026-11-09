@@ -284,6 +284,76 @@ function Q.questItemIds(questID)
     return out
 end
 
+-- The chain that leads to a quest, first step first and the quest itself last: { { id, name, before, beforeAny }, ... }.
+-- before = how many quests come right before that step (the first one is followed), beforeAny = any one of them is
+-- enough. steps.cut = the chain goes back further than MAX_CHAIN (only a guard against broken data: real chains are
+-- far shorter, and the first quest is the one that says where it all starts).
+local MAX_CHAIN = 40
+function Q.chain(questID)
+    local steps, id, seen = {}, questID, {}
+    while id and not seen[id] and #steps < MAX_CHAIN do
+        seen[id] = true
+        local list, any = beforeIds(id)
+        table.insert(steps, 1, { id = id, name = field("quest", id, "name"), before = #list, beforeAny = any })
+        id = list[1] and math.abs(list[1]) or nil
+    end
+    steps.cut = (id ~= nil and not seen[id]) or nil
+    return steps
+end
+
+-- "Marshal McBride in Northshire Valley 48.9, 41.6" / "the item Torn Page, dropped by Kobold Miner in ..." / nil
+local function shortPlace(s)
+    if not s then return nil end
+    local who = (s.kind == "item") and ("the item " .. s.who .. (s.from and (", dropped by " .. s.from) or "")) or s.who
+    if s.dungeon then return who .. " in a dungeon" .. (s.zone and (" (" .. s.zone .. ")") or "") end
+    if s.x then return string.format("%s in %s %.1f, %.1f", who, s.zone or "?", s.x, s.y) end
+    return who .. (s.zone and (" in " .. s.zone) or "")
+end
+
+-- One chat line (at most 255 letters): where a quest's chain starts and every quest in it, then where this one starts.
+--   [Wolves Among Us] (level 5+): 2 quests before it: "A Threat Within" at Marshal McBride in Northshire Valley
+--   48.9, 41.6 > "Kobold Camp Cleanup" > then this one at Marshal Dughan in Elwynn Forest 42.1, 65.9
+-- Too long: the middle steps become "(3 more)". nil when Questie does not know the quest.
+function Q.chainText(questID, link)
+    local steps = Q.chain(questID)
+    local me = steps[#steps]
+    if not (me and me.name) then return nil end
+    local level = field("quest", questID, "requiredLevel")
+    local head = (link or ('"' .. me.name .. '"')) ..
+        ((type(level) == "number" and level > 1) and (" (level " .. level .. "+)") or "")
+    local here = shortPlace(Q.starter(questID))
+    if #steps == 1 then
+        return head .. ": no quests before it, starts at " .. (here or "a place Questie does not know")
+    end
+    local names = {}
+    for i = 1, #steps - 1 do
+        local s, nxt = steps[i], steps[i + 1]
+        local n = '"' .. (s.name or ("quest " .. s.id)) .. '"'
+        if nxt.before > 1 then
+            n = n .. (nxt.beforeAny and string.format(" (or %d other)", nxt.before - 1) or string.format(" (+%d more)", nxt.before - 1))
+        end
+        if i == 1 then
+            local p = shortPlace(Q.starter(s.id))
+            if p then n = n .. " at " .. p end
+        end
+        names[i] = n
+    end
+    local count = #names
+    local function line(list)
+        return string.format("%s: %s%d quest%s before it: %s%s > then this one%s", head, steps.cut and "at least " or "",
+            count, count == 1 and "" or "s", steps.cut and "... > " or "", table.concat(list, " > "), here and (" at " .. here) or "")
+    end
+    local text = line(names)
+    local keepLast = #names - 1
+    while #text > 255 and keepLast >= 0 do              -- the first step (where it all starts) and the latest ones stay
+        local list = { names[1], string.format("(%d more)", #names - 1 - keepLast) }
+        for i = #names - keepLast + 1, #names do list[#list + 1] = names[i] end
+        text = line(list)
+        keepLast = keepLast - 1
+    end
+    return text
+end
+
 -- "starts at Marshal Dughan in Elwynn Forest (42.1, 65.9), after "A Threat Within""   (nil when Questie does not know)
 function Q.whereText(questID)
     local s = Q.starter(questID)

@@ -182,6 +182,7 @@ local BOX_SLASH = { SAY = "/s ", YELL = "/y ", EMOTE = "/e ", PARTY = "/p ", RAI
 function C.openChat(text, channel, target)
     if not ChatFrame_OpenChat then return false end
     local prefix = (channel == "WHISPER" and target) and ("/w " .. target .. " ") or BOX_SLASH[channel or ""] or ""
+    ns.log("chat box", prefix .. text)
     ChatFrame_OpenChat(prefix .. text)
     return true
 end

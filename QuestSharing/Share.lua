@@ -173,6 +173,7 @@ end
 -- the next quest waits for your click (at most 2 minutes, then the round ends quietly)
 local function park()
     run.waiting = true
+    ns.log("share", "waiting for your click: " .. #run.queue .. " quest(s) to offer")
     if not run.told then
         run.told = true
         ns.print(string.format("%d quest(s) to offer: click |cffffd100Share|r in the Party quests window, one quest per " ..
@@ -276,6 +277,7 @@ function ns.pushOne(e)
     ns.trying(clicking and "sharing a quest with the party (your click)" or "sharing a quest with the party", "share")
     C.push(e)
     ns.sharePushing = nil
+    ns.log("share", C.link(e) .. (clicking and " (your click)" or " (automatic)") .. (refused and ": refused by the game" or ": offered"))
     if refused then return false end
     ns.markOffered(e.questID)
     if ns.syncUpdate then ns.syncUpdate("O|" .. e.questID) end
@@ -423,6 +425,8 @@ function ns.startShare(reason, opts)
         ns.print(string.format("sharing %d quest(s) with %d player(s), %d second(s) apart%s (/qs stop to cancel)",
             #run.queue, #members, d.gap, #notes > 0 and (" - " .. table.concat(notes, ", ")) or ""))
     end
+    ns.log("share", string.format("round (%s): %d to offer, %d already with everyone, %d offered before, %d declined",
+        tostring(reason), #run.queue, why.known, why.offered, why.declined))
     step()
 end
 

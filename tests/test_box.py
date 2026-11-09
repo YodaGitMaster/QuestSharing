@@ -213,6 +213,19 @@ def test_clicking_a_quest_shares_it_while_a_round_waits_for_clicks(style):
     assert g.eval("NS.offered[100] ~= nil") is True
 
 
+def test_something_else_refused_right_after_a_share_does_not_switch_sharing_off(style):
+    """Found in the debug log: a share that went through, then another refusal within a second, was blamed on it."""
+    g = Game(style, CLICK_ONLY)
+    g.start()
+    g.slash("shareclick on")
+    g.join_party(["Anna"])
+    g.advance(40)
+    click(g, "share")
+    assert len(g.eval("PUSHED")) == 1
+    g.fire("ADDON_ACTION_BLOCKED", "QuestSharing", "UNKNOWN()")    # something else, a moment later
+    assert g.eval("NS.isBlocked('share')") is False
+
+
 def test_a_share_refused_even_from_your_click_switches_sharing_off(style):
     pre = """PUSH_CALLS = 0
     function QuestLogPushQuest() PUSH_CALLS = PUSH_CALLS + 1; FIRE("ADDON_ACTION_BLOCKED", "QuestSharing", "QuestLogPushQuest()") end"""

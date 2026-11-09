@@ -131,6 +131,8 @@ local function afterClick(self, _, down)
     if down then return end
     state.presses = (state.presses or 0) + 1
     local count = self:GetAttribute("qs-count") or 0
+    ns.log("ping", string.format("press %d: loaded %s%s, %s", state.presses, tostring(state.kind or "nothing"),
+        state.name and (" " .. state.name) or "", (count ~= state.count) and "went through" or "held back or nothing loaded"))
     if state.kind == "none" or not state.kind then
         say("nothing to ping: no quest creature in sight (enemy nameplates on?) - /qs ping checks everything")
     elseif count ~= state.count then
@@ -156,6 +158,7 @@ end
 
 ns.on("PING_SYSTEM_ERROR", function(_, err)
     state.lastError = tostring(err)
+    ns.log("ping", "the game's ping error: " .. tostring(err))
     ns.print("the game did not send the ping: " .. tostring(err))
 end)
 
