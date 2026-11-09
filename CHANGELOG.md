@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.7
+- **A channel the game refuses no longer stops the whole ring.** Some clients do not let addons post in `/s` at all,
+  not even from a click ("tried to call the protected function send()" from a click on the ring). One such refusal
+  used to switch off sending at once for everything, for the whole session, even after ticking the box again: whispers
+  to the player you picked went into the chat box too. Now the refusal is remembered for that channel only: `/s` goes
+  straight into the chat box (press Enter), whispers and party messages still go out at once. The hint says so,
+  `/qs doctor` lists the refused channels, and ticking *Send the message at once* again gives them another try.
+- **"Questie is installed but Quest Sharing says it is missing" now says why.** Questie 12 keeps its quest data in
+  a second folder, QuestieDB, from the same download. `/qs questie` gives, for Questie and for QuestieDB, "loaded,
+  version ..." or the reason from the game's AddOns list (not installed, switched off, marked out of date, missing an
+  addon it needs), finds Questie folders with another name (`Questie-master`), says what the game has (QuestDB,
+  LibQuestieDB, QuestieLoader), and ends with what to do ("copy BOTH folders of the Questie download..."). The grey
+  menu lines, `/qs doctor` and the debug log's session line give the same reason.
+- **Emotes and messages can follow each other right away** (Hug, then Salute): only the same slot twice within a
+  second is held back (it used to be any two picks, silently).
+- **The log and errors window scrolls** (mouse wheel) however long the text, shows up to 1000 log lines, and has
+  buttons: Select all (then Cmd+C / Ctrl+C: the game gives addons no clipboard), Debug log / Errors to switch, Clear,
+  Close. *Settings > General > Debugging* has *Show the debug log* and *Show the errors*.
+
 ## 0.3.6
 - **A debug log of everything, not only errors** (*Settings > General > Debug log*, `/qs debug on|off`, off by
   default). Every action and its outcome, one line each with the time: what you picked on the ring, who it was for

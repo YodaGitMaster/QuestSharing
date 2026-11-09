@@ -105,18 +105,103 @@ local function loaded(name)
     return ok and v and true or false
 end
 
--- /qs questie: is Questie here, which way do we read it, is it ready, and a real lookup from your own quest log
+-- What the game's AddOns list says about an addon: { installed, loaded, why (when not loaded), version }
+local REASON = {
+    MISSING = "not installed (no folder with that name in Interface/AddOns)",
+    DISABLED = "installed but switched off: tick it in the AddOns list at the character screen",
+    INTERFACE_VERSION = "installed but marked out of date: tick \"Load out of date AddOns\" at the character screen",
+    DEP_MISSING = "installed, but an addon it needs is missing",
+    DEP_DISABLED = "installed, but an addon it needs is switched off",
+    CORRUPT = "damaged: install it again",
+    INCOMPATIBLE = "not made for this game version",
+    BANNED = "blocked by the game",
+    DEMAND_LOADED = "installed, loads only when asked for",
+}
+local function addonState(name)
+    local s = { loaded = loaded(name) == true }
+    local info = (C_AddOns and C_AddOns.GetAddOnInfo) or GetAddOnInfo
+    local reason
+    if info then
+        local ok, n, _, _, loadable, r = pcall(info, name)
+        if ok then
+            reason = r
+            if (n == nil or n == "") and not reason then reason = "MISSING" end
+            if loadable and not reason then reason = nil end
+        end
+    end
+    s.installed = s.loaded or (reason ~= "MISSING" and info ~= nil)
+    if not s.loaded then s.why = REASON[reason or ""] or (reason and ("not loaded (" .. tostring(reason) .. ")")) or "not loaded" end
+    local meta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+    if meta and s.loaded then
+        local okV, v = pcall(meta, name, "Version")
+        if okV and type(v) == "string" and v ~= "" then s.version = v end
+    end
+    return s
+end
+Q.addonState = addonState
+
+-- folders whose name has "questie" in it, other than Questie and QuestieDB (a renamed download, e.g. "Questie-master")
+local function otherFolders()
+    local out = {}
+    local count = (C_AddOns and C_AddOns.GetNumAddOns) or GetNumAddOns
+    local info = (C_AddOns and C_AddOns.GetAddOnInfo) or GetAddOnInfo
+    if not (count and info) then return out end
+    local okN, n = pcall(count)
+    for i = 1, (okN and tonumber(n) or 0) do
+        local ok, name = pcall(info, i)
+        if ok and type(name) == "string" and string.find(string.lower(name), "questie", 1, true)
+           and name ~= "Questie" and name ~= "QuestieDB" then
+            out[#out + 1] = name .. (loaded(name) and " (loaded)" or " (not loaded)")
+        end
+    end
+    return out
+end
+
+-- why Questie's data cannot be read, in a few words (nil when it can): for grey menu lines and the doctor
+function Q.whyMissing()
+    if Q.source() then return nil end
+    local q, db = addonState("Questie"), addonState("QuestieDB")
+    if q.loaded and not db.installed then return "Questie is here but its quest data (the QuestieDB folder) is missing - /qs questie" end
+    if q.loaded and not db.loaded then return "QuestieDB (Questie's quest data) is not loaded - /qs questie" end
+    if Questie and Questie.started == false then return "Questie is still starting (or failed to start) - /qs questie" end
+    if not q.installed and not db.installed then return "needs the Questie addon (both folders: Questie and QuestieDB)" end
+    return "Questie's quest data cannot be read - /qs questie says why"
+end
+
+-- /qs questie: each addon's state in the AddOns list, what the game has, a verdict with what to do, then (when it
+-- works) the language and a real lookup from your own quest log
 function Q.report()
     local out = {}
-    local qOn, dbOn = loaded("Questie"), loaded("QuestieDB")
-    out[#out + 1] = "Questie addon: " .. (qOn and "loaded" or (qOn == false and "NOT loaded (installed and ticked at the character screen?)" or "?"))
-        .. (dbOn and " | QuestieDB (its database): loaded" or "")
+    local q, db = addonState("Questie"), addonState("QuestieDB")
+    local function state(s) return s.loaded and ("loaded" .. (s.version and (", version " .. s.version) or "")) or s.why end
+    out[#out + 1] = "Questie: " .. state(q)
+    out[#out + 1] = "QuestieDB (Questie's quest data, its own folder since Questie 12): " .. state(db)
+    local others = otherFolders()
+    if #others > 0 then out[#out + 1] = "other folders with Questie in the name: " .. table.concat(others, ", ") end
+    local function yn(v) return v and "yes" or "no" end
+    out[#out + 1] = string.format("found in the game: QuestDB %s, LibQuestieDB %s, QuestieLoader %s%s",
+        yn(type(_G.QuestDB) == "table"), yn(type(LibQuestieDB) == "table"), yn(type(QuestieLoader) == "table"),
+        (type(Questie) == "table" and Questie.started ~= nil) and (", Questie started " .. yn(Questie.started)) or "")
     local src = Q.source()
     if not src then
-        if QuestieLoader and Questie and Questie.started == false then
-            out[#out + 1] = "Questie is still starting (or failed to start): try again in a minute"
+        if q.loaded and not db.installed then
+            out[#out + 1] = "-> Questie 12 keeps its quest data in a second folder, QuestieDB, and it is missing. Copy BOTH " ..
+                "folders of the Questie download (Questie and QuestieDB) into Interface/AddOns, then restart the game. " ..
+                "(Questie itself cannot work without it either.)"
+        elseif db.installed and not db.loaded then
+            out[#out + 1] = "-> QuestieDB is " .. tostring(db.why)
+        elseif Questie and Questie.started == false then
+            out[#out + 1] = "-> Questie is still starting (or failed to start): try again in a minute"
+        elseif not q.installed and #others > 0 then
+            out[#out + 1] = "-> Questie's folder has another name (" .. others[1] .. "): rename it to Questie (and its database " ..
+                "folder to QuestieDB), then restart the game"
+        elseif not q.installed and not db.installed then
+            out[#out + 1] = "-> no Questie found: install Questie (both folders, Questie and QuestieDB) for \"Tell them " ..
+                "where to get it\" and \"Trace back the chain\""
+        elseif not q.loaded then
+            out[#out + 1] = "-> Questie is " .. tostring(q.why)
         else
-            out[#out + 1] = "no Questie database found: \"tell them where to get it\" cannot work"
+            out[#out + 1] = "-> Questie and QuestieDB are loaded but their data cannot be read: please send me this report"
         end
         return out, false
     end

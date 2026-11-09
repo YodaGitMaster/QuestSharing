@@ -203,6 +203,25 @@ def test_edited_rings_are_kept_and_reset_everything_puts_them_back(style):
     assert g.eval("NS.quickListFor(3)[2].label") == "Charge"
 
 
+
+def test_different_emotes_can_follow_each_other_right_away_but_the_same_one_is_not_done_twice(style):
+    """Reported: Hug then Salute quickly - the Salute did nothing (one second between ANY two picks)."""
+    g = game(style)
+    g.eval("NS.quickOpen")()
+    fun = next(i for i in range(1, 9) if g.eval("NS.quickPageList()")[i] and g.eval("NS.quickPageList()")[i].title == "Fun")
+    g.run("NS.db.quickPage = %d" % fun)
+    g.eval("NS.quickClose")()
+    def emote(slot):
+        g.eval("NS.quickOpen")()
+        g.eval("NS.quickClick")(slot)
+    emote(5)                                                        # Hug
+    emote(4)                                                        # Salute, right after
+    emote(4)                                                        # Salute again by accident: not twice
+    assert list(g.eval("EMOTED").values()) == ["HUG", "SALUTE"], list(g.eval("EMOTED").values())
+    g.advance(1.2)
+    emote(4)
+    assert list(g.eval("EMOTED").values())[-1] == "SALUTE" and len(g.eval("EMOTED")) == 3
+
 if __name__ == "__main__":
     import inspect
     failed = total = 0

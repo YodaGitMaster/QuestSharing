@@ -86,7 +86,7 @@ function ns.askParty(e)
     lastAsk.id, lastAsk.at = e.questID, GetTime()
     local msg = ns.questionMessage(e)
     if not C.inGroup() then ns.print(msg .. "  (not sent: you are not in a party)"); return false end
-    if ns.db.mode == "send" and not ns.isBlocked("chat") then
+    if ns.db.mode == "send" and ns.chatAllowed(C.channel()) then
         ns.trying("sending your status to the party", "chat")
         SendChatMessage(msg, C.channel())
     else
@@ -102,7 +102,7 @@ end
 -- Delivery ------------------------------------------------------------------------------------------
 function ns.deliver(msg)
     local mode = ns.db.mode
-    if mode == "send" and C.inGroup() and not ns.isBlocked("chat") then
+    if mode == "send" and C.inGroup() and ns.chatAllowed(C.channel()) then
         ns.trying("sending your status to the party", "chat")
         SendChatMessage(msg, C.channel())
     elseif mode == "send" and C.inGroup() and ChatFrame_OpenChat then
@@ -143,7 +143,7 @@ local lastShare = { id = nil, at = -10 }
 function ns.shareStatus(e)
     if not e then return false end
     local mode = ns.db.mode
-    if (mode == "box" or (mode == "send" and ns.isBlocked("chat"))) and ChatFrame_OpenChat then
+    if (mode == "box" or (mode == "send" and not ns.chatAllowed(C.channel()))) and ChatFrame_OpenChat then
         return ns.addToChatBox(ns.statusMessage(e, true), C.link(e))
     end
     if mode == "send" and lastShare.id == e.questID and GetTime() - lastShare.at < 1 then return false end   -- a double click

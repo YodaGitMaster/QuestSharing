@@ -38,7 +38,7 @@ function ns.tellWhere(e)
     local msg = ns.whereMessage(e)
     if not msg then ns.print("Questie does not know where this quest starts (or Questie is not installed)"); return false end
     if not C.inGroup() then ns.print(msg .. "  (not sent: you are not in a party)"); return false end
-    if ns.db.mode == "send" and not ns.isBlocked("chat") then
+    if ns.db.mode == "send" and ns.chatAllowed(C.channel()) then
         ns.trying("telling the party where to get a quest", "chat")
         SendChatMessage(msg, C.channel())
     else
@@ -60,7 +60,7 @@ function ns.traceBack(e)
     if not msg then ns.print("Questie does not know this quest (or Questie is not installed)"); return false end
     ns.log("trace", msg)
     if not C.inGroup() then ns.print(msg); return true end
-    if ns.db.mode == "send" and not ns.isBlocked("chat") then
+    if ns.db.mode == "send" and ns.chatAllowed(C.channel()) then
         ns.trying("telling the party the chain of a quest", "chat")
         SendChatMessage(msg, C.channel())
     else
@@ -114,10 +114,10 @@ function ns.questMenuItems(e)
         or (#missing == 0 and "everybody has it") or nil)
     local qOk = ns.questie and ns.questie.available()
     add("Tell them where to get it", function() ns.tellWhere(e) end,
-        (not qOk and "needs the Questie addon") or (not inParty and "you are not in a party") or (#missing == 0 and "everybody has it")
+        (not qOk and ns.questie.whyMissing()) or (not inParty and "you are not in a party") or (#missing == 0 and "everybody has it")
         or (not ns.whereMessage(e) and "Questie does not know where it starts") or nil)
     add("Trace back the chain", function() ns.traceBack(e) end,
-        (not qOk and "needs the Questie addon") or (not ns.chainMessage(e) and "Questie does not know this quest") or nil)
+        (not qOk and ns.questie.whyMissing()) or (not ns.chainMessage(e) and "Questie does not know this quest") or nil)
     add("Focus it on my map", function() ns.focusQuest(e) end, (not (ns.canPin and ns.canPin())) and "not on this client" or nil)
     add(ns.mapQuestLog() and "Select it in the quest log" or "Open it in the quest log", function() ns.openInLog(e) end, nil)
     return items

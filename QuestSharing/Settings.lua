@@ -44,6 +44,8 @@ ns.settingRows = {
       desc = "Saved to the addon's file on /reload or logout (SavedVariables/QuestSharing.lua)." },
     { tab = "general", kind = "action", label = "Show the debug log", button = "Show",
       desc = "The newest lines in a window you can copy from (/qs log).", action = function() ns.logCommand() end },
+    { tab = "general", kind = "action", label = "Show the errors", button = "Show",
+      desc = "Only the errors, with where they came from (/qs errors).", action = function() ns.errorsCommand(nil, true) end },
     { tab = "general", kind = "action", label = "Reset everything to the defaults", button = "Reset",
       desc = "Every setting and your quick chat messages.", action = function() ns.resetSettings() end },
     -- Sharing

@@ -101,7 +101,7 @@ def test_lines_that_cannot_be_used_are_grey_and_say_why(style):
     pick(g, lines, "Offer it to the party")
     assert "everybody has it" in "\n".join(g.printed()) and menu.shown is True, "a grey line says why and stays open"
     where = next(b for b in lines if "where to get it" in plain(b.text))
-    assert where.tipText == "needs the Questie addon"
+    assert where.tipText.startswith("needs the Questie addon"), where.tipText
 
 
 def test_focus_it_on_my_map(style):
@@ -290,7 +290,7 @@ def test_slash_questie_proves_it_with_a_quest_from_your_log(style):
                      (QUESTIE_11, "Questie's own database (older Questie)")):
         g = party(style, pre=LOADED + pre)
         text = report(g)
-        assert "Questie addon: loaded | QuestieDB (its database): loaded" in text, text
+        assert "Questie: loaded" in text and "QuestieDB (Questie's quest data, its own folder since Questie 12): loaded" in text, text
         assert "reading: " + how in text, (how, text)
         assert "[Wolves Among Us]|h starts at Marshal McBride in Elwynn Forest (48.9, 41.6)" in text, text
         assert "Questie works with Quest Sharing." in text
@@ -308,9 +308,61 @@ def test_slash_questie_names_the_language_of_its_names(style):
 def test_slash_questie_says_what_is_missing(style):
     g = party(style, pre="LOADED_ADDONS = {}; function IsAddOnLoaded(n) return LOADED_ADDONS[n] == true end")
     text = report(g)
-    assert "Questie addon: NOT loaded" in text and "no Questie database found" in text
+    assert "Questie: not loaded" in text and "-> no Questie found: install Questie (both folders" in text, text
     g2 = party(style, pre=LOADED + "Questie = { started = false }; QuestieLoader = { ImportModule = function() return {} end }")
     assert "still starting" in report(g2)
+
+
+# The game's AddOns list: INSTALLED = { [folder] = reason or false (= fine) }; LOADED_ADDONS = loaded ones
+ADDON_LIST = """
+INSTALLED = INSTALLED or {}
+local order = {}
+for name in pairs(INSTALLED) do order[#order + 1] = name end
+table.sort(order)
+function GetNumAddOns() return #order end
+function GetAddOnInfo(i)
+    local name = type(i) == "number" and order[i] or i
+    if INSTALLED[name] == nil then return name, nil, nil, false, "MISSING" end
+    return name, name, "", INSTALLED[name] == false, INSTALLED[name] or nil
+end
+"""
+
+
+def test_reported_questie_installed_without_its_database_says_what_to_do(style):
+    """Reported: Questie is installed, Quest Sharing says it is missing - the QuestieDB folder was not."""
+    pre = ('INSTALLED = { Questie = false }; LOADED_ADDONS = { Questie = true }; '
+           'function IsAddOnLoaded(n) return LOADED_ADDONS[n] == true end\n' + ADDON_LIST)
+    g = party(style, pre=pre)
+    text = report(g)
+    assert "Questie: loaded" in text and "QuestieDB (Questie's quest data, its own folder since Questie 12): not installed" in text
+    assert "-> Questie 12 keeps its quest data in a second folder, QuestieDB, and it is missing" in text, text
+    assert "Copy BOTH folders of the Questie download (Questie and QuestieDB)" in text
+    assert g.eval("NS.questie.whyMissing()").startswith("Questie is here but its quest data (the QuestieDB folder) is missing")
+    menu, lines = open_menu(g)
+    chain = next(b for b in lines if "Trace back the chain" in plain(b.text))
+    assert "QuestieDB folder" in chain.tipText, "the grey line says why too"
+
+
+def test_questie_db_installed_but_switched_off_or_out_of_date(style):
+    for reason, want in (("DISABLED", "switched off: tick it in the AddOns list"),
+                         ("INTERFACE_VERSION", "marked out of date: tick \"Load out of date AddOns\"")):
+        pre = (f'INSTALLED = {{ Questie = false, QuestieDB = "{reason}" }}; LOADED_ADDONS = {{ Questie = true }}; '
+               'function IsAddOnLoaded(n) return LOADED_ADDONS[n] == true end\n' + ADDON_LIST)
+        text = report(party(style, pre=pre))
+        assert "-> QuestieDB is installed but " + want.split(": ")[0] in text and want in text, (reason, text)
+
+
+def test_a_renamed_questie_folder_is_found_and_named(style):
+    pre = ('INSTALLED = { ["Questie-master"] = false }; LOADED_ADDONS = { ["Questie-master"] = true }; '
+           'function IsAddOnLoaded(n) return LOADED_ADDONS[n] == true end\n' + ADDON_LIST)
+    text = report(party(style, pre=pre))
+    assert "other folders with Questie in the name: Questie-master (loaded)" in text
+    assert "-> Questie's folder has another name (Questie-master (loaded)): rename it to Questie" in text, text
+
+
+def test_the_report_says_what_the_game_has(style):
+    text = report(party(style, pre=LOADED + QUESTIE_12))
+    assert "found in the game: QuestDB yes, LibQuestieDB no, QuestieLoader no" in text
 
 
 def test_slash_questie_when_questie_knows_none_of_your_quests(style):

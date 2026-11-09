@@ -98,14 +98,15 @@ local function blocked(event, addon, fn)
     if ns.quickBlocked then ours, l = ns.quickBlocked() end
     local what = ""
     if ours then
-        if not ns.blockedFeatures.chat then
-            ns.blockedFeatures.chat = true
-            ns.db.mode = "box"                                      -- the next ones go straight into the chat box
-        end
-        if ns.db.quickSend and l.channel ~= "INVITE" then           -- and the ring stops sending at once (remembered)
-            ns.db.quickSend = false
-            ns.print("quick chat: the game does not let the addon send from the ring, so its messages go into the chat " ..
-                "box from now on (to try again: Settings > Quick chat > Send the message at once, then /reload)")
+        -- only THIS channel: the game may refuse /s from addons and still allow /w and /p (remembered)
+        local ch = l.channel
+        if ch and ch ~= "INVITE" then
+            ns.db.chatRefused = type(ns.db.chatRefused) == "table" and ns.db.chatRefused or {}
+            if not ns.db.chatRefused[ch] then
+                ns.db.chatRefused[ch] = true
+                ns.print("quick chat: the game does not let addons send to " .. ch .. " here, so those messages go into " ..
+                    "your chat box from now on (press Enter). Other channels are still sent at once.")
+            end
         end
         what = " (while sending from the quick chat ring to " .. tostring(l.channel) .. (l.channel == "WHISPER" and (" " .. tostring(l.target)) or "") .. ")"
     else
@@ -146,15 +147,17 @@ ns.on("ADDON_ACTION_BLOCKED", blocked)
 -- A window with text you can select and copy ---------------------------------------------------------------------
 local win, box
 
-function ns.reportWindow(title, lines)
+-- kind: "log" or "errors" (shows Clear for that list), nil for other reports (the doctor)
+local W_WIDTH, W_HEIGHT = 720, 500
+function ns.reportWindow(title, lines, kind)
     local text = table.concat(lines, "\n")
     if not win then
         if not (CreateFrame and UIParent) then return false end
         local ok, f = pcall(CreateFrame, "Frame", "QuestSharingReport", UIParent, "BackdropTemplate")
         if not (ok and f) then ok, f = pcall(CreateFrame, "Frame", "QuestSharingReport", UIParent) end
         if not (ok and f) then return false end
-        f:SetWidth(620)
-        f:SetHeight(440)
+        f:SetWidth(W_WIDTH)
+        f:SetHeight(W_HEIGHT)
         f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
         pcall(function()
             f:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -170,22 +173,64 @@ function ns.reportWindow(title, lines)
         f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
         f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -12)
-        local hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        hint:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -30)
-        hint:SetText("The text is selected: press Ctrl+C to copy it, then paste it where you need it. Esc closes this window.")
-        box = CreateFrame("EditBox", nil, f)
+        f.hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        f.hint:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -30)
+        f.hint:SetText("Scroll with the mouse wheel. Select all, then Cmd+C (Mac) or Ctrl+C to copy. Esc closes this window.")
+        -- the text scrolls inside the window, however long it is
+        local okS, scroll = pcall(CreateFrame, "ScrollFrame", "QuestSharingReportScroll", f, "UIPanelScrollFrameTemplate")
+        if not (okS and scroll) then scroll = CreateFrame("ScrollFrame", "QuestSharingReportScroll", f) end
+        scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -48)
+        scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -34, 42)
+        scroll:EnableMouseWheel(true)
+        scroll:SetScript("OnMouseWheel", function(self, delta)
+            local max = (self.GetVerticalScrollRange and self:GetVerticalScrollRange()) or 0
+            local now = (self.GetVerticalScroll and self:GetVerticalScroll()) or 0
+            self:SetVerticalScroll(math.max(0, math.min(max, now - delta * 60)))
+        end)
+        f.scroll = scroll
+        box = CreateFrame("EditBox", nil, scroll)
         box:SetMultiLine(true)
-        box:SetWidth(590)
-        box:SetHeight(380)
-        box:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -48)
+        box:SetWidth(W_WIDTH - 14 - 34 - 6)
+        box:SetHeight(W_HEIGHT - 90)
         if ChatFontNormal then box:SetFontObject(ChatFontNormal) end
         box:SetAutoFocus(false)
         box:SetScript("OnEscapePressed", function() f:Hide() end)
         box:SetScript("OnTextChanged", function(self, user) if user then self:SetText(self.reportText or "") end end)   -- read only
+        if ScrollingEdit_OnCursorChanged then                    -- the game's own helper: the view follows the cursor
+            box:SetScript("OnCursorChanged", ScrollingEdit_OnCursorChanged)
+            if ScrollingEdit_OnUpdate then box:SetScript("OnUpdate", function(self, dt) ScrollingEdit_OnUpdate(self, dt, scroll) end) end
+        end
+        scroll:SetScrollChild(box)
+        -- the buttons: Select all (then Cmd+C / Ctrl+C), switch between the debug log and the errors, Clear, Close
+        local S = ns.style
+        local function button(label, w, fn, tip)
+            local b = S.button(f, label, w, fn, tip)
+            b:SetHeight(22)
+            return b
+        end
+        f.selectAll = button("Select all", 110, function()
+            box:SetFocus()
+            box:HighlightText()
+            ns.print("all of it is selected: press Cmd+C (Mac) or Ctrl+C (Windows) to copy it")
+        end, "Selects everything in this window, so one Cmd+C / Ctrl+C copies it all (the game lets addons go no further)")
+        f.selectAll:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 12)
+        f.showLog = button("Debug log", 96, function() ns.logCommand() end, "Every action and its outcome (/qs log)")
+        f.showLog:SetPoint("LEFT", f.selectAll, "RIGHT", 8, 0)
+        f.showErrors = button("Errors", 80, function() ns.errorsCommand(nil, true) end, "The errors only, with where they came from (/qs errors)")
+        f.showErrors:SetPoint("LEFT", f.showLog, "RIGHT", 8, 0)
+        f.clear = button("Clear", 70, function()
+            if win.kind == "log" then ns.logCommand("clear"); ns.logCommand()
+            elseif win.kind == "errors" then ns.errorsCommand("clear"); ns.errorsCommand(nil, true) end
+        end, "Empties the list shown")
+        f.clear:SetPoint("LEFT", f.showErrors, "RIGHT", 8, 0)
+        f.close = button("Close", 70, function() f:Hide() end)
+        f.close:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 12)
         if UISpecialFrames then table.insert(UISpecialFrames, "QuestSharingReport") end
         win = f
     end
     win.title:SetText(title)
+    win.kind = kind
+    if kind then win.clear:Show() else win.clear:Hide() end
     box.reportText = text
     box:SetText(text)
     win:Show()
@@ -212,19 +257,26 @@ function ns.errorLines(full)
     return out
 end
 
-function ns.errorsCommand(arg)
+-- quiet: from the window's own button (the window only, no chat lines)
+function ns.errorsCommand(arg, quiet)
     if arg == "clear" then
         ns.db.errors = {}
         return ns.print("error log cleared")
     end
     local lines = ns.errorLines()
-    if #lines == 0 then return ns.print("no errors recorded - good") end
-    for _, l in ipairs(lines) do ns.print(l) end
-    ns.print("the window has the details (what was running, the stack): Ctrl+A, Ctrl+C and send it")
     local full = { "Quest Sharing " .. tostring(ns.version) .. " | game interface " ..
         tostring(GetBuildInfo and select(4, GetBuildInfo()) or "?"), "" }
-    for _, l in ipairs(ns.errorLines(true)) do full[#full + 1] = l end
-    ns.reportWindow("Quest Sharing - errors", full)
+    if #lines == 0 then
+        if not quiet then ns.print("no errors recorded - good") end
+        full[#full + 1] = "no errors recorded - good"
+    else
+        if not quiet then
+            for _, l in ipairs(lines) do ns.print(l) end
+            ns.print("the window has the details (what was running, the stack): Select all, then Cmd+C / Ctrl+C")
+        end
+        for _, l in ipairs(ns.errorLines(true)) do full[#full + 1] = l end
+    end
+    if quiet or #lines > 0 then ns.reportWindow("Quest Sharing - errors", full, "errors") end
 end
 
 -- The debug log: what the game did around the addon, the session header, /qs log ---------------------------------------
@@ -239,7 +291,8 @@ function ns.logSession(why)
     local realm = GetRealmName and GetRealmName() or "?"
     ns.log("session", string.format("%s - Quest Sharing %s | game %s (%s) | %s quest API | language %s | Questie: %s | %s-%s",
         why, tostring(ns.version), tostring(iface), tostring(build), C.modern and "modern" or "classic",
-        tostring(GetLocale and GetLocale() or "?"), tostring(ns.questie and ns.questie.source() or "none"), who, realm))
+        tostring(GetLocale and GetLocale() or "?"), tostring(ns.questie and (ns.questie.source() or ("none: " ..
+        tostring(ns.questie.whyMissing()))) or "none"), who, realm))
 end
 
 local lastMembers, lastTarget = nil, nil
@@ -284,7 +337,7 @@ ns.on("CHAT_MSG_SYSTEM", function(_, msg) ns.log("game says", plainText(msg)) en
 ns.on("UI_ERROR_MESSAGE", function(_, a, b) ns.log("game error", plainText(type(b) == "string" and b or a)) end)
 
 -- /qs log: the newest lines in a window you can copy from; the whole log is in the file
-local SHOW = 600
+local SHOW = 1000
 function ns.logCommand(arg)
     if arg == "clear" then
         QuestSharingLog = {}
@@ -293,15 +346,17 @@ function ns.logCommand(arg)
     end
     local L = type(QuestSharingLog) == "table" and QuestSharingLog or {}
     if #L == 0 then
-        return ns.print(ns.logging() and "the debug log is empty so far" or
-            "the debug log is off: Settings > General > Debug log, or /qs debug on")
+        local why = ns.logging() and "the debug log is empty so far" or "the debug log is off: Settings > General > Debug log, or /qs debug on"
+        ns.print(why)
+        if win and win:IsShown() then ns.reportWindow("Quest Sharing - debug log", { why }, "log") end
+        return
     end
     local out = { string.format("Quest Sharing %s - debug log (%s): the newest %d of %d lines; all of them are in " ..
         "WTF/Account/<account>/SavedVariables/QuestSharing.lua after /reload or logout", tostring(ns.version),
         ns.logging() and "on" or "off", math.min(SHOW, #L), #L), "" }
     for i = math.max(1, #L - SHOW + 1), #L do out[#out + 1] = L[i] end
-    ns.print(string.format("debug log: %d lines (%s) - the window has them: Ctrl+A, Ctrl+C", #L, ns.logging() and "on" or "off"))
-    ns.reportWindow("Quest Sharing - debug log", out)
+    ns.print(string.format("debug log: %d lines (%s) - the window has them: Select all, then Cmd+C / Ctrl+C", #L, ns.logging() and "on" or "off"))
+    ns.reportWindow("Quest Sharing - debug log", out, "log")
 end
 
 -- /qs doctor ---------------------------------------------------------------------------------------------------------
@@ -352,7 +407,8 @@ function ns.doctorLines()
         and ("the game's ping system is here, ping key " .. tostring(ns.pingKeyName and ns.pingKeyName() or "not set - /qs pingkey <KEY>"))
         or "this client has no ping system for addons to use"))
     local src = ns.questie and ns.questie.source()
-    add(src ~= nil, "Questie: " .. (src and ("found (" .. src .. ") - \"where to get it\" works; /qs questie tests it") or "not found - \"where to get it\" needs it; /qs questie says why"))
+    add(src ~= nil, "Questie: " .. (src and ("found (" .. src .. ") - \"where to get it\" works; /qs questie tests it")
+        or ("not found - " .. tostring(ns.questie and ns.questie.whyMissing() or "/qs questie says why"))))
     local errs = d.errors or {}
     out[#out + 1] = (#errs == 0) and "[OK] no errors recorded" or ("[--] " .. #errs .. " error(s) recorded - see below")
     local flags = {}
@@ -360,6 +416,11 @@ function ns.doctorLines()
         flags[#flags + 1] = k .. "=" .. (d[k] and "on" or "off")
     end
     out[#out + 1] = "settings: " .. table.concat(flags, " ") .. string.format(" area=%s gap=%s mode=%s channel=%s", d.area, tostring(d.gap), d.quickMode, d.quickChannel)
+    local refused = {}
+    for ch in pairs(type(d.chatRefused) == "table" and d.chatRefused or {}) do refused[#refused + 1] = ch end
+    table.sort(refused)
+    out[#out + 1] = "chat the game refused for addons: " .. (#refused > 0 and (table.concat(refused, ", ") ..
+        " (into the chat box instead; tick Send the message at once again to retry)") or "none")
     out[#out + 1] = "debug log: " .. (ns.logging() and "on" or "off") .. ", " ..
         tostring(type(QuestSharingLog) == "table" and #QuestSharingLog or 0) .. " lines (/qs log)"
     for _, l in ipairs(ns.errorLines(true)) do out[#out + 1] = "error: " .. l end
