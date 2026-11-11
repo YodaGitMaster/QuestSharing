@@ -348,3 +348,42 @@ ns.on("PLAYER_ENTERING_WORLD", function()
         startTicker()
     end)
 end)
+
+-- Hiding the game's quest tracker (Settings > Tracker, /qs hidetracker on|off) ----------------------------------------
+-- The tracker holds the game's secure item buttons, so the game lets it be hidden or shown only outside a fight: in a
+-- fight it waits, and happens right after. When the game shows it again (a new quest, a zone), it is hidden again.
+local TRACKERS = { "ObjectiveTrackerFrame", "WatchFrame", "QuestWatchFrame" }
+local hookedTracker, hiddenByUs = {}, {}
+local function wantHidden() return ns.db.enabled and ns.db.hideTracker end
+local function inFight() return InCombatLockdown and InCombatLockdown() end
+
+function ns.applyTrackerHidden()
+    if inFight() then ns.trackerPending = true; return end
+    ns.trackerPending = false
+    for _, name in ipairs(TRACKERS) do
+        local f = _G[name]
+        if type(f) == "table" and f.Hide and f.Show then
+            if not hookedTracker[f] and f.HookScript then
+                hookedTracker[f] = true
+                pcall(f.HookScript, f, "OnShow", function(self)
+                    if not wantHidden() then return end
+                    if inFight() then ns.trackerPending = true; return end
+                    ns.trying("hiding the game's quest tracker", "hidetracker")
+                    self:Hide()
+                end)
+            end
+            if wantHidden() and f:IsShown() then
+                ns.trying("hiding the game's quest tracker", "hidetracker")
+                f:Hide()
+                hiddenByUs[f] = true
+            elseif not wantHidden() and hiddenByUs[f] then
+                hiddenByUs[f] = nil
+                ns.trying("showing the game's quest tracker again", "hidetracker")
+                f:Show()
+            end
+        end
+    end
+end
+ns.on("PLAYER_LOGIN", function() ns.after(1, ns.applyTrackerHidden) end)
+ns.on("PLAYER_ENTERING_WORLD", function() ns.after(1, ns.applyTrackerHidden) end)
+ns.on("PLAYER_REGEN_ENABLED", function() if ns.trackerPending then ns.after(0.5, ns.applyTrackerHidden) end end)

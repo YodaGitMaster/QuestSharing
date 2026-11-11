@@ -432,6 +432,10 @@ function ns.doctorLines()
         flags[#flags + 1] = k .. "=" .. (d[k] and "on" or "off")
     end
     out[#out + 1] = "settings: " .. table.concat(flags, " ") .. string.format(" area=%s gap=%s mode=%s channel=%s", d.area, tostring(d.gap), d.quickMode, d.quickChannel)
+    if ns.questMap then
+        local on, why = ns.questMap.state()
+        add(on, "quest map (world map and minimap): " .. (on and "on" or why))
+    end
     local refused = {}
     for ch in pairs(type(d.chatRefused) == "table" and d.chatRefused or {}) do refused[#refused + 1] = ch end
     table.sort(refused)

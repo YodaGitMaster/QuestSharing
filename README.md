@@ -149,6 +149,11 @@ the game's tracker still tells the party you are done, because that is your own 
        before that: `Bob: [Wolves Among Us] starts at Marshal McBride in Elwynn Forest (48.9, 41.6), after "A Threat
        Within" (from Deputy Willem in Elwynn Forest (48.2, 42.9)), 1 more step before that.` (Also "starts from the item
        ..., dropped by ..." when an item starts it.)
+     - **How to do it** (with Questie): **one chat line** with what is still open and where, the spot nearest to you
+       for each, then where to turn it in: `[Wolves Among Us]: kill Wolf (Elwynn Forest 42.5, 61.5); Wolf Pelt from
+       Wolf (Elwynn Forest 42.5, 61.5); then turn in at Marshal McBride (Elwynn Forest 48.9, 41.6)`. Objectives the game
+       already counts as done are left out; a finished quest says only where to turn it in. Also objects to use ("use
+       Kobold Crate"), items from chests and places to go. In a party it goes to the party, alone only to you.
      - **Trace back the chain** (with Questie): **one chat line** with the level it needs, every quest that comes
        before it from the first one, where that **first** quest starts, and where this one starts:
        `[Wolves Among Us] (level 5+): 2 quests before it: "Kobold Camp Cleanup" at Deputy Willem in Elwynn Forest 48.2,
@@ -213,8 +218,17 @@ the game's tracker still tells the party you are done, because that is your own 
    - **A small button** with that item (Shift + drag to move it): cooldown, count, red when your target is out of range.
    - Using an item is protected by the game, so these are secure buttons prepared outside combat; during a fight they
      keep what they had and the tracker icons are put in place again afterwards.
+   - **Quest items marked in your bags** (*Settings > Pings & items > Mark quest items in my bags*, `/qs bagmarks
+     on|off`, on by default): a **gold** border on items for a quest of the zone you are in, a **blue** one on items
+     for one of your quests somewhere else, so the bank can keep those and you only carry what this zone needs. The
+     item's tooltip says which quest and where. An item counts for a quest when an objective names it ("Wolf Pelt:
+     2/4"), when the bag says it belongs to that quest, or (with QuestieDB) when the quest asks for, hands out or
+     needs that exact item. The game's own bags and the bank's main slots; bag replacement addons (Bagnon, ...) use
+     their own buttons and are not marked. Clicks go through to the item.
 
-10. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. It fills the
+10. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. **Hide the game's
+    tracker** altogether: *Settings > Tracker > Hide the game's quest tracker* (`/qs hidetracker on`; outside fights, as
+    the game requires; the Party quests window still shows your quests). It fills the
    tracker (the list on the right) with the quests closest to you and **re-checks every 2 seconds as you
    move**, so the list follows you instead of changing only when you cross into another zone.
    - **Distance mode** (needs a client that can tell how far a quest is) ranks quests by distance. A quest
@@ -351,6 +365,14 @@ the game's tracker still tells the party you are done, because that is your own 
     **Clear** and **Close**.
 
 16. **Quest objectives are easier to find.**
+    - **A light quest map** (*Settings > Tracker > Quest map*, `/qs questmap on|off`, on by default): small icons on
+      the **world map** and the **minimap** where your quests' open objectives are done (a skull for creatures to
+      kill, a bag where items drop, a gear for objects to use, a map for places to go: the 6 nearest to you for each)
+      and, once a quest is done, a yellow **?** where to turn it in. Hover one for the quest and what to do there.
+      The data comes from **QuestieDB**; it draws only while the **Questie addon itself is off** (Questie draws its
+      own, and two sets of icons crowd the maps; it says so once). To use this lighter map instead of Questie's:
+      switch **Questie** off in the AddOns list at the character screen and keep **QuestieDB** on. Works with a
+      rotating minimap; `/qs questie` and `/qs doctor` say whether it is on and why not.
     - **Quest icons over creatures:** every creature that is part of one of your quests gets a gold quest icon
       above its nameplate (the game itself tells the addon which creatures those are).
     - **The nearest quest is pinned in the world:** while "tracker follows me" is on, the game's own
@@ -373,9 +395,9 @@ explanation, and groups its settings in short sections:
 | **General** | *Getting started*: your **quick chat key** (click, then press the key), **Show the ring**, **Check my setup**. *Basics*: the master switch, how your messages go out, the map button, a soft sound for good news; *Debugging*: the debug log and **Show the debug log**; reset |
 | **Sharing** | *When I join a party*, *Party chat* (in common, done, picked up a quest someone has, where the items were), *Behind the scenes* (sync, quest-log markers) |
 | **Party** | the Party quests window (show it in a party, hide it in combat, its size, move it back), *Clicking a quest* (what a click on the game's tracker posts) *Showing where we are* (the map icons, a teammate's pin) and *Friends* (the beta) |
-| **Tracker** | *The quest list on the right* (follows you, how many, distance or zone, the pause), *Finding objectives* (the world pin, quest icons over creatures, the game-settings helper)  |
+| **Tracker** | *The quest list on the right* (hide the game's tracker, follows you, how many, distance or zone, the pause), *Finding objectives* (the quest map, the world pin, quest icons over creatures, the game-settings helper)  |
 | **Quick chat** | the ring, its key, hold or toggle, its size, where Auto messages go, and the **message editor** |
-| **Pings & items** | *Pinging quest targets* (the ping key, the anti-spam time, objects too) and *Quest items* (icons in the tracker, the quest item key, the item button) |
+| **Pings & items** | *Pinging quest targets* (the ping key, the anti-spam time, objects too) and *Quest items* (quest items marked in your bags, icons in the tracker, the quest item key, the item button) |
 
 Every line is one click: a **check box** switches, a **choice** (`< value >`) moves to the next one (right click goes
 back), a **number** (`- 10 +`) counts up with the left button and down with the right one (Shift = bigger steps), and
@@ -440,6 +462,9 @@ party member running Quest Sharing finishes one you share. Never during combat.
 | `/qs highlight mobs\|pin\|cvars [on\|off]` | quest icons over creatures / pin the nearest quest / the game-settings helper |
 | `/qs doctor` | a report of what works on this client, in a window you can copy from |
 | `/qs errors [clear]` | errors this addon has caused; the window adds where each came from (line, what was running, stack) |
+| `/qs bagmarks on\|off` | quest items marked in your bags: gold for quests of this zone, blue for quests elsewhere (default on) |
+| `/qs hidetracker on\|off` | hide the game's quest tracker, outside fights (default off) |
+| `/qs questmap on\|off` | the light quest map on the world map and minimap (needs QuestieDB, Questie itself off) |
 | `/qs debug on\|off` | the debug log: every action and its outcome, saved to the addon's file on `/reload` or logout (default off) |
 | `/qs log [clear]` | show the debug log in a window you can copy from; `clear` empties it |
 | `/qs minimap on\|off` | the minimap button (default on) |
@@ -478,7 +503,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 892 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 930 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -541,10 +566,12 @@ python tests/test_ping.py             # 27 tests: the ping key, nearest quest cr
 python tests/test_zone.py             # 10 tests: only the quests of where you are (Teldrassil vs Stormwind)
 python tests/test_items.py            # 24 tests: quest item icons in the tracker, the item key and button
 python tests/test_emotes.py           # 34 tests: the emote rings behind the mouse wheel, editing them, only the ones that work
+python tests/test_bags.py             # 16 tests: quest items marked in the bags, hiding the game's quest tracker
+python tests/test_questmap.py         # 22 tests: How to do it, and the light quest map on the world map and minimap
 python tests/test_ringtest.py         # 14 tests: /qs quick test: every slot run, checked against what the game did
 python tests/test_log.py              # 35 tests: the debug log: every action and its outcome, kept small, the log window
 ```
-Expected: every line ends in `passed` with all tests green (892 in total).
+Expected: every line ends in `passed` with all tests green (930 in total).
 
 ## Files
 | File | Purpose |
@@ -555,7 +582,7 @@ Expected: every line ends in `passed` with all tests green (892 in total).
 | `QuestSharing/Sync.lua` | addon-to-addon protocol: hello, full quest list, updates (see the header of the file) |
 | `QuestSharing/Progress.lua` | notices finished quests, announces them, sends changes to synced players |
 | `QuestSharing/Panel.lua` | the "Party quests" grid (nearest 5 quests x party members) and the quest-log markers |
-| `QuestSharing/Track.lua` | keeps the quest tracker on the quests nearest to you (distance or zone mode) |
+| `QuestSharing/Track.lua` | keeps the quest tracker on the quests nearest to you (distance or zone mode); can hide the game's tracker |
 | `QuestSharing/Highlight.lua` | quest icons over creatures on their nameplates, and the game-settings helper |
 | `QuestSharing/Diagnostics.lua` | the error log, `/qs doctor` and the copyable report window |
 | `QuestSharing/MinimapButton.lua` | the minimap button |
@@ -563,9 +590,11 @@ Expected: every line ends in `passed` with all tests green (892 in total).
 | `QuestSharing/Quick.lua`, `QuestSharing/Bindings.xml` | the quick chat ring, its placeholders, the message commands and the key binding |
 | `QuestSharing/Friends.lua` | (beta) adds party members to your friends list, with safeguards |
 | `QuestSharing/QuestItems.lua` | usable quest items: icons next to the quests in the tracker, the item key and button |
+| `QuestSharing/Bags.lua` | quest items marked in the bags: gold for quests of this zone, blue for quests elsewhere |
 | `QuestSharing/Ping.lua` | the ping key: Attack ping on the nearest quest creature, "look here" on quest objects, anti-spam |
 | `QuestSharing/Menu.lua` | the right-click menu of the Party quests window |
-| `QuestSharing/Questie.lua` | reads Questie's quest database (when installed): where a quest starts, which quests come first |
+| `QuestSharing/Questie.lua` | reads Questie's quest database (when installed): where a quest starts, which quests come first, where objectives are done and quests turned in |
+| `QuestSharing/QuestMap.lua` | the light quest map: icons for your quests on the world map and minimap (QuestieDB, while Questie is off) |
 | `QuestSharing/Marker.lua` | positions on the world map, a pin where a teammate found the items |
 | `QuestSharing/Team.lua` | "picked up a quest someone has - let's do it together?" (once per quest, not for shared ones) |
 | `QuestSharing/Style.lua` | one look for every window (dialog and on-screen frames, buttons, check boxes, chat colours) and the good-news sound |

@@ -69,6 +69,7 @@ local function newObject()
     function o:Show() self.shown = true end
     function o:Hide() self.shown = false end
     function o:IsShown() return self.shown end
+    function o:IsVisible() return self.shown end
     function o:SetText(t) self.text = t; self.sets = (self.sets or 0) + 1 end
     function o:GetText() return self.text end
     function o:CreateFontString() return newObject() end
@@ -100,7 +101,7 @@ local function newObject()
                             "RegisterForDrag", "SetJustifyH", "StartMoving", "StopMovingOrSizing", "SetAllPoints",
                             "ClearAllPoints", "SetFontObject", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "SetFocus",
                             "SetMultiLine", "HighlightText", "SetFrameLevel", "RegisterForClicks", "SetHighlightTexture",
-                            "SetAlpha", "SetColorTexture", "SetDesaturated", "SetNormalFontObject", "EnableMouseWheel", "SetClampedToScreen", "SetPushedTexture", "SetPropagateKeyboardInput", "SetTextInsets", "SetJustifyV", "SetWordWrap",
+                            "SetAlpha", "SetBlendMode", "SetColorTexture", "SetDesaturated", "SetNormalFontObject", "EnableMouseWheel", "SetClampedToScreen", "SetPushedTexture", "SetPropagateKeyboardInput", "SetTextInsets", "SetJustifyV", "SetWordWrap",
                             }) do
         o[name] = function() end
     end
