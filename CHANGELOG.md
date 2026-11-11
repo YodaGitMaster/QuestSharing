@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.9
+- **Quest items marked in your bags** (*Settings > Pings & items*, `/qs bagmarks`, on by default): gold for a quest
+  of the zone you are in, blue for one of your quests elsewhere (the bank can keep it), so you only carry what this
+  zone needs. The tooltip says which quest and where. Matched by objective names, the bag's quest info and (with
+  QuestieDB) the exact items a quest asks for, hands out or needs. The game's bags and the bank's main slots.
+- **Hide the game's quest tracker** (*Settings > Tracker*, `/qs hidetracker`, off by default): outside fights (the
+  game does not allow it during one, so it happens right after), and again whenever the game shows it.
+- **How to do it** (right click a quest in the Party quests window; with QuestieDB): one chat line with what is still
+  open and where - the spot nearest to you for each creature to kill, who or what drops each item, objects to use,
+  places to go - then where to turn it in. Objectives the game already counts as done are left out; a finished quest
+  says only where to turn it in. Always one chat message. In a party to the party, alone only to you.
+- **A light quest map** on the world map and the minimap (*Settings > Tracker > Quest map*, `/qs questmap`): small
+  icons where your quests' open objectives are done (the 6 nearest per objective) and a yellow ? where a finished
+  quest is turned in; hover for the quest and what to do there. From QuestieDB, drawn only while the Questie addon
+  itself is off (it draws its own; said once): switch Questie off at the character screen and keep QuestieDB to use
+  it. Our own frames over the maps, never the game's map pins; works with a rotating minimap. `/qs questie` and
+  `/qs doctor` say whether it is on and why not.
+
 ## 0.3.8
 - **Test the whole ring: `/qs quick test`** (or *Test the ring* in the log window). Every slot of every ring is run,
   one every 3 seconds, and checked against what the game really did: emotes are done and the game's line ("You

@@ -208,6 +208,10 @@ function Q.report()
     local how = { QuestieDB = "QuestieDB (Questie 12 and newer)", LibQuestieDB = "LibQuestieDB", Questie = "Questie's own database (older Questie)" }
     out[#out + 1] = "reading: " .. how[src] .. ((Questie and Questie.API and Questie.API.isReady == false) and " - Questie is not fully ready yet" or "")
     out[#out + 1] = Q.languageNote() or ("names: " .. (Q.languages()) .. ", the game's language")
+    if ns.questMap then
+        local on, why = ns.questMap.state()
+        out[#out + 1] = "quest map (world map and minimap): " .. (on and ("on, " .. #ns.questMap.points() .. " places for your quests") or why)
+    end
     local tried, found = 0, 0
     for _, e in ipairs(C.entries()) do
         if tried >= 3 then break end
@@ -357,6 +361,179 @@ function Q.creatureNames(questID)
         end
     end
     return out
+end
+
+-- Where things are: QuestieDB's zones (area IDs) on the game's maps (UI map IDs) ---------------------------------------
+Q.get = field                                                   -- one field of one record, for QuestMap.lua
+
+local areaToMap
+local function decodeTable(s)
+    if type(s) == "table" then return s end
+    if type(s) ~= "string" or not loadstring then return nil end
+    local chunk = loadstring(s)
+    if not chunk then return nil end
+    local ok, v = pcall(chunk)
+    return (ok and type(v) == "table") and v or nil
+end
+-- the game's map for one of QuestieDB's zones (QuestieDB ships the table, with its overrides), or nil
+function Q.uiMapOf(areaId)
+    if areaToMap == nil then
+        areaToMap = false
+        local lib = type(LibQuestieDB) == "table" and LibQuestieDB.Support
+        local ok, zone = pcall(function() return lib and lib.Get and lib.Get("ZoneDB") end)
+        local priv = ok and type(zone) == "table" and zone.private
+        if type(priv) == "table" then
+            local base = decodeTable(priv.areaIdToUiMapId)
+            if base then
+                for a, m in pairs(decodeTable(priv.areaIdToUiMapIdOverride) or {}) do base[a] = m end
+                areaToMap = base
+            end
+        end
+    end
+    return areaToMap and areaToMap[areaId] or nil
+end
+function Q._resetMaps() areaToMap = nil end                    -- for the tests
+
+-- every spawn of an npc or object: { { area, map, x, y (0..100), dungeon }, ... }
+local function spawnList(kind, id)
+    local out = {}
+    local spawns = field(kind, id, "spawns")
+    if type(spawns) ~= "table" then return out end
+    for areaId, list in pairs(spawns) do
+        if type(list) == "table" then
+            for _, pt in ipairs(list) do
+                if type(pt) == "table" and pt[1] and pt[2] then
+                    out[#out + 1] = { area = areaId, map = Q.uiMapOf(areaId), x = pt[1], y = pt[2], dungeon = (pt[1] == -1 and pt[2] == -1) }
+                end
+            end
+        end
+    end
+    table.sort(out, function(a, b) if a.area ~= b.area then return a.area < b.area end; if a.x ~= b.x then return a.x < b.x end; return a.y < b.y end)
+    return out
+end
+Q.spawnList = spawnList
+
+-- the n spawns nearest to you (on the map you are on), else the first n
+local function nearest(list, n)
+    local here, px, py = C.playerPos()
+    local scored = {}
+    for _, s in ipairs(list) do
+        if not s.dungeon then
+            local d = (here and s.map == here) and ((s.x / 100 - px) ^ 2 + (s.y / 100 - py) ^ 2) or (10 + #scored)
+            scored[#scored + 1] = { s = s, d = d }
+        end
+    end
+    table.sort(scored, function(a, b) return a.d < b.d end)
+    local out = {}
+    for i = 1, math.min(n, #scored) do out[i] = scored[i].s end
+    if #out == 0 and list[1] then out[1] = list[1] end           -- only inside a dungeon: say so
+    return out
+end
+Q.nearest = nearest
+
+-- "Elwynn Forest 40.1, 80.2" / "a dungeon (The Deadmines)"
+local function where(s)
+    if not s then return nil end
+    local zone = zoneName(s.area)
+    if s.dungeon then return "in a dungeon" .. (zone and (" (" .. zone .. ")") or "") end
+    return string.format("%s %.1f, %.1f", zone or "?", s.x, s.y)
+end
+Q.where = where
+
+-- What a quest asks for and where: { { kind = "kill"|"loot"|"object"|"explore", name, label, from, spawns }, ... }
+--   kill: the creature (or any of several for kill credit); loot: the item and who or what drops it; object: the
+--   thing to use; explore: the place (triggerEnd).
+local MAX_SOURCES = 3
+function Q.targets(questID)
+    local out = {}
+    local objs = field("quest", questID, "objectives")
+    if type(objs) == "table" then
+        for _, o in ipairs(type(objs[1]) == "table" and objs[1] or {}) do
+            local id = type(o) == "table" and o[1] or o
+            local name = id and field("npc", id, "name")
+            if name then out[#out + 1] = { kind = "kill", name = name, label = "kill " .. name, spawns = spawnList("npc", id) } end
+        end
+        for _, o in ipairs(type(objs[5]) == "table" and objs[5] or {}) do       -- kill credit: any of them counts
+            local ids, names, spawns = type(o) == "table" and o[1], {}, {}
+            for i = 1, math.min(type(ids) == "table" and #ids or 0, MAX_SOURCES) do
+                local n = field("npc", ids[i], "name")
+                if n then names[#names + 1] = n; for _, s in ipairs(spawnList("npc", ids[i])) do spawns[#spawns + 1] = s end end
+            end
+            if #names > 0 then out[#out + 1] = { kind = "kill", name = names[1], label = "kill " .. table.concat(names, " or "), spawns = spawns } end
+        end
+        for _, o in ipairs(type(objs[2]) == "table" and objs[2] or {}) do       -- objects to use
+            local id = type(o) == "table" and o[1] or o
+            local name = id and field("object", id, "name")
+            if name then out[#out + 1] = { kind = "object", name = name, label = "use " .. name, spawns = spawnList("object", id) } end
+        end
+        for _, o in ipairs(type(objs[3]) == "table" and objs[3] or {}) do       -- items: who or what drops them
+            local item = type(o) == "table" and o[1] or o
+            local name = item and field("item", item, "name")
+            if name then
+                local from, spawns = {}, {}
+                for _, kind in ipairs({ "npc", "object" }) do
+                    local list = field("item", item, kind == "npc" and "npcDrops" or "objectDrops")
+                    for i = 1, math.min(type(list) == "table" and #list or 0, MAX_SOURCES) do
+                        local n = field(kind, list[i], "name")
+                        if n then from[#from + 1] = n; for _, s in ipairs(spawnList(kind, list[i])) do spawns[#spawns + 1] = s end end
+                    end
+                end
+                out[#out + 1] = { kind = "loot", name = name, from = from,
+                                  label = name .. (#from > 0 and (" from " .. table.concat(from, " or ")) or ""), spawns = spawns }
+            end
+        end
+    end
+    local trig = field("quest", questID, "triggerEnd")                         -- a place to go: { text, { [area] = points } }
+    if type(trig) == "table" and type(trig[2]) == "table" then
+        local spawns = {}
+        for areaId, list in pairs(trig[2]) do
+            for _, pt in ipairs(type(list) == "table" and list or {}) do
+                spawns[#spawns + 1] = { area = areaId, map = Q.uiMapOf(areaId), x = pt[1], y = pt[2] }
+            end
+        end
+        local text = type(trig[1]) == "string" and trig[1] or "the place"
+        out[#out + 1] = { kind = "explore", name = text, label = "go to " .. text, spawns = spawns }
+    end
+    return out
+end
+
+-- where a quest is turned in: { who, spawns } or nil
+function Q.turnIn(questID)
+    local by = field("quest", questID, "finishedBy")
+    if type(by) ~= "table" then return nil end
+    local npc = type(by[1]) == "table" and by[1][1]
+    local obj = type(by[2]) == "table" and by[2][1]
+    if npc then return { who = field("npc", npc, "name") or "the quest giver", spawns = spawnList("npc", npc) } end
+    if obj then return { who = field("object", obj, "name") or "an object", spawns = spawnList("object", obj) } end
+end
+
+-- One chat line (at most 255 letters): how to do a quest, the objectives still open first, then where to turn it in.
+--   [Wolves Among Us]: kill Kobold Vermin (Elwynn Forest 40.1, 80.2); Wolf Pelt from Prowler (Elwynn Forest 41.0,
+--   62.0); then turn in at Marshal McBride (Elwynn Forest 48.9, 41.6)
+-- done(name) says whether the game already counts that objective as finished. nil when Questie does not know it.
+function Q.howText(questID, link, done, complete)
+    if not field("quest", questID, "name") then return nil end
+    local head = link or ('"' .. tostring(field("quest", questID, "name")) .. '"')
+    local parts = {}
+    if not complete then
+        for _, tg in ipairs(Q.targets(questID)) do
+            if not (done and done(tg.name)) then
+                local spot = where(nearest(tg.spawns, 1)[1])
+                parts[#parts + 1] = tg.label .. (spot and (" (" .. spot .. ")") or "")
+            end
+        end
+    end
+    local t = Q.turnIn(questID)
+    local back = t and ("turn in at " .. t.who .. (where(nearest(t.spawns, 1)[1]) and (" (" .. where(nearest(t.spawns, 1)[1]) .. ")") or ""))
+    local text
+    if complete or #parts == 0 then
+        text = head .. ": " .. (complete and "all done - " or "") .. (back or "Questie does not know where to turn it in")
+    else
+        text = head .. ": " .. table.concat(parts, "; ") .. (back and ("; then " .. back) or "")
+        if #text > 255 and back then text = head .. ": " .. table.concat(parts, "; ") end      -- the turn-in goes first
+        while #text > 255 and #parts > 1 do table.remove(parts); text = head .. ": " .. table.concat(parts, "; ") .. " (and more)" end
+    end
+    return text
 end
 
 -- the items a quest hands you or needs (sourceItemId, requiredSourceItems): candidates for "use this item"

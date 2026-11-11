@@ -31,6 +31,9 @@ ns.defaults = {
     nearCount = 5,      -- how many quests the tracker keeps while "near" is on
     nearPause = 10,     -- seconds the tracker and the pin leave your choice alone after you change the tracker yourself
     nearMode = "auto",  -- "auto" (distance if the client can measure it, else zone), "distance" or "zone"
+    questMap = true,
+    bagMarks = true,    -- quest items marked in the bags: gold = a quest of this zone, blue = a quest elsewhere
+    hideTracker = false, -- hide the game's quest tracker (outside fights)    -- the light quest map (world map + minimap), from QuestieDB, while the Questie addon is off
     debug = false,      -- the debug log: every action and its outcome (QuestSharingLog, saved on /reload or logout)
     shareByClick = false, -- share only on my clicks (set by itself when the game refuses an automatic share)
     pickup = false,     -- (off) say in party chat when I pick up a quest someone in the party has ("let's do it together?")
@@ -352,6 +355,9 @@ function ns.setSetting(key, value)
     else
         d[key] = value
         if key == "debug" and value and ns.logSession then ns.logSession("debug log on") end
+        if (key == "questMap" or key == "enabled") and ns.questMap then ns.questMap.refresh() end
+        if (key == "bagMarks" or key == "enabled") and ns.refreshBagMarks then ns.refreshBagMarks() end
+        if (key == "hideTracker" or key == "enabled") and ns.applyTrackerHidden then ns.applyTrackerHidden() end
         if key == "quickSend" and value then               -- you ask for it again: refused channels get another try
             if type(d.chatRefused) == "table" and next(d.chatRefused) then
                 d.chatRefused = {}
@@ -418,6 +424,9 @@ local help = {
     "/qs pickup on|off    say when I pick up a quest someone in the party has (let's do it together?)",
     "/qs coords on|off    add where I found the quest items to my messages, when someone still needs them",
     "/qs shareclick on|off share only when I click Share (on by itself where the game refuses automatic sharing)",
+    "/qs questmap on|off  the light quest map: where to do your quests, on the world map and minimap (needs QuestieDB, Questie off)",
+    "/qs bagmarks on|off  mark quest items in your bags: gold for quests here, blue for quests elsewhere (the bank can keep them)",
+    "/qs hidetracker on|off hide the game's quest tracker (outside fights)",
     "/qs debug on|off     the debug log: every action and its outcome, saved to the addon's file on /reload or logout",
     "/qs log [clear]      show the debug log in a window you can copy from (clear empties it)",
     "/qs pingkey <KEY>    the key that pings the nearest quest creature (Attack) or quest object (look here); none removes it",
@@ -442,7 +451,7 @@ local help = {
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", shareclick = "shareByClick", debug = "debug", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", shareclick = "shareByClick", debug = "debug", questmap = "questMap", bagmarks = "bagMarks", hidetracker = "hideTracker", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"

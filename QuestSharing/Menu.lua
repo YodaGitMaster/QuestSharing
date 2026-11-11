@@ -3,6 +3,7 @@
 --   Offer it to the party            the quest popup, for whoever does not have it (the same as a left click)
 --   Tell them where to get it        with Questie: "Bob: [quest] starts at Marshal Dughan in Elwynn Forest (42.1, 65.9)"
 --   Trace back the chain             with Questie, one line: every quest before it, where the first and this one start
+--   How to do it                     with Questie, one line: what is still open and where, then where to turn it in
 --   Focus it on my map               the game's quest marker and arrow on this quest
 --   Open it in the quest log
 -- A line that cannot be used right now is grey and says why. Our own small frame (not the game's dropdown menus,
@@ -69,6 +70,39 @@ function ns.traceBack(e)
     return true
 end
 
+-- "[Wolves Among Us]: kill Kobold Vermin (Elwynn Forest 40.1, 80.2); ...; then turn in at ..." (one line). Objectives
+-- the game already counts as finished are left out.
+function ns.howMessage(e)
+    local q = ns.questie
+    if not (q and q.available() and q.howText) then return nil end
+    local finished = {}
+    for _, o in ipairs(C.objectives(e)) do
+        if o.finished and o.text then finished[#finished + 1] = string.lower(o.text) end
+    end
+    local function done(name)
+        name = string.lower(name or "")
+        for _, txt in ipairs(finished) do if name ~= "" and string.find(txt, name, 1, true) then return true end end
+        return false
+    end
+    local text = q.howText(e.questID, C.link(e), done, e.complete)
+    return text and C.safeCut(text, 255) or nil
+end
+
+-- In a party: to the party (sent at once or into the chat box, like the other messages); alone: only shown to you
+function ns.howTo(e)
+    local msg = ns.howMessage(e)
+    if not msg then ns.print("Questie does not know this quest (or Questie's data is not loaded)"); return false end
+    ns.log("how", msg)
+    if not C.inGroup() then ns.print(msg); return true end
+    if ns.db.mode == "send" and ns.chatAllowed(C.channel()) then
+        ns.trying("telling the party how to do a quest", "chat")
+        SendChatMessage(msg, C.channel())
+    else
+        ns.addToChatBox(msg, C.link(e))
+    end
+    return true
+end
+
 function ns.focusQuest(e)
     if not (ns.canPin and ns.canPin()) then ns.print("this client cannot focus a quest on the map"); return false end
     ns.trying("focusing the quest on your map")
@@ -116,6 +150,8 @@ function ns.questMenuItems(e)
     add("Tell them where to get it", function() ns.tellWhere(e) end,
         (not qOk and ns.questie.whyMissing()) or (not inParty and "you are not in a party") or (#missing == 0 and "everybody has it")
         or (not ns.whereMessage(e) and "Questie does not know where it starts") or nil)
+    add("How to do it", function() ns.howTo(e) end,
+        (not qOk and ns.questie.whyMissing()) or (not ns.howMessage(e) and "Questie does not know this quest") or nil)
     add("Trace back the chain", function() ns.traceBack(e) end,
         (not qOk and ns.questie.whyMissing()) or (not ns.chainMessage(e) and "Questie does not know this quest") or nil)
     add("Focus it on my map", function() ns.focusQuest(e) end, (not (ns.canPin and ns.canPin())) and "not on this client" or nil)
