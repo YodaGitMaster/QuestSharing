@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.4
+- In a quest's right-click menu, **Seek fellow adventurers** now appears directly after
+  **Tell the party how I am doing**, before **Offer it to the party**. Selecting it opens the invitation
+  composer for that quest.
+
 ## 0.4.3
 - Instance drop search now shows only weapons and wearable equipment, including armor, shields, rings,
   necklaces, trinkets and offhands. Materials, consumables, bags and other non-equipment are excluded.

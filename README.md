@@ -9,7 +9,7 @@ A World of Warcraft addon for playing quests together.
    (for example `V`, or `E` if you do not strafe with it).
 3. **Group up.** Your quests of this area are offered to the newcomers (once each), and the
    **Party quests** window shows your nearest quests with a check or an X for every member. **Left click** a quest to
-   offer it, **right click** to tell the party "I still need Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8). What about you?"
+   offer it, **right click** to open its menu: tell the party your progress or choose **Seek fellow adventurers** directly below it.
 4. **Talk with one key:** hold it, point at *Hello*, *Team up?* ("Doing [your quest] here - anyone want to group up?"
    in /s), *What I need*... and let go. Each message's channel is yours to choose in the settings.
 
@@ -143,6 +143,7 @@ the game's tracker still tells the party you are done, because that is your own 
    - **Right click** a quest: a **small menu** opens (Esc or moving away closes it; a grey line says why it cannot be
      used right now):
      - **Tell the party how I am doing** (see below),
+     - **Seek fellow adventurers**: open a role-play invitation for this quest, choose a chat and prepare the message,
      - **Offer it to the party** (the same as a left click),
      - **Tell them where to get it**: with the [Questie](https://github.com/Questie/Questie) addon installed, the party
        hears where it starts, which quest comes before it, **where that earlier quest starts**, and how many steps lie
@@ -408,7 +409,8 @@ party member running Quest Sharing finishes one you share. Never during combat.
 
 Open `/qs settings` > **Optional** for these tools; fishing and the reward browser have independent switches.
 
-**Seek fellow adventurers.** Right-click a quest in the Party quests window and choose **Seek fellow adventurers**,
+**Seek fellow adventurers.** Right-click a quest in the Party quests window and choose **Seek fellow adventurers**
+just below **Tell the party how I am doing**,
 or use `/qs adventure` (optionally followed by a quest ID, exact title or quest link). You can also open it from
 *Settings > Optional > Seek fellow adventurers*. It chooses an unfinished quest from your log; **Next quest** browses
 the others, and **Another wording** cycles through three role-play invitations, for example:

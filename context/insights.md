@@ -1,5 +1,10 @@
 # Insights
 
+## 2026-11-13 — Invitation menu ordering
+- Existing invitation action was row 3 after Offer it to the party; user requested it directly after Tell the party.
+- Moved to row 2. Existing 60 menu and 32 adventure checks passed across modern/classic paths.
+- Runtime change only reorders existing actions; no new frames, chat or state behavior.
+
 ## 2026-11-13 — Equipment-only instance drops
 - Provider filtering correctly found dungeon sources, but all positive item IDs reached results; both providers needed the same equipment predicate.
 - Original loot fixture gave cloth a weapon slot and explicitly tested its inclusion; corrected realistic slots and expected scope.

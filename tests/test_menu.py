@@ -76,7 +76,7 @@ def test_right_click_opens_a_small_menu_for_that_quest(style):
     g = party(style)
     menu, lines = open_menu(g)
     assert menu.shown is True and plain(menu.title.text) == "Wolves Among Us"
-    assert [plain(b.text) for b in lines] == ["Tell the party how I am doing", "Offer it to the party", "Seek fellow adventurers", "Tell them where to get it",
+    assert [plain(b.text) for b in lines] == ["Tell the party how I am doing", "Seek fellow adventurers", "Offer it to the party", "Tell them where to get it",
                                              "How to do it", "Trace back the chain", "Focus it on my map",
                                              "Select it in the quest log"]
     assert "QuestSharingMenu" in list(g.eval("UISpecialFrames").values()), "Esc closes it"
