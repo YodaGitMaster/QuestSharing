@@ -2,11 +2,12 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Equipment explorer name grouping implemented and verified; packaging/publishing v0.4.13.
+- Equipment explorer name grouping completed and published as v0.4.13; remote tag and downloaded install ZIP verified.
 - Standing preference: Extra tools additions stay optional and default off unless explicitly requested otherwise.
 
 ## Last completed
-- Built `dist/QuestSharing-0.4.13.zip`: 32 source-identical runtime files, 162,652 bytes; SHA256 `f22e068e8c9403c2b566f9f13811267ea7636820f9b782e1ebbd0262c1e187e3`. Publication pending.
+- Published v0.4.13 at `1bf2789ca1d7ddbbc7ee9039e4f06cb22a525361`; latest stable release, remote tag/main verified and downloaded 32-file ZIP byte-matches source-verified build.
+- `dist/QuestSharing-0.4.13.zip`: 162,652 bytes; SHA256 `f22e068e8c9403c2b566f9f13811267ea7636820f9b782e1ebbd0262c1e187e3`.
 - All 34 suites / 1,275 checks pass, including 28 grouping workflows; diff whitespace clean. Native game rendering remains unverified.
 - 2026-11-13: reproduced the same blade as three rows and one reward as two quest rows on both API paths; added 28 grouping checks, all now pass. Existing source tests inspect grouped sources; paging fixtures now use genuinely distinct equipment.
 - 2026-11-13: user-requested push verified on main; origin already contained all feature/release changes, with no pending runtime edits.
@@ -45,9 +46,9 @@ Last updated: 2026-11-13
 - World-map questing ranges: default off; enable via Extra tools toggle for native continent badges and selected/hovered-zone panel. World/cosmic overview prompts choosing a continent/zone; missing client data is unknown.
 - Extra tools > Auto-update spells to highest learned rank: default off; upgrades existing player spell buttons across normal/hidden/form pages on enable/login/learning/action changes; Check spell ranks now reports results. Waits during combat/temporary bars/dragging; macros/pet/items remain; refusal pauses until reload.
 - `/qs fishing`: persistent per-water editor; `/qs fishing on`: world-map layer, with Alt-click placement where supported. Water notes survive settings reset and are deleted explicitly.
-- `/qs rewards`: shared explorer quest tab; equipment rewards by class/level/faction, slot/search filters, native comparisons and quest routes; requires recent QuestieDB and enum tables.
+- `/qs rewards`: shared explorer quest tab; one row per equipment name with all eligible quest routes inline; class/level/faction, slot/search filters, native comparisons; requires recent QuestieDB and enum tables.
 - `/qs adventure [quest ID or title]`: editable role-play invitation for chosen chat; Prepare fills a draft, Enter sends.
-- `/qs loot [search]`: shared explorer dungeon tab; Classic/Forever dungeon equipment, encounter filter, item/name/ID/boss search, supplier/difficulty and native comparisons; opening automatically focuses the recognized current dungeon.
+- `/qs loot [search]`: shared explorer dungeon tab; one row per equipment name, full mob/source list with combined difficulties and matching versions; Classic/Forever only, filters/native comparisons retained; opening focuses recognized current dungeon.
 - Quest objective/turn-in symbols removed from both maps; old saved `questMap` setting discarded.
 
 ## Remaining limits
@@ -63,6 +64,6 @@ Last updated: 2026-11-13
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
-- v0.4.12: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.12
-- Tag `c86b34294ced23ddf904ac73f50e0fce01baae73`; ZIP 160,979 bytes; SHA256 `0378057a6fd6fef839d3743de0382a72096c61d74b84be0e6d25327e161c4cd0`.
+- v0.4.13: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.13
+- Tag `1bf2789ca1d7ddbbc7ee9039e4f06cb22a525361`; ZIP 162,652 bytes; SHA256 `f22e068e8c9403c2b566f9f13811267ea7636820f9b782e1ebbd0262c1e187e3`.
 - Main also includes a documentation follow-up recording publication. Previous release tags and ZIPs preserved.

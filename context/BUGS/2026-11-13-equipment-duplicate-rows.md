@@ -34,12 +34,13 @@
 - Supporting files: focused grouping suite, adjusted source/paging fixtures, manifest/changelog/README and continuity docs.
 - Scope: presentation grouping only; provider discovery, raw indices, saved settings, map behavior and dungeon scope unchanged.
 - Risk: merging names can conceal differing IDs; details explicitly list versions/levels and identify the comparison version.
-- Commit / PR: release https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.13
+- Commit: `1bf2789ca1d7ddbbc7ee9039e4f06cb22a525361`; release https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.13
 - Workaround? no.
 
 ## Verification
 - All 34 suites / 1,275 checks pass, including 28 grouping workflows; `git diff --check` clean.
 - Install ZIP: 32 entries byte-match runtime source, retired QuestMap renderer absent.
+- Published latest stable v0.4.13; remote tag matches implementation commit and downloaded ZIP byte-matches verified local build.
 - Native game rendering and real item-cache timing require in-game QA; no game client available.
 
 ### Wanted vs. Done
