@@ -2,9 +2,11 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Opt-in highest-learned action-bar spell ranks implemented and verified; 0.4.10 packaging/publication pending under ongoing authorization.
+- Opt-in highest-learned action-bar spell ranks completed and published as v0.4.10; remote tag and downloaded install ZIP verified.
+- No remaining feature work; native game-client QA remains unavailable in this environment.
 
 ## Last completed
+- Published v0.4.10 at `6e16bc4b6252dfc7e27399a781525e9201f3b729`; downloaded 31-file ZIP byte-matches source-verified build.
 - Added autoSpellRanks=false, Extra tools toggle/check-now, modern/legacy learned-rank enumeration and verified cursor swaps across normal bar pages; combat/cursor/temporary-bar deferral and client-refusal pause.
 - Reproduced and corrected active-zero offSpecID and unreadable-cursor cases before publication; reusable reports in context/BUGS. Optional settings layout still fits.
 - All 32 suites / 1,213 checks pass, including 48 spell-rank workflows; diff whitespace clean. Additional native-slot range and synchronous pickup ownership checks cover form pages and other addons changing slots.
@@ -49,6 +51,6 @@ Last updated: 2026-11-13
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
-- v0.4.9: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.9
-- Tag `3cd7ddb9ebd5f3b8e8955b8a6fee919e0e235698`; ZIP 154,927 bytes; SHA256 `82e65efb4ddbb59836315320c838eef78659ecf013b84ce507d3f237318774da`.
+- v0.4.10: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.10
+- Tag `6e16bc4b6252dfc7e27399a781525e9201f3b729`; ZIP 158,346 bytes; SHA256 `4c158c2b8ae663bde1a772ce31ece6183f262cd40438d56db82457a435f2969f`.
 - Main also includes a documentation follow-up recording publication. Previous release tags and ZIPs preserved.
