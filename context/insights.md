@@ -10,6 +10,7 @@
 - All 28 suites / 1,081 checks passed. New `tests/test_equipment.py`: 26 integration checks across classic/modern paths, including cross-link raid exclusion and unknown metadata.
 - Approximate previews in `/tmp/questsharing-equipment-{quests,dungeons}.png` derive positions from actual mocked native widgets; they are not game-client screenshots. Real rendering remains unverified.
 - Built source-verified v0.4.5 install ZIP: 30 files.
+- Published stable v0.4.5 at `fdea252`; downloaded 148,397-byte asset matches local bytes (SHA256 `9c447ef0f5f30eb456992e698e1b63386608154d7ced95b8631fd6f3f70e802c`).
 
 ## 2026-11-13 — Invitation menu ordering
 - Existing invitation action was row 3 after Offer it to the party; user requested it directly after Tell the party.

@@ -4,9 +4,10 @@ Last updated: 2026-11-13
 ## Active task
 - Implemented 0.4.5 shared equipment explorer, item type/slot/level range filters and dungeon-only scope.
 - User clarified: include Forever dungeons as well as Classic; exclude raids and world bosses.
-- Finishing final regression/package/release verification under ongoing publication authorization.
+- Completed push and stable v0.4.5 release; remote tag and downloaded install ZIP verified, no release work remains.
 
 ## Last completed
+- Published v0.4.5 at `fdea2529e34811b6dc8b13125fb5b66c14d5ac37`; remote asset matches the source-verified package byte for byte.
 - Added EquipmentUI.lua: one host, two child pages, icons/quality colors, selected rows and inline route/source details. Shared filters use numeric metadata and inclusive Required level / Item level bounds.
 - Updated Rewards/Loot to use shared pages and cancel pending work on close/tab changes. Existing character eligibility and native comparisons preserved.
 - Actual compatible AtlasLoot source smoke: 30 Classic/Forever dungeon entries / 1,655 raw source rows, zero Lua errors; Cruel Barb verified against Edwin VanCleef after native item details supplied.
@@ -35,6 +36,6 @@ Last updated: 2026-11-13
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
-- v0.4.4: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.4
-- Tag `0c1a51246fbe943e099a9a55ab8a41e2e1738454`; ZIP 144,598 bytes; SHA256 `893ba47c0cc1b68c523a9fa3c140b716b6d66d3c168d4f01ac05d33b2715e92d`.
+- v0.4.5: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.5
+- Tag `fdea2529e34811b6dc8b13125fb5b66c14d5ac37`; ZIP 148,397 bytes; SHA256 `9c447ef0f5f30eb456992e698e1b63386608154d7ced95b8631fd6f3f70e802c`.
 - Main also includes a documentation follow-up recording publication. Previous release tags and ZIPs preserved.
