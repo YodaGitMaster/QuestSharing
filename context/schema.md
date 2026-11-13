@@ -2,7 +2,7 @@
 Last updated: 2026-11-13
 
 ## Addon loading and persistence
-- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.2; declares file load order and SavedVariables.
+- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.3; declares file load order and SavedVariables.
 - Lua modules receive `local ADDON, ns = ...`; `ns` is the shared namespace, not a class.
 - `Core.lua`: `ns.defaults`; `ns.db` initially copies defaults. On `ADDON_LOADED`, missing settings are filled and `ns.db` aliases saved `QuestSharingDB`; current `dbVersion = 3`.
 - SavedVariables: `QuestSharingDB` (settings), `QuestSharingLog` (debug log); persisted by the game.
@@ -45,6 +45,7 @@ Last updated: 2026-11-13
 ## Instance loot search (2026-11-13)
 - `ns.loot`: `open`, `close`, `scan`, `search(text, instanceKey?, encounter?)`, `instances(text?)`; session-only data, no SavedVariables.
 - LootDrop: `{itemID,item,instanceKey,instanceName,who,difficulty,provider,sourceID,kind}`; `item` references shared local item cache `{id,name,cached,info?}`.
+- Visibility: loot results and encounter choices require shared native `item.info.slot` to be recognized by `Rewards.lua`; unknown/unloaded items and non-equipment remain hidden. Item-cache events refresh eligibility.
 - Instance record: `{key,name,count}`. Atlas key = module/content; Questie fallback key = `area:<AreaTable ID>`.
 - Primary provider: compatible `AtlasLoot.ItemDB.Storage` or `AtlasLootContinued.ItemDB.Storage`, modules named `*DungeonsAndRaids*`, content with positive `InstanceID`.
   - Encounter `items[bossID]`: name, `IgnoreAsSource`, numeric difficulty keys, optional cross-encounter `link`.

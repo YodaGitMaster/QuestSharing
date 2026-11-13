@@ -65,7 +65,9 @@ function L.search(text, key, boss)
     results = {}
     for _, r in ipairs(index) do
         local haystack = string.lower(r.item.name .. " " .. r.itemID .. " " .. r.instanceName .. " " .. r.who .. " " .. r.difficulty)
-        if (not chosen or chosen == r.instanceKey) and (not encounter or encounter == r.who)
+        -- Unclassified items stay hidden until the game confirms a weapon or wearable equipment slot.
+        if r.item.info and r.item.info.slot
+            and (not chosen or chosen == r.instanceKey) and (not encounter or encounter == r.who)
             and (needle == "" or string.find(haystack, needle, 1, true)) then results[#results + 1] = r end
     end
     table.sort(results, function(a, b)
@@ -90,7 +92,9 @@ end
 local function bosses()
     local set, list = {}, {}
     for _, r in ipairs(index) do
-        if (not chosen or r.instanceKey == chosen) and not set[r.who] then list[#list + 1] = r.who; set[r.who] = true end
+        if r.item.info and r.item.info.slot and (not chosen or r.instanceKey == chosen) and not set[r.who] then
+            list[#list + 1] = r.who; set[r.who] = true
+        end
     end
     table.sort(list)
     return list
@@ -279,10 +283,10 @@ paint = function()
     W.selection:SetText(S.GOLD .. title .. "|r")
     W.boss:SetLabel("Source: " .. (encounter or "All encounters"))
     W.status:SetText(loading and ("Reading " .. tostring(source or "loot") .. " tables: " .. progress)
-        or (#results .. " drop sources — page " .. page .. "/" .. math.max(1, math.ceil(#results / PAGE))))
+        or (#results .. " equipment drop sources — page " .. page .. "/" .. math.max(1, math.ceil(#results / PAGE))))
     W.note:SetText(note .. (skipped > 0 and (" " .. skipped .. " tables unavailable or not item lists.") or "")
-        .. (queueAt <= #itemQueue and (" Loading item names " .. (queueAt - 1) .. "/" .. #itemQueue .. ".")
-            or (unresolved > 0 and (" " .. unresolved .. " item details pending/unavailable; search by ID or source.") or "")))
+        .. (queueAt <= #itemQueue and (" Loading item details " .. (queueAt - 1) .. "/" .. #itemQueue .. ".")
+            or (unresolved > 0 and (" " .. unresolved .. " items await equipment details and remain hidden.") or "")))
     for i, row in ipairs(W.rows) do
         local r = results[(page - 1) * PAGE + i]
         row.result = r
@@ -310,7 +314,7 @@ local function build()
     local f = U.window("QuestSharingLoot", 920, 660, "Instance drops")
     if not f then return false end
     W = { frame = f, instances = {}, rows = {} }
-    U.text(f, "Choose an instance or search an item, boss or creature. Hover an item to compare; click for its source.", 24, 32, 870)
+    U.text(f, "Weapons and wearable armor only. Choose an instance or search; hover to compare, click for the source.", 24, 32, 870)
     W.instanceSearch = U.box(f, "Find instance (Enter)", 24, 60, 220, "", 100)
     W.instanceSearch:SetScript("OnEnterPressed", function(self) instanceQuery = self:GetText(); instancePage = 1; paint(); self:ClearFocus() end)
     W.search = U.box(f, "Search item, ID, boss or instance (Enter)", 264, 60, 470, "", 100)

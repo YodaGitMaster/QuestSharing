@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.3
+- Instance drop search now shows only weapons and wearable equipment, including armor, shields, rings,
+  necklaces, trinkets and offhands. Materials, consumables, bags and other non-equipment are excluded.
+- Applies to both AtlasLoot and the partial QuestieDB fallback; source choices omit encounters with no known
+  equipment. Items remain hidden until the game supplies a recognized equipment slot, then appear automatically.
+
 ## 0.4.2
 - **Instance drops** GUI (*Settings > Optional*, the quest reward browser's **Instance drops** button, or
   `/qs loot [search]`): browse instances, search item names/IDs and bosses, and see the encounter or creature that

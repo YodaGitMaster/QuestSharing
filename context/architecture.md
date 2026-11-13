@@ -16,7 +16,7 @@ QuestSharing/  # Repository root
 │   ├── Friends.lua  # add the people you group with to your friends list
 │   ├── Fishing.lua  # Optional world-map water notes, editor and AnglerAtlas zone summaries
 │   ├── Highlight.lua  # make quest objectives easier to find
-│   ├── Loot.lua  # Instance loot browser with AtlasLoot tables and partial QuestieDB fallback
+│   ├── Loot.lua  # Equipment-only instance browser with AtlasLoot tables and partial QuestieDB fallback
 │   ├── Marker.lua  # showing each other where you are
 │   ├── Menu.lua  # the small menu a right click on a quest in the Party quests window opens
 │   ├── MinimapButton.lua  # a small button on the minimap
@@ -39,7 +39,8 @@ QuestSharing/  # Repository root
 ├── README.md  # User documentation
 ├── build_release.py  # Build install ZIP and release notes
 ├── context/  # Session continuity and live architecture
-│   ├── BUGS/  # Empty; add reports after a verified bug fix
+│   ├── BUGS/  # Verified bug methodology and regressions
+│   │   └── 2026-11-13-instance-loot-non-equipment.md  # Equipment filtering reproduction and fix
 │   ├── architecture.md  # Live source map and runtime diagrams
 │   ├── decisions.md  # Choices and rationale
 │   ├── insights.md  # Timestamped findings
@@ -99,6 +100,7 @@ flowchart TD
     Loot --> AtlasLoot[Optional AtlasLoot encounter tables]
     Loot --> Q
     Loot --> Items
+    Loot --> Rewards
     QuestMenu[Menu.lua: Seek fellow adventurers] --> Adventure[Adventure.lua: invitation composer]
     Core --> Adventure
     Settings --> Adventure
@@ -187,11 +189,12 @@ sequenceDiagram
         Note over Loot,Questie: Label coverage as partial
     end
     Loot->>Loot: Index up to 100 rows per timer batch
-    Loot->>Game: Load up to 10 item names per timer batch
+    Loot->>Game: Load up to 10 item details per timer batch (Rewards.itemInfo)
     User->>Loot: Filter instance, encounter or item/boss text
-    Loot->>User: Paginated items with supplier and difficulty
+    Loot->>Loot: Require recognized weapon or wearable slot; hide unknown items
+    Loot->>User: Paginated equipment with supplier and difficulty
     Game-->>Loot: GET_ITEM_INFO_RECEIVED
-    Loot->>User: Debounced item-name refresh
+    Loot->>User: Debounced equipment classification and name refresh
 ```
 
 ## Class diagram
