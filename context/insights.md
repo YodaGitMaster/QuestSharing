@@ -1,5 +1,11 @@
 # Insights
 
+## 2026-11-13 — Release 0.4.2 published
+- Re-ran all 27 suites: 1,043 checks passed; rebuilt and verified 29 addon files.
+- Pushed main and annotated v0.4.2 tag at `5dbb839`; published stable release with ZIP and all changes since v0.3.9.
+- GitHub asset digest and downloaded bytes match local ZIP: SHA256 `f1839bca6f8d0c0cc15239c7a9e090fbd69be72424664341b61776700ef0abfb`.
+- Release: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.2
+
 ## 2026-11-13 — Instance drop browser
 - All 27 suites passed: 1,043 checks, including 46 instance-loot cases; final local install package is `dist/QuestSharing-0.4.2.zip`.
 - Verified AtlasLoot contracts in [ItemDB.lua](https://github.com/HoliestWoW/AtlasLootClassic/blob/master/AtlasLootClassic/ItemDB/ItemDB.lua) and [encounter data](https://github.com/HoliestWoW/AtlasLootClassic/blob/master/AtlasLootClassic_DungeonsAndRaids/data.lua).
