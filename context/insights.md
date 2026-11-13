@@ -5,6 +5,7 @@
 - Actual compatible AtlasLoot catalogue has several Scarlet Monastery entries sharing ID 189 and Dire Maul entries with omitted/commented ID 429, area 2557 and SubAreaIDs; ID-only matching needs localized subarea disambiguation and a tie guard.
 - Pending initial focus must survive asynchronous indexing but be canceled on manual navigation/close. Reopening recaptures current location; item-data refreshes do not recenter the browser.
 - All 31 suites / 1,165 checks pass, including 24 current-instance/Extra tools workflows. An additional timing case showed dirty live-search fields must suppress focus before the debounce callback; reproduced and corrected before publication.
+- Published v0.4.9 at `3cd7ddb9ebd5f3b8e8955b8a6fee919e0e235698`; downloaded 154,927-byte ZIP matches local source-verified build, SHA256 `82e65efb4ddbb59836315320c838eef78659ecf013b84ce507d3f237318774da`.
 
 ## 2026-11-13 — Native equipment stat filtering
 - Blizzard's [generated item API declaration](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/ItemDocumentation.lua) confirms C_Item.GetItemStats accepts an item link and may return no result. Older clients expose global GetItemStats; runtime detection/fallback is necessary.

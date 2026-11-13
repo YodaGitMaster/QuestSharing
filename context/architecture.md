@@ -175,7 +175,7 @@ sequenceDiagram
     participant Compat as Compat.lua
     participant Chat as WoW chat edit box
     User->>Menu: Right-click quest; Seek fellow adventurers (row 2)
-    Note over User,Menu: Directly after Tell the party how I am doing; also qs adventure / Optional
+    Note over User,Menu: Directly after Tell the party how I am doing; also qs adventure / Extra tools
     Menu->>Adventure: open quest invitation
     Adventure->>Compat: Read unfinished quest and link
     Adventure->>User: Editable invitation, wording and channel
