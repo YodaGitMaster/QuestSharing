@@ -40,12 +40,13 @@
 - Runtime: QuestSharing/ZoneLevels.lua only; supporting tests, release metadata and continuity documentation.
 - Native valid bounds cached/preferred; fallback Zone guide/Known quests spans for 43 questing maps; role labels for six cities and Moonglade.
 - Defaults, migration, map navigation, click-through behavior and retired quest/minimap overlays unchanged.
-- Commit / PR: v0.4.14 publication pending.
+- Commit: `73831bc7880ca8bcaab56af17ce4f020b4cff92a`; release https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.14
 - Workaround? no; this is a supported fallback path documented in context/decisions.md.
 
 ## Verification
 - All 34 suites / 1,291 checks pass; 50 zone checks cover missing/throwing/invalid APIs, all-map zero values, localization, late native recovery, unknown data, opt-in behavior, geometry and protected-map guards.
 - Install ZIP: 32 runtime files byte-match tested source, retired QuestMap renderer absent; SHA256 `d272c5586915eb3de82d0a2242dc4a715a1ed7cc56f408491f995326e1c6a5b8`.
+- Latest stable release/tag verified; downloaded install asset matches local ZIP byte for byte.
 - Native in-game visuals and actual client return values remain unverified; user should install the corrected release and open the map normally.
 
 ### Wanted vs. Done
