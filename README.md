@@ -467,7 +467,9 @@ Both tools are covered by Lua mock tests; their rendering and item tooltips stil
 the list on the left, then click an instance to browse its drops. **Search item, ID, boss or instance** searches
 within the selected instance; **All instances** searches the whole catalogue. You can also start with
 `/qs loot VanCleef` or `/qs loot 5191`. The **Source** button cycles through that instance's encounters, including
-trash and chest groups. Both instance and item lists have Previous/Next pages.
+trash and chest groups with equipment drops. Both instance and item lists have Previous/Next pages.
+Only weapons and wearable equipment are shown: armor, shields, necklaces, rings, trinkets and offhands;
+materials, consumables, bags and other non-equipment are excluded.
 
 Every result shows the item, instance, boss/creature or loot group, and difficulty when supplied. Hover for its item
 tooltip and equipped-item comparison; click for source details. An item with multiple sources appears under each
@@ -482,7 +484,7 @@ list of item sources whose creatures or objects are known to be inside instances
 dungeon loot database. Without either source, the GUI explains what to install. No loot database is bundled here.
 
 Indexing and game item-name requests happen only while using the browser, in small batches. Names update when the
-game supplies cached data; until then, use item IDs or boss/instance names. **Refresh data** rereads the catalogue.
+game supplies cached data; items stay hidden until a recognized equipment slot is available. **Refresh data** rereads the catalogue.
 If an unloaded AtlasLoot module cannot load during combat, it is retried after combat. These flows are tested with
 Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check.
 
@@ -650,9 +652,9 @@ python tests/test_ringtest.py         # 14 tests: /qs quick test: every slot run
 python tests/test_log.py              # 35 tests: the debug log: every action and its outcome, kept small, the log window
 python tests/test_optional.py         # 42 tests: fishing water notes, map drawing, reward filters and item comparisons
 python tests/test_adventure.py        # 32 tests: role-play quest invitations, preview, channels and preserved chat drafts
-python tests/test_loot.py             # 46 tests: instance loot, item/boss searches, source catalogues and asynchronous names
+python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 ```
-Expected: every line ends in `passed` with all tests green (1043 in total).
+Expected: every line ends in `passed` with all tests green (1055 in total).
 
 ## Files
 | File | Purpose |

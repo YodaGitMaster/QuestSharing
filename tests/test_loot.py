@@ -10,15 +10,15 @@ STYLES = ("modern", "classic")
 DATA = MAP_DATA + r'''
 LOOT_ITEMS = {
     [10001]={name="Captain's Blade",level=25}, [10002]={name="Serpent Staff",level=22},
-    [10003]={name="Cookie's Ladle",level=20}, [10004]={name="Silken Cloth",level=1},
-    [10005]={name="Locked Chest Prize",level=18},
+    [10003]={name="Cookie's Ladle",level=20}, [10004]={name="Silken Cloth",level=1,loc=""},
+    [10005]={name="Locked Chest Prize",level=18,loc="INVTYPE_CHEST"},
 }
 LOOT_READS, PUBLIC_READS, UNCACHED = 0,0,{}
 function GetItemInfo(id)
     LOOT_READS=LOOT_READS+1
     local r=LOOT_ITEMS[id]
     if not r or UNCACHED[id] then return nil end
-    return r.name,"|Hitem:"..id.."|h["..r.name.."]|h",2,r.level,0,"","",1,"INVTYPE_WEAPON","icon"
+    return r.name,"|Hitem:"..id.."|h["..r.name.."]|h",2,r.level,0,"","",1,r.loc or "INVTYPE_WEAPON","icon"
 end
 local module = {
     Deadmines={name="The Deadmines",InstanceID=36,MapID=1581,items={
@@ -81,7 +81,7 @@ def test_browser_lists_instances_and_real_item_sources(style):
     rows=results(g)
     assert (10001,"The Deadmines","Edwin VanCleef","Normal") in rows
     assert (10002,"Wailing Caverns","Lord Cobrahn","Normal") in rows
-    assert len(rows)==6,rows
+    assert len(rows)==5,rows
     assert [p.name for p in g.eval("NS.loot.instances()").values()]==["Empty Instance","The Deadmines","Wailing Caverns"]
     assert g.eval("NS.loot._state()")[2]=="AtlasLoot"
 
@@ -93,10 +93,10 @@ def test_difficulty_aliases_use_public_reader_and_remain_distinct(style):
     assert g.eval("AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids.Deadmines.items[1][2]")==1
 
 
-def test_trash_chests_and_non_equipment_are_included_but_sets_and_quest_rewards_are_not(style):
+def test_only_equipment_drops_are_included_from_valid_source_tables(style):
     g=game(style); g.slash("loot")
     ids={r[0] for r in results(g)}
-    assert {10004,10005}.issubset(ids)
+    assert 10005 in ids and 10004 not in ids
     assert not ids.intersection({123,99999,99998,-99})
     assert "unavailable or not item lists" in g.eval("NS.loot._window().note.text")
 
@@ -203,7 +203,7 @@ def test_load_on_demand_module_is_loaded_only_on_open(style):
             end
         end''')
     assert g.eval("LOADS")==0
-    g.slash("loot"); assert len(results(g))==6 and g.eval("LOADS")>0
+    g.slash("loot"); assert len(results(g))==5 and g.eval("LOADS")>0
 
 
 def test_in_combat_module_loading_waits_until_combat_ends(style):
@@ -215,7 +215,7 @@ def test_in_combat_module_loading_waits_until_combat_ends(style):
         end''')
     g.slash("loot"); assert g.eval("LOADS")==0 and results(g)==[]
     g.run("COMBAT=false"); g.fire("PLAYER_REGEN_ENABLED")
-    assert len(results(g))==6
+    assert len(results(g))==5
 
 
 def test_name_cache_updates_refresh_a_live_search(style):
@@ -272,6 +272,70 @@ def test_optional_settings_and_reward_browser_offer_loot_entry_points(style):
     g.eval("NS.loot.close")(); g.slash("rewards")
     g.run('for _,f in ipairs(FRAMES) do if f.text=="Instance drops" then f.scripts.OnClick(f,"LeftButton");break end end')
     assert g.eval("NS.loot._window().frame.shown")
+
+
+def test_consumables_materials_quest_items_bags_and_unknown_slots_are_hidden(style):
+    g=game(style,'''local rows=AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids.Deadmines.items[2][1]
+        for i,loc in ipairs({"", "INVTYPE_BAG", "INVTYPE_QUIVER", "UNKNOWN_SLOT"}) do
+            LOOT_ITEMS[11000+i]={name="Non-equipment "..i,level=1,loc=loc}
+            rows[#rows+1]={#rows+1,11000+i}
+        end''')
+    g.slash("loot"); g.advance(0.3)
+    assert {r[0] for r in results(g)}=={10001,10002,10003,10005}
+    for text in ("Silken Cloth", "11001", "Non-equipment", "Trash"):
+        g.eval("NS.loot.search")(text,None,None)
+        assert results(g)==[],(text,results(g))
+
+
+def test_all_wearable_slots_and_weapon_types_remain_visible(style):
+    g=game(style,'''local rows=AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids.Deadmines.items[2][1]
+        for i,loc in ipairs({"INVTYPE_HEAD", "INVTYPE_NECK", "INVTYPE_SHOULDER", "INVTYPE_CLOAK",
+            "INVTYPE_CHEST", "INVTYPE_ROBE", "INVTYPE_WRIST", "INVTYPE_HAND", "INVTYPE_WAIST",
+            "INVTYPE_LEGS", "INVTYPE_FEET", "INVTYPE_FINGER", "INVTYPE_TRINKET", "INVTYPE_WEAPON",
+            "INVTYPE_2HWEAPON", "INVTYPE_WEAPONMAINHAND", "INVTYPE_WEAPONOFFHAND", "INVTYPE_SHIELD",
+            "INVTYPE_HOLDABLE", "INVTYPE_RANGED", "INVTYPE_RANGEDRIGHT", "INVTYPE_THROWN", "INVTYPE_RELIC"}) do
+            LOOT_ITEMS[12000+i]={name="Equipment "..i,level=20,loc=loc}
+            rows[#rows+1]={#rows+1,12000+i}
+        end''')
+    g.slash("loot"); g.advance(1)
+    assert {r[0] for r in results(g)}=={10001,10002,10003,10005}|set(range(12001,12024))
+
+
+def test_uncached_items_never_appear_before_equipment_is_confirmed(style):
+    g=game(style,"UNCACHED[10001]=true; UNCACHED[10004]=true")
+    g.slash("loot")
+    assert not {10001,10004}.intersection(r[0] for r in results(g))
+    g.run("UNCACHED[10001]=nil; UNCACHED[10004]=nil")
+    g.fire("GET_ITEM_INFO_RECEIVED",10001,True); g.fire("GET_ITEM_INFO_RECEIVED",10004,True); g.advance(0.3)
+    assert 10001 in {r[0] for r in results(g)} and 10004 not in {r[0] for r in results(g)}
+
+
+def test_encounter_choices_skip_material_only_sources_but_keep_trash_gear(style):
+    g=game(style); g.slash("loot"); w=g.eval("NS.loot._window()")
+    selected=set()
+    for _ in range(8):
+        click(w.boss); selected.add(w.boss.text)
+    assert "Source: Trash" not in selected
+    g.run("table.insert(AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids.Deadmines.items[3][1],{2,10005})")
+    g.eval("NS.loot.search")("",None,None)
+    g.eval("NS.loot.scan")()
+    assert (10005,"The Deadmines","Trash","Normal") in results(g)
+
+
+def test_questie_fallback_also_excludes_non_equipment(style):
+    g=game(style,'''AtlasLoot=nil
+        ItemDB.GetAllIds=function() return {10001,10004} end
+        QUESTIE_ITEMS[10001]={name="Captain's Blade",npcDrops={639}}
+        QUESTIE_ITEMS[10004]={name="Silken Cloth",npcDrops={639}}
+        QUESTIE_NPCS[639]={name="Edwin VanCleef",spawns={[1581]={{-1,-1}}}}''')
+    g.slash("loot")
+    assert {r[0] for r in results(g)}=={10001}
+
+
+def test_namespaced_item_api_applies_the_same_equipment_filter(style):
+    g=game(style,"C_Item={GetItemInfo=GetItemInfo}; GetItemInfo=nil")
+    g.slash("loot")
+    assert {r[0] for r in results(g)}=={10001,10002,10003,10005}
 
 
 if __name__=="__main__":

@@ -1,5 +1,12 @@
 # Decisions
 
+## 2026-11-13 — Restrict instance loot to equipment
+- User clarified that instance results should contain equipment drops such as weapons and armor; previous all-item scope included unwanted materials.
+- Reuse `Rewards.itemInfo().slot` (recognized weapon/wearable slots) in loot search and encounter choices for both providers. Includes jewelry, trinkets, shields and offhands; excludes bags/quivers and non-equipment.
+- Hide unclassified items until the game returns full equipment details; existing item-cache events refresh results. Never guess gear from names or show unknown candidates temporarily.
+- Keep raw provider indexing and throttled item requests intact; avoid separate provider filters or a broad scan refactor.
+- Package correction as 0.4.3; preserve the immutable published v0.4.2 artifact.
+
 ## 2026-11-13 — Publish 0.4.2
 - User explicitly requested push and release, superseding earlier local-only packaging decisions.
 - Publish current main as v0.4.2 and attach the validated install ZIP; include all changes since the last published v0.3.9.

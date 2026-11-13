@@ -1,5 +1,11 @@
 # Insights
 
+## 2026-11-13 — Equipment-only instance drops
+- Provider filtering correctly found dungeon sources, but all positive item IDs reached results; both providers needed the same equipment predicate.
+- Original loot fixture gave cloth a weapon slot and explicitly tested its inclusion; corrected realistic slots and expected scope.
+- Common `Rewards.itemInfo().slot` is sufficient to classify weapons and wearable gear without adding API/provider dependencies; unknown details stay hidden until cache events.
+- Failed-first regression suite then passed 58 loot cases; all 27 suites / 1,055 checks passed. Built and source-verified v0.4.3 ZIP (29 files).
+
 ## 2026-11-13 — Release 0.4.2 published
 - Re-ran all 27 suites: 1,043 checks passed; rebuilt and verified 29 addon files.
 - Pushed main and annotated v0.4.2 tag at `5dbb839`; published stable release with ZIP and all changes since v0.3.9.

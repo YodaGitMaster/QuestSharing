@@ -2,41 +2,38 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Completed user-requested push and GitHub release of version 0.4.2; no publication work remains.
-- New settings tab: `/qs settings` > Optional; fishing layer and reward browser default off.
-- `/qs fishing`: persistent per-water editor; `/qs fishing on`: world-map layer, with Alt-click placement where supported.
-- Quest-objective and turn-in symbols removed from both maps: no renderer, setting or background refresh; old enabled saved settings are discarded.
-- `/qs adventure [quest ID or title]`: role-play invitation preview for any chat channel; Prepare fills chat and Enter sends. Also on each quest menu and Optional settings.
-- `/qs loot [search]`: GUI instance drop search, with instance list, encounter filter, item/name/ID/boss search, source details and native item comparison.
-- `/qs rewards`: on-demand quest equipment browser; defaults to own class/level/faction, supports slot/search filters, item comparisons and quest routes.
+- User clarified instance drop search should show equipment only; corrected in version 0.4.3, validated and packaged.
+- Next: commit, push and publish the correction under the existing release authorization; verify remote tag and ZIP.
 
 ## Last completed
-- Added `QuestSharing/Loot.lua`, Optional settings entry, reward browser button and `/qs loot` command.
-- Primary provider is compatible installed AtlasLoot DungeonsAndRaids; clearly labelled partial QuestieDB fallback uses known instance NPC/object drop sources.
-- Loot tables indexed on request in batches; native item-name requests are throttled, cached names refresh asynchronously, and closing/disabling cancels unfinished work.
-- All 27 suites passed: 1,043 tests, including 46 new loot integration cases; `git diff --check` clean.
-- Actual Forever-compatible AtlasLoot ItemDB.lua/data.lua smoke-loaded: 34 instance records / 2,635 item-source entries, item 5191 (Cruel Barb) -> Edwin VanCleef / The Deadmines, no Lua errors.
-- Updated README, changelog, schema, decisions, insights and live architecture.
-- Built local install ZIP: `dist/QuestSharing-0.4.2.zip` (29 addon files); quest map renderer remains absent.
-- Committed release implementation as `5dbb839731f7ce33ff2bd1c6f5fb4353b6dd06cc`; pushed main and annotated tag `v0.4.2`.
-- Published stable GitHub release with combined notes for 0.4.0–0.4.2 and `QuestSharing-0.4.2.zip` (144,509 bytes).
-- Downloaded the published ZIP and confirmed byte equality with the tested local artifact; SHA256 `f1839bca6f8d0c0cc15239c7a9e090fbd69be72424664341b61776700ef0abfb`.
+- Reproduced Silken Cloth leakage on modern/classic paths; corrected unrealistic fixture slots and added failing-first tests.
+- `Loot.lua` now requires recognized `Rewards.itemInfo().slot` for results and encounter choices. Weapons and wearable gear remain; materials, consumables, bags and unknown classifications stay hidden.
+- Existing asynchronous item-cache events reveal equipment after details load; provider indexing, batching and source attribution remain intact.
+- All 27 suites / 1,055 checks passed, including 58 loot cases; `git diff --check` clean.
+- Built `dist/QuestSharing-0.4.3.zip`: 29 addon files match source; SHA256 `af209ddb41dc6ca695b1364b56c00c3dade5ef7281b385ae19010ccbec0f0cd1`.
+- Reusable report: `context/BUGS/2026-11-13-instance-loot-non-equipment.md`; live architecture/schema updated.
 
-## Remaining work / limits
-- Loot GUI rendering, installed AtlasLoot module loading and live native item-data timing need an in-game check; no game client is available here.
-- Full instance loot coverage requires a compatible installed AtlasLoot catalogue; QuestieDB alone is partial, and no third-party loot data is bundled.
-- Real-game verification of invitation chat routing, window layout, Alt-click fishing placement, item data and comparison tooltips is still required; no game client is available here.
-- Fishing coverage gap: per-water fish/skills are user-entered, not a complete automatic catalogue for every location. Optional installed AnglerAtlas supplies separate zone summaries; some Forever data is explicitly provisional.
-- Reward browser requires recent QuestieDB item enumeration and active-flavor class/faction/race enum tables.
-- Equipment family filter uses Classic rules; item-specific restrictions, Forever proficiency changes and build suitability need tooltip comparison. Quest conditions beyond displayed level/class/race are not fully evaluated.
-- Water records are retained on settings reset and only deleted explicitly.
+## Implemented tools
+- Optional tab in `/qs settings`; fishing layer and quest reward browser default off.
+- `/qs fishing`: persistent per-water editor; `/qs fishing on`: world-map layer, with Alt-click placement where supported. Water notes survive settings reset and are deleted explicitly.
+- `/qs rewards`: equipment rewards by class/level/faction, slot/search filters, native comparisons and quest routes; requires recent QuestieDB and enum tables.
+- `/qs adventure [quest ID or title]`: editable role-play invitation for chosen chat; Prepare fills a draft, Enter sends.
+- `/qs loot [search]`: instance equipment, encounter filter, item/name/ID/boss search, supplier/difficulty and native comparisons.
+- Quest objective/turn-in symbols removed from both maps; old saved `questMap` setting discarded.
+
+## Remaining limits
+- No game client available: GUI rendering, installed-module loading, chat routing, Alt-click placement and live item-cache timing need in-game checks.
+- Complete instance loot requires a compatible installed AtlasLoot DungeonsAndRaids catalogue; QuestieDB is a labelled partial fallback. No third-party dataset bundled.
+- Fishing water fish/skills are user-entered; optional AnglerAtlas supplies separate zone summaries, with provisional Forever data labelled.
+- Reward class equipment families follow Classic rules; native tooltips remain authoritative for item restrictions and build suitability. Not every quest condition is evaluated.
 
 ## Verification environment
-- `/tmp/questsharing-test-env/bin/python` with `lupa` 2.8 / Lua 5.1; host Python lacked lupa.
-- Third-party reference only: `/tmp/questsharing-angler-reference`; no third-party dataset is bundled.
-- Important existing guard: never open/redraw Blizzard's world map from addon code; protected pin creation can be tainted. New map buttons print directions.
+- `/tmp/questsharing-test-env/bin/python`: lupa 2.8 / Lua 5.1. Host Python lacks lupa.
+- Actual AtlasLoot source smoke test from v0.4.2: 34 instances / 2,635 raw item-source entries; `/tmp/questsharing-loot-reference`.
+- AnglerAtlas reference `/tmp/questsharing-angler-reference`; no reference data bundled.
+- Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
-## Current release
-- Published v0.4.2: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.2
-- Tag resolves to `5dbb839731f7ce33ff2bd1c6f5fb4353b6dd06cc`; GitHub confirms stable published release and uploaded install ZIP.
-- Main also includes a documentation follow-up recording publication verification. Previous published version was v0.3.9 (`0c3b168`).
+## Published release
+- v0.4.2: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.2
+- Tag `5dbb839731f7ce33ff2bd1c6f5fb4353b6dd06cc`; previously verified install asset byte equality.
+- v0.4.3 correction publication pending; preserve the published 0.4.2 tag and ZIP.
