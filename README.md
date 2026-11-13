@@ -391,7 +391,7 @@ explanation, and groups its settings in short sections:
 | **Tracker** | *The quest list on the right* (hide the game's tracker, follows you, how many, distance or zone, the pause), *Finding objectives* (the world pin, quest icons over creatures, the game-settings helper)  |
 | **Quick chat** | the ring, its key, hold or toggle, its size, where Auto messages go, and the **message editor** |
 | **Pings & items** | *Pinging quest targets* (the ping key, the anti-spam time, objects too) and *Quest items* (quest items marked in your bags, icons in the tracker, the quest item key, the item button) |
-| **Extra tools** | role-play quest invitations; fishing water markers and their editor; quest reward equipment and instance drop browsers |
+| **Extra tools** | highest learned spell ranks on action bars; role-play quest invitations; fishing water markers; quest reward and instance drop browsers |
 
 Every line is one click: a **check box** switches, a **choice** (`< value >`) moves to the next one (right click goes
 back), a **number** (`- 10 +`) counts up with the left button and down with the right one (Shift = bigger steps), and
@@ -405,9 +405,22 @@ tracker follows you, your quick chat key (or that it is not set) and how many pr
 **Good news has a sound** (switch it off under General): a soft ping when someone accepts a quest you shared or a
 party member running Quest Sharing finishes one you share. Never during combat.
 
-## Extra tools: quest invitations, fishing, quest rewards and instance drops
+## Extra tools: spell ranks, quest invitations, fishing, quest rewards and instance drops
 
 Open `/qs settings` > **Extra tools** for these tools; fishing and the reward browser have independent switches.
+
+**Highest learned spell ranks on your action bars.** Enable **Auto-update spells to highest learned rank**
+in Extra tools (off by default). It upgrades existing player spell buttons across normal action-bar pages,
+including hidden/form pages and duplicate copies, to the highest rank you have learned. It checks when enabled,
+at login, after learning spells and when spell buttons change. **Check spell ranks now** runs a check and reports
+its result. This does not train or buy spells; macros, items, pet actions and unranked abilities stay unchanged.
+While enabled, deliberately placing a lower-ranked spell on a normal bar also upgrades it.
+
+Updates wait until you leave combat, temporary/vehicle bars end and you finish dragging anything on the cursor.
+Unknown or ambiguous rank data is skipped; if the client refuses a replacement, updates pause until `/reload`
+and report the problem. Turn the option off to keep lower-ranked buttons; disabling it does not undo upgrades.
+Action bars supplied by other addons work when they use the game's normal action slots; custom secure actions
+and spells written inside macros are not edited.
 
 **Seek fellow adventurers.** Right-click a quest in the Party quests window and choose **Seek fellow adventurers**
 just below **Tell the party how I am doing**,
@@ -703,6 +716,7 @@ python tests/test_adventure.py        # 32 tests: role-play quest invitations, p
 python tests/test_equipment.py        # 36 tests: one window, shared filters, rare+ quality, dungeon/raid identity and cancellation
 python tests/test_instance_focus.py   # 24 tests: current dungeon, batched loads, manual browsing, wing identity and Extra tools
 python tests/test_stats.py            # 20 tests: combined stat minimums, native APIs, cache refresh, live inputs and reset
+python tests/test_spell_ranks.py      # 48 tests: learned rank upgrades, normal pages, cursor/combat guards and client APIs
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 ```
 Expected: every line ends in `passed` with all tests green (1121 in total).
@@ -731,6 +745,7 @@ Expected: every line ends in `passed` with all tests green (1121 in total).
 | `QuestSharing/Fishing.lua` | optional world-map water markers, saved water editor and AnglerAtlas zone summaries |
 | `QuestSharing/Rewards.lua` | optional QuestieDB equipment rewards, filters, item comparisons and quest routes |
 | `QuestSharing/EquipmentUI.lua` | one equipment window, shared item type/slot/level/stat filters, item cards and inline details |
+| `QuestSharing/SpellRanks.lua` | opt-in highest learned spell ranks on existing normal action-bar buttons |
 | `QuestSharing/OptionalUI.lua` | shared controls for the optional tools |
 | `QuestSharing/Adventure.lua` | role-play quest invitation preview and chat preparation in a chosen channel |
 | `QuestSharing/Loot.lua` | searchable instance loot, encounter sources, AtlasLoot adapter and partial QuestieDB fallback |
