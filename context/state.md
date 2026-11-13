@@ -2,10 +2,12 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Shared stat filters completed and published as v0.4.8; remote tag and downloaded install ZIP verified.
-- No remaining feature work; native game-client QA remains unavailable in this environment.
+- Current-dungeon focus and Extra tools label verified; 0.4.9 packaging/publication pending under ongoing authorization.
 
 ## Last completed
+- Current dungeon automatically selected/revealed on open; waits for catalogue, respects manual browsing, resolves provider subzones and preserves shared gear filters.
+- Settings label changed to Extra tools; tab widths rebalanced within existing window, internal id `optional` retained.
+- All 31 suites / 1,165 checks pass, including 24 current-dungeon/label workflows; diff whitespace clean. Reproduced/corrected initial-focus versus pending-search race before release.
 - Published v0.4.8 at `50d41cad29bc5aa4119d964d91668bec4e75f89e`; downloaded 30-file ZIP matches the tested source-verified build byte for byte.
 - Implemented three shared AND stat conditions, searchable selectors/live inclusive minimums, clear/reset, lazy native API compatibility and event-invalidated cache; Rare+/eligibility/dungeon scope retained.
 - Updated live architecture/schema/decisions and checked approximate widget geometry; no native client available.
@@ -21,7 +23,7 @@ Last updated: 2026-11-13
 - Reviewed approximate native-widget geometry; actual game rendering remains unverified.
 
 ## Implemented tools
-- Optional tab in `/qs settings`; fishing layer and quest reward browser default off.
+- Extra tools tab in `/qs settings`; fishing layer and quest reward browser default off.
 - `/qs fishing`: persistent per-water editor; `/qs fishing on`: world-map layer, with Alt-click placement where supported. Water notes survive settings reset and are deleted explicitly.
 - `/qs rewards`: shared explorer quest tab; equipment rewards by class/level/faction, slot/search filters, native comparisons and quest routes; requires recent QuestieDB and enum tables.
 - `/qs adventure [quest ID or title]`: editable role-play invitation for chosen chat; Prepare fills a draft, Enter sends.

@@ -10,6 +10,7 @@ local chosen, encounter, query, instanceQuery = nil, nil, "", ""
 local itemQueue, queueAt, page, instancePage = {}, 1, 1, 1
 local deferredAtlas = false
 local unresolved, selectedKey = 0, nil
+local focusTarget
 local function resultKey(r) return table.concat({r.itemID,r.instanceKey,r.who,r.difficulty},"\031") end
 local PAGE, INSTANCE_PAGE = 7, 9
 local paint, refresh
@@ -43,8 +44,8 @@ local function readItem(id)
     end
 end
 
-local function instance(key, name)
-    if not instances[key] then instances[key] = { key = key, name = name, count = 0 } end
+local function instance(key, name, instanceID)
+    if not instances[key] then instances[key] = { key = key, name = name, count = 0, instanceID = instanceID } end
     return instances[key]
 end
 
@@ -87,6 +88,40 @@ function L.instances(text)
     end
     table.sort(list, function(a, b) if a.name == b.name then return a.key < b.key end; return a.name < b.name end)
     return list
+end
+
+local function currentDungeon(text)
+    local name,kind,id
+    if type(GetInstanceInfo)=="function" then
+        -- optionalUI.call deliberately returns only three values; instanceID is the eighth.
+        local ok,n,k,_,_,_,_,_,instanceID=pcall(GetInstanceInfo)
+        if ok then name,kind,id=clean(n),k,instanceID end
+    end
+    local inside,instanceType=U.call(IsInInstance)
+    if inside==false or (kind or instanceType)~="party" then return end
+    return {name=name or clean(U.call(GetRealZoneText)),subzone=clean(U.call(GetSubZoneText)),id=positive(id) and id or nil,text=text}
+end
+
+local function focusCurrentDungeon()
+    local target=focusTarget
+    if not target then return end
+    focusTarget=nil
+    if W.search.dirty or W.instanceSearch.dirty then return end
+    local best,score,tied=nil,0,false
+    for _,place in pairs(instances) do
+        local sameID=target.id and place.instanceID==target.id
+        local sameName=target.name and place.name==target.name
+        local sameSubzone=target.subzone and place.name==target.subzone
+        if target.subzone and place.subzones and place.subzones[target.subzone] then sameSubzone=true end
+        local compatible=not target.id or not place.instanceID or sameID
+        local rank=compatible and ((sameID and 100 or 0)+(sameName and 10 or 0)+(sameSubzone and 20 or 0)) or 0
+        if rank>score then best,score,tied=place,rank,false elseif rank>0 and rank==score then tied=true end
+    end
+    -- A shared map/instance ID can cover several wings; never choose an arbitrary one.
+    if not best or tied then return end
+    chosen,encounter,query,instanceQuery,page,selectedKey=best.key,nil,target.text or "","",1,nil
+    W.search:SetText(query);W.search.cancel();W.instanceSearch:SetText("");W.instanceSearch.cancel()
+    for i,place in ipairs(L.instances()) do if place.key==chosen then instancePage=math.ceil(i/INSTANCE_PAGE);break end end
 end
 
 local function bosses()
@@ -145,7 +180,13 @@ local function atlasJobs()
                 if type(content) == "table" and type(content.items) == "table" and standardDungeon(content, module, a) then
                     local name = clean(content.name) or clean(U.call(content.GetName, content, true))
                         or areaName(content.MapID or content.AreaID or content.InstanceID)
-                    local place = instance(moduleName .. ":" .. tostring(key), name)
+                    -- Compatible Dire Maul tables omit InstanceID but retain its verified area ID.
+                    local place = instance(moduleName .. ":" .. tostring(key), name, content.InstanceID or (content.MapID==2557 and 429 or nil))
+                    place.subzones={}
+                    for _,id in ipairs(type(content.SubAreaIDs)=="table" and content.SubAreaIDs or {}) do
+                        local zone=clean(U.call(C_Map and C_Map.GetAreaInfo,id) or U.call(GetAreaInfo,id))
+                        if zone then place.subzones[zone]=true end
+                    end
                     for bossID, boss in pairs(content.items) do
                         if type(bossID) == "number" and type(boss) == "table" and not boss.IgnoreAsSource then
                             local who = clean(boss.name) or clean(U.call(content.GetNameForItemTable, content, bossID, true))
@@ -280,6 +321,7 @@ function L.scan()
         if done then
             loading, ready = false, true
             if chosen and not instances[chosen] then chosen, encounter = nil, nil end
+            focusCurrentDungeon()
             refresh(); pumpNames(token)
         else
             paint(); ns.after(0.01, step)
@@ -360,17 +402,21 @@ local function build()
     if not f then return false end
     W = { frame = f, instances = {}, rows = {} }
     W.instanceSearch,W.clearInstanceSearch=E.searchBox(f,"Find dungeon",0,0,190,"dungeons",function(text)
+        focusTarget=nil
         instanceQuery=text;instancePage=1;paint()
     end)
     W.search,W.clearSearch=E.searchBox(f,"Search item, ID, boss or dungeon",210,0,450,"dungeons",function(text)
+        focusTarget=nil
         query=text;page=1;refresh()
     end)
-    local all = S.button(f, "All dungeons", 190, function() E.dismissMenu();chosen, encounter, page = nil, nil, 1; refresh() end)
+    local all = S.button(f, "All dungeons", 190, function() E.dismissMenu();focusTarget=nil;chosen, encounter, page = nil, nil, 1; refresh() end)
+    W.all=all
     all:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -54)
     W.selection = U.text(f, "All dungeons", 0, 87, 190)
     W.boss=E.dropdown(f,"Source",210,54,450,function()
         local list={"All encounters"};for _,who in ipairs(bosses()) do list[#list+1]=who end;return list
     end,function() return encounter or "All encounters" end,function(value)
+        focusTarget=nil
         encounter=value~="All encounters" and value or nil;page=1;refresh()
     end)
     W.instanceStatus = U.text(f, "", 0, 112, 190)
@@ -378,7 +424,7 @@ local function build()
     W.dungeonList:SetPoint("TOPLEFT",f,"TOPLEFT",0,-145);W.dungeonList:SetWidth(190);W.dungeonList:SetHeight(324)
     E.wheel(W.dungeonList,L.goInstances)
     for i = 1, INSTANCE_PAGE do
-        local b = S.button(W.dungeonList, "", 190, function(self) E.dismissMenu();chosen, encounter, page = self.place.key, nil, 1; refresh() end)
+        local b = S.button(W.dungeonList, "", 190, function(self) E.dismissMenu();focusTarget=nil;chosen, encounter, page = self.place.key, nil, 1; refresh() end)
         b:SetPoint("TOPLEFT", W.dungeonList, "TOPLEFT", 0, -((i - 1) * 36))
         E.wheel(b,L.goInstances)
         W.instances[i] = b
@@ -435,11 +481,13 @@ local function build()
     W.details, W.detailsText, W.setDetails = E.details(f, 684, 348, "Drop source")
     E.navigation(W.search,W.rows,L.go)
     f.clear=function()
+        focusTarget=nil
         query,chosen,encounter,instanceQuery="",nil,nil,"";page,instancePage=1,1
         W.search:SetText("");W.search.cancel();W.instanceSearch:SetText("");W.instanceSearch.cancel();refresh()
     end
     f.refresh = function() page=1; refresh() end
     f.suspend = function()
+        focusTarget=nil
         if loading or queueAt <= #itemQueue then generation = generation + 1; loading, ready = false, false end
     end
     f:SetScript("OnHide", f.suspend)
@@ -452,8 +500,10 @@ function L.open(text)
     if text and text ~= "" then query, chosen, encounter, page = text, nil, nil, 1; W.search:SetText(text);W.search.cancel() end
     E.show("dungeons")
     for _,box in ipairs({W.search,W.instanceSearch}) do if box.dirty then box.flush() end end
+    focusTarget=currentDungeon(text and text~="" and text or nil)
     if not ready and not loading then L.scan()
     else
+        if ready then focusCurrentDungeon() end
         refresh()
         if not loading then
             itemQueue, queueAt = {}, 1

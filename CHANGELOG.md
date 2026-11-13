@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.9
+- Opening **Instance drops** inside a recognized dungeon automatically selects that dungeon and brings its
+  navigation row into view. Works on first load and reopening, including a catalogue loaded in batches.
+- Clears stale item/dungeon searches and encounter selection when focusing; an explicit `/qs loot [search]`
+  keeps its search inside the current dungeon. Shared type, level and stat filters remain in effect.
+- Uses native instance IDs, exact localized names and provider subarea names for dungeon wings. Unknown,
+  ambiguous, raid and outdoor locations preserve browsing. Manual navigation remains in control after opening.
+- Renamed the **Optional** settings tab to **Extra tools**, with tab widths adjusted to keep every label inside
+  the settings window. Existing actions, settings and internal tab identifiers remain compatible.
+
 ## 0.4.8
 - Added three shared **stat filters** to quest rewards and instance drops, each with a searchable bonus selector
   and an inclusive minimum. Combine conditions such as Intellect ≥ 10 and Stamina ≥ 5; every selected condition

@@ -18,7 +18,7 @@ ns.settingTabs = {
     { id = "tracker", title = "Tracker",      intro = "Keep the quests near you in sight, and find the creatures you need." },
     { id = "quick",   title = "Quick chat",   intro = "Hold your key, point at a message, let go. Pick a message below to edit it." },
     { id = "actions", title = "Pings & items", intro = "One key pings your quest target for the party, one uses your quest item." },
-    { id = "optional", title = "Optional", intro = "Extra tools: quest invitations, fishing, quest rewards and instance drops." },
+    { id = "optional", title = "Extra tools", intro = "Quest invitations, fishing, quest rewards and instance drops." },
 }
 
 -- kind = header | bool | choice | number | action | key.   desc = the grey line under the label (also its tooltip)
@@ -612,7 +612,7 @@ local function build()
 
     local x = LEFT
     for _, t in ipairs(ns.settingTabs) do
-        local width = t.id == "quick" and 100 or (t.id == "actions" and 108 or 76)
+        local width = t.id == "quick" and 100 or (t.id == "actions" and 108 or (t.id == "optional" and 96 or 72))
         local b = clickable(f, width, 24, function() ns.settingsTab(t.id) end)
         b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -42)
         local bg = S.fill(b, "BACKGROUND", 0.12, 0.14, 0.2, 0.9)

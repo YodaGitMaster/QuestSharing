@@ -62,6 +62,7 @@ QuestSharing/  # Repository root
     ├── test_friends.py  # Tests for friends
     ├── test_highlight.py  # Tests for highlight
     ├── test_items.py  # Tests for items
+    ├── test_instance_focus.py  # Current dungeon opening, delayed catalogue focus, manual navigation and Extra tools label
     ├── test_log.py  # Tests for log
     ├── test_loot.py  # Instance loot parsing, search, provider fallback and asynchronous item names
     ├── test_look.py  # Tests for look
@@ -93,7 +94,7 @@ flowchart TD
     DB[Optional QuestieDB] --> Q[Questie.lua: ns.questie]
     Share --> API[WoW APIs via Compat.lua]
     Sync --> API
-    Settings[Settings.lua: Optional tab] --> Fishing[Fishing.lua: water notes]
+    Settings[Settings.lua: Extra tools tab] --> Fishing[Fishing.lua: water notes]
     Settings --> Rewards[Rewards.lua: reward browser]
     OptionalUI[OptionalUI.lua] --> Equipment[EquipmentUI.lua: shared explorer, Rare+ only]
     Equipment --> Rewards
@@ -109,6 +110,7 @@ flowchart TD
     Loot --> AtlasLoot[Optional AtlasLoot encounter tables]
     Loot --> Q
     Loot --> Items
+    Loot --> Location[WoW GetInstanceInfo and localized subzone names]
     Loot --> Rewards
     QuestMenu[Menu.lua: Seek fellow adventurers] --> Adventure[Adventure.lua: invitation composer]
     Core --> Adventure
@@ -191,6 +193,7 @@ sequenceDiagram
     participant Questie as Questie.lua
     participant Game as WoW item APIs
     User->>Loot: Open instance drops
+    Loot->>Game: Read current party-instance ID, name and subzone
     Loot->>Atlas: Read installed Classic/Forever dungeon tables; reject raids/world bosses
     alt Compatible AtlasLoot data available
         Atlas-->>Loot: Instances, encounters, difficulties and item IDs
@@ -199,6 +202,8 @@ sequenceDiagram
         Note over Loot,Questie: Label coverage as partial
     end
     Loot->>Loot: Index up to 100 rows per timer batch
+    Loot->>Loot: After indexing, select recognized current dungeon and reveal its navigation page
+    Note over User,Loot: Manual location/search changes cancel pending focus; later refreshes preserve browsing
     Loot->>Game: Load up to 10 item details per timer batch (Rewards.itemInfo)
     User->>Loot: Filter dungeon, encounter or item/boss text; shared type/slot/level filters
     Loot->>Loot: Require recognized equipment slot and native quality 3+; hide unknown items
@@ -291,6 +296,14 @@ classDiagram
         sourceID
         kind
     }
+    class DungeonRecord {
+        key
+        name
+        count
+        instanceID_optional
+        subzones_localized_names
+    }
+    LootDrop --> DungeonRecord : instanceKey
     class NativeItemInfo {
         name
         link

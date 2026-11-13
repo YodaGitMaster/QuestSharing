@@ -1,5 +1,11 @@
 # Insights
 
+## 2026-11-13 — Current dungeon context
+- Blizzard's [instance API declaration](https://github.com/Gethe/wow-ui-source/blob/classic/Interface/AddOns/Blizzard_APIDocumentationGenerated/InstanceDocumentation.lua) confirms instanceID is GetInstanceInfo's eighth return; optionalUI.call intentionally returns only three, so use protected direct invocation here.
+- Actual compatible AtlasLoot catalogue has several Scarlet Monastery entries sharing ID 189 and Dire Maul entries with omitted/commented ID 429, area 2557 and SubAreaIDs; ID-only matching needs localized subarea disambiguation and a tie guard.
+- Pending initial focus must survive asynchronous indexing but be canceled on manual navigation/close. Reopening recaptures current location; item-data refreshes do not recenter the browser.
+- All 31 suites / 1,165 checks pass, including 24 current-instance/Extra tools workflows. An additional timing case showed dirty live-search fields must suppress focus before the debounce callback; reproduced and corrected before publication.
+
 ## 2026-11-13 — Native equipment stat filtering
 - Blizzard's [generated item API declaration](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/ItemDocumentation.lua) confirms C_Item.GetItemStats accepts an item link and may return no result. Older clients expose global GetItemStats; runtime detection/fallback is necessary.
 - Three explicit AND conditions avoid hidden filter state and additional windows. Inclusive minimums use native units; missing/zero/malformed values cannot satisfy a positive bonus condition.
