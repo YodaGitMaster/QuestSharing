@@ -391,7 +391,7 @@ explanation, and groups its settings in short sections:
 | **Tracker** | *The quest list on the right* (hide the game's tracker, follows you, how many, distance or zone, the pause), *Finding objectives* (the world pin, quest icons over creatures, the game-settings helper)  |
 | **Quick chat** | the ring, its key, hold or toggle, its size, where Auto messages go, and the **message editor** |
 | **Pings & items** | *Pinging quest targets* (the ping key, the anti-spam time, objects too) and *Quest items* (quest items marked in your bags, icons in the tracker, the quest item key, the item button) |
-| **Optional** | role-play quest invitations; fishing water markers and their editor; quest reward equipment and instance drop browsers |
+| **Extra tools** | role-play quest invitations; fishing water markers and their editor; quest reward equipment and instance drop browsers |
 
 Every line is one click: a **check box** switches, a **choice** (`< value >`) moves to the next one (right click goes
 back), a **number** (`- 10 +`) counts up with the left button and down with the right one (Shift = bigger steps), and
@@ -405,14 +405,14 @@ tracker follows you, your quick chat key (or that it is not set) and how many pr
 **Good news has a sound** (switch it off under General): a soft ping when someone accepts a quest you shared or a
 party member running Quest Sharing finishes one you share. Never during combat.
 
-## Optional: quest invitations, fishing, quest rewards and instance drops
+## Extra tools: quest invitations, fishing, quest rewards and instance drops
 
-Open `/qs settings` > **Optional** for these tools; fishing and the reward browser have independent switches.
+Open `/qs settings` > **Extra tools** for these tools; fishing and the reward browser have independent switches.
 
 **Seek fellow adventurers.** Right-click a quest in the Party quests window and choose **Seek fellow adventurers**
 just below **Tell the party how I am doing**,
 or use `/qs adventure` (optionally followed by a quest ID, exact title or quest link). You can also open it from
-*Settings > Optional > Seek fellow adventurers*. It chooses an unfinished quest from your log; **Next quest** browses
+*Settings > Extra tools > Seek fellow adventurers*. It chooses an unfinished quest from your log; **Next quest** browses
 the others, and **Another wording** cycles through three role-play invitations, for example:
 
 > Hail, fellow adventurers! I seek brave companions for [Wolves Among Us] in Elwynn Forest. Who will join me and share the adventure?
@@ -500,7 +500,13 @@ and stops if disabled or its tab/window is closed. Uncached item details update 
 Map controls give directions: open the map yourself with `M`, avoiding this client's protected-map restrictions.
 Both tools are covered by Lua mock tests; their rendering and item tooltips still need verification in the game.
 
-**Instance drops and who drops them.** Open *Settings > Optional > Search instance loot and who drops it*, click
+**Instance drops and who drops them.** Opening the browser inside a recognized dungeon selects that dungeon
+and brings its navigation row into view. This also works after the catalogue finishes loading. Old item/dungeon
+searches and encounter choices are cleared; an explicit `/qs loot [search]` keeps that query inside your current
+dungeon. Shared equipment and stat filters remain. Browse other dungeons normally afterward; unknown or
+ambiguous locations, raids and outdoor areas keep your browsing context.
+
+Open *Settings > Extra tools > Search instance loot and who drops it*, click
 **Instance drops** tab in the equipment explorer, or type `/qs loot`. Use **Find dungeon** to narrow
 the list on the left, then click a dungeon to browse its drops. **Search item, ID, boss or dungeon** searches
 within the selected dungeon; **All dungeons** searches the dungeon catalogue. You can also start with
@@ -695,6 +701,7 @@ python tests/test_log.py              # 35 tests: the debug log: every action an
 python tests/test_optional.py         # 42 tests: fishing water notes, map drawing, reward filters and item comparisons
 python tests/test_adventure.py        # 32 tests: role-play quest invitations, preview, channels and preserved chat drafts
 python tests/test_equipment.py        # 36 tests: one window, shared filters, rare+ quality, dungeon/raid identity and cancellation
+python tests/test_instance_focus.py   # 24 tests: current dungeon, batched loads, manual browsing, wing identity and Extra tools
 python tests/test_stats.py            # 20 tests: combined stat minimums, native APIs, cache refresh, live inputs and reset
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 ```

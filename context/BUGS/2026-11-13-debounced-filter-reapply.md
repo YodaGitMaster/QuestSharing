@@ -48,3 +48,22 @@
 ## If it shows up again
 - Inspect all explicit and debounced paths to the same commit function; they must share cancellation.
 - Include navigation or selection after submission in the reproduction, then advance past the debounce interval.
+
+## Addendum 2026-11-13 — Pending search versus initial dungeon focus
+- New variant during unreleased 0.4.9: opening a 250-row catalogue and immediately typing Captain allowed indexing to finish before the 180ms live-search callback; automatic focus cleared the new text and selected Wailing Caverns.
+- Previous range-submit fix still holds; this new asynchronous writer was in Loot.lua and did not own the edit-box debounce. Trap: race condition between initial catalogue focus and pending manual input.
+- Reproduced on both API styles in test_instance_focus.py (22/24 before correction). Apply the same methodology: type, complete background indexing, advance beyond debounce, inspect final query and selected dungeon together.
+- Fix: initial focus discards its target and yields when either search field is dirty, leaving the user's pending callback intact. No common debounce, provider or range-filter change.
+- Result: 24/24 focused checks pass; original range/pagination suites remain covered by the full verification run. Status: solved.
+
+| Wanted | Done | Match |
+|---|---|---|
+| Typing during catalogue load stays authoritative | Initial focus yields to dirty edit boxes | ✅ |
+| Normal first opening still selects current dungeon | No pending input continues through normal matching | ✅ |
+
+| Quality check | Result |
+|---|---|
+| Only planned runtime files changed | ✅ |
+| Symptom reproduced before correction | ✅ |
+| Modern and classic paths verified | ✅ |
+| Minimal fix, no unrelated refactor | ✅ |
