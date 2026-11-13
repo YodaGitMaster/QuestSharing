@@ -408,12 +408,14 @@ party member running Quest Sharing finishes one you share. Never during combat.
 ## Extra tools: zone levels, spell ranks, quest invitations, fishing, quest rewards and instance drops
 
 Open `/qs settings` > **Extra tools** for these tools; fishing and the reward browser have independent switches.
+Extra tools are opt-in: enable their switches or open a tool explicitly when you need it.
 
 **Questing levels on the world map.** Open the map normally with `M`: continent maps display level badges
 over outdoor zones, and a small **Questing levels** panel shows the range for the zone you view or hover.
-Choose a continent/zone from the world overview to see its details. This is enabled by default; switch
-**Show zone questing level ranges** off in Extra tools to hide it. Labels do not intercept map clicks and
+Choose a continent/zone from the world overview to see its details. This is **off by default**; enable
+**Show zone questing level ranges** in Extra tools to display it. Labels do not intercept map clicks and
 follow map resizing/zoom.
+When upgrading from v0.4.11, the option is switched off once; your subsequent choice stays saved across reloads.
 
 Ranges come from the game's player-level map data, including supported Forever zones; no extra addon is
 required. **?** or **range unavailable** means the client has not supplied valid data for that zone; the addon
@@ -728,7 +730,7 @@ python tests/test_equipment.py        # 36 tests: one window, shared filters, ra
 python tests/test_instance_focus.py   # 24 tests: current dungeon, batched loads, manual browsing, wing identity and Extra tools
 python tests/test_stats.py            # 20 tests: combined stat minimums, native APIs, cache refresh, live inputs and reset
 python tests/test_spell_ranks.py      # 48 tests: learned rank upgrades, normal pages, cursor/combat guards and client APIs
-python tests/test_zone_levels.py      # 30 tests: native map ranges, zone bounds, hover, zoom, lifecycle and read-only labels
+python tests/test_zone_levels.py      # 34 tests: optional default/migration, map ranges, bounds, hover, zoom and lifecycle
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 ```
 Expected: every line ends in `passed` with all tests green (1121 in total).

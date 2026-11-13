@@ -1,5 +1,10 @@
 # Insights
 
+## 2026-11-13 — Optional means off until explicitly enabled
+- User corrected the map-range default: all future Extra tools additions should be opt-in unless explicitly requested otherwise.
+- Reproduced six failing modern/legacy assertions for fresh installs, v0.4.11 saved true values and Reset. A changed default cannot distinguish an old auto-enabled saved value from an explicit choice; the once-only migration marker requires a new choice and then preserves it.
+- Verification: all 33 suites / 1,247 checks pass, including 34 zone-level workflows; the renderer is unchanged.
+
 ## 2026-11-13 — Native zone level ranges
 - Verified [Blizzard Forever map API declarations](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/MapDocumentation.lua): GetMapLevels returns player min/max before pet min/max; GetMapRectOnMap returns minX,maxX,minY,maxY, requiring a four-value protected read rather than optionalUI.call's three-value helper.
 - Native zone descendants, rectangles and player ranges avoid inaccurate static Classic/Forever mappings. UI map type Zone filters out dungeon level ranges; world/cosmic overviews avoid stacking every world's zone labels.

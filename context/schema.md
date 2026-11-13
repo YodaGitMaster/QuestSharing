@@ -2,7 +2,7 @@
 Last updated: 2026-11-13
 
 ## Addon loading and persistence
-- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.11; declares file load order and SavedVariables.
+- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.12; declares file load order and SavedVariables.
 - Lua modules receive `local ADDON, ns = ...`; `ns` is the shared namespace, not a class.
 - `Core.lua`: `ns.defaults`; `ns.db` initially copies defaults. On `ADDON_LOADED`, missing settings are filled and `ns.db` aliases saved `QuestSharingDB`; current `dbVersion = 3`.
 - SavedVariables: `QuestSharingDB` (settings), `QuestSharingLog` (debug log); persisted by the game.
@@ -13,7 +13,8 @@ Last updated: 2026-11-13
 - `Sync.lua`: addon channel messages separated by `|`; `H|1` hello, `L|i|n|entries` quest-list parts, `P|entry` quest update. Entry: `questID:complete(0/1):objectives`; consult encoder/parser before changing wire format.
 
 ## Optional tools (2026-11-13)
-- `zoneLevels`: SavedVariables boolean, default true; `ns.zoneLevels` owns read-only click-through badges and a selected/hovered-zone panel. `range(id)` validates C_Map.GetMapLevels player bounds 1..1000 and caches successful ranges; refresh clears the cache. Missing ranges stay unknown.
+- `zoneLevels`: SavedVariables boolean, default false; `ns.zoneLevels` owns read-only click-through badges and a selected/hovered-zone panel. `range(id)` validates C_Map.GetMapLevels player bounds 1..1000 and caches successful ranges; refresh clears the cache. Missing ranges stay unknown.
+- `zoneLevelsOptInMigrated`: SavedVariables migration marker, not a user setting/default. ADDON_LOADED forces zoneLevels=false and sets this true once if missing/non-true; later explicit true/false choices survive reload. Reset leaves the marker intact and resets zoneLevels=false. dbVersion remains 3.
 - Map zone records: `{id,name,x,y,min?,max?}` from native GetMapChildrenInfo(Zone,true) and GetMapRectOnMap; only finite normalized rectangles and outdoor Zone map types qualify. World/cosmic views prompt navigation rather than stacking all world zones. Native player range data includes supported Forever maps; no guessed range catalogue.
 - One view per observed map canvas `{canvas,labels,zones,panel,heading,text}`; previous canvas hidden, frames pooled, sizes/zoom read while visible. Own frames do not receive mouse input. No map navigation/native pin calls or quest minimap symbols. Tick 0.25s while map is shown, 1s otherwise; rebuild zone data every 2s and retry missing data.
 - `autoSpellRanks`: SavedVariables boolean, default false; existing missing-default fill, no dbVersion change. `ns.spellRanks` exposes update(report), schedule(report), settingChanged(), status().
