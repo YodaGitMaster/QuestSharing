@@ -2,7 +2,7 @@
 Last updated: 2026-11-13
 
 ## Active task
-- User explicitly requested push and GitHub release of version 0.4.2; final validation passed, publication verification pending.
+- Completed user-requested push and GitHub release of version 0.4.2; no publication work remains.
 - New settings tab: `/qs settings` > Optional; fishing layer and reward browser default off.
 - `/qs fishing`: persistent per-water editor; `/qs fishing on`: world-map layer, with Alt-click placement where supported.
 - Quest-objective and turn-in symbols removed from both maps: no renderer, setting or background refresh; old enabled saved settings are discarded.
@@ -18,7 +18,9 @@ Last updated: 2026-11-13
 - Actual Forever-compatible AtlasLoot ItemDB.lua/data.lua smoke-loaded: 34 instance records / 2,635 item-source entries, item 5191 (Cruel Barb) -> Edwin VanCleef / The Deadmines, no Lua errors.
 - Updated README, changelog, schema, decisions, insights and live architecture.
 - Built local install ZIP: `dist/QuestSharing-0.4.2.zip` (29 addon files); quest map renderer remains absent.
-- Release prepared for commit, push and publication with an install ZIP and combined notes for 0.4.0–0.4.2.
+- Committed release implementation as `5dbb839731f7ce33ff2bd1c6f5fb4353b6dd06cc`; pushed main and annotated tag `v0.4.2`.
+- Published stable GitHub release with combined notes for 0.4.0–0.4.2 and `QuestSharing-0.4.2.zip` (144,509 bytes).
+- Downloaded the published ZIP and confirmed byte equality with the tested local artifact; SHA256 `f1839bca6f8d0c0cc15239c7a9e090fbd69be72424664341b61776700ef0abfb`.
 
 ## Remaining work / limits
 - Loot GUI rendering, installed AtlasLoot module loading and live native item-data timing need an in-game check; no game client is available here.
@@ -34,6 +36,7 @@ Last updated: 2026-11-13
 - Third-party reference only: `/tmp/questsharing-angler-reference`; no third-party dataset is bundled.
 - Important existing guard: never open/redraw Blizzard's world map from addon code; protected pin creation can be tainted. New map buttons print directions.
 
-## Prior release
-- GitHub's published release remains v0.3.9: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.3.9
-- Previous release commit: `0c3b168`; v0.4.2 publication is now explicitly authorized and pending verification.
+## Current release
+- Published v0.4.2: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.2
+- Tag resolves to `5dbb839731f7ce33ff2bd1c6f5fb4353b6dd06cc`; GitHub confirms stable published release and uploaded install ZIP.
+- Main also includes a documentation follow-up recording publication verification. Previous published version was v0.3.9 (`0c3b168`).
