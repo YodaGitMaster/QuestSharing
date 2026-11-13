@@ -6,6 +6,7 @@ Last updated: 2026-11-13
 - Standing preference: Extra tools additions stay optional and default off unless explicitly requested otherwise.
 
 ## Last completed
+- 2026-11-13: user-requested push verified on main; origin already contained all feature/release changes, with no pending runtime edits.
 - Published v0.4.12 at `c86b34294ced23ddf904ac73f50e0fce01baae73`; downloaded 32-file ZIP byte-matches source-verified build.
 - Changed zoneLevels default to false and added once-only opt-in migration; later choices persist and Reset returns to off. Renderer unchanged.
 - All 33 suites / 1,247 checks pass, including 34 zone-level workflows; diff whitespace clean.
