@@ -6,6 +6,7 @@
 - Supplier lists combine modes per dungeon/mob/provider; quest lists preserve independent routes/requirements. Hover previews bounded at six; full scrollable details remain in the same window.
 - Existing paging fixtures incorrectly used repeated sources of one item as different results; replaced with distinct equipment and kept separate raw-source coverage.
 - All 34 suites / 1,275 checks pass, including 28 grouping workflows; native rendering still requires the game client.
+- Published v0.4.13 at `1bf2789ca1d7ddbbc7ee9039e4f06cb22a525361`; downloaded latest-stable 162,652-byte ZIP matches the 32-file source-verified build, SHA256 `f22e068e8c9403c2b566f9f13811267ea7636820f9b782e1ebbd0262c1e187e3`.
 
 ## 2026-11-13 — Optional means off until explicitly enabled
 - User corrected the map-range default: all future Extra tools additions should be opt-in unless explicitly requested otherwise.
