@@ -1,7 +1,7 @@
 -- Settings.lua: the settings window.   /qs settings   (also: the minimap button, the "Settings" link on the Party quests
 -- window, and an entry under Game Menu > Options > AddOns)
 --
--- Six tabs, each about one thing you do: General (getting started), Sharing (when you group up), Party window, Tracker
+-- Tabs, each about one thing you do: General (getting started), Sharing (when you group up), Party window, Tracker
 -- (finding your quests), Quick chat (the ring and its messages), Social. Every line is one click: a check box switches,
 -- a choice moves to the next value (right click goes back), a number counts up (left click) or down (right click, Shift
 -- = bigger steps). The grey line under each setting says what it does. The Quick chat tab also holds the message editor.
@@ -18,10 +18,31 @@ ns.settingTabs = {
     { id = "tracker", title = "Tracker",      intro = "Keep the quests near you in sight, and find the creatures you need." },
     { id = "quick",   title = "Quick chat",   intro = "Hold your key, point at a message, let go. Pick a message below to edit it." },
     { id = "actions", title = "Pings & items", intro = "One key pings your quest target for the party, one uses your quest item." },
+    { id = "optional", title = "Optional", intro = "Extra tools: quest invitations, fishing, quest rewards and instance drops." },
 }
 
 -- kind = header | bool | choice | number | action | key.   desc = the grey line under the label (also its tooltip)
 ns.settingRows = {
+    { tab = "optional", kind = "header", label = "Instance drops" },
+    { tab = "optional", kind = "action", label = "Search instance loot and who drops it", button = "Browse",
+      desc = "Search by instance, item or boss. AtlasLoot tables, or partial QuestieDB drop sources.",
+      action = function() ns.loot.open() end },
+    { tab = "optional", kind = "header", label = "Find quest companions" },
+    { tab = "optional", kind = "action", label = "Seek fellow adventurers", button = "Write invite",
+      desc = "A role-play invitation for your quest, in any chat you choose; you press Enter to send.",
+      action = function() ns.adventure.open() end },
+    { tab = "optional", kind = "header", label = "Fishing on the big map" },
+    { tab = "optional", kind = "bool", key = "fishingMap", label = "Show fishing waters on the world map",
+      desc = "Your water markers with skill levels and fish. Optional AnglerAtlas adds zone summaries." },
+    { tab = "optional", kind = "action", label = "Add or edit a body of water", button = "Open",
+      desc = "Name the water, set its map coordinates, fishing skill and fish; saved between sessions.",
+      action = function() ns.fishing.open() end },
+    { tab = "optional", kind = "header", label = "Quest rewards for my character" },
+    { tab = "optional", kind = "bool", key = "rewardBrowser", label = "Quest reward equipment browser",
+      desc = "Filter by class, level, faction and equipment slot. Needs QuestieDB's item catalogue." },
+    { tab = "optional", kind = "action", label = "Find quest rewards", button = "Browse",
+      desc = "See the item, quest, where it starts and its prerequisites; hover to compare equipment.",
+      action = function() ns.rewards.open() end },
     -- General
     { tab = "general", kind = "header", label = "Getting started" },
     { tab = "general", kind = "key", label = "Quick chat key",
@@ -109,8 +130,6 @@ ns.settingRows = {
     { tab = "tracker", kind = "number", key = "nearPause", label = "Seconds it waits after I change the tracker myself", min = 5, max = 300,
       desc = "When you add or remove a tracked quest by hand, the tracker and the pin leave your choice alone for this long." },
     { tab = "tracker", kind = "header", label = "Finding objectives" },
-    { tab = "tracker", kind = "bool", key = "questMap", label = "Quest map: where to do my quests (world map and minimap)",
-      desc = "Small icons from QuestieDB; off while the Questie addon is on (it draws its own)." },
     { tab = "tracker", kind = "bool", key = "nearPin", label = "Pin the nearest quest in the world",
       desc = "The game's own quest marker follows the closest quest as you move." },
     { tab = "tracker", kind = "bool", key = "markMobs", label = "Quest icon above creatures that are part of my quests",
@@ -593,7 +612,7 @@ local function build()
 
     local x = LEFT
     for _, t in ipairs(ns.settingTabs) do
-        local width = (t.id == "quick" or t.id == "actions") and 112 or 92     -- six tabs fit the window
+        local width = t.id == "quick" and 100 or (t.id == "actions" and 108 or 76)
         local b = clickable(f, width, 24, function() ns.settingsTab(t.id) end)
         b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -42)
         local bg = S.fill(b, "BACKGROUND", 0.12, 0.14, 0.2, 0.9)

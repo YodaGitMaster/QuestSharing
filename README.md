@@ -365,14 +365,6 @@ the game's tracker still tells the party you are done, because that is your own 
     **Clear** and **Close**.
 
 16. **Quest objectives are easier to find.**
-    - **A light quest map** (*Settings > Tracker > Quest map*, `/qs questmap on|off`, on by default): small icons on
-      the **world map** and the **minimap** where your quests' open objectives are done (a skull for creatures to
-      kill, a bag where items drop, a gear for objects to use, a map for places to go: the 6 nearest to you for each)
-      and, once a quest is done, a yellow **?** where to turn it in. Hover one for the quest and what to do there.
-      The data comes from **QuestieDB**; it draws only while the **Questie addon itself is off** (Questie draws its
-      own, and two sets of icons crowd the maps; it says so once). To use this lighter map instead of Questie's:
-      switch **Questie** off in the AddOns list at the character screen and keep **QuestieDB** on. Works with a
-      rotating minimap; `/qs questie` and `/qs doctor` say whether it is on and why not.
     - **Quest icons over creatures:** every creature that is part of one of your quests gets a gold quest icon
       above its nameplate (the game itself tells the addon which creatures those are).
     - **The nearest quest is pinned in the world:** while "tracker follows me" is on, the game's own
@@ -395,9 +387,10 @@ explanation, and groups its settings in short sections:
 | **General** | *Getting started*: your **quick chat key** (click, then press the key), **Show the ring**, **Check my setup**. *Basics*: the master switch, how your messages go out, the map button, a soft sound for good news; *Debugging*: the debug log and **Show the debug log**; reset |
 | **Sharing** | *When I join a party*, *Party chat* (in common, done, picked up a quest someone has, where the items were), *Behind the scenes* (sync, quest-log markers) |
 | **Party** | the Party quests window (show it in a party, hide it in combat, its size, move it back), *Clicking a quest* (what a click on the game's tracker posts) *Showing where we are* (the map icons, a teammate's pin) and *Friends* (the beta) |
-| **Tracker** | *The quest list on the right* (hide the game's tracker, follows you, how many, distance or zone, the pause), *Finding objectives* (the quest map, the world pin, quest icons over creatures, the game-settings helper)  |
+| **Tracker** | *The quest list on the right* (hide the game's tracker, follows you, how many, distance or zone, the pause), *Finding objectives* (the world pin, quest icons over creatures, the game-settings helper)  |
 | **Quick chat** | the ring, its key, hold or toggle, its size, where Auto messages go, and the **message editor** |
 | **Pings & items** | *Pinging quest targets* (the ping key, the anti-spam time, objects too) and *Quest items* (quest items marked in your bags, icons in the tracker, the quest item key, the item button) |
+| **Optional** | role-play quest invitations; fishing water markers and their editor; quest reward equipment and instance drop browsers |
 
 Every line is one click: a **check box** switches, a **choice** (`< value >`) moves to the next one (right click goes
 back), a **number** (`- 10 +`) counts up with the left button and down with the right one (Shift = bigger steps), and
@@ -410,6 +403,88 @@ tracker follows you, your quick chat key (or that it is not set) and how many pr
 
 **Good news has a sound** (switch it off under General): a soft ping when someone accepts a quest you shared or a
 party member running Quest Sharing finishes one you share. Never during combat.
+
+## Optional: quest invitations, fishing, quest rewards and instance drops
+
+Open `/qs settings` > **Optional** for these tools; fishing and the reward browser have independent switches.
+
+**Seek fellow adventurers.** Right-click a quest in the Party quests window and choose **Seek fellow adventurers**,
+or use `/qs adventure` (optionally followed by a quest ID, exact title or quest link). You can also open it from
+*Settings > Optional > Seek fellow adventurers*. It chooses an unfinished quest from your log; **Next quest** browses
+the others, and **Another wording** cycles through three role-play invitations, for example:
+
+> Hail, fellow adventurers! I seek brave companions for [Wolves Among Us] in Elwynn Forest. Who will join me and share the adventure?
+
+Edit the invitation if you wish. For **Chat channel**, enter `current` to keep the active chat (including its whisper
+recipient or custom channel), or `say`, `yell`, `party`, `raid`, `guild`, `officer`, `instance`, `whisper Anna-Realm`,
+or a joined channel number/name such as `1` or `LookingForGroup`. **Prepare chat** writes the message into your chat
+box; **press Enter to send**. This also applies when the other features send immediately. With `current`, an existing
+draft is kept and the invitation is appended only if it fits; changing channels asks you to send or clear that draft
+first. Completed/abandoned quests cannot be advertised. Generated invitations fit the 255-byte chat limit; unusually
+long quest links fall back to a shortened plain title. This works without a party or Questie.
+
+**Fishing on the big map.** `/qs fishing` opens the water editor. Add a lake, river, coast or fishing pool by name,
+map ID and X/Y coordinates (0–100); **Use my position** fills the coordinates of where you stand.
+On clients with map cursor support, enable the fishing layer and **Alt-click a body of water on the big map** to
+start a new marker at that exact location.
+Enter its minimum fishing skill, skill needed to avoid getaways, fish list and notes such as season or time of day. Leave unknown
+skills blank. **Save water**, then enable **Show fishing waters on the world map**: the map has a fishing icon,
+water name and minimum skill at that location. Hover for the fish and other details; click the icon to edit it.
+Use the editor's saved-water list to revisit any location, with Previous/Next for more waters. Each body of water
+has its own record, including multiple waters in the same zone. Your notes persist across sessions and settings
+resets; **Delete selected** removes just that water.
+
+Installing [AnglerAtlas](https://www.curseforge.com/wow/addons/angler-atlas) adds a scrollable **zone overview** with
+the zone's fishing skill and fish. That overview is read from the installed addon; zone estimates and provisional
+Forever data remain labelled. **There is no built-in verified catalogue of every individual water:** markers and
+their specific fish/skill values are entered by you, and zone summaries are not copied onto individual waters.
+The fishing layer works alongside Questie.
+
+**Find quest equipment for your character.** `/qs rewards` opens the browser and enables it. It starts with your
+class, current level and faction. Change class, faction or equipment slot with their buttons, edit the level and
+press Enter, or search for an item, quest or zone. **Near my level** shows quests from ten levels below to three
+above your selected level, while still requiring their minimum acceptance level and the item's required level to
+be within reach. Switch that filter off to browse lower-level rewards too; **Completed quests** includes quests
+already completed when requested. **My character** restores your own filters.
+
+Each result shows the item, item level, equipment slot, quest, quest level and starting zone. Hover to see the
+game's item tooltip and equipped-item comparison. Click for the quest giver, coordinates and prerequisite quests.
+For example, a level-20 Alliance Druid can find staffs, leather and cloth rewards from ordinary quests as well as
+Druid quests. Results are sorted by item level; compare the actual stats for healing, casting or feral play.
+Class equipment families follow Classic rules, so item-specific restrictions and any Forever proficiency changes
+must be checked in the tooltip. Race restrictions use QuestieDB's active faction masks and your own race when
+browsing your faction. Prerequisites, reputation, skills and other quest conditions may still block acceptance;
+the list is a planning tool, not a promise that every quest is immediately available. Reward choices are alternatives.
+
+The browser needs a recent **QuestieDB** with `ItemDB.GetAllIds`, item `questRewards`, and `LibQuestieDB.Enum` class
+and race mappings; without it the window explains what is missing. It scans only when opened/refreshed, in batches,
+and stops if disabled. Uncached item details update when the game supplies them. **Refresh data** rereads the source.
+Map controls give directions: open the map yourself with `M`, avoiding this client's protected-map restrictions.
+Both tools are covered by Lua mock tests; their rendering and item tooltips still need verification in the game.
+
+**Instance drops and who drops them.** Open *Settings > Optional > Search instance loot and who drops it*, click
+**Instance drops** in the quest reward browser, or type `/qs loot`. Use **Find instance** and press Enter to narrow
+the list on the left, then click an instance to browse its drops. **Search item, ID, boss or instance** searches
+within the selected instance; **All instances** searches the whole catalogue. You can also start with
+`/qs loot VanCleef` or `/qs loot 5191`. The **Source** button cycles through that instance's encounters, including
+trash and chest groups. Both instance and item lists have Previous/Next pages.
+
+Every result shows the item, instance, boss/creature or loot group, and difficulty when supplied. Hover for its item
+tooltip and equipped-item comparison; click for source details. An item with multiple sources appears under each
+source. Trash tables describe a shared group rather than a particular creature; the browser does not invent a
+specific NPC or a drop percentage when the catalogue does not provide one.
+
+For encounter loot tables, install/enable a compatible **AtlasLoot** and its **DungeonsAndRaids** module, such as
+[AtlasLootClassic (Forever & Era Fix)](https://www.curseforge.com/wow/addons/atlaslootclassic-forever-era-fix).
+The browser reads the installed catalogue at runtime; available instances and difficulty variants follow that
+catalogue's coverage. Without compatible AtlasLoot tables, **QuestieDB** provides a clearly labelled **partial**
+list of item sources whose creatures or objects are known to be inside instances. QuestieDB alone is not a complete
+dungeon loot database. Without either source, the GUI explains what to install. No loot database is bundled here.
+
+Indexing and game item-name requests happen only while using the browser, in small batches. Names update when the
+game supplies cached data; until then, use item IDs or boss/instance names. **Refresh data** rereads the catalogue.
+If an unloaded AtlasLoot module cannot load during combat, it is retried after combat. These flows are tested with
+Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check.
 
 ## Install
 **Easiest:** download `QuestSharing-<version>.zip` from the GitHub *Releases* page, unzip it and drop the
@@ -455,6 +530,7 @@ party member running Quest Sharing finishes one you share. Never during combat.
 | `/qs near mode auto\|distance\|zone` | `auto` uses distance if your client can measure it, otherwise your zone |
 | `/qs near now` / `resume` | refresh now / end a pause early |
 | `/qs settings` | open the settings window |
+| `/qs adventure [quest ID or exact title]` | preview a role-play invitation for an unfinished quest, then prepare it in any chosen chat |
 | `/qs friends` | (beta) add everybody in your party to your friends list now |
 | `/qs friends on\|off` | (beta) do it automatically when a party forms or someone joins (default off) |
 | `/qs key [KEY]` | bind the quick chat wheel to a key, e.g. `/qs key V` or `/qs key ALT-E`; `/qs key none` removes it |
@@ -464,7 +540,9 @@ party member running Quest Sharing finishes one you share. Never during combat.
 | `/qs errors [clear]` | errors this addon has caused; the window adds where each came from (line, what was running, stack) |
 | `/qs bagmarks on\|off` | quest items marked in your bags: gold for quests of this zone, blue for quests elsewhere (default on) |
 | `/qs hidetracker on\|off` | hide the game's quest tracker, outside fights (default off) |
-| `/qs questmap on\|off` | the light quest map on the world map and minimap (needs QuestieDB, Questie itself off) |
+| `/qs fishing [on\|off]` | open the fishing water editor; on/off switches its world-map layer |
+| `/qs rewards [on\|off]` | open quest reward equipment for your class, level and faction; on/off enables/disables the browser |
+| `/qs loot [search]` | search instance drops by item/name/ID, boss or instance and inspect who drops each item |
 | `/qs debug on\|off` | the debug log: every action and its outcome, saved to the addon's file on `/reload` or logout (default off) |
 | `/qs log [clear]` | show the debug log in a window you can copy from; `clear` empties it |
 | `/qs minimap on\|off` | the minimap button (default on) |
@@ -503,7 +581,7 @@ computer's audio can also take the sound device away from the game.
 
 ## Known limits (please read)
 - **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
-  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 930 tests), but I could
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 1043 tests), but I could
   not run it inside your client. The risky parts are what only the real game can show: whether the tracker
   click hook and the quest-log markers match your client's interface, whether the "right away" check works,
   and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
@@ -567,11 +645,14 @@ python tests/test_zone.py             # 10 tests: only the quests of where you a
 python tests/test_items.py            # 24 tests: quest item icons in the tracker, the item key and button
 python tests/test_emotes.py           # 34 tests: the emote rings behind the mouse wheel, editing them, only the ones that work
 python tests/test_bags.py             # 16 tests: quest items marked in the bags, hiding the game's quest tracker
-python tests/test_questmap.py         # 22 tests: How to do it, and the light quest map on the world map and minimap
+python tests/test_questmap.py         # 15 tests: How to do it, and guards against the retired quest map symbols
 python tests/test_ringtest.py         # 14 tests: /qs quick test: every slot run, checked against what the game did
 python tests/test_log.py              # 35 tests: the debug log: every action and its outcome, kept small, the log window
+python tests/test_optional.py         # 42 tests: fishing water notes, map drawing, reward filters and item comparisons
+python tests/test_adventure.py        # 32 tests: role-play quest invitations, preview, channels and preserved chat drafts
+python tests/test_loot.py             # 46 tests: instance loot, item/boss searches, source catalogues and asynchronous names
 ```
-Expected: every line ends in `passed` with all tests green (930 in total).
+Expected: every line ends in `passed` with all tests green (1043 in total).
 
 ## Files
 | File | Purpose |
@@ -594,7 +675,11 @@ Expected: every line ends in `passed` with all tests green (930 in total).
 | `QuestSharing/Ping.lua` | the ping key: Attack ping on the nearest quest creature, "look here" on quest objects, anti-spam |
 | `QuestSharing/Menu.lua` | the right-click menu of the Party quests window |
 | `QuestSharing/Questie.lua` | reads Questie's quest database (when installed): where a quest starts, which quests come first, where objectives are done and quests turned in |
-| `QuestSharing/QuestMap.lua` | the light quest map: icons for your quests on the world map and minimap (QuestieDB, while Questie is off) |
+| `QuestSharing/Fishing.lua` | optional world-map water markers, saved water editor and AnglerAtlas zone summaries |
+| `QuestSharing/Rewards.lua` | optional QuestieDB equipment rewards, filters, item comparisons and quest routes |
+| `QuestSharing/OptionalUI.lua` | shared controls for the optional tools |
+| `QuestSharing/Adventure.lua` | role-play quest invitation preview and chat preparation in a chosen channel |
+| `QuestSharing/Loot.lua` | searchable instance loot, encounter sources, AtlasLoot adapter and partial QuestieDB fallback |
 | `QuestSharing/Marker.lua` | positions on the world map, a pin where a teammate found the items |
 | `QuestSharing/Team.lua` | "picked up a quest someone has - let's do it together?" (once per quest, not for shared ones) |
 | `QuestSharing/Style.lua` | one look for every window (dialog and on-screen frames, buttons, check boxes, chat colours) and the good-news sound |

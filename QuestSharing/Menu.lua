@@ -146,6 +146,8 @@ function ns.questMenuItems(e)
     add("Offer it to the party", function() ns.offerQuest(e) end,
         (not inParty and "you are not in a party") or (raid and "not in a raid") or (not C.pushable(e) and "the game does not let this quest be shared")
         or (#missing == 0 and "everybody has it") or nil)
+    add("Seek fellow adventurers", function() ns.adventure.open(e) end,
+        C.doneByMe(e) and "you have finished this quest" or nil)
     local qOk = ns.questie and ns.questie.available()
     add("Tell them where to get it", function() ns.tellWhere(e) end,
         (not qOk and ns.questie.whyMissing()) or (not inParty and "you are not in a party") or (#missing == 0 and "everybody has it")

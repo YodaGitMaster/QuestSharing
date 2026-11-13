@@ -208,10 +208,6 @@ function Q.report()
     local how = { QuestieDB = "QuestieDB (Questie 12 and newer)", LibQuestieDB = "LibQuestieDB", Questie = "Questie's own database (older Questie)" }
     out[#out + 1] = "reading: " .. how[src] .. ((Questie and Questie.API and Questie.API.isReady == false) and " - Questie is not fully ready yet" or "")
     out[#out + 1] = Q.languageNote() or ("names: " .. (Q.languages()) .. ", the game's language")
-    if ns.questMap then
-        local on, why = ns.questMap.state()
-        out[#out + 1] = "quest map (world map and minimap): " .. (on and ("on, " .. #ns.questMap.points() .. " places for your quests") or why)
-    end
     local tried, found = 0, 0
     for _, e in ipairs(C.entries()) do
         if tried >= 3 then break end
@@ -250,8 +246,8 @@ local function firstSpawn(kind, id)
     if not bestList then return nil end
     local p = bestList[1]
     local zone = zoneName(bestArea)
-    if p[1] == -1 and p[2] == -1 then return { zone = zone, dungeon = true } end
-    return { zone = zone, x = p[1], y = p[2] }
+    if p[1] == -1 and p[2] == -1 then return { zone = zone, area = bestArea, dungeon = true } end
+    return { zone = zone, area = bestArea, x = p[1], y = p[2] }
 end
 
 -- Where a quest starts: { who = "Marshal Dughan", kind = "npc"|"object"|"item", zone, x, y, dungeon } or nil
@@ -275,7 +271,7 @@ function Q.starter(questID)
         local from = type(drops) == "table" and drops[1]
         if from then
             local sp = firstSpawn("npc", from) or {}
-            s.from, s.zone, s.x, s.y, s.dungeon = field("npc", from, "name"), sp.zone, sp.x, sp.y, sp.dungeon
+            s.from, s.zone, s.area, s.x, s.y, s.dungeon = field("npc", from, "name"), sp.zone, sp.area, sp.x, sp.y, sp.dungeon
         end
         return s
     end
@@ -364,7 +360,7 @@ function Q.creatureNames(questID)
 end
 
 -- Where things are: QuestieDB's zones (area IDs) on the game's maps (UI map IDs) ---------------------------------------
-Q.get = field                                                   -- one field of one record, for QuestMap.lua
+Q.get = field                                                   -- one field of one record, shared by data-driven tools
 
 local areaToMap
 local function decodeTable(s)

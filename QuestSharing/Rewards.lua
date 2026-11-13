@@ -1,0 +1,373 @@
+-- A local, on-demand catalogue of quest reward equipment. QuestieDB owns reward links and quest restrictions;
+-- the game supplies equipment slots, stats and comparison tooltips. No database scan happens at login.
+local ADDON, ns = ...
+local R, U, S = {}, ns.optionalUI, ns.style
+ns.rewards = R
+local index, results, quests, window = {}, {}, {}, nil
+local loading, ready, generation, pending = false, false, 0, false
+local page, PAGE, scanDone, scanTotal = 1, 8, 0, 0
+local filters
+local catalogueError = "Needs a recent QuestieDB with an enumerable item catalogue."
+local function get(kind, id, key) return ns.questie.get(kind, id, key) end
+local function num(v) return tonumber(v) or 0 end
+local function enums() return type(LibQuestieDB) == "table" and LibQuestieDB.Enum or {} end
+local function classKeys() return enums().classKeys or {} end
+local function playerClass() local _, c = U.call(UnitClass, "player"); return c end
+local function playerFaction() return U.call(UnitFactionGroup, "player") end
+
+-- Arithmetic rather than bit.band: Forever race masks include bits above the 32-bit range.
+local function overlaps(a, b)
+    a, b = num(a), num(b)
+    while a > 0 and b > 0 do
+        if a % 2 == 1 and b % 2 == 1 then return true end
+        a, b = math.floor(a / 2), math.floor(b / 2)
+    end
+    return false
+end
+R.overlaps = overlaps
+
+local function raceMask()
+    local fn = UnitRace
+    if not fn then return nil end
+    local _, _, id = U.call(fn, "player")
+    local map = enums().raceMaskById
+    return map and map[id]
+end
+
+-- Classic equipment families. Unknown classes are left visible with a warning, rather than guessed.
+-- Item-specific class restrictions remain in the game's tooltip; QuestieDB has no item allowed-class field.
+local WEAPONS = {
+    WARRIOR = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 15, 16, 18, 20 },
+    PALADIN = { 0, 1, 4, 5, 6, 7, 8, 20 }, HUNTER = { 0, 1, 2, 3, 6, 7, 8, 10, 13, 15, 18, 20 },
+    ROGUE = { 2, 3, 4, 7, 13, 15, 16, 18, 20 }, PRIEST = { 4, 10, 15, 19, 20 },
+    SHAMAN = { 0, 1, 4, 5, 10, 13, 15, 20 }, MAGE = { 7, 10, 15, 19, 20 },
+    WARLOCK = { 7, 10, 15, 19, 20 }, DRUID = { 4, 5, 10, 15, 20 },
+}
+local ARMOR = { WARRIOR = 4, PALADIN = 4, HUNTER = 3, ROGUE = 2, PRIEST = 1, SHAMAN = 3, MAGE = 1, WARLOCK = 1, DRUID = 2 }
+local SHIELDS = { WARRIOR = true, PALADIN = true, SHAMAN = true }
+local function canEquip(item, class, level)
+    if item.kind == 2 then
+        local list = WEAPONS[class]
+        if not list then return true end
+        for _, sub in ipairs(list) do if sub == item.sub then return true end end
+        return false
+    end
+    if item.kind ~= 4 then return false end
+    if item.sub == 6 then return SHIELDS[class] == true end
+    if item.sub >= 7 and item.sub <= 10 then
+        return ({ [7] = "PALADIN", [8] = "DRUID", [9] = "SHAMAN", [10] = "DEATHKNIGHT" })[item.sub] == class
+    end
+    if item.sub == 0 then return true end -- rings, cloaks, necks, trinkets and held-in-offhand
+    local max = ARMOR[class]
+    if not max then return true end
+    if level < 40 and (class == "HUNTER" or class == "SHAMAN") then max = 2 end
+    if level < 40 and (class == "WARRIOR" or class == "PALADIN") then max = 3 end
+    return item.sub >= 1 and item.sub <= max
+end
+
+local SLOTS = { "All slots", "Head", "Neck", "Shoulder", "Back", "Chest", "Wrist", "Hands", "Waist", "Legs", "Feet", "Finger", "Trinket", "Weapon", "Offhand", "Ranged" }
+local SLOT = { INVTYPE_HEAD = "Head", INVTYPE_NECK = "Neck", INVTYPE_SHOULDER = "Shoulder", INVTYPE_CLOAK = "Back",
+    INVTYPE_CHEST = "Chest", INVTYPE_ROBE = "Chest", INVTYPE_WRIST = "Wrist", INVTYPE_HAND = "Hands", INVTYPE_WAIST = "Waist",
+    INVTYPE_LEGS = "Legs", INVTYPE_FEET = "Feet", INVTYPE_FINGER = "Finger", INVTYPE_TRINKET = "Trinket",
+    INVTYPE_WEAPON = "Weapon", INVTYPE_2HWEAPON = "Weapon", INVTYPE_WEAPONMAINHAND = "Weapon",
+    INVTYPE_WEAPONOFFHAND = "Offhand", INVTYPE_SHIELD = "Offhand", INVTYPE_HOLDABLE = "Offhand",
+    INVTYPE_RANGED = "Ranged", INVTYPE_RANGEDRIGHT = "Ranged", INVTYPE_THROWN = "Ranged", INVTYPE_RELIC = "Ranged" }
+
+local function info(id)
+    local fn = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+    if not fn then return nil end
+    local ok, name, link, quality, level, required, _, _, _, loc, texture = pcall(fn, id)
+    if not ok or not name then return nil end
+    return { name = name, link = link, quality = quality, level = level, required = required, slot = SLOT[loc], texture = texture }
+end
+R.itemInfo = info -- shared native item metadata reader for the instance loot browser
+
+local function quest(id)
+    if quests[id] then return quests[id] end
+    local q = { id = id, name = get("quest", id, "name"), required = num(get("quest", id, "requiredLevel")),
+        level = num(get("quest", id, "questLevel")), max = num(get("quest", id, "requiredMaxLevel")),
+        classes = num(get("quest", id, "requiredClasses")), races = num(get("quest", id, "requiredRaces")) }
+    quests[id] = q
+    return q
+end
+
+local function completed(id)
+    return U.call((C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted) or IsQuestFlaggedCompleted, id)
+end
+
+local function eligible(q, f)
+    if not q.name or q.name == "" or q.required > f.level or (q.max > 0 and q.max < f.level) then return false end
+    if f.near and q.level > 0 and (q.level < f.level - 10 or q.level > f.level + 3) then return false end
+    local class = classKeys()[f.class]
+    if q.classes ~= 0 and (not class or not overlaps(q.classes, class)) then return false end
+    if q.races ~= 0 then
+        local factionMask = enums().factionRaceMasks and enums().factionRaceMasks[f.faction]
+        if not factionMask or not overlaps(q.races, factionMask) then return false end
+        local mine = raceMask()
+        if f.faction == playerFaction() and mine and not overlaps(q.races, mine) then return false end
+    end
+    if not f.completed and completed(q.id) == true then return false end
+    return true
+end
+
+local function defaults()
+    return { class = playerClass(), level = math.max(1, num(U.call(UnitLevel, "player"))), faction = playerFaction(),
+        slot = "All slots", near = true, completed = false, text = "" }
+end
+
+local function detail(r)
+    local q = ns.questie
+    local starter = q.starter(r.questID)
+    local before, any = q.before(r.questID)
+    local lines = { r.name .. " — item level " .. r.itemLevel,
+        r.questName .. " (quest " .. r.questLevel .. ", requires level " .. r.requiredLevel .. ")",
+        q.whereText(r.questID) or "Quest starting location unknown." }
+    if #before > 0 then lines[#lines + 1] = "Prerequisites (" .. (any and "any" or "all") .. "): " .. table.concat(before, ", ") end
+    for _, key in ipairs({ "requiredSkill", "requiredMinRep", "requiredMaxRep", "requiredSpell" }) do
+        local v = get("quest", r.questID, key)
+        if (type(v) == "table" and next(v)) or (type(v) == "number" and v ~= 0) then
+            lines[#lines + 1] = "Additional " .. key .. " requirement; check the quest before travelling."
+        end
+    end
+    lines[#lines + 1] = "Quest chains and other requirements may still block acceptance."
+    lines[#lines + 1] = "Reward choices are alternatives; not every listed item is guaranteed together."
+    return lines, starter
+end
+R.detail = detail
+
+function R.search(f)
+    filters = f or filters or defaults()
+    results = {}
+    local f = filters
+    local needle = string.lower(f.text or "")
+    local level = num(f.level)
+    if level < 1 or level > 1000 or level % 1 ~= 0 or not f.class or not f.faction then return results end
+    for _, item in ipairs(index) do
+        if item.required <= level and canEquip(item, f.class, level) then
+            local itemInfo -- request game info only for eligible rewards, not every item in the database
+            for _, qid in ipairs(item.quests) do
+                local q = quest(qid)
+                if eligible(q, f) then
+                    itemInfo = itemInfo or info(item.id)
+                    local name = itemInfo and itemInfo.name or item.name or ("Item " .. item.id)
+                    local slot = itemInfo and itemInfo.slot
+                    local starter = ns.questie.starter(qid)
+                    local text = string.lower(name .. " " .. q.name .. " " .. (starter and starter.zone or ""))
+                    if (not itemInfo or (slot and num(itemInfo.required) <= level))
+                        and (f.slot == "All slots" or f.slot == slot) and (needle == "" or string.find(text, needle, 1, true)) then
+                        results[#results + 1] = { itemID = item.id, name = name, link = itemInfo and itemInfo.link,
+                            itemLevel = itemInfo and num(itemInfo.level) > 0 and itemInfo.level or item.level,
+                            slot = slot or "Details loading", questID = qid, questName = q.name, questLevel = q.level,
+                            requiredLevel = q.required, zone = starter and starter.zone or "Unknown start", cached = itemInfo ~= nil }
+                    end
+                end
+            end
+        end
+    end
+    table.sort(results, function(a, b)
+        if a.itemLevel ~= b.itemLevel then return a.itemLevel > b.itemLevel end
+        if a.name ~= b.name then return a.name < b.name end
+        if a.questID ~= b.questID then return a.questID < b.questID end
+        return a.itemID < b.itemID
+    end)
+    return results
+end
+
+local function paint()
+    if not window then return end
+    page = math.max(1, math.min(page, math.max(1, math.ceil(#results / PAGE))))
+    window.status:SetText(loading and ("Reading QuestieDB items: " .. scanDone .. "/" .. scanTotal)
+        or (not ready and catalogueError)
+        or (#results .. " reward options — page " .. page .. "/" .. math.max(1, math.ceil(#results / PAGE))
+            .. ". Sorted by item level; compare stats for your build."))
+    for i, row in ipairs(window.rows) do
+        local r = results[(page - 1) * PAGE + i]
+        row.result = r
+        if r then
+            row.item:SetText(S.GOLD .. r.name .. "|r  (iLvl " .. r.itemLevel .. ", " .. r.slot .. ")")
+            row.quest:SetText(r.questName .. " — " .. r.zone .. " — quest " .. r.questLevel .. ", minimum " .. r.requiredLevel)
+            row.frame:Show()
+        else row.frame:Hide() end
+    end
+end
+
+function R.refresh()
+    if not (window and window.frame:IsShown() and ns.db.enabled and ns.db.rewardBrowser) then return end
+    R.search(); paint()
+end
+
+local function schedule()
+    if pending or not (window and window.frame:IsShown()) then return end
+    pending = true
+    ns.after(0.2, function() pending = false; R.refresh() end)
+end
+
+function R.scan()
+    generation = generation + 1
+    local token = generation
+    index, quests, results = {}, {}, {}
+    loading, ready, scanDone = false, false, 0
+    local db = type(ItemDB) == "table" and type(ItemDB.GetAllIds) == "function" and ItemDB
+        or (type(LibQuestieDB) == "table" and LibQuestieDB.Item)
+    local ids = db and U.call(db.GetAllIds)
+    catalogueError = "Needs a recent QuestieDB with an enumerable item catalogue."
+    if type(ids) ~= "table" then paint(); return false end
+    local e = enums()
+    if type(e.classKeys) ~= "table" or type(e.factionRaceMasks) ~= "table" or type(e.raceMaskById) ~= "table" then
+        catalogueError = "Update QuestieDB: class, faction or race mappings are unavailable."
+        paint(); return false
+    end
+    loading, scanTotal = true, #ids
+    local cursor = 1
+    local function batch()
+        if token ~= generation then return end
+        if not ns.db.enabled or not ns.db.rewardBrowser then loading = false; return end
+        for _ = 1, 100 do
+            local id = ids[cursor]
+            if not id then
+                loading, ready = false, true
+                R.refresh(); paint()
+                return
+            end
+            cursor = cursor + 1
+            local kind = num(get("item", id, "class"))
+            if kind == 2 or kind == 4 then
+                local list = get("item", id, "questRewards")
+                if type(list) == "table" and #list > 0 then
+                    index[#index + 1] = { id = id, kind = kind, sub = num(get("item", id, "subClass")),
+                        quests = list, name = get("item", id, "name"), level = num(get("item", id, "itemLevel")),
+                        required = num(get("item", id, "requiredLevel")) }
+                end
+            end
+            scanDone = scanDone + 1
+        end
+        paint(); ns.after(0.01, batch)
+    end
+    batch()
+    return true
+end
+
+local function cycle(parent, label, x, y, width, choices, key)
+    local b = S.button(parent, "", width, function()
+        local at = 0
+        for i, value in ipairs(choices) do if filters[key] == value then at = i end end
+        filters[key] = choices[at % #choices + 1]
+        page = 1; R.updateControls(); R.refresh()
+    end)
+    b:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
+    b.filterKey, b.caption = key, label
+    return b
+end
+
+function R.updateControls()
+    if not window then return end
+    for _, b in ipairs(window.controls) do b:SetLabel(b.caption .. ": " .. tostring(filters[b.filterKey] or "unknown")) end
+    window.near:SetLabel("Near my level: " .. (filters.near and "yes" or "all levels"))
+    window.completed:SetLabel("Completed quests: " .. (filters.completed and "show" or "hide"))
+end
+
+local function build()
+    if window then return true end
+    local f = U.window("QuestSharingRewards", 860, 640, "Quest reward equipment")
+    if not f then return false end
+    window = { frame = f, rows = {}, controls = {} }
+    U.text(f, "Find equipment from quests you can pursue. Hover an item to compare; click a result for the quest route.", 24, 32, 810)
+    local classes = {}
+    for k, v in pairs(classKeys()) do if type(v) == "number" and v > 0 and not string.find(k, "ALL", 1, true) and k ~= "NONE" then classes[#classes + 1] = k end end
+    if #classes == 0 then for k in pairs(WEAPONS) do classes[#classes + 1] = k end end
+    table.sort(classes)
+    window.controls[1] = cycle(f, "Class", 24, 62, 180, classes, "class")
+    window.controls[2] = cycle(f, "Faction", 214, 62, 180, { "Alliance", "Horde" }, "faction")
+    window.controls[3] = cycle(f, "Slot", 404, 62, 180, SLOTS, "slot")
+    window.level = U.box(f, "Character level", 600, 50, 98, filters.level, 4)
+    window.level:SetScript("OnEnterPressed", function(self)
+        local n = tonumber(self:GetText())
+        if n and n >= 1 and n <= 1000 and n % 1 == 0 then filters.level = n; page = 1; R.refresh() end
+        self:SetText(tostring(filters.level)); self:ClearFocus()
+    end)
+    local mine = S.button(f, "My character", 120, function()
+        filters = defaults(); window.level:SetText(tostring(filters.level)); window.search:SetText("")
+        page = 1; R.updateControls(); R.refresh()
+    end)
+    mine:SetPoint("TOPLEFT", f, "TOPLEFT", 710, -65)
+    window.near = S.button(f, "", 180, function() filters.near = not filters.near; page = 1; R.updateControls(); R.refresh() end)
+    window.near:SetPoint("TOPLEFT", f, "TOPLEFT", 24, -103)
+    window.completed = S.button(f, "", 180, function() filters.completed = not filters.completed; page = 1; R.updateControls(); R.refresh() end)
+    window.completed:SetPoint("LEFT", window.near, "RIGHT", 10, 0)
+    window.search = U.box(f, "Search item, quest or zone (Enter)", 404, 88, 294, "", 100)
+    window.search:SetScript("OnEnterPressed", function(self) filters.text = self:GetText(); page = 1; R.refresh(); self:ClearFocus() end)
+    local reload = S.button(f, "Refresh data", 120, function() R.scan() end)
+    reload:SetPoint("TOPLEFT", f, "TOPLEFT", 710, -105)
+    window.status = U.text(f, "", 24, 147, 806)
+    for i = 1, PAGE do
+        local row = {}
+        local b = CreateFrame("Button", nil, f)
+        b:SetWidth(806); b:SetHeight(44); b:SetPoint("TOPLEFT", f, "TOPLEFT", 24, -(178 + (i - 1) * 47))
+        row.frame, row.item, row.quest = b, U.text(b, "", 4, 2, 798), U.text(b, "", 4, 22, 798)
+        if row.item.SetWordWrap then row.item:SetWordWrap(false); row.quest:SetWordWrap(false) end
+        b:RegisterForClicks("LeftButtonUp")
+        b:SetScript("OnEnter", function(self)
+            local r = row.result
+            if not r then return end
+            if GameTooltip and GameTooltip.SetHyperlink then
+                pcall(function()
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:SetHyperlink("item:" .. r.itemID)
+                    GameTooltip:AddLine("Quest: " .. r.questName, 1, 0.82, 0)
+                    GameTooltip:AddLine("Click for location and prerequisites.", 1, 1, 1)
+                    GameTooltip:Show()
+                    if GameTooltip_ShowCompareItem then GameTooltip_ShowCompareItem(GameTooltip) end
+                end)
+            else U.tip(self, r.name, (detail(r))) end
+        end)
+        b:SetScript("OnLeave", U.hideTip)
+        b:SetScript("OnClick", function()
+            local r = row.result
+            if not r then return end
+            local lines, starter = detail(r)
+            if not window.routeFrame then for _, line in ipairs(lines) do ns.print(line) end; return end
+            window.setRoute(table.concat(lines, "\n"))
+            window.routeMap = starter and starter.area and ns.questie.uiMapOf(starter.area)
+            window.routeFrame:Show()
+        end)
+        window.rows[i] = row
+    end
+    local prev = S.button(f, "Previous", 100, function() page = math.max(1, page - 1); paint() end)
+    prev:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 24, 60)
+    local nextPage = S.button(f, "Next", 100, function() page = page + 1; paint() end)
+    nextPage:SetPoint("LEFT", prev, "RIGHT", 10, 0)
+    local drops = S.button(f, "Instance drops", 150, function() ns.loot.open() end)
+    drops:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -24, 60)
+    U.text(f, "Class equipment families use Classic rules. Check tooltips for item restrictions and your build's stats.\n"
+        .. "Quest availability also depends on chains, reputation and skills. Item level alone does not mean an upgrade.", 24, 596, 806)
+    window.routeFrame = U.window("QuestSharingRewardRoute", 640, 390, "Quest reward route")
+    if window.routeFrame then
+        window.route, window.setRoute = U.scrollText(window.routeFrame, 24, 40, 590, 285)
+        local map = S.button(window.routeFrame, "Find starting zone on map", 200, function()
+            if not U.mapHint(window.routeMap) then ns.print("this quest has no known map for its starting zone") end
+        end)
+        map:SetPoint("BOTTOMLEFT", window.routeFrame, "BOTTOMLEFT", 24, 24)
+    end
+    f:SetScript("OnShow", function() schedule() end)
+    return true
+end
+
+function R.open()
+    if not ns.db.enabled then ns.print("switch Quest Sharing on first (/qs on)"); return end
+    if not ns.db.rewardBrowser then ns.setSetting("rewardBrowser", true) end
+    filters = filters or defaults()
+    if not build() then return end
+    R.updateControls(); window.frame:Show()
+    if not ready and not loading then R.scan() else R.refresh() end
+end
+
+function R.settingChanged()
+    if not ns.db.enabled or not ns.db.rewardBrowser then
+        generation = generation + 1; loading = false
+        if window then window.frame:Hide(); if window.routeFrame then window.routeFrame:Hide() end end
+    end
+end
+
+function R._window() return window end
+function R._results() return results end
+function R._state() return ready, loading, #index end
+for _, ev in ipairs({ "GET_ITEM_INFO_RECEIVED", "QUEST_TURNED_IN", "QUEST_LOG_UPDATE", "PLAYER_LEVEL_UP" }) do ns.on(ev, schedule) end

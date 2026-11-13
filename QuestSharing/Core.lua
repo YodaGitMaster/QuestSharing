@@ -31,9 +31,10 @@ ns.defaults = {
     nearCount = 5,      -- how many quests the tracker keeps while "near" is on
     nearPause = 10,     -- seconds the tracker and the pin leave your choice alone after you change the tracker yourself
     nearMode = "auto",  -- "auto" (distance if the client can measure it, else zone), "distance" or "zone"
-    questMap = true,
+    fishingMap = false, -- optional fishing notes on the world map
+    rewardBrowser = false, -- optional quest reward catalogue
     bagMarks = true,    -- quest items marked in the bags: gold = a quest of this zone, blue = a quest elsewhere
-    hideTracker = false, -- hide the game's quest tracker (outside fights)    -- the light quest map (world map + minimap), from QuestieDB, while the Questie addon is off
+    hideTracker = false, -- hide the game's quest tracker (outside fights)
     debug = false,      -- the debug log: every action and its outcome (QuestSharingLog, saved on /reload or logout)
     shareByClick = false, -- share only on my clicks (set by itself when the game refuses an automatic share)
     pickup = false,     -- (off) say in party chat when I pick up a quest someone in the party has ("let's do it together?")
@@ -264,6 +265,7 @@ ns.on("ADDON_LOADED", function(_, name)
         QuestSharingDB.chat, QuestSharingDB.announce, QuestSharingDB.pickup = false, false, false
     end
     QuestSharingDB.dbVersion = ns.defaults.dbVersion
+    QuestSharingDB.questMap = nil -- retired quest overlays; do not retain the old enabled setting
     ns.db = QuestSharingDB
     if ns.refreshSettings then ns.refreshSettings() end
 end)
@@ -355,7 +357,10 @@ function ns.setSetting(key, value)
     else
         d[key] = value
         if key == "debug" and value and ns.logSession then ns.logSession("debug log on") end
-        if (key == "questMap" or key == "enabled") and ns.questMap then ns.questMap.refresh() end
+        if (key == "fishingMap" or key == "enabled") and ns.fishing then ns.fishing.refresh() end
+        if (key == "rewardBrowser" or key == "enabled") and ns.rewards then ns.rewards.settingChanged() end
+        if key == "enabled" and not value and ns.adventure then ns.adventure.close() end
+        if key == "enabled" and not value and ns.loot then ns.loot.close() end
         if (key == "bagMarks" or key == "enabled") and ns.refreshBagMarks then ns.refreshBagMarks() end
         if (key == "hideTracker" or key == "enabled") and ns.applyTrackerHidden then ns.applyTrackerHidden() end
         if key == "quickSend" and value then               -- you ask for it again: refused channels get another try
@@ -407,6 +412,10 @@ local function status()
 end
 
 local help = {
+    "/qs loot [search]    search instance drops and the boss or creature that drops each item",
+    "/qs adventure [quest ID or title]  prepare a role-play invitation in any chat channel",
+    "/qs fishing [on|off]  fishing waters on the big map; no argument opens the water editor",
+    "/qs rewards [on|off]  browse quest reward equipment for your class, level and faction",
     "/qs settings         open the settings window (click a line to switch it on or off)",
     "/qs share            share your quests in this area with the party now",
     "/qs stop             cancel a share that is in progress",
@@ -424,7 +433,6 @@ local help = {
     "/qs pickup on|off    say when I pick up a quest someone in the party has (let's do it together?)",
     "/qs coords on|off    add where I found the quest items to my messages, when someone still needs them",
     "/qs shareclick on|off share only when I click Share (on by itself where the game refuses automatic sharing)",
-    "/qs questmap on|off  the light quest map: where to do your quests, on the world map and minimap (needs QuestieDB, Questie off)",
     "/qs bagmarks on|off  mark quest items in your bags: gold for quests here, blue for quests elsewhere (the bank can keep them)",
     "/qs hidetracker on|off hide the game's quest tracker (outside fights)",
     "/qs debug on|off     the debug log: every action and its outcome, saved to the addon's file on /reload or logout",
@@ -451,7 +459,7 @@ local help = {
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", shareclick = "shareByClick", debug = "debug", questmap = "questMap", bagmarks = "bagMarks", hidetracker = "hideTracker", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", shareclick = "shareByClick", debug = "debug", bagmarks = "bagMarks", hidetracker = "hideTracker", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"
@@ -461,6 +469,13 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     cmd = string.lower(cmd or "")
     local d = ns.db
     if cmd == "share" then ns.shareClick()
+    elseif cmd == "loot" then ns.loot.open(arg)
+    elseif cmd == "questmap" then ns.print("quest symbols on the world map and minimap have been removed")
+    elseif cmd == "adventure" then ns.adventure.command(arg)
+    elseif cmd == "fishing" or cmd == "rewards" then
+        local key = cmd == "fishing" and "fishingMap" or "rewardBrowser"
+        if arg == "on" or arg == "off" then ns.setSetting(key, arg == "on")
+        elseif cmd == "fishing" then ns.fishing.open() else ns.rewards.open() end
     elseif cmd == "stop" then ns.stopShare("stopped by you")
     elseif cmd == "on" or cmd == "off" then ns.setSetting("enabled", cmd == "on"); status()
     elseif cmd == "ping" and (arg == "" or arg == "test" or arg == "status") then
