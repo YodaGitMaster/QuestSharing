@@ -29,10 +29,10 @@ def selected(rows):
 
 
 def many_quests(style):
-    return quest_game(style,'''REWARD_ITEMS[800].questRewards={}
-        for id=9000,9017 do
+    return quest_game(style,'''for id=9000,9017 do
             QUESTIE_QUESTS[id]={name="Route "..id,requiredLevel=15,questLevel=20,startedBy={{197}}}
-            table.insert(REWARD_ITEMS[800].questRewards,id)
+            REWARD_ITEMS[id]={name="Staff "..id,class=2,subClass=10,itemLevel=25,requiredLevel=18,
+                questRewards={id},loc="INVTYPE_2HWEAPON"}
         end''')
 
 
@@ -58,7 +58,7 @@ def test_quest_class_and_faction_are_direct_searchable_choices(style):
 
 def test_live_search_debounces_both_tabs_without_enter(style):
     g=loot_game(style);g.slash("loot");w=g.eval("NS.loot._window()")
-    type_text(w.search,"Cookie");g.advance(0.1);assert len(results(g))==5
+    type_text(w.search,"Cookie");g.advance(0.1);assert len(results(g))==4
     type_text(w.search,"Serpent");g.advance(0.19)
     assert {r[0] for r in results(g)}=={10002}
     q=quest_game(style);q.slash("rewards");qw=q.eval("NS.rewards._window()")
@@ -84,7 +84,7 @@ def test_reset_recovers_from_combined_search_dungeon_source_and_type_filters(sty
     type_text(w.search,"impossible");g.advance(0.19)
     assert results(g)==[] and "Clear filters" in w.detailsText.text
     click(controls(g)[1].reset)
-    assert len(results(g))==5 and w.search.GetText(w.search)=="" and w.boss.text=="Source: All encounters"
+    assert len(results(g))==4 and w.search.GetText(w.search)=="" and w.boss.text=="Source: All encounters"
     assert selected(w.rows) is not None and "Source:" in w.detailsText.text
 
 

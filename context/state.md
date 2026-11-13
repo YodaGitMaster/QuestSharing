@@ -2,10 +2,13 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Zone questing ranges corrected to opt-in/off by default and published as v0.4.12; remote tag and downloaded install ZIP verified.
+- Equipment explorer name grouping implemented and verified; packaging/publishing v0.4.13.
 - Standing preference: Extra tools additions stay optional and default off unless explicitly requested otherwise.
 
 ## Last completed
+- Built `dist/QuestSharing-0.4.13.zip`: 32 source-identical runtime files, 162,652 bytes; SHA256 `f22e068e8c9403c2b566f9f13811267ea7636820f9b782e1ebbd0262c1e187e3`. Publication pending.
+- All 34 suites / 1,275 checks pass, including 28 grouping workflows; diff whitespace clean. Native game rendering remains unverified.
+- 2026-11-13: reproduced the same blade as three rows and one reward as two quest rows on both API paths; added 28 grouping checks, all now pass. Existing source tests inspect grouped sources; paging fixtures now use genuinely distinct equipment.
 - 2026-11-13: user-requested push verified on main; origin already contained all feature/release changes, with no pending runtime edits.
 - Published v0.4.12 at `c86b34294ced23ddf904ac73f50e0fce01baae73`; downloaded 32-file ZIP byte-matches source-verified build.
 - Changed zoneLevels default to false and added once-only opt-in migration; later choices persist and Reset returns to off. Renderer unchanged.

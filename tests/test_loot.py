@@ -58,6 +58,11 @@ def results(g):
     return [(r.itemID,r.instanceName,r.who,r.difficulty) for r in g.eval("NS.loot._results()").values()]
 
 
+def source_results(g):
+    return [(s.itemID,s.instanceName,s.who,s.difficulty)
+            for r in g.eval("NS.loot._results()").values() for s in r.sources.values()]
+
+
 def key(g, name):
     return next(p.key for p in g.eval("NS.loot.instances()").values() if p.name==name)
 
@@ -78,17 +83,17 @@ def test_no_loot_scan_or_item_requests_happen_at_login(style):
 
 def test_browser_lists_instances_and_real_item_sources(style):
     g=game(style); g.slash("loot")
-    rows=results(g)
+    rows=source_results(g)
     assert (10001,"The Deadmines","Edwin VanCleef","Normal") in rows
     assert (10002,"Wailing Caverns","Lord Cobrahn","Normal") in rows
-    assert len(rows)==5,rows
+    assert len(rows)==5 and len(results(g))==4,rows
     assert [p.name for p in g.eval("NS.loot.instances()").values()]==["The Deadmines","Wailing Caverns"]
     assert g.eval("NS.loot._state()")[2]=="AtlasLoot"
 
 
 def test_difficulty_aliases_use_public_reader_and_remain_distinct(style):
     g=game(style); g.slash("loot")
-    modes={r[3] for r in results(g) if r[0]==10001}
+    modes={r[3] for r in source_results(g) if r[0]==10001}
     assert modes=={"Normal","Heroic"} and g.eval("PUBLIC_READS")>0
     assert g.eval("AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids.Deadmines.items[1][2]")==1
 
@@ -143,15 +148,16 @@ def test_native_tooltip_and_equipped_comparison_are_used(style):
 def test_same_item_can_have_multiple_boss_sources_without_duplicates(style):
     g=game(style,'''table.insert(AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids.Deadmines.items[2][1],{2,10001})''')
     g.slash("loot")
-    entries=[r for r in results(g) if r[0]==10001]
+    entries=[r for r in source_results(g) if r[0]==10001]
     assert len(entries)==3 and {r[2] for r in entries}=={"Edwin VanCleef","Cookie"}
+    assert len([r for r in results(g) if r[0]==10001])==1
 
 
 def test_linked_encounter_tables_are_resolved_under_their_original_source_name(style):
     g=game(style,'''table.insert(AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids.Caverns.items,
         {name="Shared chest",link={"AtlasLootClassic_DungeonsAndRaids","Deadmines",4}})''')
     g.slash("loot")
-    assert (10005,"Wailing Caverns","Shared chest","Normal") in results(g)
+    assert (10005,"Wailing Caverns","Shared chest","Normal") in source_results(g)
 
 
 def test_partial_questie_sources_exclude_outdoor_npcs_and_include_dungeon_chests(style):
@@ -203,7 +209,7 @@ def test_load_on_demand_module_is_loaded_only_on_open(style):
             end
         end''')
     assert g.eval("LOADS")==0
-    g.slash("loot"); assert len(results(g))==5 and g.eval("LOADS")>0
+    g.slash("loot"); assert len(results(g))==4 and g.eval("LOADS")>0
 
 
 def test_in_combat_module_loading_waits_until_combat_ends(style):
@@ -215,7 +221,7 @@ def test_in_combat_module_loading_waits_until_combat_ends(style):
         end''')
     g.slash("loot"); assert g.eval("LOADS")==0 and results(g)==[]
     g.run("COMBAT=false"); g.fire("PLAYER_REGEN_ENABLED")
-    assert len(results(g))==5
+    assert len(results(g))==4
 
 
 def test_name_cache_updates_refresh_a_live_search(style):
@@ -251,7 +257,10 @@ def test_large_catalogue_is_batched_and_closing_cancels_scan(style):
 
 def test_pagination_handles_many_instances_and_drops(style):
     g=game(style,'''local m=AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids
-        for i,id in ipairs({389,43,36,33,48,34,90,47,189,129,70,209,349,109,230,229,429,289,329}) do m["Extra"..i]={name="Dungeon "..i,InstanceID=id,items={{name="Boss",[1]={{1,10001}}}}} end''')
+        for i,id in ipairs({389,43,36,33,48,34,90,47,189,129,70,209,349,109,230,229,429,289,329}) do
+            LOOT_ITEMS[13000+i]={name="Blade "..i,level=25,required=18,kind=2,sub=7}
+            m["Extra"..i]={name="Dungeon "..i,InstanceID=id,items={{name="Boss",[1]={{1,13000+i}}}}}
+        end''')
     g.slash("loot"); g.advance(1); w=g.eval("NS.loot._window()")
     first=w.instances[1].place.key; click(w.instanceNext)
     assert w.instances[1].place.key!=first
@@ -319,7 +328,7 @@ def test_encounter_choices_skip_material_only_sources_but_keep_trash_gear(style)
     g.run("table.insert(AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids.Deadmines.items[3][1],{2,10005})")
     g.eval("NS.loot.search")("",None,None)
     g.eval("NS.loot.scan")()
-    assert (10005,"The Deadmines","Trash","Normal") in results(g)
+    assert (10005,"The Deadmines","Trash","Normal") in source_results(g)
 
 
 def test_questie_fallback_also_excludes_non_equipment(style):

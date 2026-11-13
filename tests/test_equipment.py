@@ -69,7 +69,7 @@ def test_filter_controls_offer_direct_choices_and_apply_reset(style):
     c.min.SetText(c.min,"22");c.max.SetText(c.max,"25");click(c.apply)
     assert {r[0] for r in loot_results(g)}=={10001,10002}
     click(c.reset)
-    assert len(loot_results(g))==5 and c.min.GetText(c.min)==""
+    assert len(loot_results(g))==4 and c.min.GetText(c.min)==""
 
 
 def test_invalid_ranges_are_rejected_without_changing_active_results(style):

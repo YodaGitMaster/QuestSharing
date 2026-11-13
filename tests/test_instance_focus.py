@@ -59,7 +59,7 @@ def test_outdoors_raid_unknown_and_missing_api_preserve_browsing(style):
     for extra in ('IN_INSTANCE=false','CURRENT_TYPE="raid"','CURRENT_ID=9999;CURRENT_NAME="Unknown"',
                   'GetInstanceInfo=nil;IsInInstance=nil', 'GetInstanceInfo=function()error("bad api")end;ZONE="Unknown"'):
         g=game(style,CURRENT+extra);g.slash("loot")
-        assert len(results(g))==5,extra
+        assert len(results(g))==4,extra
 
 
 def test_no_id_uses_exact_name_for_questie_fallback_and_legacy_client(style):

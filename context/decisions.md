@@ -1,5 +1,11 @@
 # Decisions
 
+## 2026-11-13 — One explorer row per equipment name
+- Group only after existing quality/gear/stat/level/search/source/quest-eligibility filters. Preserve raw indices and every matching source; avoid losing other bosses when collapsing the presentation.
+- Shared EquipmentUI.groupItems normalizes case, color codes and outer whitespace; stable name key preserves selection when sources or item versions arrive. Highest native item level then lowest item ID chooses a deterministic comparison version; all matching item IDs/levels remain visible in details.
+- Loot groups suppliers by dungeon/mob name/provider, combines difficulty labels and lists every supplier inline. Quest groups routes by quest ID, preserving locations/prerequisites/extra requirements. The map action explicitly refers to the first listed quest when multiple routes exist.
+- No new windows/settings/migrations; Rare+ and dungeon scope unchanged. Publish 0.4.13 under ongoing publication authorization.
+
 ## 2026-11-13 — Extra tools must remain optional
 - User clarified "always as optional thing": Extra tools additions default off unless the user explicitly asks otherwise; record this as the standing preference for future features.
 - Correct zoneLevels=true from 0.4.11 to false. Changing defaults alone would leave the previously auto-enabled SavedVariables value active, so add a once-only zoneLevelsOptInMigrated marker that resets the old state to off before defaults fill. Subsequent explicit choices persist; reset returns to off without rerunning migration.

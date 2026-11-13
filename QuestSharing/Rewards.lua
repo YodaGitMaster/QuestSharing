@@ -8,7 +8,7 @@ local loading, ready, generation, pending = false, false, 0, false
 local page, PAGE, scanDone, scanTotal = 1, 7, 0, 0
 local unknownItems = 0
 local filters, selectedKey
-local function resultKey(r) return r.itemID .. ":" .. r.questID end
+local function resultKey(r) return r.key end
 local catalogueError = "Needs a recent QuestieDB with an enumerable item catalogue."
 local function get(kind, id, key) return ns.questie.get(kind, id, key) end
 local function num(v) return tonumber(v) or 0 end
@@ -126,24 +126,52 @@ end
 
 local function detail(r)
     local q = ns.questie
-    local starter = q.starter(r.questID)
-    local before, any = q.before(r.questID)
     local lines = { r.name .. " — item level " .. r.itemLevel,
-        "Equipment: " .. r.slot .. "; requires character level " .. tostring(r.info and r.info.required or "unknown"),
-        r.questName .. " (quest " .. r.questLevel .. ", requires level " .. r.requiredLevel .. ")",
-        q.whereText(r.questID) or "Quest starting location unknown." }
-    if #before > 0 then lines[#lines + 1] = "Prerequisites (" .. (any and "any" or "all") .. "): " .. table.concat(before, ", ") end
-    for _, key in ipairs({ "requiredSkill", "requiredMinRep", "requiredMaxRep", "requiredSpell" }) do
-        local v = get("quest", r.questID, key)
-        if (type(v) == "table" and next(v)) or (type(v) == "number" and v ~= 0) then
-            lines[#lines + 1] = "Additional " .. key .. " requirement; check the quest before travelling."
+        "Equipment: " .. r.slot .. "; requires character level " .. tostring(r.info and r.info.required or "unknown") }
+    for _,line in ipairs(E.versionLines(r,function(v) return v.info end)) do lines[#lines+1]=line end
+    for _,s in ipairs(r.routes) do
+        local before,any=q.before(s.questID)
+        lines[#lines+1]="\n"..s.questName.." (quest "..s.questLevel..", requires level "..s.requiredLevel..")"
+        lines[#lines+1]=q.whereText(s.questID) or "Quest starting location unknown."
+        if #r.itemIDs>1 then lines[#lines+1]="Reward items: "..table.concat(s.itemIDs,", ") end
+        if #before>0 then lines[#lines+1]="Prerequisites ("..(any and "any" or "all").."): "..table.concat(before,", ") end
+        for _,key in ipairs({ "requiredSkill", "requiredMinRep", "requiredMaxRep", "requiredSpell" }) do
+            local v=get("quest",s.questID,key)
+            if (type(v)=="table" and next(v)) or (type(v)=="number" and v~=0) then
+                lines[#lines+1]="Additional "..key.." requirement; check the quest before travelling."
+            end
         end
     end
+    if #r.routes>1 then lines[#lines+1]="\nMap directions refer to the first quest listed above." end
     lines[#lines + 1] = "Quest chains and other requirements may still block acceptance."
     lines[#lines + 1] = "Reward choices are alternatives; not every listed item is guaranteed together."
-    return lines, starter
+    return lines, q.starter(r.routes[1].questID)
 end
 R.detail = detail
+
+local function sourceLess(a,b)
+    if a.questID~=b.questID then return a.questID<b.questID end
+    return a.itemID<b.itemID
+end
+local function routes(r)
+    local list,seen={},{}
+    for _,s in ipairs(r.sources) do
+        local entry=seen[s.questID]
+        if not entry then
+            entry={questID=s.questID,questName=s.questName,questLevel=s.questLevel,requiredLevel=s.requiredLevel,
+                zone=s.zone,itemIDs={},seenIDs={}}
+            list[#list+1]=entry;seen[s.questID]=entry
+        end
+        if not entry.seenIDs[s.itemID] then entry.itemIDs[#entry.itemIDs+1]=s.itemID;entry.seenIDs[s.itemID]=true end
+    end
+    return list
+end
+local function routeSummary(r)
+    local names={}
+    for i=1,math.min(3,#r.routes) do names[#names+1]=r.routes[i].questName end
+    return table.concat(names,", ")..(#r.routes>3 and (" +"..(#r.routes-3).." more") or "")
+        ..(#r.routes>1 and (" · "..#r.routes.." quests") or (" — "..r.zone))
+end
 
 function R.search(f)
     filters = f or filters or defaults()
@@ -180,10 +208,9 @@ function R.search(f)
             end
         end
     end
-    E.sortResults(results,function(r) return r.info end,function(r) return r.name end,function(a,b)
-        if a.questID~=b.questID then return a.questID<b.questID end
-        return a.itemID<b.itemID
-    end)
+    results=E.groupItems(results,function(r) return r.name end,function(r) return r.info end,sourceLess)
+    for _,r in ipairs(results) do r.routes=routes(r) end
+    E.sortResults(results,function(r) return r.info end,function(r) return r.name end,sourceLess)
     return results
 end
 
@@ -200,7 +227,7 @@ local function paint()
         row.result = r
         if r then
             E.paintRow(row, r.info, r.name .. " · iLvl " .. r.itemLevel .. " · req " .. tostring(r.info and r.info.required or "?"),
-                r.questName .. " — " .. r.zone)
+                routeSummary(r))
             row.frame:Show()
         else row.frame:Hide() end
     end
@@ -344,12 +371,14 @@ local function build()
             if GameTooltip and GameTooltip.SetHyperlink then
                 pcall(function()
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:SetHyperlink("item:" .. r.itemID)
-                    GameTooltip:AddLine("Quest: " .. r.questName, 1, 0.82, 0)
+                    for i=1,math.min(6,#r.routes) do GameTooltip:AddLine("Quest: "..r.routes[i].questName,1,0.82,0,true) end
+                    if #r.routes>6 then GameTooltip:AddLine("+"..(#r.routes-6).." more quests; click for all.",1,1,1) end
+                    if #r.itemIDs>1 then GameTooltip:AddLine(#r.itemIDs.." item versions share this name; click for details.",1,1,1,true) end
                     GameTooltip:AddLine("Click for location and prerequisites.", 1, 1, 1)
                     GameTooltip:Show()
                     if GameTooltip_ShowCompareItem then GameTooltip_ShowCompareItem(GameTooltip) end
                 end)
-            else U.tip(self, r.name, (detail(r))) end
+            else U.tip(self, r.name, {routeSummary(r),"Click for all locations and prerequisites."}) end
         end)
         b:SetScript("OnLeave", function() local tint=row.selected and 1.15 or 1;row.bg:SetVertexColor(tint,tint,tint);U.hideTip() end)
         row.choose=function(auto)
@@ -372,7 +401,7 @@ local function build()
     window.reload = S.button(f, "Refresh data", 120, function() R.scan() end)
     window.reload:SetPoint("TOPLEFT", f, "TOPLEFT", 530, -500)
     U.text(f, "Compare stats for your build. Quest chains, reputation and skills may affect availability.", 0, 536, 650)
-    window.routeFrame, window.route, window.setRoute = E.details(f, 674, 358, "Quest route")
+    window.routeFrame, window.route, window.setRoute = E.details(f, 674, 358, "Quest routes")
     local map = S.button(window.routeFrame, "Map directions (open M)", 260, function()
         if not U.mapHint(window.routeMap) then ns.print("this quest has no known map for its starting zone") end
     end)

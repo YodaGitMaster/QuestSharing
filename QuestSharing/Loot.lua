@@ -11,7 +11,7 @@ local itemQueue, queueAt, page, instancePage = {}, 1, 1, 1
 local deferredAtlas = false
 local unresolved, selectedKey = 0, nil
 local focusTarget
-local function resultKey(r) return table.concat({r.itemID,r.instanceKey,r.who,r.difficulty},"\031") end
+local function resultKey(r) return r.key end
 local PAGE, INSTANCE_PAGE = 7, 9
 local paint, refresh
 local function clean(s)
@@ -60,6 +60,50 @@ local function add(id, place, who, mode, provider, sourceID, kind)
     place.count = place.count + 1
 end
 
+local function sourceLess(a,b)
+    if a.instanceName~=b.instanceName then return a.instanceName<b.instanceName end
+    if a.instanceKey~=b.instanceKey then return a.instanceKey<b.instanceKey end
+    if a.who~=b.who then return a.who<b.who end
+    if a.difficulty~=b.difficulty then return a.difficulty<b.difficulty end
+    if a.itemID~=b.itemID then return a.itemID<b.itemID end
+    return a.provider<b.provider
+end
+
+local function suppliers(r)
+    local list,seen={},{}
+    for _,s in ipairs(r.sources) do
+        local key=table.concat({s.instanceKey,s.who,s.provider},"\031")
+        local entry=seen[key]
+        if not entry then
+            entry={who=s.who,instanceName=s.instanceName,provider=s.provider,modes={},ids={},seenModes={},seenIDs={}}
+            list[#list+1]=entry;seen[key]=entry
+        end
+        if s.difficulty~="" and not entry.seenModes[s.difficulty] then
+            entry.modes[#entry.modes+1]=s.difficulty;entry.seenModes[s.difficulty]=true
+        end
+        if not entry.seenIDs[s.itemID] then entry.ids[#entry.ids+1]=s.itemID;entry.seenIDs[s.itemID]=true end
+    end
+    for _,entry in ipairs(list) do
+        table.sort(entry.modes);table.sort(entry.ids)
+        entry.label=entry.who.." — "..entry.instanceName..(#entry.modes>0 and (" · "..table.concat(entry.modes,", ")) or "")
+    end
+    return list
+end
+
+local function sourceSummary(r)
+    local names,seen,places,placeCount={},{},{},0
+    for _,s in ipairs(r.suppliers) do
+        if not seen[s.who] then names[#names+1]=s.who;seen[s.who]=true end
+        if not places[s.instanceName] then places[s.instanceName]=true;placeCount=placeCount+1 end
+    end
+    local total=#names
+    while #names>3 do table.remove(names) end
+    return table.concat(names,", ")..(total>3 and (" +"..(total-3).." more") or "")
+        .." — "..(placeCount>1 and (placeCount.." dungeons") or r.instanceName)
+        ..(#r.suppliers>1 and (" · "..#r.suppliers.." sources") or
+            (#r.suppliers[1].modes>0 and (" · "..table.concat(r.suppliers[1].modes,", ")) or ""))
+end
+
 function L.search(text, key, boss)
     if text ~= nil then query = text end
     chosen, encounter = key, boss
@@ -72,12 +116,9 @@ function L.search(text, key, boss)
             and (not chosen or chosen == r.instanceKey) and (not encounter or encounter == r.who)
             and (needle == "" or string.find(haystack, needle, 1, true)) then results[#results + 1] = r end
     end
-    E.sortResults(results,function(r) return r.item.info end,function(r) return r.item.name end,function(a,b)
-        if a.instanceName~=b.instanceName then return a.instanceName<b.instanceName end
-        if a.who~=b.who then return a.who<b.who end
-        if a.itemID~=b.itemID then return a.itemID<b.itemID end
-        return a.difficulty<b.difficulty
-    end)
+    results=E.groupItems(results,function(r) return r.item.name end,function(r) return r.item.info end,sourceLess)
+    for _,r in ipairs(results) do r.suppliers=suppliers(r) end
+    E.sortResults(results,function(r) return r.item.info end,function(r) return r.item.name end,sourceLess)
     return results
 end
 
@@ -358,7 +399,7 @@ paint = function()
         row.result = r
         if r then
             E.paintRow(row, r.item.info, r.item.name .. " · iLvl " .. tostring(r.item.info.level or "?") .. " · req " .. tostring(r.item.info.required or "?"),
-                r.who .. " — " .. r.instanceName .. (r.difficulty~="" and (" · "..r.difficulty) or ""))
+                sourceSummary(r))
             row.frame:Show()
         else row.frame:Hide() end
     end
@@ -443,12 +484,18 @@ local function build()
             if GameTooltip and GameTooltip.SetHyperlink then
                 pcall(function()
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:SetHyperlink("item:" .. r.itemID)
-                    GameTooltip:AddLine(r.instanceName .. " — " .. r.who, 1, 0.82, 0, true)
-                    if r.difficulty ~= "" then GameTooltip:AddLine(r.difficulty, 1, 1, 1) end
+                    for i=1,math.min(6,#r.suppliers) do GameTooltip:AddLine(r.suppliers[i].label, 1, 0.82, 0, true) end
+                    if #r.suppliers>6 then GameTooltip:AddLine("+"..(#r.suppliers-6).." more sources; click for all.",1,1,1) end
+                    if #r.itemIDs>1 then GameTooltip:AddLine(#r.itemIDs.." item versions share this name; click for details.",1,1,1,true) end
                     GameTooltip:Show()
                     if GameTooltip_ShowCompareItem then GameTooltip_ShowCompareItem(GameTooltip) end
                 end)
-            else U.tip(self, r.item.name, { r.instanceName, "Source: " .. r.who, r.difficulty, "Data: " .. r.provider }) end
+            else
+                local lines={}
+                for i=1,math.min(6,#r.suppliers) do lines[#lines+1]=r.suppliers[i].label end
+                if #r.suppliers>6 then lines[#lines+1]="+"..(#r.suppliers-6).." more sources; click for all." end
+                U.tip(self,r.item.name,lines)
+            end
         end)
         row.frame:SetScript("OnLeave", function() local tint=row.selected and 1.15 or 1;row.bg:SetVertexColor(tint,tint,tint);U.hideTip() end)
         row.choose=function(auto)
@@ -457,12 +504,17 @@ local function build()
             if not r or not W.details then return end
             selectedKey=resultKey(r)
             E.select(W.rows, row)
+            local lines=E.versionLines(r,function(v) return v.item.info end)
+            lines[#lines+1]="\nSources ("..#r.suppliers.."):"
+            for _,s in ipairs(r.suppliers) do
+                lines[#lines+1]="\nInstance: "..s.instanceName.."\nSource: "..s.who
+                    ..(#s.modes>0 and ("\nDifficulty: "..table.concat(s.modes,", ")) or "")
+                    ..(#r.itemIDs>1 and ("\nItems: "..table.concat(s.ids,", ")) or "").."\nCatalogue: "..s.provider
+            end
             W.setDetails(r.item.name .. " (item " .. r.itemID .. ")\n\nEquipment: " .. r.item.info.slot
                 .. "\nItem level: " .. tostring(r.item.info.level or "unknown")
                 .. "\nRequired level: " .. tostring(r.item.info.required or "unknown")
-                .. "\n\nInstance: " .. r.instanceName
-                .. "\nSource: " .. r.who .. (r.difficulty ~= "" and ("\nDifficulty: " .. r.difficulty) or "")
-                .. "\nCatalogue: " .. r.provider .. "\n\nDrop chance is not supplied by this browser."
+                .. "\n\n"..table.concat(lines,"\n").."\n\nDrop chance is not supplied by this browser."
                 .. "\nEncounter groups such as Trash refer to a shared loot table, not a specific boss."
                 .. (r.provider == "QuestieDB" and "\nQuestieDB lists known sources only; this is not a complete instance loot table." or ""))
         end
@@ -478,7 +530,7 @@ local function build()
     W.next = pager("Next", 310, function() L.go(1) end)
     W.reload = pager("Refresh data", 570, function() L.scan() end)
     W.note = U.text(f, "", 0, 536, 660)
-    W.details, W.detailsText, W.setDetails = E.details(f, 684, 348, "Drop source")
+    W.details, W.detailsText, W.setDetails = E.details(f, 684, 348, "Drop sources")
     E.navigation(W.search,W.rows,L.go)
     f.clear=function()
         focusTarget=nil

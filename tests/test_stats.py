@@ -39,7 +39,7 @@ def apply(g,index,stat,minimum=""):
 
 
 def test_no_stat_lookup_until_a_condition_is_enabled(style):
-    g=game(style);assert g.eval("STAT_READS")==0 and len(results(g))==5
+    g=game(style);assert g.eval("STAT_READS")==0 and len(results(g))==4
     assert apply(g,1,"Intellect")
     assert {r[0] for r in results(g)}=={10002,10003}
     before=g.eval("STAT_READS");g.eval("NS.loot.search")("",None,None)
@@ -97,7 +97,7 @@ def test_searchable_controls_live_minimum_and_individual_clear(style):
     assert {r[0] for r in results(g)}=={10002}
     type_text(row.min,"20");pick(g,row.stat,"")
     g.advance(.3)
-    assert len(results(g))==5 and row.min.GetText(row.min)==""
+    assert len(results(g))==4 and row.min.GetText(row.min)==""
     assert g.eval("NS.equipmentUI.filters.stats[1].stat")==None
 
 
@@ -106,7 +106,7 @@ def test_reset_cancels_pending_stat_edits_and_tabs_share_conditions(style):
     apply(g,1,"Intellect","10");g.slash("rewards");g.slash("loot")
     assert {r[0] for r in results(g)}=={10002}
     type_text(c.stats[1].min,"99");click(c.reset);g.advance(.3)
-    assert len(results(g))==5 and c.stats[1].min.GetText(c.stats[1].min)==""
+    assert len(results(g))==4 and c.stats[1].min.GetText(c.stats[1].min)==""
     assert all(not row.stat for row in g.eval("NS.equipmentUI.filters.stats").values())
 
 
@@ -123,7 +123,7 @@ def test_missing_erroring_and_legacy_only_api_are_safe(style):
     g=game(style,extra='C_Item=C_Item or {};C_Item.GetItemStats=nil;GetItemStats=nil')
     assert "unavailable" in controls(g)[1].statError.text
     apply(g,1,"Intellect");assert results(g)==[]
-    g.eval("NS.equipmentUI.reset")();assert len(results(g))==5
+    g.eval("NS.equipmentUI.reset")();assert len(results(g))==4
     assert "unavailable" in controls(g)[1].statError.text
     g.run('C_Item.GetItemStats=function()error("unavailable")end;GetItemStats=ReadStats')
     apply(g,1,"Intellect","10");assert {r[0] for r in results(g)}=={10002}

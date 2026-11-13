@@ -266,6 +266,48 @@ function E.sortResults(list,infoOf,nameOf,tie)
         return tie(a,b)
     end)
 end
+-- Keep source records intact; only the filtered presentation is grouped by equipment name.
+function E.groupItems(list,nameOf,infoOf,sourceLess)
+    local groups,ordered={},{}
+    for _,r in ipairs(list) do
+        local name=string.gsub(string.gsub(nameOf(r),"|c%x%x%x%x%x%x%x%x",""),"|r","")
+        local key=string.lower(string.match(name,"^%s*(.-)%s*$"))
+        if not groups[key] then
+            groups[key]={key=key,sources={}}
+            ordered[#ordered+1]=groups[key]
+        end
+        local sources=groups[key].sources
+        sources[#sources+1]=r
+    end
+    for i,group in ipairs(ordered) do
+        table.sort(group.sources,sourceLess)
+        local best,versions=group.sources[1],{}
+        for _,r in ipairs(group.sources) do
+            versions[r.itemID]=r
+            local level,bestLevel=tonumber(infoOf(r).level) or 0,tonumber(infoOf(best).level) or 0
+            if level>bestLevel or (level==bestLevel and r.itemID<best.itemID) then best=r end
+        end
+        local result={}
+        for k,v in pairs(best) do result[k]=v end
+        result.key,result.sources,result.itemIDs,result.versions=group.key,group.sources,{},{}
+        for id in pairs(versions) do result.itemIDs[#result.itemIDs+1]=id end
+        table.sort(result.itemIDs)
+        for _,id in ipairs(result.itemIDs) do result.versions[#result.versions+1]=versions[id] end
+        ordered[i]=result
+    end
+    return ordered
+end
+function E.versionLines(r,infoOf)
+    local lines={}
+    if #r.itemIDs>1 then
+        lines[1]="Versions with this name (tooltip compares item "..r.itemID.."):"
+        for _,v in ipairs(r.versions) do
+            local info=infoOf(v)
+            lines[#lines+1]="Item "..v.itemID..": iLvl "..tostring(info.level or "?")..", requires level "..tostring(info.required or "?")
+        end
+    end
+    return lines
+end
 function E.pageStatus(first,count,total)
     if total==0 then return "No matching equipment" end
     return first.."–"..math.min(total,first+count-1).." of "..total.." items • scroll to browse"

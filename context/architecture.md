@@ -43,6 +43,7 @@ QuestSharing/  # Repository root
 ├── build_release.py  # Build install ZIP and release notes
 ├── context/  # Session continuity and live architecture
 │   ├── BUGS/  # Verified bug methodology and regressions
+│   │   ├── 2026-11-13-equipment-duplicate-rows.md  # Filtered name grouping with complete source retention
 │   │   ├── 2026-11-13-zone-levels-opt-in.md  # Once-only migration from auto-enabled map ranges
 │   │   ├── 2026-11-13-spell-rank-zero-spec.md  # Numeric-zero active specialization in Lua
 │   │   ├── 2026-11-13-spell-rank-cursor-read.md  # Preserve readability separately from an empty cursor
@@ -62,6 +63,7 @@ QuestSharing/  # Repository root
     ├── test_box.py  # Tests for box
     ├── test_done.py  # Tests for done
     ├── test_equipment.py  # Shared window, type/level filters, dungeon identity and cancellation
+    ├── test_equipment_grouping.py  # Unique names, combined suppliers/routes, versions and filter boundaries
     ├── test_emotes.py  # Tests for emotes
     ├── test_extras.py  # Tests for extras
     ├── test_features.py  # Tests for features
@@ -107,6 +109,9 @@ flowchart TD
     OptionalUI[OptionalUI.lua] --> Equipment[EquipmentUI.lua: shared explorer, Rare+ only]
     Equipment --> Rewards
     Equipment --> Loot
+    Rewards --> Group[EquipmentUI.groupItems: filter first, one row per name]
+    Loot --> Group
+    Group --> Inline[Single inline detail pane: every matching source and version]
     Equipment --> StatAPI[WoW GetItemStats: lazy link cache, invalidated on item events]
     Settings --> Ranks[SpellRanks.lua: opt-in action-bar rank updates]
     Core --> Ranks
@@ -210,12 +215,13 @@ sequenceDiagram
     Items-->>Rewards: Equipment and questRewards links
     Rewards->>Q: Read quest level, class/race masks and starter
     Rewards->>Game: Get item details for eligible rewards
-    Rewards->>User: Filtered and paginated equipment
+    Rewards->>Rewards: Group filtered equipment by name; collect every eligible quest route
+    Rewards->>User: Paginated unique equipment names
     Game-->>Rewards: GET_ITEM_INFO_RECEIVED
     Rewards->>User: Debounced refresh of cached item details
     User->>Rewards: Hover item / click quest
     Rewards->>Game: Item and equipped comparison tooltip
-    Rewards->>User: Starter coordinates and prerequisites in inline detail pane
+    Rewards->>User: All matching quest starters/prerequisites inline; map directions use first route
 ```
 
 ```mermaid
@@ -258,7 +264,8 @@ sequenceDiagram
     Loot->>Game: Load up to 10 item details per timer batch (Rewards.itemInfo)
     User->>Loot: Filter dungeon, encounter or item/boss text; shared type/slot/level filters
     Loot->>Loot: Require recognized equipment slot and native quality 3+; hide unknown items
-    Loot->>User: Paginated equipment with supplier and difficulty
+    Loot->>Loot: Group filtered names; combine each supplier's difficulty labels
+    Loot->>User: One equipment row per name; all suppliers and versions inline
     Game-->>Loot: GET_ITEM_INFO_RECEIVED
     Loot->>User: Debounced equipment classification and name refresh
 ```
@@ -276,7 +283,8 @@ sequenceDiagram
     E->>Page: Debounced search or direct filter selection; keep quality 3+
     Page->>E: matches native item metadata
     E->>E: Read cached native stat table only for active conditions; require all minimums
-    E->>Page: Apply sorting; preserve selected result if visible
+    Page->>E: groupItems(filtered sources) by normalized name
+    E->>Page: Sort unique equipment; preserve selected name if visible
     User->>Page: Select item card
     Page->>E: Update inline route/source pane
     User->>E: Close explorer
@@ -352,6 +360,16 @@ classDiagram
         sourceID
         kind
     }
+    class EquipmentGroup {
+        key_normalized_name
+        representative_source_fields
+        sources
+        itemIDs
+        versions
+        routes_or_suppliers
+    }
+    EquipmentGroup --> RewardOption : quest sources and routes
+    EquipmentGroup --> LootDrop : dungeon sources and suppliers
     class DungeonRecord {
         key
         name

@@ -472,6 +472,9 @@ The fishing layer works alongside Questie.
 **Quest rewards** and **Instance drops** with its tabs. Item rows have icons, quality colors, item/required levels
 and a source line; hover for the game's comparison tooltip. Click a row to update the route or drop-source pane
 on the right. Selecting more items never opens additional route/source windows.
+Each equipment name appears **once**, with every matching mob or quest listed together in its details.
+Different item IDs sharing a name are grouped too; details show each version's level, and the comparison
+tooltip uses the highest-level matching version. Filters apply before grouping, so only matching sources remain.
 **Only Rare (blue) quality and above are listed** in both tabs; green, white and grey items are excluded.
 Items with unknown quality stay hidden until their details load. Clear filters keeps this quality minimum.
 
@@ -542,8 +545,9 @@ Only weapons and wearable equipment are shown: armor, shields, necklaces, rings,
 materials, consumables, bags and other non-equipment are excluded.
 
 Every result shows the item, instance, boss/creature or loot group, and difficulty when supplied. Hover for its item
-tooltip and equipped-item comparison; click for source details. An item with multiple sources appears under each
-source. Trash tables describe a shared group rather than a particular creature; the browser does not invent a
+tooltip and equipped-item comparison; click for all matching sources. Multiple bosses share one item row,
+with each mob listed once and its difficulty labels combined. Shared quest rewards likewise list every eligible
+quest route in one pane; map directions refer to the first quest listed. Trash tables describe a shared group rather than a particular creature; the browser does not invent a
 specific NPC or a drop percentage when the catalogue does not provide one.
 
 For encounter loot tables, install/enable a compatible **AtlasLoot** and its **DungeonsAndRaids** module, such as
@@ -727,6 +731,7 @@ python tests/test_log.py              # 35 tests: the debug log: every action an
 python tests/test_optional.py         # 42 tests: fishing water notes, map drawing, reward filters and item comparisons
 python tests/test_adventure.py        # 32 tests: role-play quest invitations, preview, channels and preserved chat drafts
 python tests/test_equipment.py        # 36 tests: one window, shared filters, rare+ quality, dungeon/raid identity and cancellation
+python tests/test_equipment_grouping.py # 28 tests: unique names, merged sources/routes, variants, filtering, counts and selection
 python tests/test_instance_focus.py   # 24 tests: current dungeon, batched loads, manual browsing, wing identity and Extra tools
 python tests/test_stats.py            # 20 tests: combined stat minimums, native APIs, cache refresh, live inputs and reset
 python tests/test_spell_ranks.py      # 48 tests: learned rank upgrades, normal pages, cursor/combat guards and client APIs
