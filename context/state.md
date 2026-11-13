@@ -2,10 +2,11 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Zone questing ranges corrected to opt-in/off by default, including one-time migration of v0.4.11 installs; 0.4.12 packaging/publication pending.
+- Zone questing ranges corrected to opt-in/off by default and published as v0.4.12; remote tag and downloaded install ZIP verified.
 - Standing preference: Extra tools additions stay optional and default off unless explicitly requested otherwise.
 
 ## Last completed
+- Published v0.4.12 at `c86b34294ced23ddf904ac73f50e0fce01baae73`; downloaded 32-file ZIP byte-matches source-verified build.
 - Changed zoneLevels default to false and added once-only opt-in migration; later choices persist and Reset returns to off. Renderer unchanged.
 - All 33 suites / 1,247 checks pass, including 34 zone-level workflows; diff whitespace clean.
 - Published v0.4.11 at `f18d8258a33bee3270967c6afdaaf57c258a31ef`; downloaded 32-file ZIP byte-matches source-verified build.
@@ -58,6 +59,6 @@ Last updated: 2026-11-13
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
-- v0.4.11: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.11
-- Tag `f18d8258a33bee3270967c6afdaaf57c258a31ef`; ZIP 160,895 bytes; SHA256 `b822023e6024808c72639b328b5e00538d1154f26268bc781cfd29ec25bfe4ea`.
+- v0.4.12: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.12
+- Tag `c86b34294ced23ddf904ac73f50e0fce01baae73`; ZIP 160,979 bytes; SHA256 `0378057a6fd6fef839d3743de0382a72096c61d74b84be0e6d25327e161c4cd0`.
 - Main also includes a documentation follow-up recording publication. Previous release tags and ZIPs preserved.
