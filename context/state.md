@@ -2,9 +2,11 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Questing level ranges on world-map zones implemented and verified; 0.4.11 packaging/publication pending under ongoing authorization.
+- Questing level ranges on world-map zones completed and published as v0.4.11; remote tag and downloaded install ZIP verified.
+- No remaining feature work; native game-client rendering/data QA remains unavailable in this environment.
 
 ## Last completed
+- Published v0.4.11 at `f18d8258a33bee3270967c6afdaaf57c258a31ef`; downloaded 32-file ZIP byte-matches source-verified build.
 - Added zoneLevels=true, Extra tools toggle, native continent zone badges and selected/hovered outdoor-zone panel; click-through own frames only, unknown data labelled, existing quest/minimap overlays remain retired.
 - Zone data comes from client C_Map APIs including supported Forever zones; no bundled speculative ranges or Questie dependency. Settings layout still fits.
 - All 33 suites / 1,243 checks pass, including 30 map-level workflows; diff whitespace clean. Native game map rendering/coverage still needs in-game QA.
@@ -54,6 +56,6 @@ Last updated: 2026-11-13
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
-- v0.4.10: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.10
-- Tag `6e16bc4b6252dfc7e27399a781525e9201f3b729`; ZIP 158,346 bytes; SHA256 `4c158c2b8ae663bde1a772ce31ece6183f262cd40438d56db82457a435f2969f`.
+- v0.4.11: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.11
+- Tag `f18d8258a33bee3270967c6afdaaf57c258a31ef`; ZIP 160,895 bytes; SHA256 `b822023e6024808c72639b328b5e00538d1154f26268bc781cfd29ec25bfe4ea`.
 - Main also includes a documentation follow-up recording publication. Previous release tags and ZIPs preserved.

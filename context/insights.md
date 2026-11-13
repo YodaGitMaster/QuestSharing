@@ -5,6 +5,7 @@
 - Native zone descendants, rectangles and player ranges avoid inaccurate static Classic/Forever mappings. UI map type Zone filters out dungeon level ranges; world/cosmic overviews avoid stacking every world's zone labels.
 - New 30-check integration suite covers supported custom/Forever maps, unknown/recovering data, player-vs-pet ranges, hover reset, scale/resize, stale-label cleanup, delayed map load, canvas replacement, settings persistence and no native map mutations. Actual game rendering/data coverage remains unverified.
 - All 33 suites / 1,243 checks pass; settings geometry still fits and native map/protected-call guards remain intact. Range precedes zone name in the panel so long localized names cannot hide the level value.
+- Published v0.4.11 at `f18d8258a33bee3270967c6afdaaf57c258a31ef`; downloaded 160,895-byte ZIP matches local source-verified build, SHA256 `b822023e6024808c72639b328b5e00538d1154f26268bc781cfd29ec25bfe4ea`.
 
 ## 2026-11-13 — Learned spell ranks and action bars
 - Verified modern spell-book entry/skill-line fields and pickup arguments against [Blizzard Forever spell-book declarations](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/SpellBookDocumentation.lua); rank subtext comes from [spell API declarations](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/SpellDocumentation.lua).
