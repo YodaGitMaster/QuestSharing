@@ -2,7 +2,7 @@
 Last updated: 2026-11-13
 
 ## Addon loading and persistence
-- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.4; declares file load order and SavedVariables.
+- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.5; declares file load order and SavedVariables.
 - Lua modules receive `local ADDON, ns = ...`; `ns` is the shared namespace, not a class.
 - `Core.lua`: `ns.defaults`; `ns.db` initially copies defaults. On `ADDON_LOADED`, missing settings are filled and `ns.db` aliases saved `QuestSharingDB`; current `dbVersion = 3`.
 - SavedVariables: `QuestSharingDB` (settings), `QuestSharingLog` (debug log); persisted by the game.
@@ -42,16 +42,25 @@ Last updated: 2026-11-13
 - `QuestSharingDB.questMap` is removed at ADDON_LOADED, even when previously true; dbVersion stays 3.
 - Legacy `/qs questmap ...` explains the removal and cannot enable overlays.
 
+## Shared equipment explorer (2026-11-13)
+- `EquipmentUI.lua` loads after OptionalUI and before Rewards/Loot; `ns.equipmentUI` owns one `QuestSharingEquipment` top-level window.
+- Session-only shared filters: `{category, subtype, slot, mode, min?, max?}`. Categories: All equipment, Weapons, Armor, Accessories; mode: Required level or Item level; inclusive bounds 0..1000, blank = unbounded.
+- Native item metadata adds `kind`/`sub` numeric item class/subclass. QuestieDB supplies known fallback metadata; unclassified subtypes stay unknown. Required level 0 remains valid.
+- `page(key)`, `show(key)`, `visible(key)`, `close(key?)`: only one child page is active; hiding/switching calls its suspend function to cancel timers. Pages have `refresh` and `suspend` callbacks.
+- `matches(info, fallback?)`: common type/subtype/slot/range predicate; quest eligibility remains separate. Quest/Loot render seven item cards per page and reuse inline scrollable route/source panels.
+- No standalone reward/loot/route/source top-level windows remain; shared tab filters survive tab switches, not logout.
+
 ## Instance loot search (2026-11-13)
 - `ns.loot`: `open`, `close`, `scan`, `search(text, instanceKey?, encounter?)`, `instances(text?)`; session-only data, no SavedVariables.
 - LootDrop: `{itemID,item,instanceKey,instanceName,who,difficulty,provider,sourceID,kind}`; `item` references shared local item cache `{id,name,cached,info?}`.
 - Visibility: loot results and encounter choices require shared native `item.info.slot` to be recognized by `Rewards.lua`; unknown/unloaded items and non-equipment remain hidden. Item-cache events refresh eligibility.
 - Instance record: `{key,name,count}`. Atlas key = module/content; Questie fallback key = `area:<AreaTable ID>`.
-- Primary provider: compatible `AtlasLoot.ItemDB.Storage` or `AtlasLootContinued.ItemDB.Storage`, modules named `*DungeonsAndRaids*`, content with positive `InstanceID`.
+- Dungeon identity: AtlasLoot public content type must identify Dungeons when present; known Classic/Forever instance IDs cover older providers. Raid flags/content types, oversized groups, unknown IDs without classification and zero-ID extras excluded. Missing InstanceID supported only for recognized dungeon areas (Dire Maul). Cross-encounter links must target an eligible dungeon.
+- Primary provider: compatible `AtlasLoot.ItemDB.Storage` or `AtlasLootContinued.ItemDB.Storage`, modules named `*DungeonsAndRaids*`, content classified as an eligible dungeon.
   - Encounter `items[bossID]`: name, `IgnoreAsSource`, numeric difficulty keys, optional cross-encounter `link`.
   - Public `GetItemTable(module,content,boss,diff)` resolves difficulty aliases/links and returns row list, format and difficulty metadata.
   - Positive numeric `row[2]` is an item ID; header strings and non-Item formats are excluded. IgnoreAsSource tables excluded; Trash ExtraList retained.
-- Fallback: QuestieDB `Item.GetAllIds`, `npcDrops`/`objectDrops`; source spawns need `{-1,-1}` dungeon marker or a mapped `UIMapType.Dungeon` map. Outdoor mobs are excluded. Coverage explicitly partial.
+- Fallback: QuestieDB `Item.GetAllIds`, `npcDrops`/`objectDrops`; source spawns need `{-1,-1}` dungeon marker or a mapped `UIMapType.Dungeon` map. Outdoor mobs, raid interiors and unknown areas are excluded by a known dungeon-area registry; map type alone is insufficient. Forever Hall of Thanes has an unverified provider map placeholder and is not added to the fallback area registry. Coverage explicitly partial.
 - Index batches: <=100 rows/items per timer; native names: <=10 unique item IDs per 0.1s timer. `Rewards.itemInfo` is the shared native item metadata reader.
 - `GET_ITEM_INFO_RECEIVED` updates the local cache and debounces refresh. Closed browsers cancel unfinished indexing/names; reopening retries uncached names.
 - GUI entry points: Optional settings action, quest reward browser button, `/qs loot [search]`. No map symbols or automatic chat added.

@@ -1,5 +1,14 @@
 # Decisions
 
+## 2026-11-13 — One equipment explorer and dungeon scope
+- User requested improved graphics, one window for quest/instance equipment, item type and level filters, and exclusion of random encounters and raids.
+- User explicitly answered the scope question: include Forever dungeons too. Use AtlasLoot's public localized Dungeons category, with verified known IDs for older catalogues; Questie fallback requires known dungeon areas. Never infer a dungeon solely from a map-type enum (raids share it).
+- Reuse one top-level host with lazy quest/dungeon child pages and inline detail panels; native comparison tooltips remain. Tab changes and close cancel unfinished scans/names.
+- Shared category/subtype/slot filters and inclusive bounds; offer Required level and Item level explicitly to remove ambiguity. Invalid ranges preserve the last valid range. Native numeric metadata avoids locale-dependent item-type text.
+- Keep quest class/faction/character level and quest eligibility distinct from shared equipment filters. No SavedVariables migration or provider dataset bundling.
+- Accept Dire Maul's known area when its compatible provider omits InstanceID. Exclude the unverified Hall of Thanes area placeholder from the partial Questie fallback; its primary AtlasLoot dungeon is included by instance/category.
+- Release as 0.4.5 under the ongoing publication authorization.
+
 ## 2026-11-13 — Invitation menu placement
 - User requested Seek fellow adventurers immediately after Tell the party in the quest right-click menu.
 - Move its existing action to row 2, before Offer it to the party; keep selected-quest invitation behavior.

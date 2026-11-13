@@ -9,16 +9,16 @@ from test_questmap import DATA as MAP_DATA
 STYLES = ("modern", "classic")
 DATA = MAP_DATA + r'''
 LOOT_ITEMS = {
-    [10001]={name="Captain's Blade",level=25}, [10002]={name="Serpent Staff",level=22},
-    [10003]={name="Cookie's Ladle",level=20}, [10004]={name="Silken Cloth",level=1,loc=""},
-    [10005]={name="Locked Chest Prize",level=18,loc="INVTYPE_CHEST"},
+    [10001]={name="Captain's Blade",level=25,required=18,kind=2,sub=7}, [10002]={name="Serpent Staff",level=22,required=15,kind=2,sub=10},
+    [10003]={name="Cookie's Ladle",level=20,required=0,kind=2,sub=4}, [10004]={name="Silken Cloth",level=1,loc=""},
+    [10005]={name="Locked Chest Prize",level=18,required=12,kind=4,sub=1,loc="INVTYPE_CHEST"},
 }
 LOOT_READS, PUBLIC_READS, UNCACHED = 0,0,{}
 function GetItemInfo(id)
     LOOT_READS=LOOT_READS+1
     local r=LOOT_ITEMS[id]
     if not r or UNCACHED[id] then return nil end
-    return r.name,"|Hitem:"..id.."|h["..r.name.."]|h",2,r.level,0,"","",1,r.loc or "INVTYPE_WEAPON","icon"
+    return r.name,"|Hitem:"..id.."|h["..r.name.."]|h",2,r.level,r.required or 0,"","",1,r.loc or "INVTYPE_WEAPON","icon",0,r.kind,r.sub
 end
 local module = {
     Deadmines={name="The Deadmines",InstanceID=36,MapID=1581,items={
@@ -82,7 +82,7 @@ def test_browser_lists_instances_and_real_item_sources(style):
     assert (10001,"The Deadmines","Edwin VanCleef","Normal") in rows
     assert (10002,"Wailing Caverns","Lord Cobrahn","Normal") in rows
     assert len(rows)==5,rows
-    assert [p.name for p in g.eval("NS.loot.instances()").values()]==["Empty Instance","The Deadmines","Wailing Caverns"]
+    assert [p.name for p in g.eval("NS.loot.instances()").values()]==["The Deadmines","Wailing Caverns"]
     assert g.eval("NS.loot._state()")[2]=="AtlasLoot"
 
 
@@ -251,7 +251,7 @@ def test_large_catalogue_is_batched_and_closing_cancels_scan(style):
 
 def test_pagination_handles_many_instances_and_drops(style):
     g=game(style,'''local m=AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids
-        for i=1,25 do m["Extra"..i]={name="Instance "..i,InstanceID=1000+i,items={{name="Boss",[1]={{1,10001}}}}} end''')
+        for i,id in ipairs({389,43,36,33,48,34,90,47,189,129,70,209,349,109,230,229,429,289,329}) do m["Extra"..i]={name="Dungeon "..i,InstanceID=id,items={{name="Boss",[1]={{1,10001}}}}} end''')
     g.slash("loot"); g.advance(1); w=g.eval("NS.loot._window()")
     first=w.instances[1].place.key; click(w.instanceNext)
     assert w.instances[1].place.key!=first
@@ -270,7 +270,7 @@ def test_optional_settings_and_reward_browser_offer_loot_entry_points(style):
     g.run('for i,r in ipairs(NS.settingRows) do if r.label=="Search instance loot and who drops it" then NS.settingsClick(i,"LeftButton") end end')
     assert g.eval("NS.loot._window().frame.shown")
     g.eval("NS.loot.close")(); g.slash("rewards")
-    g.run('for _,f in ipairs(FRAMES) do if f.text=="Instance drops" then f.scripts.OnClick(f,"LeftButton");break end end')
+    g.run('local _,_,_,tabs=NS.equipmentUI._window(); tabs.dungeons.scripts.OnClick(tabs.dungeons,"LeftButton")')
     assert g.eval("NS.loot._window().frame.shown")
 
 

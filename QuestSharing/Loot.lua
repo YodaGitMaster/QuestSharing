@@ -1,7 +1,7 @@
 -- On-demand instance loot search. AtlasLoot supplies encounter tables; QuestieDB is a labelled partial fallback.
 -- Provider tables are never edited here. Names are requested from the game in small batches while this window is open.
 local ADDON, ns = ...
-local L, U, S, Q = {}, ns.optionalUI, ns.style, ns.questie
+local L, U, S, Q, E = {}, ns.optionalUI, ns.style, ns.questie, ns.equipmentUI
 ns.loot = L
 local W, index, results, instances, items = nil, {}, {}, {}, {}
 local generation, loading, ready, pending = 0, false, false, false
@@ -10,14 +10,14 @@ local chosen, encounter, query, instanceQuery = nil, nil, "", ""
 local itemQueue, queueAt, page, instancePage = {}, 1, 1, 1
 local deferredAtlas = false
 local unresolved = 0
-local PAGE, INSTANCE_PAGE = 8, 9
+local PAGE, INSTANCE_PAGE = 7, 9
 local paint, refresh
 local function clean(s)
     return type(s) == "string" and (string.gsub(string.gsub(s, "|c%x%x%x%x%x%x%x%x", ""), "|r", "")) or nil
 end
 local function positive(n) return type(n) == "number" and n > 0 and n < math.huge and n % 1 == 0 end
 local function field(kind, id, key) return Q.get(kind, id, key) end
-local function shown() return W and W.frame:IsShown() and ns.db.enabled end
+local function shown() return W and E.visible("dungeons") and ns.db.enabled end
 local function atlas() return AtlasLoot or AtlasLootContinued end
 local function areaName(id)
     return clean(U.call(C_Map and C_Map.GetAreaInfo, id) or U.call(GetAreaInfo, id)) or ("Instance area " .. tostring(id))
@@ -66,7 +66,7 @@ function L.search(text, key, boss)
     for _, r in ipairs(index) do
         local haystack = string.lower(r.item.name .. " " .. r.itemID .. " " .. r.instanceName .. " " .. r.who .. " " .. r.difficulty)
         -- Unclassified items stay hidden until the game confirms a weapon or wearable equipment slot.
-        if r.item.info and r.item.info.slot
+        if r.item.info and r.item.info.slot and E.matches(r.item.info)
             and (not chosen or chosen == r.instanceKey) and (not encounter or encounter == r.who)
             and (needle == "" or string.find(haystack, needle, 1, true)) then results[#results + 1] = r end
     end
@@ -92,7 +92,7 @@ end
 local function bosses()
     local set, list = {}, {}
     for _, r in ipairs(index) do
-        if r.item.info and r.item.info.slot and (not chosen or r.instanceKey == chosen) and not set[r.who] then
+        if r.item.info and r.item.info.slot and E.matches(r.item.info) and (not chosen or r.instanceKey == chosen) and not set[r.who] then
             list[#list + 1] = r.who; set[r.who] = true
         end
     end
@@ -113,6 +113,25 @@ local function pumpNames(token)
     ns.after(0.1, function() pumpNames(token) end)
 end
 
+-- Known Classic/Forever dungeon instance and area IDs also cover partial QuestieDB sources;
+-- UIMapType.Dungeon alone cannot distinguish a dungeon from a raid interior.
+local dungeonIDs = { [389]=true,[43]=true,[36]=true,[33]=true,[48]=true,[34]=true,[90]=true,[47]=true,
+    [189]=true,[129]=true,[70]=true,[209]=true,[349]=true,[109]=true,[230]=true,[229]=true,[429]=true,[289]=true,[329]=true,[3065]=true,[2999]=true,[2998]=true,[2959]=true,[3002]=true }
+local dungeonAreas = { [2437]=true,[718]=true,[1581]=true,[209]=true,[719]=true,[717]=true,[721]=true,[491]=true,
+    [796]=true,[722]=true,[1337]=true,[1176]=true,[2100]=true,[1477]=true,[1584]=true,[1583]=true,[2557]=true,[2057]=true,[2017]=true,[16611]=true,[16732]=true,[16560]=true,[3002]=true }
+local function standardDungeon(content, module, owner)
+    if content.IsRaid or (tonumber(content.MaxPlayers) or 0) > 10 then return false end
+    local types = U.call(module.GetContentTypes, module)
+    local kind = type(types) == "table" and types[content.ContentType]
+    local category = type(kind) == "table" and kind[1] or U.call(content.GetContentType, content)
+    local dungeonName = owner.Locales and owner.Locales["Dungeons"] or "Dungeons"
+    if category and category ~= dungeonName then return false end
+    if content.InstanceID ~= nil then
+        return positive(content.InstanceID) and (category == dungeonName or dungeonIDs[content.InstanceID] == true)
+    end
+    return dungeonAreas[content.MapID] == true -- Dire Maul wings omit InstanceID in some compatible catalogues.
+end
+
 -- Use AtlasLoot's public reader so inherited difficulty tables and cross-encounter links resolve correctly.
 local function atlasJobs()
     local a = atlas()
@@ -123,7 +142,7 @@ local function atlasJobs()
     for moduleName, module in pairs(storage) do
         if type(moduleName) == "string" and string.find(moduleName, "DungeonsAndRaids", 1, true) and type(module) == "table" then
             for key, content in pairs(module) do
-                if type(content) == "table" and positive(content.InstanceID) and type(content.items) == "table" then
+                if type(content) == "table" and type(content.items) == "table" and standardDungeon(content, module, a) then
                     local name = clean(content.name) or clean(U.call(content.GetName, content, true))
                         or areaName(content.MapID or content.AreaID or content.InstanceID)
                     local place = instance(moduleName .. ":" .. tostring(key), name)
@@ -135,9 +154,10 @@ local function atlasJobs()
                             if type(boss.link) == "table" then
                                 local target = storage[boss.link[1]]
                                 target = target and target[boss.link[2]]
-                                original = target and target.items and target.items[boss.link[3]] or boss
+                                original = target and standardDungeon(target, storage[boss.link[1]], a)
+                                    and target.items and target.items[boss.link[3]] or nil
                             end
-                            for diff, rows in pairs(original) do
+                            for diff, rows in pairs(original or {}) do
                                 if type(diff) == "number" and diff > 0 and (type(rows) == "table" or type(rows) == "string" or type(rows) == "number") then
                                     jobs[#jobs + 1] = { module = moduleName, content = key, boss = bossID,
                                         diff = diff, place = place, who = who, sourceID = bossID, db = db, owner = module }
@@ -179,7 +199,7 @@ local function questieSources(kind, id, cache)
             local dungeonType = Enum and Enum.UIMapType and Enum.UIMapType.Dungeon or 4
             inside = type(info) == "table" and info.mapType == dungeonType
         end
-        if inside then
+        if inside and dungeonAreas[tonumber(area)] then
             local place = instance("area:" .. tostring(area), areaName(area))
             found[#found + 1] = { place = place, who = clean(field(kind, id, "name")) or (kind .. " " .. id),
                 id = key, kind = kind }
@@ -200,7 +220,7 @@ function L.scan()
     if not jobs then loadAtlas(); jobs = atlasJobs() end
     local ids
     if jobs then
-        source, note = "AtlasLoot", "Encounter loot from the installed AtlasLoot catalogue."
+        source, note = "AtlasLoot", "Classic and Forever dungeon equipment from AtlasLoot. Raids and world bosses excluded."
     else
         local db = type(ItemDB) == "table" and type(ItemDB.GetAllIds) == "function" and ItemDB
             or (type(LibQuestieDB) == "table" and LibQuestieDB.Item)
@@ -212,7 +232,7 @@ function L.scan()
             if paint then paint() end
             return false
         end
-        source, note = "QuestieDB", "Partial QuestieDB drop sources; install compatible AtlasLoot for encounter loot tables."
+        source, note = "QuestieDB", "Partial QuestieDB sources for known Classic/Forever dungeons; AtlasLoot supplies fuller loot tables."
         if deferredAtlas then note = note .. " AtlasLoot will be retried after combat." end
     end
     local jobAt, rowAt, rows, mode, cache = 1, 1, nil, nil, {}
@@ -272,14 +292,14 @@ paint = function()
     if not W then return end
     local places = L.instances(instanceQuery)
     instancePage = math.max(1, math.min(instancePage, math.max(1, math.ceil(#places / INSTANCE_PAGE))))
-    W.instanceStatus:SetText(#places .. " instances — page " .. instancePage .. "/" .. math.max(1, math.ceil(#places / INSTANCE_PAGE)))
+    W.instanceStatus:SetText(#places .. " dungeons — page " .. instancePage .. "/" .. math.max(1, math.ceil(#places / INSTANCE_PAGE)))
     for i, b in ipairs(W.instances) do
         local place = places[(instancePage - 1) * INSTANCE_PAGE + i]
         b.place = place
         if place then b:SetLabel((chosen == place.key and "> " or "") .. place.name); b:Show() else b:Hide() end
     end
     page = math.max(1, math.min(page, math.max(1, math.ceil(#results / PAGE))))
-    local title = chosen and instances[chosen] and instances[chosen].name or "All instances"
+    local title = chosen and instances[chosen] and instances[chosen].name or "All dungeons"
     W.selection:SetText(S.GOLD .. title .. "|r")
     W.boss:SetLabel("Source: " .. (encounter or "All encounters"))
     W.status:SetText(loading and ("Reading " .. tostring(source or "loot") .. " tables: " .. progress)
@@ -291,8 +311,9 @@ paint = function()
         local r = results[(page - 1) * PAGE + i]
         row.result = r
         if r then
-            row.item:SetText(r.item.name .. (r.item.info and ("  (iLvl " .. tostring(r.item.info.level or "?") .. ")") or ""))
-            row.from:SetText(r.instanceName .. " — " .. r.who .. (r.difficulty ~= "" and (" — " .. r.difficulty) or ""))
+            row.edge:Hide()
+            E.paintRow(row, r.item.info, r.item.name .. " · iLvl " .. tostring(r.item.info.level or "?") .. " · req " .. tostring(r.item.info.required or "?"),
+                r.who .. " — " .. r.instanceName)
             row.frame:Show()
         else row.frame:Hide() end
     end
@@ -311,42 +332,34 @@ end
 
 local function build()
     if W then return true end
-    local f = U.window("QuestSharingLoot", 920, 660, "Instance drops")
+    local f = E.page("dungeons")
     if not f then return false end
     W = { frame = f, instances = {}, rows = {} }
-    U.text(f, "Weapons and wearable armor only. Choose an instance or search; hover to compare, click for the source.", 24, 32, 870)
-    W.instanceSearch = U.box(f, "Find instance (Enter)", 24, 60, 220, "", 100)
+    W.instanceSearch = U.box(f, "Find dungeon (Enter)", 0, 0, 190, "", 100)
     W.instanceSearch:SetScript("OnEnterPressed", function(self) instanceQuery = self:GetText(); instancePage = 1; paint(); self:ClearFocus() end)
-    W.search = U.box(f, "Search item, ID, boss or instance (Enter)", 264, 60, 470, "", 100)
+    W.search = U.box(f, "Search item, ID, boss or dungeon (Enter)", 210, 0, 450, "", 100)
     W.search:SetScript("OnEnterPressed", function(self) query = self:GetText(); page = 1; refresh(); self:ClearFocus() end)
-    local reload = S.button(f, "Refresh data", 150, function() L.scan() end)
-    reload:SetPoint("TOPLEFT", f, "TOPLEFT", 744, -77)
-    local all = S.button(f, "All instances", 220, function() chosen, encounter, page = nil, nil, 1; refresh() end)
-    all:SetPoint("TOPLEFT", f, "TOPLEFT", 24, -116)
-    W.selection = U.text(f, "All instances", 264, 116, 630)
-    W.boss = S.button(f, "Source: All encounters", 630, function()
+    local all = S.button(f, "All dungeons", 190, function() chosen, encounter, page = nil, nil, 1; refresh() end)
+    all:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -54)
+    W.selection = U.text(f, "All dungeons", 0, 87, 190)
+    W.boss = S.button(f, "Source: All encounters", 450, function()
         local list, at = bosses(), 0
         for i, who in ipairs(list) do if who == encounter then at = i end end
         encounter = at < #list and list[at + 1] or nil
         page = 1; refresh()
     end)
-    W.boss:SetPoint("TOPLEFT", f, "TOPLEFT", 264, -140)
-    W.instanceStatus = U.text(f, "", 24, 149, 220)
+    W.boss:SetPoint("TOPLEFT", f, "TOPLEFT", 210, -54)
+    W.instanceStatus = U.text(f, "", 0, 112, 190)
     for i = 1, INSTANCE_PAGE do
-        local b = S.button(f, "", 220, function(self) chosen, encounter, page = self.place.key, nil, 1; refresh() end)
-        b:SetPoint("TOPLEFT", f, "TOPLEFT", 24, -(177 + (i - 1) * 37))
+        local b = S.button(f, "", 190, function(self) chosen, encounter, page = self.place.key, nil, 1; refresh() end)
+        b:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -(145 + (i - 1) * 36))
         W.instances[i] = b
     end
-    W.status = U.text(f, "", 264, 169, 630)
+    W.status = U.text(f, "", 210, 92, 450)
     for i = 1, PAGE do
-        local row = {}
-        row.frame = CreateFrame("Button", nil, f)
-        row.frame:SetWidth(630); row.frame:SetHeight(43)
-        row.frame:SetPoint("TOPLEFT", f, "TOPLEFT", 264, -(198 + (i - 1) * 47))
-        row.item, row.from = U.text(row.frame, "", 2, 1, 626), U.text(row.frame, "", 2, 21, 626)
-        if row.item.SetWordWrap then row.item:SetWordWrap(false); row.from:SetWordWrap(false) end
-        row.frame:RegisterForClicks("LeftButtonUp")
+        local row = E.row(f, 210, 120+(i-1)*53, 450, i)
         row.frame:SetScript("OnEnter", function(self)
+            row.bg:SetVertexColor(1.3,1.3,1.3)
             local r = row.result
             if not r then return end
             if GameTooltip and GameTooltip.SetHyperlink then
@@ -359,33 +372,37 @@ local function build()
                 end)
             else U.tip(self, r.item.name, { r.instanceName, "Source: " .. r.who, r.difficulty, "Data: " .. r.provider }) end
         end)
-        row.frame:SetScript("OnLeave", U.hideTip)
+        row.frame:SetScript("OnLeave", function() row.bg:SetVertexColor(1,1,1); U.hideTip() end)
         row.frame:SetScript("OnClick", function()
             local r = row.result
             if not r or not W.details then return end
-            W.setDetails(r.item.name .. " (item " .. r.itemID .. ")\n\nInstance: " .. r.instanceName
+            E.select(W.rows, row)
+            W.setDetails(r.item.name .. " (item " .. r.itemID .. ")\n\nEquipment: " .. r.item.info.slot
+                .. "\nItem level: " .. tostring(r.item.info.level or "unknown")
+                .. "\nRequired level: " .. tostring(r.item.info.required or "unknown")
+                .. "\n\nInstance: " .. r.instanceName
                 .. "\nSource: " .. r.who .. (r.difficulty ~= "" and ("\nDifficulty: " .. r.difficulty) or "")
                 .. "\nCatalogue: " .. r.provider .. "\n\nDrop chance is not supplied by this browser."
                 .. "\nEncounter groups such as Trash refer to a shared loot table, not a specific boss."
                 .. (r.provider == "QuestieDB" and "\nQuestieDB lists known sources only; this is not a complete instance loot table." or ""))
-            W.details:Show()
         end)
         W.rows[i] = row
     end
-    local function pager(label, x, y, fn)
-        local b = S.button(f, label, 100, fn); b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -y); return b
+    local function pager(label, x, fn)
+        local b = S.button(f, label, 90, fn); b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -500); return b
     end
-    W.instancePrev = pager("Previous", 24, 522, function() instancePage = math.max(1, instancePage - 1); paint() end)
-    W.instanceNext = pager("Next", 134, 522, function() instancePage = instancePage + 1; paint() end)
-    W.prev = pager("Previous", 264, 590, function() page = math.max(1, page - 1); paint() end)
-    W.next = pager("Next", 374, 590, function() page = page + 1; paint() end)
-    W.note = U.text(f, "", 24, 619, 870)
-    W.details = U.window("QuestSharingLootSource", 650, 390, "Item drop source")
-    if W.details then W.detailsText, W.setDetails = U.scrollText(W.details, 24, 40, 600, 310) end
-    f:SetScript("OnHide", function()
+    W.instancePrev = pager("Previous", 0, function() instancePage = math.max(1, instancePage - 1); paint() end)
+    W.instanceNext = pager("Next", 100, function() instancePage = instancePage + 1; paint() end)
+    W.prev = pager("Previous", 210, function() page = math.max(1, page - 1); paint() end)
+    W.next = pager("Next", 310, function() page = page + 1; paint() end)
+    W.reload = pager("Refresh data", 570, function() L.scan() end)
+    W.note = U.text(f, "", 0, 536, 660)
+    W.details, W.detailsText, W.setDetails = E.details(f, 684, 348, "Drop source")
+    f.refresh = function() page=1; refresh() end
+    f.suspend = function()
         if loading or queueAt <= #itemQueue then generation = generation + 1; loading, ready = false, false end
-        if W.details then W.details:Hide() end
-    end)
+    end
+    f:SetScript("OnHide", f.suspend)
     return true
 end
 
@@ -393,7 +410,7 @@ function L.open(text)
     if not ns.db.enabled then ns.print("switch Quest Sharing on first (/qs on)"); return false end
     if not build() then return false end
     if text and text ~= "" then query, chosen, encounter, page = text, nil, nil, 1; W.search:SetText(text) end
-    W.frame:Show()
+    E.show("dungeons")
     if not ready and not loading then L.scan()
     else
         refresh()
@@ -406,7 +423,7 @@ function L.open(text)
     return true
 end
 
-function L.close() if W then W.frame:Hide() end end
+function L.close() if W then E.close("dungeons") end end
 function L._window() return W end
 function L._results() return results end
 function L._state() return ready, loading, source, #index end

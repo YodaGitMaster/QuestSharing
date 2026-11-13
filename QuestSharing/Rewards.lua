@@ -1,11 +1,11 @@
 -- A local, on-demand catalogue of quest reward equipment. QuestieDB owns reward links and quest restrictions;
 -- the game supplies equipment slots, stats and comparison tooltips. No database scan happens at login.
 local ADDON, ns = ...
-local R, U, S = {}, ns.optionalUI, ns.style
+local R, U, S, E = {}, ns.optionalUI, ns.style, ns.equipmentUI
 ns.rewards = R
 local index, results, quests, window = {}, {}, {}, nil
 local loading, ready, generation, pending = false, false, 0, false
-local page, PAGE, scanDone, scanTotal = 1, 8, 0, 0
+local page, PAGE, scanDone, scanTotal = 1, 7, 0, 0
 local filters
 local catalogueError = "Needs a recent QuestieDB with an enumerable item catalogue."
 local function get(kind, id, key) return ns.questie.get(kind, id, key) end
@@ -76,9 +76,16 @@ local SLOT = { INVTYPE_HEAD = "Head", INVTYPE_NECK = "Neck", INVTYPE_SHOULDER = 
 local function info(id)
     local fn = (C_Item and C_Item.GetItemInfo) or GetItemInfo
     if not fn then return nil end
-    local ok, name, link, quality, level, required, _, _, _, loc, texture = pcall(fn, id)
+    local ok, name, link, quality, level, required, _, _, _, loc, texture, _, kind, sub = pcall(fn, id)
     if not ok or not name then return nil end
-    return { name = name, link = link, quality = quality, level = level, required = required, slot = SLOT[loc], texture = texture }
+    local dbKind = tonumber((get("item", id, "class")))
+    kind = tonumber(kind) or dbKind
+    sub = tonumber(sub)
+    if sub == nil and (dbKind == 2 or dbKind == 4) then sub = tonumber((get("item", id, "subClass"))) end
+    if (not kind or kind == 0) and SLOT[loc] then
+        kind = (SLOT[loc] == "Weapon" or (SLOT[loc] == "Ranged" and loc ~= "INVTYPE_RELIC")) and 2 or 4
+    end
+    return { name = name, link = link, quality = quality, level = level, required = required, slot = SLOT[loc], texture = texture, kind = kind, sub = sub }
 end
 R.itemInfo = info -- shared native item metadata reader for the instance loot browser
 
@@ -120,6 +127,7 @@ local function detail(r)
     local starter = q.starter(r.questID)
     local before, any = q.before(r.questID)
     local lines = { r.name .. " — item level " .. r.itemLevel,
+        "Equipment: " .. r.slot .. "; requires character level " .. tostring(r.info and r.info.required or "unknown"),
         r.questName .. " (quest " .. r.questLevel .. ", requires level " .. r.requiredLevel .. ")",
         q.whereText(r.questID) or "Quest starting location unknown." }
     if #before > 0 then lines[#lines + 1] = "Prerequisites (" .. (any and "any" or "all") .. "): " .. table.concat(before, ", ") end
@@ -154,8 +162,9 @@ function R.search(f)
                     local starter = ns.questie.starter(qid)
                     local text = string.lower(name .. " " .. q.name .. " " .. (starter and starter.zone or ""))
                     if (not itemInfo or (slot and num(itemInfo.required) <= level))
+                        and E.matches(itemInfo, item)
                         and (f.slot == "All slots" or f.slot == slot) and (needle == "" or string.find(text, needle, 1, true)) then
-                        results[#results + 1] = { itemID = item.id, name = name, link = itemInfo and itemInfo.link,
+                        results[#results + 1] = { itemID = item.id, name = name, info = itemInfo, link = itemInfo and itemInfo.link,
                             itemLevel = itemInfo and num(itemInfo.level) > 0 and itemInfo.level or item.level,
                             slot = slot or "Details loading", questID = qid, questName = q.name, questLevel = q.level,
                             requiredLevel = q.required, zone = starter and starter.zone or "Unknown start", cached = itemInfo ~= nil }
@@ -184,20 +193,21 @@ local function paint()
         local r = results[(page - 1) * PAGE + i]
         row.result = r
         if r then
-            row.item:SetText(S.GOLD .. r.name .. "|r  (iLvl " .. r.itemLevel .. ", " .. r.slot .. ")")
-            row.quest:SetText(r.questName .. " — " .. r.zone .. " — quest " .. r.questLevel .. ", minimum " .. r.requiredLevel)
+            row.edge:Hide()
+            E.paintRow(row, r.info, r.name .. " · iLvl " .. r.itemLevel .. " · req " .. tostring(r.info and r.info.required or "?"),
+                r.questName .. " — " .. r.zone)
             row.frame:Show()
         else row.frame:Hide() end
     end
 end
 
 function R.refresh()
-    if not (window and window.frame:IsShown() and ns.db.enabled and ns.db.rewardBrowser) then return end
+    if not (window and E.visible("quests") and ns.db.enabled and ns.db.rewardBrowser) then return end
     R.search(); paint()
 end
 
 local function schedule()
-    if pending or not (window and window.frame:IsShown()) then return end
+    if pending or not (window and E.visible("quests")) then return end
     pending = true
     ns.after(0.2, function() pending = false; R.refresh() end)
 end
@@ -221,7 +231,7 @@ function R.scan()
     local cursor = 1
     local function batch()
         if token ~= generation then return end
-        if not ns.db.enabled or not ns.db.rewardBrowser then loading = false; return end
+        if not ns.db.enabled or not ns.db.rewardBrowser or not E.visible("quests") then loading = false; return end
         for _ = 1, 100 do
             local id = ids[cursor]
             if not id then
@@ -268,45 +278,39 @@ end
 
 local function build()
     if window then return true end
-    local f = U.window("QuestSharingRewards", 860, 640, "Quest reward equipment")
+    local f = E.page("quests")
     if not f then return false end
     window = { frame = f, rows = {}, controls = {} }
-    U.text(f, "Find equipment from quests you can pursue. Hover an item to compare; click a result for the quest route.", 24, 32, 810)
     local classes = {}
     for k, v in pairs(classKeys()) do if type(v) == "number" and v > 0 and not string.find(k, "ALL", 1, true) and k ~= "NONE" then classes[#classes + 1] = k end end
     if #classes == 0 then for k in pairs(WEAPONS) do classes[#classes + 1] = k end end
     table.sort(classes)
-    window.controls[1] = cycle(f, "Class", 24, 62, 180, classes, "class")
-    window.controls[2] = cycle(f, "Faction", 214, 62, 180, { "Alliance", "Horde" }, "faction")
-    window.controls[3] = cycle(f, "Slot", 404, 62, 180, SLOTS, "slot")
-    window.level = U.box(f, "Character level", 600, 50, 98, filters.level, 4)
+    window.controls[1] = cycle(f, "Class", 0, 8, 165, classes, "class")
+    window.controls[2] = cycle(f, "Faction", 175, 8, 165, { "Alliance", "Horde" }, "faction")
+    window.level = U.box(f, "Character level", 350, 0, 110, filters.level, 4)
     window.level:SetScript("OnEnterPressed", function(self)
         local n = tonumber(self:GetText())
         if n and n >= 1 and n <= 1000 and n % 1 == 0 then filters.level = n; page = 1; R.refresh() end
         self:SetText(tostring(filters.level)); self:ClearFocus()
     end)
-    local mine = S.button(f, "My character", 120, function()
+    local mine = S.button(f, "My character", 180, function()
         filters = defaults(); window.level:SetText(tostring(filters.level)); window.search:SetText("")
         page = 1; R.updateControls(); R.refresh()
     end)
-    mine:SetPoint("TOPLEFT", f, "TOPLEFT", 710, -65)
-    window.near = S.button(f, "", 180, function() filters.near = not filters.near; page = 1; R.updateControls(); R.refresh() end)
-    window.near:SetPoint("TOPLEFT", f, "TOPLEFT", 24, -103)
-    window.completed = S.button(f, "", 180, function() filters.completed = not filters.completed; page = 1; R.updateControls(); R.refresh() end)
-    window.completed:SetPoint("LEFT", window.near, "RIGHT", 10, 0)
-    window.search = U.box(f, "Search item, quest or zone (Enter)", 404, 88, 294, "", 100)
+    mine:SetPoint("TOPLEFT", f, "TOPLEFT", 470, -18)
+    window.near = S.button(f, "", 165, function() filters.near = not filters.near; page = 1; R.updateControls(); R.refresh() end)
+    window.near:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -54)
+    window.completed = S.button(f, "", 165, function() filters.completed = not filters.completed; page = 1; R.updateControls(); R.refresh() end)
+    window.completed:SetPoint("TOPLEFT", f, "TOPLEFT", 175, -54)
+    window.search = U.box(f, "Search item, quest or zone (Enter)", 350, 42, 300, "", 100)
     window.search:SetScript("OnEnterPressed", function(self) filters.text = self:GetText(); page = 1; R.refresh(); self:ClearFocus() end)
-    local reload = S.button(f, "Refresh data", 120, function() R.scan() end)
-    reload:SetPoint("TOPLEFT", f, "TOPLEFT", 710, -105)
-    window.status = U.text(f, "", 24, 147, 806)
+    window.status = U.text(f, "", 0, 92, 650)
     for i = 1, PAGE do
-        local row = {}
-        local b = CreateFrame("Button", nil, f)
-        b:SetWidth(806); b:SetHeight(44); b:SetPoint("TOPLEFT", f, "TOPLEFT", 24, -(178 + (i - 1) * 47))
-        row.frame, row.item, row.quest = b, U.text(b, "", 4, 2, 798), U.text(b, "", 4, 22, 798)
-        if row.item.SetWordWrap then row.item:SetWordWrap(false); row.quest:SetWordWrap(false) end
-        b:RegisterForClicks("LeftButtonUp")
+        local row = E.row(f, 0, 120 + (i-1)*53, 650, i)
+        local b = row.frame
+        row.quest = row.from
         b:SetScript("OnEnter", function(self)
+            row.bg:SetVertexColor(1.3,1.3,1.3)
             local r = row.result
             if not r then return end
             if GameTooltip and GameTooltip.SetHyperlink then
@@ -319,35 +323,35 @@ local function build()
                 end)
             else U.tip(self, r.name, (detail(r))) end
         end)
-        b:SetScript("OnLeave", U.hideTip)
+        b:SetScript("OnLeave", function() row.bg:SetVertexColor(1,1,1); U.hideTip() end)
         b:SetScript("OnClick", function()
             local r = row.result
             if not r then return end
             local lines, starter = detail(r)
-            if not window.routeFrame then for _, line in ipairs(lines) do ns.print(line) end; return end
+            E.select(window.rows, row)
             window.setRoute(table.concat(lines, "\n"))
             window.routeMap = starter and starter.area and ns.questie.uiMapOf(starter.area)
-            window.routeFrame:Show()
         end)
         window.rows[i] = row
     end
-    local prev = S.button(f, "Previous", 100, function() page = math.max(1, page - 1); paint() end)
-    prev:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 24, 60)
-    local nextPage = S.button(f, "Next", 100, function() page = page + 1; paint() end)
-    nextPage:SetPoint("LEFT", prev, "RIGHT", 10, 0)
-    local drops = S.button(f, "Instance drops", 150, function() ns.loot.open() end)
-    drops:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -24, 60)
-    U.text(f, "Class equipment families use Classic rules. Check tooltips for item restrictions and your build's stats.\n"
-        .. "Quest availability also depends on chains, reputation and skills. Item level alone does not mean an upgrade.", 24, 596, 806)
-    window.routeFrame = U.window("QuestSharingRewardRoute", 640, 390, "Quest reward route")
-    if window.routeFrame then
-        window.route, window.setRoute = U.scrollText(window.routeFrame, 24, 40, 590, 285)
-        local map = S.button(window.routeFrame, "Find starting zone on map", 200, function()
-            if not U.mapHint(window.routeMap) then ns.print("this quest has no known map for its starting zone") end
-        end)
-        map:SetPoint("BOTTOMLEFT", window.routeFrame, "BOTTOMLEFT", 24, 24)
+    window.prev = S.button(f, "Previous", 100, function() page = math.max(1, page - 1); paint() end)
+    window.prev:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -500)
+    window.next = S.button(f, "Next", 100, function() page = page + 1; paint() end)
+    window.next:SetPoint("TOPLEFT", f, "TOPLEFT", 110, -500)
+    window.reload = S.button(f, "Refresh data", 120, function() R.scan() end)
+    window.reload:SetPoint("TOPLEFT", f, "TOPLEFT", 530, -500)
+    U.text(f, "Compare stats for your build. Quest chains, reputation and skills may affect availability.", 0, 536, 650)
+    window.routeFrame, window.route, window.setRoute = E.details(f, 674, 358, "Quest route")
+    local map = S.button(window.routeFrame, "Find starting zone on map", 260, function()
+        if not U.mapHint(window.routeMap) then ns.print("this quest has no known map for its starting zone") end
+    end)
+    map:SetPoint("BOTTOMLEFT", window.routeFrame, "BOTTOMLEFT", 14, 18)
+    f.refresh = function() page=1; R.refresh() end
+    f.suspend = function()
+        generation = generation + 1
+        if loading then loading, ready = false, false end
     end
-    f:SetScript("OnShow", function() schedule() end)
+    f:SetScript("OnHide", f.suspend)
     return true
 end
 
@@ -356,14 +360,14 @@ function R.open()
     if not ns.db.rewardBrowser then ns.setSetting("rewardBrowser", true) end
     filters = filters or defaults()
     if not build() then return end
-    R.updateControls(); window.frame:Show()
+    R.updateControls(); E.show("quests")
     if not ready and not loading then R.scan() else R.refresh() end
 end
 
 function R.settingChanged()
     if not ns.db.enabled or not ns.db.rewardBrowser then
         generation = generation + 1; loading = false
-        if window then window.frame:Hide(); if window.routeFrame then window.routeFrame:Hide() end end
+        if window then E.close("quests") end
     end
 end
 

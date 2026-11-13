@@ -442,14 +442,26 @@ Forever data remain labelled. **There is no built-in verified catalogue of every
 their specific fish/skill values are entered by you, and zone summaries are not copied onto individual waters.
 The fishing layer works alongside Questie.
 
+**One equipment window.** `/qs rewards` and `/qs loot` open the same **Equipment explorer**. Switch between
+**Quest rewards** and **Instance drops** with its tabs. Item rows have icons, quality colors, item/required levels
+and a source line; hover for the game's comparison tooltip. Click a row to update the route or drop-source pane
+on the right. Selecting more items never opens additional route/source windows.
+
+The filter bar applies to both tabs. Choose **Weapons**, **Armor** or **Accessories**, then a specific **Item type**
+(swords, staves, cloth, leather, mail, plate, shields, jewelry, etc.) and/or an equipment **Slot**. Left-click a
+choice to go forward, right-click to go back. For **Level range measures**, choose **Required level** or **Item
+level**, enter **Min** and **Max**, then press Enter or **Apply**. Bounds are inclusive; blank means unrestricted.
+Invalid or reversed ranges show a message and keep the last valid range. **Reset filters** clears the shared bar;
+the quest tab's character/class/faction and eligibility controls remain separate.
+
 **Find quest equipment for your character.** `/qs rewards` opens the browser and enables it. It starts with your
-class, current level and faction. Change class, faction or equipment slot with their buttons, edit the level and
+class, current level and faction. Change class or faction with their buttons, edit the character level and
 press Enter, or search for an item, quest or zone. **Near my level** shows quests from ten levels below to three
 above your selected level, while still requiring their minimum acceptance level and the item's required level to
 be within reach. Switch that filter off to browse lower-level rewards too; **Completed quests** includes quests
 already completed when requested. **My character** restores your own filters.
 
-Each result shows the item, item level, equipment slot, quest, quest level and starting zone. Hover to see the
+Each result shows the item, its item/required levels, quest and starting zone; the details pane includes the slot and quest level. Hover to see the
 game's item tooltip and equipped-item comparison. Click for the quest giver, coordinates and prerequisite quests.
 For example, a level-20 Alliance Druid can find staffs, leather and cloth rewards from ordinary quests as well as
 Druid quests. Results are sorted by item level; compare the actual stats for healing, casting or feral play.
@@ -460,14 +472,14 @@ the list is a planning tool, not a promise that every quest is immediately avail
 
 The browser needs a recent **QuestieDB** with `ItemDB.GetAllIds`, item `questRewards`, and `LibQuestieDB.Enum` class
 and race mappings; without it the window explains what is missing. It scans only when opened/refreshed, in batches,
-and stops if disabled. Uncached item details update when the game supplies them. **Refresh data** rereads the source.
+and stops if disabled or its tab/window is closed. Uncached item details update when the game supplies them. **Refresh data** rereads the source.
 Map controls give directions: open the map yourself with `M`, avoiding this client's protected-map restrictions.
 Both tools are covered by Lua mock tests; their rendering and item tooltips still need verification in the game.
 
 **Instance drops and who drops them.** Open *Settings > Optional > Search instance loot and who drops it*, click
-**Instance drops** in the quest reward browser, or type `/qs loot`. Use **Find instance** and press Enter to narrow
-the list on the left, then click an instance to browse its drops. **Search item, ID, boss or instance** searches
-within the selected instance; **All instances** searches the whole catalogue. You can also start with
+**Instance drops** tab in the equipment explorer, or type `/qs loot`. Use **Find dungeon** and press Enter to narrow
+the list on the left, then click a dungeon to browse its drops. **Search item, ID, boss or dungeon** searches
+within the selected dungeon; **All dungeons** searches the dungeon catalogue. You can also start with
 `/qs loot VanCleef` or `/qs loot 5191`. The **Source** button cycles through that instance's encounters, including
 trash and chest groups with equipment drops. Both instance and item lists have Previous/Next pages.
 Only weapons and wearable equipment are shown: armor, shields, necklaces, rings, trinkets and offhands;
@@ -480,9 +492,12 @@ specific NPC or a drop percentage when the catalogue does not provide one.
 
 For encounter loot tables, install/enable a compatible **AtlasLoot** and its **DungeonsAndRaids** module, such as
 [AtlasLootClassic (Forever & Era Fix)](https://www.curseforge.com/wow/addons/atlaslootclassic-forever-era-fix).
-The browser reads the installed catalogue at runtime; available instances and difficulty variants follow that
-catalogue's coverage. Without compatible AtlasLoot tables, **QuestieDB** provides a clearly labelled **partial**
-list of item sources whose creatures or objects are known to be inside instances. QuestieDB alone is not a complete
+The browser reads the installed catalogue at runtime and includes **Classic and Forever dungeons**.
+**Raids, world bosses and unidentified encounter collections are excluded**, even if they contain equipment.
+Dungeon classification comes from AtlasLoot's content category or known dungeon IDs; coverage follows the installed
+catalogue. Dire Maul wings without InstanceID are supported by their known dungeon area. Without compatible AtlasLoot tables, **QuestieDB** provides a clearly labelled **partial**
+list of item sources whose creatures or objects are known to be inside recognized dungeons; raid interiors and
+unknown instance areas are excluded. Some Forever areas cannot be identified by that fallback. QuestieDB alone is not a complete
 dungeon loot database. Without either source, the GUI explains what to install. No loot database is bundled here.
 
 Indexing and game item-name requests happen only while using the browser, in small batches. Names update when the
@@ -654,9 +669,10 @@ python tests/test_ringtest.py         # 14 tests: /qs quick test: every slot run
 python tests/test_log.py              # 35 tests: the debug log: every action and its outcome, kept small, the log window
 python tests/test_optional.py         # 42 tests: fishing water notes, map drawing, reward filters and item comparisons
 python tests/test_adventure.py        # 32 tests: role-play quest invitations, preview, channels and preserved chat drafts
+python tests/test_equipment.py        # 26 tests: one window, shared filters, dungeon/raid identity and cancellation
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 ```
-Expected: every line ends in `passed` with all tests green (1055 in total).
+Expected: every line ends in `passed` with all tests green (1081 in total).
 
 ## Files
 | File | Purpose |
@@ -681,6 +697,7 @@ Expected: every line ends in `passed` with all tests green (1055 in total).
 | `QuestSharing/Questie.lua` | reads Questie's quest database (when installed): where a quest starts, which quests come first, where objectives are done and quests turned in |
 | `QuestSharing/Fishing.lua` | optional world-map water markers, saved water editor and AnglerAtlas zone summaries |
 | `QuestSharing/Rewards.lua` | optional QuestieDB equipment rewards, filters, item comparisons and quest routes |
+| `QuestSharing/EquipmentUI.lua` | one equipment window, shared item type/slot/level filters, item cards and inline details |
 | `QuestSharing/OptionalUI.lua` | shared controls for the optional tools |
 | `QuestSharing/Adventure.lua` | role-play quest invitation preview and chat preparation in a chosen channel |
 | `QuestSharing/Loot.lua` | searchable instance loot, encounter sources, AtlasLoot adapter and partial QuestieDB fallback |

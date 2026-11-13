@@ -2,23 +2,24 @@
 Last updated: 2026-11-13
 
 ## Active task
-- User requested Seek fellow adventurers directly after Tell the party in the quest right-click menu.
-- Completed in version 0.4.4; pushed main/tag and published the stable release with verified install ZIP.
+- Implemented 0.4.5 shared equipment explorer, item type/slot/level range filters and dungeon-only scope.
+- User clarified: include Forever dungeons as well as Classic; exclude raids and world bosses.
+- Finishing final regression/package/release verification under ongoing publication authorization.
 
 ## Last completed
-- Published v0.4.4 at `0c1a51246fbe943e099a9a55ab8a41e2e1738454`; downloaded asset matches source-verified local ZIP (29 addon files).
-- Confirmed existing action was row 3, then moved it to row 2 (before Offer it to the party).
-- Updated existing menu-order expectation and user documentation. Selecting the action still opens that quest's invitation composer.
-- Targeted verification: 60/60 menu and 32/32 adventure checks passed on modern/classic paths; diff whitespace clean.
-- Previous full baseline (v0.4.3): all 27 suites / 1,055 checks passed.
-- v0.4.3 equipment-only loot filter remains in place; no changes to it in this work block.
+- Added EquipmentUI.lua: one host, two child pages, icons/quality colors, selected rows and inline route/source details. Shared filters use numeric metadata and inclusive Required level / Item level bounds.
+- Updated Rewards/Loot to use shared pages and cancel pending work on close/tab changes. Existing character eligibility and native comparisons preserved.
+- Actual compatible AtlasLoot source smoke: 30 Classic/Forever dungeon entries / 1,655 raw source rows, zero Lua errors; Cruel Barb verified against Edwin VanCleef after native item details supplied.
+- Final validation: all 28 suites / 1,081 checks passed, including 26 shared-explorer, 42 optional and 58 loot cases; diff whitespace clean.
+- Built `dist/QuestSharing-0.4.5.zip`: 30 source-matching addon files; SHA256 `9c447ef0f5f30eb456992e698e1b63386608154d7ced95b8631fd6f3f70e802c`.
+- Inspected approximate layout previews derived from actual mocked frame geometry; real game rendering remains unavailable.
 
 ## Implemented tools
 - Optional tab in `/qs settings`; fishing layer and quest reward browser default off.
 - `/qs fishing`: persistent per-water editor; `/qs fishing on`: world-map layer, with Alt-click placement where supported. Water notes survive settings reset and are deleted explicitly.
-- `/qs rewards`: equipment rewards by class/level/faction, slot/search filters, native comparisons and quest routes; requires recent QuestieDB and enum tables.
+- `/qs rewards`: shared explorer quest tab; equipment rewards by class/level/faction, slot/search filters, native comparisons and quest routes; requires recent QuestieDB and enum tables.
 - `/qs adventure [quest ID or title]`: editable role-play invitation for chosen chat; Prepare fills a draft, Enter sends.
-- `/qs loot [search]`: instance equipment, encounter filter, item/name/ID/boss search, supplier/difficulty and native comparisons.
+- `/qs loot [search]`: shared explorer dungeon tab; Classic/Forever dungeon equipment, encounter filter, item/name/ID/boss search, supplier/difficulty and native comparisons.
 - Quest objective/turn-in symbols removed from both maps; old saved `questMap` setting discarded.
 
 ## Remaining limits
