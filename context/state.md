@@ -2,17 +2,15 @@
 Last updated: 2026-11-13
 
 ## Active task
-- User clarified instance drop search should show equipment only; corrected in version 0.4.3, validated and packaged.
-- Completed push and stable v0.4.3 publication; remote tag and downloaded ZIP verified, no release work remains.
+- User requested Seek fellow adventurers directly after Tell the party in the quest right-click menu.
+- Implemented in version 0.4.4; validated and ready to push/publish under the ongoing release authorization.
 
 ## Last completed
-- Published v0.4.3 at `72d7d3528629ca2c24c518275440195be3b0a703`; downloaded GitHub ZIP matches the verified local package byte for byte.
-- Reproduced Silken Cloth leakage on modern/classic paths; corrected unrealistic fixture slots and added failing-first tests.
-- `Loot.lua` now requires recognized `Rewards.itemInfo().slot` for results and encounter choices. Weapons and wearable gear remain; materials, consumables, bags and unknown classifications stay hidden.
-- Existing asynchronous item-cache events reveal equipment after details load; provider indexing, batching and source attribution remain intact.
-- All 27 suites / 1,055 checks passed, including 58 loot cases; `git diff --check` clean.
-- Built `dist/QuestSharing-0.4.3.zip`: 29 addon files match source; SHA256 `af209ddb41dc6ca695b1364b56c00c3dade5ef7281b385ae19010ccbec0f0cd1`.
-- Reusable report: `context/BUGS/2026-11-13-instance-loot-non-equipment.md`; live architecture/schema updated.
+- Confirmed existing action was row 3, then moved it to row 2 (before Offer it to the party).
+- Updated existing menu-order expectation and user documentation. Selecting the action still opens that quest's invitation composer.
+- Targeted verification: 60/60 menu and 32/32 adventure checks passed on modern/classic paths; diff whitespace clean.
+- Previous full baseline (v0.4.3): all 27 suites / 1,055 checks passed.
+- v0.4.3 equipment-only loot filter remains in place; no changes to it in this work block.
 
 ## Implemented tools
 - Optional tab in `/qs settings`; fishing layer and quest reward browser default off.

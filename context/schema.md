@@ -2,7 +2,7 @@
 Last updated: 2026-11-13
 
 ## Addon loading and persistence
-- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.3; declares file load order and SavedVariables.
+- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.4; declares file load order and SavedVariables.
 - Lua modules receive `local ADDON, ns = ...`; `ns` is the shared namespace, not a class.
 - `Core.lua`: `ns.defaults`; `ns.db` initially copies defaults. On `ADDON_LOADED`, missing settings are filled and `ns.db` aliases saved `QuestSharingDB`; current `dbVersion = 3`.
 - SavedVariables: `QuestSharingDB` (settings), `QuestSharingLog` (debug log); persisted by the game.
@@ -35,7 +35,7 @@ Last updated: 2026-11-13
 - `route(input)`: `prefix, isCurrent` or `nil, error`; accepts current, standard chat aliases, whisper recipient and joined channel number/name (`GetChannelName` when available).
 - `prepare(e, text, route)`: revalidates quest and byte limit, then preserves/appends to active chat for current or calls ChatFrame_OpenChat with channel prefix. Never sends automatically.
 - Explicit channel changes refuse nonempty existing drafts; duplicate quests and combined drafts >255 bytes are rejected without mutation.
-- Entry points: quest menu (8 rows total), Optional settings action, `/qs adventure [quest ID | exact title | quest link]`.
+- Entry points: quest right-click menu (8 rows total; invitation is row 2, immediately after Tell the party how I am doing), Optional settings action, `/qs adventure [quest ID | exact title | quest link]`.
 
 ## Retired quest overlay (2026-11-13)
 - `QuestMap.lua` deleted and removed from load order. No `ns.questMap` runtime table, renderer, refresh timers or setting row.

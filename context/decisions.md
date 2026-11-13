@@ -1,5 +1,10 @@
 # Decisions
 
+## 2026-11-13 — Invitation menu placement
+- User requested Seek fellow adventurers immediately after Tell the party in the quest right-click menu.
+- Move its existing action to row 2, before Offer it to the party; keep selected-quest invitation behavior.
+- Update existing menu-order assertion and documentation; release as 0.4.4 under the ongoing push/release authorization.
+
 ## 2026-11-13 — Restrict instance loot to equipment
 - User clarified that instance results should contain equipment drops such as weapons and armor; previous all-item scope included unwanted materials.
 - Reuse `Rewards.itemInfo().slot` (recognized weapon/wearable slots) in loot search and encounter choices for both providers. Includes jewelry, trinkets, shields and offhands; excludes bags/quivers and non-equipment.
