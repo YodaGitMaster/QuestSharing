@@ -6,6 +6,7 @@
 - Cache successful stat tables only; item info events clear cache before existing page refresh handlers. Unavailable data can recover without restarting or reindexing the catalogue.
 - Existing mocks lack both stat APIs; dedicated fixtures exercise each API explicitly. Approximate widget render checked stat-row spacing; native game rendering remains unverified.
 - Verification: all 30 suites / 1,141 checks pass, including 20 new stat checks across modern and legacy API paths.
+- Published v0.4.8 at `50d41cad29bc5aa4119d964d91668bec4e75f89e`; downloaded ZIP byte-matches local source-verified build, SHA256 `3940b4a035ca9dceaf48ba9b95ffc066284e2f2081ea323543788decb5a02330`.
 
 ## 2026-11-13 — Equipment navigation redesign
 - Most friction came from interaction design: cycling controls, Enter-only searches, page buttons and extra clicks for details. Direct/searchable dropdowns, live input and stable automatic selection address those paths.

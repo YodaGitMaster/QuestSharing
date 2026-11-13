@@ -2,9 +2,11 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Shared stat filters completed and verified; 0.4.8 packaging/publication pending under existing authorization.
+- Shared stat filters completed and published as v0.4.8; remote tag and downloaded install ZIP verified.
+- No remaining feature work; native game-client QA remains unavailable in this environment.
 
 ## Last completed
+- Published v0.4.8 at `50d41cad29bc5aa4119d964d91668bec4e75f89e`; downloaded 30-file ZIP matches the tested source-verified build byte for byte.
 - Implemented three shared AND stat conditions, searchable selectors/live inclusive minimums, clear/reset, lazy native API compatibility and event-invalidated cache; Rare+/eligibility/dungeon scope retained.
 - Updated live architecture/schema/decisions and checked approximate widget geometry; no native client available.
 - All 30 suites / 1,141 checks pass, including 20 new stat workflows; diff whitespace clean.
@@ -39,6 +41,6 @@ Last updated: 2026-11-13
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
-- v0.4.7: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.7
-- Tag `13d718f8212f084b7748c8f311d8ea5a2113664d`; ZIP 152,730 bytes; SHA256 `f8b13b1b34f17348296fe718f7e399c8dc2301ec8401f73ea28df78e46d779b9`.
+- v0.4.8: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.8
+- Tag `50d41cad29bc5aa4119d964d91668bec4e75f89e`; ZIP 154,142 bytes; SHA256 `3940b4a035ca9dceaf48ba9b95ffc066284e2f2081ea323543788decb5a02330`.
 - Main also includes a documentation follow-up recording publication. Previous release tags and ZIPs preserved.
