@@ -1,5 +1,15 @@
 # Insights
 
+## 2026-11-13 — Equipment navigation redesign
+- Most friction came from interaction design: cycling controls, Enter-only searches, page buttons and extra clicks for details. Direct/searchable dropdowns, live input and stable automatic selection address those paths.
+- One unnamed popup is reused for all choices and stays open through background data refreshes; manual selection/tab change/close dismiss it. Filter reset cancels debounced callbacks so stale text cannot jump pages later.
+- 30 usability workflow checks cover both API styles, including direct class/source choices, debounce, sorting/My level, wheel/arrow boundaries, cache-preserved selection, no-results recovery and hidden-tab search return.
+- Native edit-box API verified against [Blizzard generated API documentation](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua); optional SetAltArrowKeyMode(false) supports arrow navigation without capturing global keys.
+- Caught and fixed delayed Apply callbacks resetting pagination after a scroll; the new workflow case failed on both API styles before cancelling both input serials at the common commit path. See `context/BUGS/2026-11-13-debounced-filter-reapply.md`.
+- Final all-suite validation: 29 scripts / 1,121 checks passed; built/source-verified 30-file v0.4.7 ZIP.
+- Mixed wheel/keyboard dropdown case also failed before correction; keep the Enter cursor inside the visible option slice. See `context/BUGS/2026-11-13-dropdown-offscreen-selection.md`.
+- Reviewed approximate native-widget geometry previews under `/tmp/questsharing-equipment-{quests,dungeons}.png`; these are layout approximations, not game screenshots.
+
 ## 2026-11-13 — Minimum Rare equipment quality
 - One shared predicate covers quests, dungeon results and source choices. Added confirmed native quality >=3 before type/slot/level filters; unknown quality is hidden until cache events supply it.
 - New integration cases failed before the filter (26/36 shared-explorer checks passed), then 36/36 passed. Optional 42/42 and loot 58/58 also passed.

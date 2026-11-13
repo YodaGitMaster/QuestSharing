@@ -3,7 +3,7 @@ local ADDON, ns = ...
 local E, U, S = {}, ns.optionalUI, ns.style
 ns.equipmentUI = E
 local host, active, pages, tabs = nil, nil, {}, {}
-local f = { category = "All equipment", subtype = "Any type", slot = "All slots", mode = "Required level" }
+local f = { category = "All equipment", subtype = "Any type", slot = "All slots", mode = "Required level", sort = "Highest item level" }
 E.filters = f
 local categories = { "All equipment", "Weapons", "Armor", "Accessories" }
 local types = {
@@ -16,6 +16,7 @@ local weaponTypes = { Axes={0,1}, Swords={7,8}, Maces={4,5}, Staves={10}, Dagger
     ["Fist weapons"]={13}, Bows={2}, Guns={3}, Crossbows={18}, Wands={19}, Thrown={16}, ["Fishing poles"]={20} }
 local armorTypes = { Cloth=1, Leather=2, Mail=3, Plate=4, Shields=6 }
 local slots = { "All slots", "Head", "Neck", "Shoulder", "Back", "Chest", "Wrist", "Hands", "Waist", "Legs", "Feet", "Finger", "Trinket", "Weapon", "Offhand", "Ranged" }
+local readableQuality = { [3]="|cff79bfff", [4]="|cffcd9bff", [5]="|cffffbf80" }
 local quality = { [0]="|cff9d9d9d", [1]="|cffffffff", [2]="|cff1eff00", [3]="|cff0070dd", [4]="|cffa335ee", [5]="|cffff8000" }
 
 function E.matches(info, fallback)
@@ -51,20 +52,193 @@ local function changed()
     local p = active and pages[active]
     if p and p.refresh then p.refresh() end
 end
-local function nextValue(values, current, button)
-    local at = 1
-    for i,v in ipairs(values) do if v == current then at = i end end
-    return values[(at - 1 + (button == "RightButton" and -1 or 1)) % #values + 1]
+local menu, drawMenu
+local function option(entry)
+    if type(entry) == "table" then return entry.value, entry.label or tostring(entry.value) end
+    return entry, tostring(entry)
 end
+function E.dismissMenu()
+    if menu then menu.frame:Hide(); menu.search:ClearFocus(); menu.owner=nil end
+end
+local function chooseOption(entry)
+    if not menu or not menu.owner or not entry then return end
+    local owner = menu.owner
+    local value = option(entry)
+    E.dismissMenu(); owner.chooseValue(value); owner.refresh()
+end
+local function buildMenu()
+    if menu then return end
+    local panel = CreateFrame("Frame", nil, host)
+    panel:SetWidth(250); panel:SetHeight(330); panel:SetFrameStrata("TOOLTIP")
+    if panel.SetFrameLevel then panel:SetFrameLevel((host.GetFrameLevel and host:GetFrameLevel() or 0)+40) end
+    panel:SetClampedToScreen(true); panel:EnableMouse(true)
+    S.fill(panel,"BACKGROUND",0.07,0.09,0.14,1):SetAllPoints(panel)
+    menu={frame=panel,rows={},offset=0,cursor=1}
+    menu.search=U.box(panel,"Find an option",10,8,230,"",80)
+    if menu.search.SetAltArrowKeyMode then menu.search:SetAltArrowKeyMode(false) end
+    menu.status=U.text(panel,"",10,307,230)
+    for i=1,10 do
+        local row=S.button(panel,"",230,function(self) chooseOption(self.entry) end)
+        row:SetHeight(24);row:SetPoint("TOPLEFT",panel,"TOPLEFT",10,-(48+(i-1)*25))
+        row.label:ClearAllPoints();row.label:SetPoint("LEFT",row,"LEFT",8,0);row.label:SetWidth(214);row.label:SetJustifyH("LEFT");row.label:SetWordWrap(false)
+        row:HookScript("OnEnter",function(self) if self.entry then local _,label=option(self.entry);U.tip(self,label,{}) end end)
+        row:HookScript("OnLeave",U.hideTip)
+        menu.rows[i]=row
+    end
+    panel:EnableMouseWheel(true)
+    panel:SetScript("OnMouseWheel",function(_,delta) menu.offset=menu.offset+(delta>0 and -3 or 3);drawMenu() end)
+    for _,row in ipairs(menu.rows) do row:EnableMouseWheel(true);row:SetScript("OnMouseWheel",function(_,delta) menu.offset=menu.offset+(delta>0 and -3 or 3);drawMenu() end) end
+    menu.search:SetScript("OnTextChanged",function() menu.offset,menu.cursor=0,1;drawMenu() end)
+    menu.search:SetScript("OnEnterPressed",function() chooseOption(menu.filtered[menu.cursor]) end)
+    menu.search:SetScript("OnArrowPressed",function(_,key)
+        if key~="UP" and key~="DOWN" then return end
+        local n=#menu.filtered
+        menu.cursor=math.max(1,math.min(n,menu.cursor+(key=="UP" and -1 or 1)))
+        if menu.cursor<=menu.offset then menu.offset=menu.cursor-1 elseif menu.cursor>menu.offset+10 then menu.offset=menu.cursor-10 end
+        drawMenu()
+    end)
+    menu.search:SetScript("OnEscapePressed",E.dismissMenu)
+    panel:Hide()
+end
+
+drawMenu=function()
+    if not menu.owner then return end
+    local values=type(menu.owner.choices)=="function" and menu.owner.choices() or menu.owner.choices
+    local needle=string.lower(menu.search:GetText() or "")
+    menu.filtered={}
+    for _,entry in ipairs(values or {}) do
+        local _,label=option(entry)
+        if needle=="" or string.find(string.lower(label),needle,1,true) then menu.filtered[#menu.filtered+1]=entry end
+    end
+    menu.offset=math.max(0,math.min(menu.offset,math.max(0,#menu.filtered-10)))
+    menu.cursor=math.max(menu.offset+1,math.min(menu.cursor,menu.offset+10,#menu.filtered))
+    local current=menu.owner.readValue()
+    for i,row in ipairs(menu.rows) do
+        local entry=menu.filtered[menu.offset+i];row.entry=entry
+        if entry then
+            local value,label=option(entry)
+            row:SetLabel((value==current and S.GOLD or S.WHITE)..(menu.offset+i==menu.cursor and "> " or "  ")..label.."|r");row:Show()
+        else row:Hide() end
+    end
+    menu.status:SetText(#menu.filtered==0 and "No matching options" or ("Scroll or type to find • "..#menu.filtered.." options"))
+end
+
+function E.dropdown(parent,label,x,y,width,choices,read,choose)
+    local b=S.button(parent,"",width,function(self)
+        if menu and menu.owner==self and menu.frame:IsShown() then E.dismissMenu();return end
+        U.hideTip();buildMenu();menu.owner=self;menu.offset,menu.cursor=0,1
+        menu.frame:ClearAllPoints();menu.frame:SetPoint("TOPLEFT",self,"BOTTOMLEFT",0,-4)
+        menu.search:SetText("");drawMenu()
+        for i,entry in ipairs(menu.filtered) do local value=option(entry);if value==self.readValue() then menu.cursor=i;menu.offset=math.max(0,i-5);break end end
+        drawMenu();menu.frame:Show();menu.search:SetFocus()
+    end,"Choose directly from a searchable list")
+    b:SetHeight(24);b:SetPoint("TOPLEFT",parent,"TOPLEFT",x,-y)
+    b.choices,b.readValue,b.chooseValue=choices,read,choose
+    b.label:ClearAllPoints();b.label:SetPoint("LEFT",b,"LEFT",8,0);b.label:SetWidth(width-30);b.label:SetJustifyH("LEFT");b.label:SetWordWrap(false)
+    U.text(b,"v",width-16,5,12)
+    b.refresh=function()
+        local current=read();local values=type(choices)=="function" and choices() or choices
+        local text=tostring(current or "All")
+        for _,entry in ipairs(values or {}) do local v,l=option(entry);if v==current then text=l;break end end
+        b:SetLabel((label and (label..": ") or "")..text)
+        if menu and menu.owner==b and menu.frame:IsShown() then drawMenu() end
+    end
+    b:HookScript("OnEnter",function(self) U.tip(self,self.text,{"Click to choose; type to find an option."}) end)
+    b.refresh();return b
+end
+function E.liveBox(box,key,apply)
+    local serial=0
+    box.cancel=function() serial=serial+1;box.dirty=false end
+    box.flush=function() box.cancel();apply(box:GetText()) end
+    box:SetScript("OnTextChanged",function()
+        serial=serial+1;local token=serial;box.dirty=true
+        ns.after(0.18,function()
+            if token~=serial then return end
+            if (key and E.visible(key)) or (not key and host and host:IsShown()) then box.flush() end
+        end)
+    end)
+    box:SetScript("OnEnterPressed",function(self) self.flush();self:ClearFocus() end)
+    box:SetScript("OnEscapePressed",function(self) self:SetText("");self.flush();self:ClearFocus() end)
+    box:SetScript("OnEditFocusGained",E.dismissMenu)
+end
+function E.searchBox(parent,label,x,y,width,key,apply)
+    local box=U.box(parent,label,x,y,width-54,"",100)
+    E.liveBox(box,key,apply)
+    local clear=S.button(parent,"Clear",48,function() box:SetText("");box.flush();box:ClearFocus() end)
+    clear:SetPoint("TOPLEFT",parent,"TOPLEFT",x+width-48,-(y+18))
+    return box,clear
+end
+function E.wheel(frame,step)
+    frame:EnableMouseWheel(true)
+    frame:SetScript("OnMouseWheel",function(_,delta) if delta~=0 then E.dismissMenu();step(delta>0 and -1 or 1) end end)
+end
+function E.navigation(box,rows,step)
+    if box.SetAltArrowKeyMode then box:SetAltArrowKeyMode(false) end
+    box:SetScript("OnArrowPressed",function(_,key)
+        if key~="UP" and key~="DOWN" then return end
+        local visible,at={},0
+        for _,row in ipairs(rows) do if row.result and row.frame:IsShown() then visible[#visible+1]=row;if row.selected then at=#visible end end end
+        local dir=key=="UP" and -1 or 1
+        local target=at+dir
+        if target<1 or target>#visible then
+            if #visible==0 then return end
+            if step(dir)==false then return end
+            visible={}
+            for _,row in ipairs(rows) do if row.result and row.frame:IsShown() then visible[#visible+1]=row end end
+            target=dir>0 and 1 or #visible
+        end
+        if visible[target] then visible[target].choose() end
+    end)
+end
+function E.focusRows(rows,wanted,keyOf)
+    local selected,first
+    for _,row in ipairs(rows) do
+        if row.result and row.frame:IsShown() then
+            first=first or row
+            if keyOf(row.result)==wanted then selected=row end
+        end
+    end
+    selected=selected or first
+    if selected then selected.choose(true) else E.select(rows,nil) end
+    return selected
+end
+function E.sortResults(list,infoOf,nameOf,tie)
+    table.sort(list,function(a,b)
+        local ai,bi=infoOf(a) or {},infoOf(b) or {}
+        if f.sort=="Highest item level" then
+            local av,bv=tonumber(ai.level) or -1,tonumber(bi.level) or -1
+            if av~=bv then return av>bv end
+        elseif f.sort=="Lowest required level" then
+            local av,bv=tonumber(ai.required) or math.huge,tonumber(bi.required) or math.huge
+            if av~=bv then return av<bv end
+        end
+        local an,bn=string.lower(nameOf(a)),string.lower(nameOf(b))
+        if an~=bn then return an<bn end
+        return tie(a,b)
+    end)
+end
+function E.pageStatus(first,count,total)
+    if total==0 then return "No matching equipment" end
+    return first.."–"..math.min(total,first+count-1).." of "..total.." items • scroll to browse"
+end
+function E.pageButtons(prev,next,total,page,count)
+    for _,pair in ipairs({{prev,page>1},{next,page*count<total}}) do
+        local b,enabled=pair[1],pair[2]
+        if b then
+            b.disabled=not enabled;b:SetAlpha(enabled and 1 or 0.35)
+            if enabled and b.Enable then b:Enable() elseif not enabled and b.Disable then b:Disable() end
+            b.label:SetText((enabled and S.WHITE or S.GREY)..b.text.."|r")
+        end
+    end
+end
+function E._menu() return menu end
 local controls
 local function labels()
     if not controls then return end
-    controls.category:SetLabel(f.category)
-    controls.subtype:SetLabel(f.subtype)
-    controls.slot:SetLabel(f.slot)
-    controls.mode:SetLabel(f.mode)
+    for _,key in ipairs({"category","subtype","slot","mode","sort"}) do controls[key].refresh() end
 end
 function E.applyRange(minimum, maximum)
+    E.dismissMenu()
     local function parse(s)
         if s == nil or s == "" then return nil, true end
         local n = tonumber(s)
@@ -78,13 +252,22 @@ function E.applyRange(minimum, maximum)
     end
     f.min, f.max = lo, hi
     if controls then controls.error:SetText("") end
-    changed()
+    labels();changed()
     return true
 end
 function E.reset()
     f.category, f.subtype, f.slot, f.mode, f.min, f.max = "All equipment", "Any type", "All slots", "Required level", nil, nil
-    if controls then controls.min:SetText(""); controls.max:SetText(""); controls.error:SetText("") end
-    labels(); changed()
+    if controls then controls.min:SetText(""); controls.max:SetText(""); controls.min.cancel();controls.max.cancel();controls.error:SetText("") end
+    f.sort="Highest item level"
+    E.dismissMenu();labels()
+    local p=active and pages[active]
+    if p and p.clear then p.clear() else changed() end
+end
+function E.myLevel()
+    local level=U.call(UnitLevel,"player")
+    if type(level)~="number" or level<1 then return end
+    f.mode="Required level"
+    controls.min:SetText("");controls.max:SetText(tostring(level));controls.min.cancel();controls.max.cancel();E.applyRange("",tostring(level))
 end
 function E.visible(key) return host and host:IsShown() and active == key and pages[key] and pages[key]:IsShown() end
 local function hidePage(key)
@@ -92,6 +275,7 @@ local function hidePage(key)
     if p then p:Hide(); if p.suspend then p.suspend() end end
 end
 function E.close(key)
+    E.dismissMenu()
     if key and key ~= active then hidePage(key); return end
     if active then hidePage(active) end
     active = nil
@@ -111,33 +295,38 @@ local function build()
         end)
         tabs[key]:SetPoint("TOPLEFT", host, "TOPLEFT", 24 + (i-1)*194, -40)
     end
-    U.text(host, "Blue quality and above • select an item for its source and route", 440, 43, 610)
+    U.text(host, "Blue+ only • hover to compare", 440, 43, 370)
     local bar = CreateFrame("Frame", nil, host)
     bar:SetPoint("TOPLEFT", host, "TOPLEFT", 16, -73); bar:SetWidth(1048); bar:SetHeight(69)
     S.fill(bar, "BACKGROUND", 0.09, 0.12, 0.18, 1):SetAllPoints(bar)
     controls = {}
-    local function choice(key, label, x, width, values)
-        U.text(bar, label, x, 5, width)
-        local b = S.button(bar, "", width, function(_, button)
-            f[key] = nextValue(type(values) == "function" and values() or values, f[key], button)
-            if key == "category" then f.subtype = "Any type" end
-            labels(); changed()
-        end, "Left click: next; right click: previous")
-        b:SetPoint("TOPLEFT", bar, "TOPLEFT", x, -25); controls[key] = b
+    local function choice(key,label,x,width,values)
+        U.text(bar,label,x,5,width)
+        controls[key]=E.dropdown(bar,nil,x,24,width,values,function() return f[key] end,function(value)
+            f[key]=value
+            if key=="category" then f.subtype="Any type";f.slot="All slots" end
+            labels();changed()
+        end)
     end
     choice("category", "Equipment", 8, 150, categories)
     choice("subtype", "Item type", 168, 150, function() return types[f.category] end)
     choice("slot", "Slot", 328, 130, slots)
     choice("mode", "Level range measures", 468, 136, { "Required level", "Item level" })
+    controls.sort=E.dropdown(host,"Sort",830,38,226,{"Highest item level","Lowest required level","Name A–Z"},function() return f.sort end,function(value) f.sort=value;labels();changed() end)
     controls.min = U.box(bar, "Min", 614, 7, 60, "", 4)
     controls.max = U.box(bar, "Max", 684, 7, 60, "", 4)
-    local function apply() E.applyRange(controls.min:GetText(), controls.max:GetText()) end
-    for _,b in ipairs({controls.min,controls.max}) do b:SetScript("OnEnterPressed", function(self) apply(); self:ClearFocus() end) end
+    local function apply()
+        controls.min.cancel();controls.max.cancel()
+        E.applyRange(controls.min:GetText(), controls.max:GetText())
+    end
+    for _,b in ipairs({controls.min,controls.max}) do E.liveBox(b,nil,apply) end
     controls.apply = S.button(bar, "Apply", 70, apply); controls.apply:SetPoint("TOPLEFT", bar, "TOPLEFT", 754, -25)
-    controls.reset = S.button(bar, "Reset filters", 110, E.reset); controls.reset:SetPoint("TOPLEFT", bar, "TOPLEFT", 834, -25)
+    controls.reset = S.button(bar, "Clear filters", 110, E.reset); controls.reset:SetPoint("TOPLEFT", bar, "TOPLEFT", 834, -25)
+    controls.mine=S.button(bar,"My level",86,E.myLevel,"Only equipment requiring your level or lower");controls.mine:SetPoint("TOPLEFT",bar,"TOPLEFT",954,-25)
     controls.error = U.text(bar, "", 8, 49, 1020)
     labels()
-    host:SetScript("OnHide", function() if active then local key=active; active=nil; hidePage(key) end; U.hideTip() end)
+    host:HookScript("OnMouseDown",E.dismissMenu)
+    host:SetScript("OnHide", function() E.dismissMenu();if active then local key=active; active=nil; hidePage(key) end; U.hideTip() end)
     return true
 end
 function E.page(key)
@@ -151,9 +340,11 @@ function E.page(key)
 end
 function E.show(key)
     if not build() then return false end
+    E.dismissMenu()
     if active and active ~= key then hidePage(active) end
     active = key
     host:Show(); pages[key]:Show()
+    for _,b in ipairs({controls.min,controls.max}) do if b.dirty then b.flush() end end
     for k,b in pairs(tabs) do b:SetLabel((k == key and S.GOLD or S.GREY) .. (k == "quests" and "Quest rewards" or "Instance drops") .. "|r") end
     return true
 end
@@ -173,6 +364,7 @@ function E.row(parent, x, y, width, i)
     row.bg = S.fill(b, "BACKGROUND", 0.10, 0.13, (i%2==0 and 0.20 or 0.17), 1); row.bg:SetAllPoints(b)
     row.edge = S.fill(b, "OVERLAY", 0.3, 0.75, 1, 0.9); row.edge:SetWidth(3); row.edge:SetHeight(48); row.edge:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0); row.edge:Hide()
     row.icon = b:CreateTexture(nil, "ARTWORK"); row.icon:SetWidth(34); row.icon:SetHeight(34); row.icon:SetPoint("TOPLEFT", b, "TOPLEFT", 9, -7)
+    row.rarity=S.fill(b,"ARTWORK",1,1,1,1);row.rarity:SetWidth(34);row.rarity:SetHeight(3);row.rarity:SetPoint("TOPLEFT",b,"TOPLEFT",9,-42)
     row.item = U.text(b, "", 52, 6, width-60); row.item:SetFontObject(GameFontNormal or ChatFontNormal)
     row.from = U.text(b, "", 52, 27, width-60)
     if row.item.SetWordWrap then row.item:SetWordWrap(false); row.from:SetWordWrap(false) end
@@ -181,10 +373,17 @@ function E.row(parent, x, y, width, i)
 end
 function E.paintRow(row, info, name, subtitle)
     row.icon:SetTexture(info and info.texture or "Interface\\Icons\\INV_Misc_QuestionMark")
-    row.item:SetText((quality[info and info.quality] or S.WHITE) .. name .. "|r")
+    local title,stats=string.match(name,"^(.-)( · iLvl .*)$")
+    row.item:SetText((readableQuality[info and info.quality] or S.WHITE)..(title or name).."|r"..S.GREY..(stats or "").."|r")
+    local hex=quality[info and info.quality] or S.WHITE
+    row.rarity:SetVertexColor(tonumber(string.sub(hex,5,6),16)/255,tonumber(string.sub(hex,7,8),16)/255,tonumber(string.sub(hex,9,10),16)/255)
     row.from:SetText(S.GREY .. subtitle .. "|r")
 end
 function E.select(rows, selected)
-    for _,r in ipairs(rows) do if r == selected then r.edge:Show() else r.edge:Hide() end end
+    for _,r in ipairs(rows) do
+        r.selected=r==selected
+        local tint=r.selected and 1.15 or 1;r.bg:SetVertexColor(tint,tint,tint)
+        if r.selected then r.edge:Show() else r.edge:Hide() end
+    end
 end
 function E._window() return host, controls, pages, tabs end

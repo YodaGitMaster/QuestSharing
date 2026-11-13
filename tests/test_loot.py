@@ -312,10 +312,10 @@ def test_uncached_items_never_appear_before_equipment_is_confirmed(style):
 
 def test_encounter_choices_skip_material_only_sources_but_keep_trash_gear(style):
     g=game(style); g.slash("loot"); w=g.eval("NS.loot._window()")
-    selected=set()
-    for _ in range(8):
-        click(w.boss); selected.add(w.boss.text)
-    assert "Source: Trash" not in selected
+    click(w.boss)
+    selected=set(g.eval("NS.equipmentUI._menu().filtered").values())
+    assert "Trash" not in selected
+    g.eval("NS.equipmentUI.dismissMenu")()
     g.run("table.insert(AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids.Deadmines.items[3][1],{2,10005})")
     g.eval("NS.loot.search")("",None,None)
     g.eval("NS.loot.scan")()

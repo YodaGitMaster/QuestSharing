@@ -9,7 +9,8 @@ local source, note, skipped, progress = nil, "Open to load instance drops.", 0, 
 local chosen, encounter, query, instanceQuery = nil, nil, "", ""
 local itemQueue, queueAt, page, instancePage = {}, 1, 1, 1
 local deferredAtlas = false
-local unresolved = 0
+local unresolved, selectedKey = 0, nil
+local function resultKey(r) return table.concat({r.itemID,r.instanceKey,r.who,r.difficulty},"\031") end
 local PAGE, INSTANCE_PAGE = 7, 9
 local paint, refresh
 local function clean(s)
@@ -70,12 +71,11 @@ function L.search(text, key, boss)
             and (not chosen or chosen == r.instanceKey) and (not encounter or encounter == r.who)
             and (needle == "" or string.find(haystack, needle, 1, true)) then results[#results + 1] = r end
     end
-    table.sort(results, function(a, b)
-        if a.instanceName ~= b.instanceName then return a.instanceName < b.instanceName end
-        if a.who ~= b.who then return a.who < b.who end
-        if a.item.name ~= b.item.name then return a.item.name < b.item.name end
-        if a.itemID ~= b.itemID then return a.itemID < b.itemID end
-        return a.difficulty < b.difficulty
+    E.sortResults(results,function(r) return r.item.info end,function(r) return r.item.name end,function(a,b)
+        if a.instanceName~=b.instanceName then return a.instanceName<b.instanceName end
+        if a.who~=b.who then return a.who<b.who end
+        if a.itemID~=b.itemID then return a.itemID<b.itemID end
+        return a.difficulty<b.difficulty
     end)
     return results
 end
@@ -210,6 +210,7 @@ local function questieSources(kind, id, cache)
 end
 
 function L.scan()
+    E.dismissMenu()
     generation = generation + 1
     local token = generation
     index, results, instances, items, seen, itemQueue = {}, {}, {}, {}, {}, {}
@@ -301,9 +302,12 @@ paint = function()
     page = math.max(1, math.min(page, math.max(1, math.ceil(#results / PAGE))))
     local title = chosen and instances[chosen] and instances[chosen].name or "All dungeons"
     W.selection:SetText(S.GOLD .. title .. "|r")
-    W.boss:SetLabel("Source: " .. (encounter or "All encounters"))
+    W.selection:SetWordWrap(false)
+    W.boss.refresh()
     W.status:SetText(loading and ("Reading " .. tostring(source or "loot") .. " tables: " .. progress)
-        or (#results .. " equipment drop sources — page " .. page .. "/" .. math.max(1, math.ceil(#results / PAGE))))
+        or E.pageStatus((page-1)*PAGE+1,PAGE,#results))
+    E.pageButtons(W.prev,W.next,#results,page,PAGE)
+    E.pageButtons(W.instancePrev,W.instanceNext,#places,instancePage,INSTANCE_PAGE)
     W.note:SetText(note .. (skipped > 0 and (" " .. skipped .. " tables unavailable or not item lists.") or "")
         .. (queueAt <= #itemQueue and (" Loading item details " .. (queueAt - 1) .. "/" .. #itemQueue .. ".")
             or (unresolved > 0 and (" " .. unresolved .. " items await equipment details and remain hidden.") or "")))
@@ -311,16 +315,36 @@ paint = function()
         local r = results[(page - 1) * PAGE + i]
         row.result = r
         if r then
-            row.edge:Hide()
             E.paintRow(row, r.item.info, r.item.name .. " · iLvl " .. tostring(r.item.info.level or "?") .. " · req " .. tostring(r.item.info.required or "?"),
-                r.who .. " — " .. r.instanceName)
+                r.who .. " — " .. r.instanceName .. (r.difficulty~="" and (" · "..r.difficulty) or ""))
             row.frame:Show()
         else row.frame:Hide() end
     end
+    if not E.focusRows(W.rows,selectedKey,resultKey) then
+        selectedKey=nil
+        W.setDetails((loading or unresolved>0) and "Loading dungeon equipment details… Eligible blue+ drops appear as the game supplies their data." or
+            (#index==0 and note) or "No matching blue-or-better equipment.\n\nTry Clear filters, another dungeon, or a broader search.")
+    end
+end
+
+function L.go(delta)
+    local nextPage=math.max(1,math.min(math.max(1,math.ceil(#results/PAGE)),page+delta))
+    if nextPage==page then return false end
+    page=nextPage;paint();return true
+end
+function L.goInstances(delta)
+    local total=#L.instances(instanceQuery)
+    local nextPage=math.max(1,math.min(math.max(1,math.ceil(total/INSTANCE_PAGE)),instancePage+delta))
+    if nextPage==instancePage then return false end
+    instancePage=nextPage;paint();return true
 end
 
 refresh = function()
     if not shown() then return end
+    if encounter then
+        local valid=false;for _,who in ipairs(bosses()) do if who==encounter then valid=true;break end end
+        if not valid then encounter=nil end
+    end
     L.search(query, chosen, encounter); paint()
 end
 
@@ -335,29 +359,37 @@ local function build()
     local f = E.page("dungeons")
     if not f then return false end
     W = { frame = f, instances = {}, rows = {} }
-    W.instanceSearch = U.box(f, "Find dungeon (Enter)", 0, 0, 190, "", 100)
-    W.instanceSearch:SetScript("OnEnterPressed", function(self) instanceQuery = self:GetText(); instancePage = 1; paint(); self:ClearFocus() end)
-    W.search = U.box(f, "Search item, ID, boss or dungeon (Enter)", 210, 0, 450, "", 100)
-    W.search:SetScript("OnEnterPressed", function(self) query = self:GetText(); page = 1; refresh(); self:ClearFocus() end)
-    local all = S.button(f, "All dungeons", 190, function() chosen, encounter, page = nil, nil, 1; refresh() end)
+    W.instanceSearch,W.clearInstanceSearch=E.searchBox(f,"Find dungeon",0,0,190,"dungeons",function(text)
+        instanceQuery=text;instancePage=1;paint()
+    end)
+    W.search,W.clearSearch=E.searchBox(f,"Search item, ID, boss or dungeon",210,0,450,"dungeons",function(text)
+        query=text;page=1;refresh()
+    end)
+    local all = S.button(f, "All dungeons", 190, function() E.dismissMenu();chosen, encounter, page = nil, nil, 1; refresh() end)
     all:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -54)
     W.selection = U.text(f, "All dungeons", 0, 87, 190)
-    W.boss = S.button(f, "Source: All encounters", 450, function()
-        local list, at = bosses(), 0
-        for i, who in ipairs(list) do if who == encounter then at = i end end
-        encounter = at < #list and list[at + 1] or nil
-        page = 1; refresh()
+    W.boss=E.dropdown(f,"Source",210,54,450,function()
+        local list={"All encounters"};for _,who in ipairs(bosses()) do list[#list+1]=who end;return list
+    end,function() return encounter or "All encounters" end,function(value)
+        encounter=value~="All encounters" and value or nil;page=1;refresh()
     end)
-    W.boss:SetPoint("TOPLEFT", f, "TOPLEFT", 210, -54)
     W.instanceStatus = U.text(f, "", 0, 112, 190)
+    W.dungeonList=CreateFrame("Frame",nil,f)
+    W.dungeonList:SetPoint("TOPLEFT",f,"TOPLEFT",0,-145);W.dungeonList:SetWidth(190);W.dungeonList:SetHeight(324)
+    E.wheel(W.dungeonList,L.goInstances)
     for i = 1, INSTANCE_PAGE do
-        local b = S.button(f, "", 190, function(self) chosen, encounter, page = self.place.key, nil, 1; refresh() end)
-        b:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -(145 + (i - 1) * 36))
+        local b = S.button(W.dungeonList, "", 190, function(self) E.dismissMenu();chosen, encounter, page = self.place.key, nil, 1; refresh() end)
+        b:SetPoint("TOPLEFT", W.dungeonList, "TOPLEFT", 0, -((i - 1) * 36))
+        E.wheel(b,L.goInstances)
         W.instances[i] = b
     end
     W.status = U.text(f, "", 210, 92, 450)
+    W.list=CreateFrame("Frame",nil,f)
+    W.list:SetPoint("TOPLEFT",f,"TOPLEFT",210,-120);W.list:SetWidth(450);W.list:SetHeight(371)
+    E.wheel(W.list,L.go)
     for i = 1, PAGE do
-        local row = E.row(f, 210, 120+(i-1)*53, 450, i)
+        local row = E.row(W.list, 0, (i-1)*53, 450, i)
+        E.wheel(row.frame,L.go)
         row.frame:SetScript("OnEnter", function(self)
             row.bg:SetVertexColor(1.3,1.3,1.3)
             local r = row.result
@@ -372,10 +404,12 @@ local function build()
                 end)
             else U.tip(self, r.item.name, { r.instanceName, "Source: " .. r.who, r.difficulty, "Data: " .. r.provider }) end
         end)
-        row.frame:SetScript("OnLeave", function() row.bg:SetVertexColor(1,1,1); U.hideTip() end)
-        row.frame:SetScript("OnClick", function()
+        row.frame:SetScript("OnLeave", function() local tint=row.selected and 1.15 or 1;row.bg:SetVertexColor(tint,tint,tint);U.hideTip() end)
+        row.choose=function(auto)
+            if auto~=true then E.dismissMenu() end
             local r = row.result
             if not r or not W.details then return end
+            selectedKey=resultKey(r)
             E.select(W.rows, row)
             W.setDetails(r.item.name .. " (item " .. r.itemID .. ")\n\nEquipment: " .. r.item.info.slot
                 .. "\nItem level: " .. tostring(r.item.info.level or "unknown")
@@ -385,19 +419,25 @@ local function build()
                 .. "\nCatalogue: " .. r.provider .. "\n\nDrop chance is not supplied by this browser."
                 .. "\nEncounter groups such as Trash refer to a shared loot table, not a specific boss."
                 .. (r.provider == "QuestieDB" and "\nQuestieDB lists known sources only; this is not a complete instance loot table." or ""))
-        end)
+        end
+        row.frame:SetScript("OnClick",row.choose)
         W.rows[i] = row
     end
     local function pager(label, x, fn)
         local b = S.button(f, label, 90, fn); b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -500); return b
     end
-    W.instancePrev = pager("Previous", 0, function() instancePage = math.max(1, instancePage - 1); paint() end)
-    W.instanceNext = pager("Next", 100, function() instancePage = instancePage + 1; paint() end)
-    W.prev = pager("Previous", 210, function() page = math.max(1, page - 1); paint() end)
-    W.next = pager("Next", 310, function() page = page + 1; paint() end)
+    W.instancePrev = pager("Previous", 0, function() L.goInstances(-1) end)
+    W.instanceNext = pager("Next", 100, function() L.goInstances(1) end)
+    W.prev = pager("Previous", 210, function() L.go(-1) end)
+    W.next = pager("Next", 310, function() L.go(1) end)
     W.reload = pager("Refresh data", 570, function() L.scan() end)
     W.note = U.text(f, "", 0, 536, 660)
     W.details, W.detailsText, W.setDetails = E.details(f, 684, 348, "Drop source")
+    E.navigation(W.search,W.rows,L.go)
+    f.clear=function()
+        query,chosen,encounter,instanceQuery="",nil,nil,"";page,instancePage=1,1
+        W.search:SetText("");W.search.cancel();W.instanceSearch:SetText("");W.instanceSearch.cancel();refresh()
+    end
     f.refresh = function() page=1; refresh() end
     f.suspend = function()
         if loading or queueAt <= #itemQueue then generation = generation + 1; loading, ready = false, false end
@@ -409,8 +449,9 @@ end
 function L.open(text)
     if not ns.db.enabled then ns.print("switch Quest Sharing on first (/qs on)"); return false end
     if not build() then return false end
-    if text and text ~= "" then query, chosen, encounter, page = text, nil, nil, 1; W.search:SetText(text) end
+    if text and text ~= "" then query, chosen, encounter, page = text, nil, nil, 1; W.search:SetText(text);W.search.cancel() end
     E.show("dungeons")
+    for _,box in ipairs({W.search,W.instanceSearch}) do if box.dirty then box.flush() end end
     if not ready and not loading then L.scan()
     else
         refresh()

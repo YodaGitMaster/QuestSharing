@@ -41,6 +41,8 @@ QuestSharing/  # Repository root
 ├── build_release.py  # Build install ZIP and release notes
 ├── context/  # Session continuity and live architecture
 │   ├── BUGS/  # Verified bug methodology and regressions
+│   │   ├── 2026-11-13-dropdown-offscreen-selection.md  # Mixed wheel/keyboard dropdown navigation
+│   │   ├── 2026-11-13-debounced-filter-reapply.md  # Range commit debounce cancellation playbook
 │   │   └── 2026-11-13-instance-loot-non-equipment.md  # Equipment filtering reproduction and fix
 │   ├── architecture.md  # Live source map and runtime diagrams
 │   ├── decisions.md  # Choices and rationale
@@ -75,6 +77,7 @@ QuestSharing/  # Repository root
     ├── test_together.py  # Tests for together
     ├── test_tracker.py  # Tests for tracker
     ├── test_triggers.py  # Tests for triggers
+    ├── test_usability.py  # Direct choices, live searches, sorting, selection and navigation workflows
     ├── test_where.py  # Tests for where
     └── test_zone.py  # Tests for zone
 ```
@@ -211,7 +214,9 @@ sequenceDiagram
     E->>Page: Hide old page and suspend pending work
     E->>Page: Show selected child in same host
     User->>E: Apply type, slot or inclusive level range
-    E->>Page: Require native quality 3+ and apply shared equipment filters
+    User->>E: Search dropdown choices / type live query / scroll results
+    E->>Page: Debounced search or direct filter selection; keep quality 3+
+    E->>Page: Apply sorting; preserve selected result if visible
     User->>Page: Select item card
     Page->>E: Update inline route/source pane
     User->>E: Close explorer
@@ -299,6 +304,7 @@ classDiagram
         subtype
         slot
         mode
+        sort
         min_optional
         max_optional
     }
