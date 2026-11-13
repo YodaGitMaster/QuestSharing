@@ -3,7 +3,7 @@ local ADDON, ns = ...
 local E, U, S = {}, ns.optionalUI, ns.style
 ns.equipmentUI = E
 local host, active, pages, tabs = nil, nil, {}, {}
-local f = { category = "All equipment", subtype = "Any type", slot = "All slots", mode = "Required level", sort = "Highest item level" }
+local f = { category = "All equipment", subtype = "Any type", slot = "All slots", mode = "Required level", sort = "Highest item level", stats = {{},{},{}} }
 E.filters = f
 local categories = { "All equipment", "Weapons", "Armor", "Accessories" }
 local types = {
@@ -18,6 +18,47 @@ local armorTypes = { Cloth=1, Leather=2, Mail=3, Plate=4, Shields=6 }
 local slots = { "All slots", "Head", "Neck", "Shoulder", "Back", "Chest", "Wrist", "Hands", "Waist", "Legs", "Feet", "Finger", "Trinket", "Weapon", "Offhand", "Ranged" }
 local readableQuality = { [3]="|cff79bfff", [4]="|cffcd9bff", [5]="|cffffbf80" }
 local quality = { [0]="|cff9d9d9d", [1]="|cffffffff", [2]="|cff1eff00", [3]="|cff0070dd", [4]="|cffa335ee", [5]="|cffff8000" }
+local statChoices = {{value="",label="Any stat"}}
+local statKeys = {}
+for _,entry in ipairs({
+    {"Strength","ITEM_MOD_STRENGTH_SHORT"}, {"Agility","ITEM_MOD_AGILITY_SHORT"},
+    {"Stamina","ITEM_MOD_STAMINA_SHORT"}, {"Intellect","ITEM_MOD_INTELLECT_SHORT"},
+    {"Spirit","ITEM_MOD_SPIRIT_SHORT"}, {"Armor","RESISTANCE0_NAME"},
+    {"Health","ITEM_MOD_HEALTH_SHORT"}, {"Mana","ITEM_MOD_MANA_SHORT"},
+    {"Attack power","ITEM_MOD_ATTACK_POWER_SHORT"}, {"Ranged attack power","ITEM_MOD_RANGED_ATTACK_POWER_SHORT"},
+    {"Spell power","ITEM_MOD_SPELL_POWER_SHORT"}, {"Spell damage","ITEM_MOD_SPELL_DAMAGE_DONE_SHORT"},
+    {"Healing","ITEM_MOD_SPELL_HEALING_DONE_SHORT"}, {"Mana per 5 sec","ITEM_MOD_MANA_REGENERATION_SHORT"},
+    {"Hit rating","ITEM_MOD_HIT_RATING_SHORT"}, {"Crit rating","ITEM_MOD_CRIT_RATING_SHORT"},
+    {"Haste rating","ITEM_MOD_HASTE_RATING_SHORT"}, {"Defense rating","ITEM_MOD_DEFENSE_SKILL_RATING_SHORT"},
+    {"Dodge rating","ITEM_MOD_DODGE_RATING_SHORT"}, {"Parry rating","ITEM_MOD_PARRY_RATING_SHORT"},
+    {"Block rating","ITEM_MOD_BLOCK_RATING_SHORT"}, {"Block value","ITEM_MOD_BLOCK_VALUE_SHORT"},
+    {"Arcane resistance","RESISTANCE6_NAME"}, {"Fire resistance","RESISTANCE2_NAME"},
+    {"Frost resistance","RESISTANCE4_NAME"}, {"Nature resistance","RESISTANCE3_NAME"},
+    {"Shadow resistance","RESISTANCE5_NAME"},
+}) do
+    statChoices[#statChoices+1]=entry[1];statKeys[entry[1]]=entry[2]
+end
+local statCache={}
+ns.on("GET_ITEM_INFO_RECEIVED",function() statCache={} end)
+local function statHint()
+    if not ((C_Item and type(C_Item.GetItemStats)=="function") or type(GetItemStats)=="function") then
+        return "Stat API unavailable on this client; leave Any stat selected."
+    end
+    return "Blank min = 1 • Any stat clears a condition • client-reported bonuses only • ratings use points"
+end
+local function itemStats(info)
+    local link=info.link
+    if not link then return end
+    if statCache[link] then return statCache[link] end
+    for i=1,2 do
+        local fn=i==1 and C_Item and C_Item.GetItemStats or (i==2 and GetItemStats)
+        if type(fn)=="function" then
+            local ok,stats=pcall(fn,link)
+            if ok and type(stats)=="table" then statCache[link]=stats;return stats end
+        end
+    end
+    -- Do not cache failures: the client may supply the item on a later refresh.
+end
 
 function E.matches(info, fallback)
     -- Require confirmed quality so uncached items cannot bypass the blue-or-better rule.
@@ -45,6 +86,14 @@ function E.matches(info, fallback)
     local value = info and info[key]
     if value == nil and fallback then value = fallback[key] end
     if (f.min or f.max) and (type(value) ~= "number" or (f.min and value < f.min) or (f.max and value > f.max)) then return false end
+    local stats
+    for _,condition in ipairs(f.stats) do
+        if condition.stat then
+            stats=stats or itemStats(info)
+            local amount=stats and stats[statKeys[condition.stat]]
+            if type(amount)~="number" or not (amount >= (condition.min or 1)) then return false end
+        end
+    end
     return true
 end
 
@@ -236,6 +285,20 @@ local controls
 local function labels()
     if not controls then return end
     for _,key in ipairs({"category","subtype","slot","mode","sort"}) do controls[key].refresh() end
+    for _,row in ipairs(controls.stats or {}) do row.stat.refresh() end
+end
+function E.applyStat(index,stat,minimum)
+    if not f.stats[index] or (stat~="" and not statKeys[stat]) then return false end
+    local n=minimum=="" and 1 or tonumber(minimum)
+    if stat~="" and (not n or n<1 or n>100000 or n%1~=0) then
+        if controls then controls.statError:SetText(S.RED.."Stat minimum must be a whole number from 1 to 100000.|r") end
+        return false
+    end
+    local row=controls and controls.stats[index]
+    if row then row.min.cancel() end
+    f.stats[index]={stat=stat~="" and stat or nil,min=stat~="" and n or nil}
+    if controls then controls.statError:SetText(statHint()) end
+    labels();changed();return true
 end
 function E.applyRange(minimum, maximum)
     E.dismissMenu()
@@ -259,6 +322,11 @@ function E.reset()
     f.category, f.subtype, f.slot, f.mode, f.min, f.max = "All equipment", "Any type", "All slots", "Required level", nil, nil
     if controls then controls.min:SetText(""); controls.max:SetText(""); controls.min.cancel();controls.max.cancel();controls.error:SetText("") end
     f.sort="Highest item level"
+    for i=1,3 do
+        f.stats[i]={}
+        if controls then controls.stats[i].min:SetText("");controls.stats[i].min.cancel() end
+    end
+    if controls then controls.statError:SetText(statHint()) end
     E.dismissMenu();labels()
     local p=active and pages[active]
     if p and p.clear then p.clear() else changed() end
@@ -284,9 +352,9 @@ function E.close(key)
 end
 local function build()
     if host then return true end
-    host = U.window("QuestSharingEquipment", 1080, 760, "Equipment explorer")
+    host = U.window("QuestSharingEquipment", 1080, 828, "Equipment explorer")
     if not host then return false end
-    local scale = math.min(1, (UIParent:GetWidth() - 40) / 1080, (UIParent:GetHeight() - 40) / 760)
+    local scale = math.min(1, (UIParent:GetWidth() - 40) / 1080, (UIParent:GetHeight() - 40) / 828)
     host:SetScale(math.max(0.5, scale))
     S.fill(host, "BACKGROUND", 0.035, 0.055, 0.09, 1):SetAllPoints(host)
     for i, key in ipairs({ "quests", "dungeons" }) do
@@ -297,7 +365,7 @@ local function build()
     end
     U.text(host, "Blue+ only • hover to compare", 440, 43, 370)
     local bar = CreateFrame("Frame", nil, host)
-    bar:SetPoint("TOPLEFT", host, "TOPLEFT", 16, -73); bar:SetWidth(1048); bar:SetHeight(69)
+    bar:SetPoint("TOPLEFT", host, "TOPLEFT", 16, -73); bar:SetWidth(1048); bar:SetHeight(137)
     S.fill(bar, "BACKGROUND", 0.09, 0.12, 0.18, 1):SetAllPoints(bar)
     controls = {}
     local function choice(key,label,x,width,values)
@@ -324,6 +392,19 @@ local function build()
     controls.reset = S.button(bar, "Clear filters", 110, E.reset); controls.reset:SetPoint("TOPLEFT", bar, "TOPLEFT", 834, -25)
     controls.mine=S.button(bar,"My level",86,E.myLevel,"Only equipment requiring your level or lower");controls.mine:SetPoint("TOPLEFT",bar,"TOPLEFT",954,-25)
     controls.error = U.text(bar, "", 8, 49, 1020)
+    U.text(bar,"Stats • all selected must match",8,70,228)
+    controls.stats={}
+    for i=1,3 do
+        local index,x=i,8+(i-1)*344
+        local row={};controls.stats[index]=row
+        row.min=U.box(bar,"Min bonus",x+238,74,88,"",6)
+        row.stat=E.dropdown(bar,nil,x,92,228,statChoices,function() return f.stats[index].stat or "" end,function(value)
+            if E.applyStat(index,value,row.min:GetText()) and value=="" then row.min:SetText("");row.min.cancel() end
+        end)
+        E.liveBox(row.min,nil,function(text) E.applyStat(index,f.stats[index].stat or "",text) end)
+        row.stat:HookScript("OnEnter",function(self) U.tip(self,"Item stat filter",{"All selected bonuses must meet their minimum.","Uses bonuses reported by the client; procs and unreported bonuses are not matched.","Ratings use rating points, not percentages."}) end)
+    end
+    controls.statError=U.text(bar,statHint(),8,118,1020)
     labels()
     host:HookScript("OnMouseDown",E.dismissMenu)
     host:SetScript("OnHide", function() E.dismissMenu();if active then local key=active; active=nil; hidePage(key) end; U.hideTip() end)
@@ -333,7 +414,7 @@ function E.page(key)
     if not build() then return end
     if not pages[key] then
         local p = CreateFrame("Frame", nil, host)
-        p:SetPoint("TOPLEFT", host, "TOPLEFT", 24, -152); p:SetWidth(1032); p:SetHeight(580); p:Hide()
+        p:SetPoint("TOPLEFT", host, "TOPLEFT", 24, -220); p:SetWidth(1032); p:SetHeight(580); p:Hide()
         pages[key] = p
     end
     return pages[key]
@@ -345,6 +426,7 @@ function E.show(key)
     active = key
     host:Show(); pages[key]:Show()
     for _,b in ipairs({controls.min,controls.max}) do if b.dirty then b.flush() end end
+    for _,row in ipairs(controls.stats) do if row.min.dirty then row.min.flush() end end
     for k,b in pairs(tabs) do b:SetLabel((k == key and S.GOLD or S.GREY) .. (k == "quests" and "Quest rewards" or "Instance drops") .. "|r") end
     return true
 end

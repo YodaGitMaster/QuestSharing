@@ -1,5 +1,12 @@
 # Insights
 
+## 2026-11-13 — Native equipment stat filtering
+- Blizzard's [generated item API declaration](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/ItemDocumentation.lua) confirms C_Item.GetItemStats accepts an item link and may return no result. Older clients expose global GetItemStats; runtime detection/fallback is necessary.
+- Three explicit AND conditions avoid hidden filter state and additional windows. Inclusive minimums use native units; missing/zero/malformed values cannot satisfy a positive bonus condition.
+- Cache successful stat tables only; item info events clear cache before existing page refresh handlers. Unavailable data can recover without restarting or reindexing the catalogue.
+- Existing mocks lack both stat APIs; dedicated fixtures exercise each API explicitly. Approximate widget render checked stat-row spacing; native game rendering remains unverified.
+- Verification: all 30 suites / 1,141 checks pass, including 20 new stat checks across modern and legacy API paths.
+
 ## 2026-11-13 — Equipment navigation redesign
 - Most friction came from interaction design: cycling controls, Enter-only searches, page buttons and extra clicks for details. Direct/searchable dropdowns, live input and stable automatic selection address those paths.
 - One unnamed popup is reused for all choices and stays open through background data refreshes; manual selection/tab change/close dismiss it. Filter reset cancels debounced callbacks so stale text cannot jump pages later.

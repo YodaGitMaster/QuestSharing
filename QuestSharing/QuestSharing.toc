@@ -2,7 +2,7 @@
 ## Title: Quest Sharing
 ## Notes: Shares your quests with a new party, says which ones you have in common, and posts friendly quest progress to chat when you click a tracked quest.
 ## Author: YodaGitMaster
-## Version: 0.4.7
+## Version: 0.4.8
 ## SavedVariables: QuestSharingDB, QuestSharingLog
 ## OptionalDeps: Questie, QuestieDB, AnglerAtlas, AtlasLootClassic, AtlasLootContinued
 

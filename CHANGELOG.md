@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.8
+- Added three shared **stat filters** to quest rewards and instance drops, each with a searchable bonus selector
+  and an inclusive minimum. Combine conditions such as Intellect ≥ 10 and Stamina ≥ 5; every selected condition
+  must match. Blank minimum means 1, Any stat removes a condition, and Clear filters resets all three.
+- Includes primary attributes, armor, health/mana, attack/spell bonuses, healing, mana regeneration,
+  combat ratings and resistances. Uses client-reported bonuses; ratings are points, not percentages.
+  Unreported bonuses, procs and missing data do not match; clients without a stat API show an explanation.
+- Filters update while typing, survive tab changes and refresh when item data arrives. The stat row stays
+  inside the existing explorer; Rare+ quality, class/faction eligibility and Classic/Forever dungeon scope remain.
+
 ## 0.4.7
 - Replaced click-through filter controls with **searchable dropdowns**: choose equipment, item type, slot,
   level measure, class, faction and dungeon source directly. A single reusable popup supports scrolling,

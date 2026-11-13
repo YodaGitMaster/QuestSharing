@@ -2,10 +2,12 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Completed equipment usability redesign and stable v0.4.7 publication; tag and downloaded ZIP verified.
-- Existing ongoing push/release authorization applies; no additional feature work remains.
+- Shared stat filters completed and verified; 0.4.8 packaging/publication pending under existing authorization.
 
 ## Last completed
+- Implemented three shared AND stat conditions, searchable selectors/live inclusive minimums, clear/reset, lazy native API compatibility and event-invalidated cache; Rare+/eligibility/dungeon scope retained.
+- Updated live architecture/schema/decisions and checked approximate widget geometry; no native client available.
+- All 30 suites / 1,141 checks pass, including 20 new stat workflows; diff whitespace clean.
 - Published v0.4.7 at `13d718f8212f084b7748c8f311d8ea5a2113664d`; downloaded asset matches the tested local ZIP byte for byte.
 - Searchable direct dropdowns replace sequential cycling for filters/class/faction/source; one child popup supports search, wheel and keyboard confirmation.
 - Live search/range/character inputs, Clear controls, My level, sorting, wheel/arrow list navigation, automatic/stable inline selection and helpful empty/loading states.
