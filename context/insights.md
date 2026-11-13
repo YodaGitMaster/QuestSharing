@@ -6,6 +6,7 @@
 - Initial dedicated tests reproduced active-zero specialization rejection and unreadable-cursor mutation; corrected explicit zero handling and fallible cursor/combat guards before publication. Rank 10 must beat rank 2 numerically, and action spell IDs may refer to ranks hidden from the current book view.
 - Verification: all 32 suites / 1,213 checks pass, including 48 spell-rank workflows. Tests cover combat beginning during pickup, occupied/unreadable cursor, wrong pickup/no-op/refused/partial placement, normal hidden/form pages, offspec/future/passive filtering, event coalescing and other addons changing target slots synchronously.
 - No game client available; live native bar permissions and actual spell-book payloads remain in-game QA items, with refusal/unsupported behavior explicitly reported by the feature.
+- Published v0.4.10 at `6e16bc4b6252dfc7e27399a781525e9201f3b729`; downloaded 158,346-byte ZIP matches local source-verified build, SHA256 `4c158c2b8ae663bde1a772ce31ece6183f262cd40438d56db82457a435f2969f`.
 
 ## 2026-11-13 — Current dungeon context
 - Blizzard's [instance API declaration](https://github.com/Gethe/wow-ui-source/blob/classic/Interface/AddOns/Blizzard_APIDocumentationGenerated/InstanceDocumentation.lua) confirms instanceID is GetInstanceInfo's eighth return; optionalUI.call intentionally returns only three, so use protected direct invocation here.
