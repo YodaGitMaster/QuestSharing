@@ -18,7 +18,7 @@ function GetItemInfo(id)
     LOOT_READS=LOOT_READS+1
     local r=LOOT_ITEMS[id]
     if not r or UNCACHED[id] then return nil end
-    return r.name,"|Hitem:"..id.."|h["..r.name.."]|h",2,r.level,r.required or 0,"","",1,r.loc or "INVTYPE_WEAPON","icon",0,r.kind,r.sub
+    return r.name,"|Hitem:"..id.."|h["..r.name.."]|h",r.quality or 3,r.level,r.required or 0,"","",1,r.loc or "INVTYPE_WEAPON","icon",0,r.kind,r.sub
 end
 local module = {
     Deadmines={name="The Deadmines",InstanceID=36,MapID=1581,items={

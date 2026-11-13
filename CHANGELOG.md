@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.6
+- Both equipment tabs now show only **Rare (blue) quality and above**. Green, white and grey items are excluded
+  from quest rewards, dungeon results and source choices, including the partial QuestieDB fallback.
+- This minimum remains in effect after Reset filters. Items with unknown quality stay hidden until the game
+  supplies their details; normal item-cache updates then show eligible equipment automatically.
+
 ## 0.4.5
 - Quest rewards and dungeon drops now share one **Equipment explorer** window with tabs, item icons,
   quality colors, highlighted selection and an inline route/source panel. Selecting an item or changing tabs

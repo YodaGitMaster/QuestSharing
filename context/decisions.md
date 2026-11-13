@@ -1,5 +1,12 @@
 # Decisions
 
+## 2026-11-13 — Blue quality and above
+- User requested avoidance of green quality or lower; apply a fixed native quality >=3 minimum to both equipment tabs and source choices.
+- Put the check in the common EquipmentUI.matches predicate; Reset filters cannot bypass it. Do not add a toggle that restores unwanted qualities.
+- Require confirmed native quality rather than guessing unknown items from names, color strings or provider fallback data. Existing item-cache events refresh loaded gear.
+- Update unrelated fixtures to Rare quality so existing functional coverage remains meaningful; new mixed-quality cases cover the actual threshold, provider paths, reset and asynchronous data.
+- Release as 0.4.6 under the ongoing publication authorization.
+
 ## 2026-11-13 — One equipment explorer and dungeon scope
 - User requested improved graphics, one window for quest/instance equipment, item type and level filters, and exclusion of random encounters and raids.
 - User explicitly answered the scope question: include Forever dungeons too. Use AtlasLoot's public localized Dungeons category, with verified known IDs for older catalogues; Questie fallback requires known dungeon areas. Never infer a dungeon solely from a map-type enum (raids share it).

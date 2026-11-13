@@ -2,7 +2,7 @@
 Last updated: 2026-11-13
 
 ## Addon loading and persistence
-- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.5; declares file load order and SavedVariables.
+- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.6; declares file load order and SavedVariables.
 - Lua modules receive `local ADDON, ns = ...`; `ns` is the shared namespace, not a class.
 - `Core.lua`: `ns.defaults`; `ns.db` initially copies defaults. On `ADDON_LOADED`, missing settings are filled and `ns.db` aliases saved `QuestSharingDB`; current `dbVersion = 3`.
 - SavedVariables: `QuestSharingDB` (settings), `QuestSharingLog` (debug log); persisted by the game.
@@ -47,7 +47,7 @@ Last updated: 2026-11-13
 - Session-only shared filters: `{category, subtype, slot, mode, min?, max?}`. Categories: All equipment, Weapons, Armor, Accessories; mode: Required level or Item level; inclusive bounds 0..1000, blank = unbounded.
 - Native item metadata adds `kind`/`sub` numeric item class/subclass. QuestieDB supplies known fallback metadata; unclassified subtypes stay unknown. Required level 0 remains valid.
 - `page(key)`, `show(key)`, `visible(key)`, `close(key?)`: only one child page is active; hiding/switching calls its suspend function to cancel timers. Pages have `refresh` and `suspend` callbacks.
-- `matches(info, fallback?)`: common type/subtype/slot/range predicate; quest eligibility remains separate. Quest/Loot render seven item cards per page and reuse inline scrollable route/source panels.
+- `matches(info, fallback?)`: first requires confirmed native numeric quality >=3 (Rare/blue); unknown quality and grey/white/green are hidden. This floor is fixed and Reset filters cannot remove it. Then applies the common type/subtype/slot/range predicate; quest eligibility remains separate. Quest/Loot render seven item cards per page and reuse inline scrollable route/source panels.
 - No standalone reward/loot/route/source top-level windows remain; shared tab filters survive tab switches, not logout.
 
 ## Instance loot search (2026-11-13)

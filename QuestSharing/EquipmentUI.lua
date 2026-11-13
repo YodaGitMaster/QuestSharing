@@ -19,6 +19,8 @@ local slots = { "All slots", "Head", "Neck", "Shoulder", "Back", "Chest", "Wrist
 local quality = { [0]="|cff9d9d9d", [1]="|cffffffff", [2]="|cff1eff00", [3]="|cff0070dd", [4]="|cffa335ee", [5]="|cffff8000" }
 
 function E.matches(info, fallback)
+    -- Require confirmed quality so uncached items cannot bypass the blue-or-better rule.
+    if not info or type(info.quality) ~= "number" or not (info.quality >= 3) then return false end
     local kind = info and info.kind or fallback and fallback.kind
     local sub = info and info.sub or fallback and fallback.sub
     local slot = info and info.slot
@@ -109,7 +111,7 @@ local function build()
         end)
         tabs[key]:SetPoint("TOPLEFT", host, "TOPLEFT", 24 + (i-1)*194, -40)
     end
-    U.text(host, "Compare gear • select an item for its source and route", 440, 43, 610)
+    U.text(host, "Blue quality and above • select an item for its source and route", 440, 43, 610)
     local bar = CreateFrame("Frame", nil, host)
     bar:SetPoint("TOPLEFT", host, "TOPLEFT", 16, -73); bar:SetWidth(1048); bar:SetHeight(69)
     S.fill(bar, "BACKGROUND", 0.09, 0.12, 0.18, 1):SetAllPoints(bar)

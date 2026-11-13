@@ -49,7 +49,7 @@ function GetItemInfo(id)
     ITEM_READS=ITEM_READS+1
     local r=REWARD_ITEMS[id]
     if not r or UNCACHED[id] then return nil end
-    return r.name,"|Hitem:"..id.."|h["..r.name.."]|h",2,r.itemLevel,r.requiredLevel,"","",1,r.loc,"icon"
+    return r.name,"|Hitem:"..id.."|h["..r.name.."]|h",r.quality or 3,r.itemLevel,r.requiredLevel,"","",1,r.loc,"icon"
 end
 function IsQuestFlaggedCompleted(id) return FINISHED[id]==true end
 MAP_OPENS={}
@@ -188,9 +188,9 @@ def test_hover_compares_game_items(style):
 
 def test_uncached_item_refreshes_on_data_event(style):
     g=game(style,"UNCACHED[800]=true"); g.slash("rewards")
-    assert not g.eval("NS.rewards._results()[1].cached")
+    assert ids(g)==[(801,8001)], "unknown-quality rewards stay hidden until their native details load"
     g.run("UNCACHED[800]=nil"); g.fire("GET_ITEM_INFO_RECEIVED",800,True); g.advance(0.3)
-    assert g.eval("NS.rewards._results()[1].cached")
+    assert ids(g)==[(800,8000),(801,8001)] and g.eval("NS.rewards._results()[1].cached")
 
 
 def test_switch_off_cancels_scan_and_reopen_restarts(style):

@@ -2,18 +2,15 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Implemented 0.4.5 shared equipment explorer, item type/slot/level range filters and dungeon-only scope.
-- User clarified: include Forever dungeons as well as Classic; exclude raids and world bosses.
-- Completed push and stable v0.4.5 release; remote tag and downloaded install ZIP verified, no release work remains.
+- Implemented user's request to exclude green quality and lower from both equipment tabs; version 0.4.6.
+- Final validation and package passed; push/publication verification pending under ongoing release authorization.
 
 ## Last completed
-- Published v0.4.5 at `fdea2529e34811b6dc8b13125fb5b66c14d5ac37`; remote asset matches the source-verified package byte for byte.
-- Added EquipmentUI.lua: one host, two child pages, icons/quality colors, selected rows and inline route/source details. Shared filters use numeric metadata and inclusive Required level / Item level bounds.
-- Updated Rewards/Loot to use shared pages and cancel pending work on close/tab changes. Existing character eligibility and native comparisons preserved.
-- Actual compatible AtlasLoot source smoke: 30 Classic/Forever dungeon entries / 1,655 raw source rows, zero Lua errors; Cruel Barb verified against Edwin VanCleef after native item details supplied.
-- Final validation: all 28 suites / 1,081 checks passed, including 26 shared-explorer, 42 optional and 58 loot cases; diff whitespace clean.
-- Built `dist/QuestSharing-0.4.5.zip`: 30 source-matching addon files; SHA256 `9c447ef0f5f30eb456992e698e1b63386608154d7ced95b8631fd6f3f70e802c`.
-- Inspected approximate layout previews derived from actual mocked frame geometry; real game rendering remains unavailable.
+- All 28 suites / 1,091 checks passed; source-verified 30-file ZIP `dist/QuestSharing-0.4.6.zip`, SHA256 `8efb93d2f4bdb21766d1ffd6c96eb59711bede03e363ff5c33c65d8c51d02dec`.
+- EquipmentUI.matches now requires confirmed native quality >=3 (Rare/blue), covering quest rewards, dungeon results and source choices; Reset filters preserves the minimum.
+- Unknown-quality equipment stays hidden until native item-cache events refresh it. Header and README explain the rule.
+- Added five integration cases across both API styles; failing-before verification then 36/36 shared-explorer cases passed. Optional 42/42 and loot 58/58 passed.
+- Baseline fixture gear is now Rare; explicit low-quality cases verify grey/white/green exclusion. No provider, window, eligibility or SavedVariables changes.
 
 ## Implemented tools
 - Optional tab in `/qs settings`; fishing layer and quest reward browser default off.
