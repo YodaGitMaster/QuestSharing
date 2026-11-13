@@ -27,6 +27,7 @@
 - No workaround; released with v0.4.7.
 
 ## Verification
+- Released at `13d718f8212f084b7748c8f311d8ea5a2113664d`, v0.4.7; 29 suites / 1,121 checks passed and published ZIP byte-matched.
 - Failed-before/passed-after cases on both API styles; full suite and release verification in context/state.md.
 
 ## If it shows up again

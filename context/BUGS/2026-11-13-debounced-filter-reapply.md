@@ -29,6 +29,7 @@
 - Release: v0.4.7; no workaround or SavedVariables changes.
 
 ## Verification
+- Released at `13d718f8212f084b7748c8f311d8ea5a2113664d`, v0.4.7; 29 suites / 1,121 checks passed and published ZIP byte-matched.
 - Focused regression: 26/28 before correction, 28/28 after.
 - Full-suite and published asset verification recorded in context/state.md.
 
