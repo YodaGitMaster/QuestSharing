@@ -730,7 +730,7 @@ Expected: every line ends in `passed` with all tests green (1121 in total).
 | `QuestSharing/Questie.lua` | reads Questie's quest database (when installed): where a quest starts, which quests come first, where objectives are done and quests turned in |
 | `QuestSharing/Fishing.lua` | optional world-map water markers, saved water editor and AnglerAtlas zone summaries |
 | `QuestSharing/Rewards.lua` | optional QuestieDB equipment rewards, filters, item comparisons and quest routes |
-| `QuestSharing/EquipmentUI.lua` | one equipment window, shared item type/slot/level filters, item cards and inline details |
+| `QuestSharing/EquipmentUI.lua` | one equipment window, shared item type/slot/level/stat filters, item cards and inline details |
 | `QuestSharing/OptionalUI.lua` | shared controls for the optional tools |
 | `QuestSharing/Adventure.lua` | role-play quest invitation preview and chat preparation in a chosen channel |
 | `QuestSharing/Loot.lua` | searchable instance loot, encounter sources, AtlasLoot adapter and partial QuestieDB fallback |

@@ -2,9 +2,11 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Current-dungeon focus and Extra tools label verified; 0.4.9 packaging/publication pending under ongoing authorization.
+- Current-dungeon focus and Extra tools label completed and published as v0.4.9; remote tag and downloaded install ZIP verified.
+- No remaining feature work; native game-client QA remains unavailable in this environment.
 
 ## Last completed
+- Published v0.4.9 at `3cd7ddb9ebd5f3b8e8955b8a6fee919e0e235698`; downloaded 30-file ZIP byte-matches source-verified build.
 - Current dungeon automatically selected/revealed on open; waits for catalogue, respects manual browsing, resolves provider subzones and preserves shared gear filters.
 - Settings label changed to Extra tools; tab widths rebalanced within existing window, internal id `optional` retained.
 - All 31 suites / 1,165 checks pass, including 24 current-dungeon/label workflows; diff whitespace clean. Reproduced/corrected initial-focus versus pending-search race before release.
@@ -27,7 +29,7 @@ Last updated: 2026-11-13
 - `/qs fishing`: persistent per-water editor; `/qs fishing on`: world-map layer, with Alt-click placement where supported. Water notes survive settings reset and are deleted explicitly.
 - `/qs rewards`: shared explorer quest tab; equipment rewards by class/level/faction, slot/search filters, native comparisons and quest routes; requires recent QuestieDB and enum tables.
 - `/qs adventure [quest ID or title]`: editable role-play invitation for chosen chat; Prepare fills a draft, Enter sends.
-- `/qs loot [search]`: shared explorer dungeon tab; Classic/Forever dungeon equipment, encounter filter, item/name/ID/boss search, supplier/difficulty and native comparisons.
+- `/qs loot [search]`: shared explorer dungeon tab; Classic/Forever dungeon equipment, encounter filter, item/name/ID/boss search, supplier/difficulty and native comparisons; opening automatically focuses the recognized current dungeon.
 - Quest objective/turn-in symbols removed from both maps; old saved `questMap` setting discarded.
 
 ## Remaining limits
@@ -43,6 +45,6 @@ Last updated: 2026-11-13
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
-- v0.4.8: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.8
-- Tag `50d41cad29bc5aa4119d964d91668bec4e75f89e`; ZIP 154,142 bytes; SHA256 `3940b4a035ca9dceaf48ba9b95ffc066284e2f2081ea323543788decb5a02330`.
+- v0.4.9: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.9
+- Tag `3cd7ddb9ebd5f3b8e8955b8a6fee919e0e235698`; ZIP 154,927 bytes; SHA256 `82e65efb4ddbb59836315320c838eef78659ecf013b84ce507d3f237318774da`.
 - Main also includes a documentation follow-up recording publication. Previous release tags and ZIPs preserved.
