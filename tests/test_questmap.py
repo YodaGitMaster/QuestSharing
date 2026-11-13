@@ -1,6 +1,4 @@
-"""How to do it (one chat line from QuestieDB) and the light quest map (world map + minimap): where to do your quests'
-objectives and where to turn them in, drawn only while the Questie addon itself is off.   python tests/test_questmap.py"""
-import math
+"""How-to quest text, plus guards that retired quest symbols cannot return to either map."""
 import pathlib
 import re
 import sys
@@ -110,74 +108,33 @@ def test_the_menu_line_goes_to_the_party_or_only_to_you(style):
     assert g.sent() == [] and "kill Wolf" in unlink("\n".join(g.printed()))
 
 
-# ---- the quest map ---------------------------------------------------------------------------------------------------
-def points(g):
-    return [(p.kind, p.label) for p in g.eval("NS.questMap.points()").values()]
-
-
-def test_the_map_has_the_places_of_your_open_objectives_then_the_turn_in(style):
-    g = game(style)
-    pts = points(g)
-    assert pts.count(("kill", "kill Wolf")) == 3 and pts.count(("loot", "Wolf Pelt from Wolf")) == 3, pts
-    g.run("local q = BYID(100); q.complete = true; for _, o in ipairs(q.objectives) do o.finished = true end")
-    g.fire("QUEST_LOG_UPDATE")
-    g.advance(1.5)
-    assert ("turnin", "turn in at Marshal McBride") in points(g) and ("kill", "kill Wolf") not in points(g)
-
-
-def test_the_world_map_shows_them_on_their_map_only(style):
+# ---- retired quest map overlays ---------------------------------------------------------------------------
+def test_quest_overlay_renderer_and_setting_are_absent(style):
     g = game(style)
     g.run("WorldMapFrame.shown = true")
-    g.advance(0.5)
-    pins = [p for p in g.eval("NS.questMap._worldPins()").values() if p.shown]
-    assert len(pins) == 6, len(pins)
-    tex = {p.icon.texture for p in pins}
-    assert "Interface\\TargetingFrame\\UI-RaidTargetingIcon_8" in tex and "Interface\\Icons\\INV_Misc_Bag_08" in tex
-    g.run("WORLDMAP_ID = 1453")                                     # another map
-    g.advance(0.5)
-    assert not any(p.shown for p in g.eval("NS.questMap._worldPins()").values())
+    g.advance(20)
+    assert g.eval("NS.questMap") is None
+    assert g.eval("NS.defaults.questMap") is None
+    assert g.eval("(function() for _,r in ipairs(NS.settingRows) do if r.key=='questMap' then return true end end return false end)()") is False
+    assert g.eval("(function() for _,f in ipairs(FRAMES) do if f.qpoint then return true end end return false end)()") is False
 
 
-def test_the_minimap_shows_the_ones_around_you_in_the_right_direction(style):
+def test_old_enabled_setting_is_removed_and_legacy_command_cannot_restore_symbols(style):
     g = game(style)
-    g.advance(0.5)
-    pins = [p for p in g.eval("NS.questMap._miniPins()").values() if p.shown]
-    near = [p for p in pins if p.qpoint.x == 0.425]                # the wolf at 42.5, 61.5: just north-east of you
-    assert near and len(pins) < 6, "only the ones inside the minimap's circle"
-    x, y = near[0].point[4], near[0].point[5]
-    assert x > 0 and y > 0, (x, y)                                  # east = right, north = up
-
-
-def test_a_rotating_minimap_turns_with_you(style):
-    g = game(style)
-    g.run('CVARS.rotateMinimap = "1"; function GetPlayerFacing() return math.pi / 2 end')    # facing west
-    g.advance(0.5)
-    p = next(p for p in g.eval("NS.questMap._miniPins()").values() if p.shown and p.qpoint.x == 0.425)
-    x, y = p.point[4], p.point[5]
-    assert x > 0 and y < 0, (x, y)                                  # north-east, facing west: to your right, behind
-
-
-def test_it_stays_off_while_questie_draws_its_own_and_says_so_once(style):
-    pre = 'LOADED_ADDONS = { Questie = true, QuestieDB = true }; function IsAddOnLoaded(n) return LOADED_ADDONS[n] == true end\n'
-    g = game(style, pre)
-    assert points(g) == [] and g.eval("(NS.questMap.state())") is False
-    g.fire("PLAYER_LOGIN")
-    g.advance(7)
-    said = [l for l in g.printed() if "quest map: off while the Questie addon is on" in l]
-    assert len(said) == 1, g.printed()
-
-
-def test_the_switch_and_the_reports(style):
-    g = game(style)
-    g.slash("questmap off")
-    g.advance(1.5)
-    assert points(g) == [] and not any(p.shown for p in g.eval("NS.questMap._miniPins()").values())
+    g.run("QuestSharingDB.questMap = true")
+    g.fire("ADDON_LOADED", "QuestSharing")
+    assert g.eval("NS.db.questMap") is None
     g.slash("questmap on")
-    g.advance(1.5)
-    assert len(points(g)) == 6
-    g.run("PRINTED = {}")
-    g.slash("questie")
-    assert "quest map (world map and minimap): on, 6 places for your quests" in "\n".join(g.printed())
+    g.fire("QUEST_LOG_UPDATE")
+    g.advance(20)
+    assert g.eval("NS.questMap") is None and g.eval("NS.db.questMap") is None
+    assert "symbols on the world map and minimap have been removed" in "\n".join(g.printed())
+
+
+def test_install_manifest_has_no_quest_overlay_module():
+    addon = pathlib.Path(__file__).resolve().parents[1] / "QuestSharing"
+    assert not (addon / "QuestMap.lua").exists()
+    assert "QuestMap.lua" not in (addon / "QuestSharing.toc").read_text()
 
 
 if __name__ == "__main__":

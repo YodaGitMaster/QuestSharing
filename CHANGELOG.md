@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.4.2
+- **Instance drops** GUI (*Settings > Optional*, the quest reward browser's **Instance drops** button, or
+  `/qs loot [search]`): browse instances, search item names/IDs and bosses, and see the encounter or creature that
+  supplies each item. Includes encounter filtering, pagination, item tooltips/comparisons and source details.
+- Reads compatible installed **AtlasLoot** DungeonsAndRaids encounter tables, including available difficulty
+  variants, trash and chest groups. Without those tables, **QuestieDB** supplies clearly labelled partial sources
+  for creatures/objects known to be inside instances. Coverage follows the installed catalogue; no drop rates
+  or missing dungeon data are invented.
+- Data is indexed only on request, in batches; item names load in small batches and update as the game supplies
+  them. Closing the window or disabling the addon cancels unfinished work. Quest map symbols remain removed.
+
+## 0.4.1
+- Removed Quest Sharing's quest-objective and turn-in symbols from the world map and minimap, including their
+  renderer, setting and background refresh; old enabled settings are discarded on load.
+- **Seek fellow adventurers**: a role-play quest invitation from a quest's right-click menu, *Settings > Optional*,
+  or `/qs adventure [quest ID or exact title]`. Choose an unfinished quest, cycle through three wordings and edit
+  the preview. It includes a quest link and the current zone when the quest is in that area.
+- Choose the current chat, say/yell, party/raid, guild/officer, instance, a whisper recipient, or any joined channel
+  by number/name. **Prepare chat** fills the chat box; press Enter to send, including when other features send
+  immediately. Existing drafts are preserved; switching channels with an unfinished draft asks you to clear it first.
+- Invitations respect the 255-byte chat limit and never recruit for completed or abandoned quests.
+
+## 0.4.0
+- **Optional** settings tab: both new tools start switched off.
+- **Fishing waters** (`/qs fishing`): add, edit and delete a marker for each body of water, with map coordinates,
+  minimum and no-getaway fishing skill, fish and notes. Markers appear on the big world map when enabled.
+  Alt-clicking a water starts a new marker there on clients with normalized map cursor support. Notes
+  survive logout/reload and settings resets. Unknown skills stay unknown. Optional **AnglerAtlas** adds a separate
+  zone summary; provisional Forever data stays labelled. Individual water records are entered by the user;
+  this release does not include a verified catalogue of every lake and river.
+- **Quest reward equipment** (`/qs rewards`): browse QuestieDB item rewards by class, character level, faction,
+  equipment slot and item/quest/zone search. Starts with your character, hides completed quests where the game
+  reports completion, and sorts by item level. Hover for the game's equipment comparison; click for the quest
+  giver, coordinates and prerequisites. Classic equipment families narrow class results; check item tooltips for
+  item-specific restrictions and build suitability. Requires a recent QuestieDB item catalogue and enum tables.
+- Catalogue scanning happens only on request, in small batches; disabling it cancels pending work. Full-width
+  Forever race masks are respected. The new tools never open/redraw the game's protected world map.
+
 ## 0.3.9
 - **Quest items marked in your bags** (*Settings > Pings & items*, `/qs bagmarks`, on by default): gold for a quest
   of the zone you are in, blue for one of your quests elsewhere (the bank can keep it), so you only carry what this
