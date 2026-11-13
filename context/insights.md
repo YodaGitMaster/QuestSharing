@@ -1,5 +1,12 @@
 # Insights
 
+## 2026-11-13 — Empty native zone levels caused map-wide question marks
+- Native GetMapLevels may return nothing; valid client/API availability alone does not establish data coverage. Zero metadata reproduces all-unknown badges on both API mocks; user's affected scope is every zone.
+- Standalone guides now cover 39 Classic questing maps and Zephras/Riverglades. Hyjal/Shen'dralas use explicitly labelled known-quest spans, not invented official brackets; six cities and Moonglade have meaningful role labels.
+- Checked every Classic guide/map ID against author source; Forever IDs verified against QuestieDB mappings. Reference checkout/downloads stay in `/tmp/questsharing-zone-reference`, not the addon package.
+- Do not cache a fallback as native success: late API data must replace it without needing a manual refresh.
+- All 34 suites / 1,291 checks pass, including 50 zone workflows and a zero-metadata 50-map badge scenario; native game rendering remains unverified.
+
 ## 2026-11-13 — Equipment identity differs from source identity
 - Reproduced three Captain's Blade rows for two mobs/two modes and two Druid Staff rows for two quests. Raw exact-source dedup was correct; presentation needed a second grouping layer.
 - Group after every filter, by normalized name; retain raw source arrays and all matching IDs. Highest native level/lowest ID selects the comparison version; stable name key survives cache arrivals.

@@ -1,5 +1,12 @@
 # Decisions
 
+## 2026-11-13 — Native level metadata needs a standalone fallback
+- User reports `???` in every zone. Reproduced with GetMapLevels returning 0,0 on modern/classic paths; API also explicitly permits no return. Previous native-only implementation and happy-path mocks did not establish real coverage.
+- Keep native validated bounds preferred and cached. Add 39 Classic outdoor brackets checked against LibTourist Classic Era revision 246 (`d2380757a8fe2b1cb2d341817e36e1cd0bccee3a`, MIT; author repo https://repos.curseforge.com/wow/libtourist-classic-era). These are general Zone guide ranges; no runtime library dependency or copied library implementation.
+- Forever sources: Blizzard news 24302071 confirms Zephras 1–12; news 24315820 describes Riverglades mid-30s to mid-40s, represented as a labelled 35–45 Zone guide. Exact native metadata still wins.
+- QuestieDB commit `4dde6c43201b15c0b0f370cf85e7259e1922322a`, `src/corrections/Forever/generated/foreverBaseQuest.lua`: 36 zone-tagged Mount Hyjal quests at 56–60, 19 Shen'dralas quests at 38–43. These are computed spans of those known records, explicitly labelled Known quests, not claimed complete/recommended zone bounds. Real UI map IDs verified from the same provider's Forever zone mappings: Hyjal2482, Zephras2521, Riverglades2548, Shen'dralas2652; no AreaTable/UI-map-ID confusion.
+- Label six cities and Moonglade as City/Sanctuary. Unknown future maps remain unknown; never guess from neighboring maps. Fallbacks are not cached, allowing native data to arrive later. Only ZoneLevels runtime changes; default off, protected map behavior and all other tools retained. Release 0.4.14 under ongoing publication authorization.
+
 ## 2026-11-13 — One explorer row per equipment name
 - Group only after existing quality/gear/stat/level/search/source/quest-eligibility filters. Preserve raw indices and every matching source; avoid losing other bosses when collapsing the presentation.
 - Shared EquipmentUI.groupItems normalizes case, color codes and outer whitespace; stable name key preserves selection when sources or item versions arrive. Highest native item level then lowest item ID chooses a deterministic comparison version; all matching item IDs/levels remain visible in details.
