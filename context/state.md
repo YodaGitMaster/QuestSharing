@@ -6,6 +6,7 @@ Last updated: 2026-11-13
 - No remaining feature work; native game-client QA remains unavailable in this environment.
 
 ## Last completed
+- Rechecked push/release on user request: origin/main matches local publication documentation, v0.4.9 is the latest stable published release and its uploaded ZIP digest matches the verified build; no new runtime changes require another release.
 - Published v0.4.9 at `3cd7ddb9ebd5f3b8e8955b8a6fee919e0e235698`; downloaded 30-file ZIP byte-matches source-verified build.
 - Current dungeon automatically selected/revealed on open; waits for catalogue, respects manual browsing, resolves provider subzones and preserves shared gear filters.
 - Settings label changed to Extra tools; tab widths rebalanced within existing window, internal id `optional` retained.
