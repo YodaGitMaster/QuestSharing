@@ -1,5 +1,16 @@
 # Insights
 
+## 2026-11-13 — Unified equipment explorer
+- User clarified that Forever dungeons must remain included; exclude raids/world bosses via actual dungeon identity, not merely a positive InstanceID or UIMapType.Dungeon.
+- Verified AtlasLoot [content category API](https://github.com/HoliestWoW/AtlasLootClassic/blob/master/AtlasLootClassic/ItemDB/ItemDB.lua) and [Classic/Forever catalogue](https://github.com/HoliestWoW/AtlasLootClassic/blob/master/AtlasLootClassic_DungeonsAndRaids/data.lua).
+- Actual provider smoke after classification: 30 dungeon entries / 1,655 raw source rows, zero Lua errors; item 5191 -> Edwin VanCleef / The Deadmines / Normal once native item details are available.
+- Dire Maul wings have commented-out InstanceID in the compatible catalogue; accept their known area rather than losing them. Hall of Thanes map placeholder is explicitly unverified; do not add it to the Questie fallback area registry.
+- EquipmentUI owns the only top-level gear window; quest/drop details are child panels. Shared session filters survive tabs; scan cancellation is explicit because the mock does not propagate OnHide automatically.
+- Native numeric class/subclass metadata supports item types; fallback unset class/subclass zero cannot be treated as a known axe subclass.
+- All 28 suites / 1,081 checks passed. New `tests/test_equipment.py`: 26 integration checks across classic/modern paths, including cross-link raid exclusion and unknown metadata.
+- Approximate previews in `/tmp/questsharing-equipment-{quests,dungeons}.png` derive positions from actual mocked native widgets; they are not game-client screenshots. Real rendering remains unverified.
+- Built source-verified v0.4.5 install ZIP: 30 files.
+
 ## 2026-11-13 — Invitation menu ordering
 - Existing invitation action was row 3 after Offer it to the party; user requested it directly after Tell the party.
 - Moved to row 2. Existing 60 menu and 32 adventure checks passed across modern/classic paths.

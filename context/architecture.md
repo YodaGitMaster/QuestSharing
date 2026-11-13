@@ -14,6 +14,7 @@ QuestSharing/  # Repository root
 │   ├── Core.lua  # settings, timers, events, chat helpers and the /qs commands
 │   ├── Diagnostics.lua  # an error log and a "doctor" report, so problems on a real game client are easy to report
 │   ├── Friends.lua  # add the people you group with to your friends list
+│   ├── EquipmentUI.lua  # Shared equipment explorer, filters, item cards and inline details
 │   ├── Fishing.lua  # Optional world-map water notes, editor and AnglerAtlas zone summaries
 │   ├── Highlight.lua  # make quest objectives easier to find
 │   ├── Loot.lua  # Equipment-only instance browser with AtlasLoot tables and partial QuestieDB fallback
@@ -52,6 +53,7 @@ QuestSharing/  # Repository root
     ├── test_bags.py  # Tests for bags
     ├── test_box.py  # Tests for box
     ├── test_done.py  # Tests for done
+    ├── test_equipment.py  # Shared window, type/level filters, dungeon identity and cancellation
     ├── test_emotes.py  # Tests for emotes
     ├── test_extras.py  # Tests for extras
     ├── test_features.py  # Tests for features
@@ -89,14 +91,16 @@ flowchart TD
     Sync --> API
     Settings[Settings.lua: Optional tab] --> Fishing[Fishing.lua: water notes]
     Settings --> Rewards[Rewards.lua: reward browser]
-    OptionalUI[OptionalUI.lua] --> Fishing
+    OptionalUI[OptionalUI.lua] --> Equipment[EquipmentUI.lua: shared explorer]
+    Equipment --> Rewards
+    Equipment --> Loot
+    OptionalUI --> Fishing
     OptionalUI --> Rewards
     Fishing --> Waters[(QuestSharingDB.fishingWaters)]
     Atlas[Optional AnglerAtlas] --> Fishing
     Rewards --> Q
     Rewards --> Items[WoW item info and comparison tooltips]
     Settings --> Loot[Loot.lua: instance drop search]
-    Rewards --> Loot
     Loot --> AtlasLoot[Optional AtlasLoot encounter tables]
     Loot --> Q
     Loot --> Items
@@ -143,7 +147,7 @@ sequenceDiagram
     participant Items as QuestieDB ItemDB
     participant Q as Questie.lua
     participant Game as WoW item APIs
-    User->>Rewards: Open browser
+    User->>Rewards: Open shared EquipmentUI quest tab
     Rewards->>Items: GetAllIds; read 100 items per timer batch
     Items-->>Rewards: Equipment and questRewards links
     Rewards->>Q: Read quest level, class/race masks and starter
@@ -153,7 +157,7 @@ sequenceDiagram
     Rewards->>User: Debounced refresh of cached item details
     User->>Rewards: Hover item / click quest
     Rewards->>Game: Item and equipped comparison tooltip
-    Rewards->>User: Starter coordinates and prerequisite route
+    Rewards->>User: Starter coordinates and prerequisites in inline detail pane
 ```
 
 ```mermaid
@@ -182,7 +186,7 @@ sequenceDiagram
     participant Questie as Questie.lua
     participant Game as WoW item APIs
     User->>Loot: Open instance drops
-    Loot->>Atlas: Read installed DungeonsAndRaids encounter tables
+    Loot->>Atlas: Read installed Classic/Forever dungeon tables; reject raids/world bosses
     alt Compatible AtlasLoot data available
         Atlas-->>Loot: Instances, encounters, difficulties and item IDs
     else No compatible encounter catalogue
@@ -191,11 +195,27 @@ sequenceDiagram
     end
     Loot->>Loot: Index up to 100 rows per timer batch
     Loot->>Game: Load up to 10 item details per timer batch (Rewards.itemInfo)
-    User->>Loot: Filter instance, encounter or item/boss text
+    User->>Loot: Filter dungeon, encounter or item/boss text; shared type/slot/level filters
     Loot->>Loot: Require recognized weapon or wearable slot; hide unknown items
     Loot->>User: Paginated equipment with supplier and difficulty
     Game-->>Loot: GET_ITEM_INFO_RECEIVED
     Loot->>User: Debounced equipment classification and name refresh
+```
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant E as EquipmentUI.lua
+    participant Page as Rewards.lua / Loot.lua
+    User->>E: Open quest or dungeon tab
+    E->>Page: Hide old page and suspend pending work
+    E->>Page: Show selected child in same host
+    User->>E: Apply type, slot or inclusive level range
+    E->>Page: Refresh with shared equipment filters
+    User->>Page: Select item card
+    Page->>E: Update inline route/source pane
+    User->>E: Close explorer
+    E->>Page: Cancel unfinished timers and hide child
 ```
 
 ## Class diagram
@@ -213,6 +233,7 @@ classDiagram
         fishing
         rewards
         loot
+        equipmentUI
     }
     class Settings {
         dbVersion
@@ -235,6 +256,7 @@ classDiagram
     }
     class RewardOption {
         itemID
+        info
         itemLevel
         slot
         questID
@@ -251,7 +273,7 @@ classDiagram
     }
     class LootDrop {
         itemID
-        itemCache
+        item
         instanceKey
         instanceName
         who
@@ -260,6 +282,27 @@ classDiagram
         sourceID
         kind
     }
+    class NativeItemInfo {
+        name
+        quality
+        level
+        required
+        slot
+        kind
+        sub
+        texture
+    }
+    RewardOption --> NativeItemInfo : info
+    LootDrop --> NativeItemInfo : item.info
+    class EquipmentFilter {
+        category
+        subtype
+        slot
+        mode
+        min_optional
+        max_optional
+    }
+    Namespace --> EquipmentFilter : equipmentUI owns session filters
     Namespace --> LootDrop : loot builds an on-demand index
     Namespace --> InvitationDraft : adventure session-only composer
     Settings --> WaterNote : fishingWaters indexed by local numeric ID

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.5
+- Quest rewards and dungeon drops now share one **Equipment explorer** window with tabs, item icons,
+  quality colors, highlighted selection and an inline route/source panel. Selecting an item or changing tabs
+  reuses this window; closing it or leaving a tab cancels that tab's unfinished work.
+- Both tabs share equipment category, item type and slot filters, plus an inclusive minimum/maximum level
+  range. Choose **Required level** or **Item level**; blank bounds are unrestricted. Invalid ranges keep the
+  previous valid filter and explain the error. Right-click a choice to cycle backwards; Reset filters clears it.
+- Dungeon equipment includes **Classic and Forever dungeons**, as requested, and excludes raids, world bosses
+  and unidentified encounter tables. Uses AtlasLoot's dungeon category with known dungeon identities for older
+  catalogues and the partial QuestieDB fallback. Dire Maul wings without InstanceID remain included.
+
 ## 0.4.4
 - In a quest's right-click menu, **Seek fellow adventurers** now appears directly after
   **Tell the party how I am doing**, before **Offer it to the party**. Selecting it opens the invitation
