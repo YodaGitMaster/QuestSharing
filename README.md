@@ -465,7 +465,15 @@ while typing; Enter or **Apply** works too. Bounds are inclusive and blank means
 ranges keep the last valid range and explain the problem. **My level** sets the required-level maximum to your
 current level without a lower bound. **Sort** by highest item level, lowest required level, or name.
 
-**Clear filters** clears the shared type/slot/range/sort controls and the active tab's searches. On the dungeon tab
+**Stat filters** work in both tabs. Choose up to three bonuses from the searchable stat dropdowns and enter a
+**Min bonus** for each: for example, **Intellect ≥ 10** and **Stamina ≥ 5**. Every selected condition must match;
+minimums are inclusive, blank means 1, and choosing **Any stat** removes that condition. Minimums update while
+typing or on Enter; invalid values keep the last valid filter. Primary attributes, armor, attack/spell bonuses,
+healing, regeneration, combat ratings and resistances are available. Ratings use points, not percentages.
+Only bonuses reported by the client's item-stat API can match; procs and unreported bonuses are not evaluated.
+Missing stat data stays hidden while a condition is active; clients without the API show an explanation.
+
+**Clear filters** clears the shared type/slot/range/stat/sort controls and the active tab's searches. On the dungeon tab
 it also returns to All dungeons/All encounters; on the quest tab it shows all quest levels while keeping completed
 quests hidden and preserving character/class/faction. Blue quality and above remains enforced. Empty results
 explain how to broaden the search; pending item data is labelled as loading.
@@ -687,6 +695,7 @@ python tests/test_log.py              # 35 tests: the debug log: every action an
 python tests/test_optional.py         # 42 tests: fishing water notes, map drawing, reward filters and item comparisons
 python tests/test_adventure.py        # 32 tests: role-play quest invitations, preview, channels and preserved chat drafts
 python tests/test_equipment.py        # 36 tests: one window, shared filters, rare+ quality, dungeon/raid identity and cancellation
+python tests/test_stats.py            # 20 tests: combined stat minimums, native APIs, cache refresh, live inputs and reset
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 ```
 Expected: every line ends in `passed` with all tests green (1121 in total).

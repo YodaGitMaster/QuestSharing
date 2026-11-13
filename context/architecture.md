@@ -73,6 +73,7 @@ QuestSharing/  # Repository root
     ├── test_quick.py  # Tests for quick
     ├── test_ringtest.py  # Tests for ringtest
     ├── test_settings.py  # Tests for settings
+    ├── test_stats.py  # Shared stat minimums, native API compatibility, live controls and cache invalidation
     ├── test_team.py  # Tests for team
     ├── test_together.py  # Tests for together
     ├── test_tracker.py  # Tests for tracker
@@ -97,6 +98,7 @@ flowchart TD
     OptionalUI[OptionalUI.lua] --> Equipment[EquipmentUI.lua: shared explorer, Rare+ only]
     Equipment --> Rewards
     Equipment --> Loot
+    Equipment --> StatAPI[WoW GetItemStats: lazy link cache, invalidated on item events]
     OptionalUI --> Fishing
     OptionalUI --> Rewards
     Fishing --> Waters[(QuestSharingDB.fishingWaters)]
@@ -213,9 +215,11 @@ sequenceDiagram
     User->>E: Open quest or dungeon tab
     E->>Page: Hide old page and suspend pending work
     E->>Page: Show selected child in same host
-    User->>E: Apply type, slot or inclusive level range
+    User->>E: Apply type, slot, inclusive level range or up to three stat minimums
     User->>E: Search dropdown choices / type live query / scroll results
     E->>Page: Debounced search or direct filter selection; keep quality 3+
+    Page->>E: matches native item metadata
+    E->>E: Read cached native stat table only for active conditions; require all minimums
     E->>Page: Apply sorting; preserve selected result if visible
     User->>Page: Select item card
     Page->>E: Update inline route/source pane
@@ -289,6 +293,7 @@ classDiagram
     }
     class NativeItemInfo {
         name
+        link
         quality
         level
         required
@@ -307,7 +312,13 @@ classDiagram
         sort
         min_optional
         max_optional
+        stats_three_conditions
     }
+    class StatCondition {
+        stat_optional
+        min_1_to_100000
+    }
+    EquipmentFilter --> StatCondition : three AND conditions
     Namespace --> EquipmentFilter : equipmentUI owns session filters
     Namespace --> LootDrop : loot builds an on-demand index
     Namespace --> InvitationDraft : adventure session-only composer
