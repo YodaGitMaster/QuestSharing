@@ -391,7 +391,7 @@ explanation, and groups its settings in short sections:
 | **Tracker** | *The quest list on the right* (hide the game's tracker, follows you, how many, distance or zone, the pause), *Finding objectives* (the world pin, quest icons over creatures, the game-settings helper)  |
 | **Quick chat** | the ring, its key, hold or toggle, its size, where Auto messages go, and the **message editor** |
 | **Pings & items** | *Pinging quest targets* (the ping key, the anti-spam time, objects too) and *Quest items* (quest items marked in your bags, icons in the tracker, the quest item key, the item button) |
-| **Extra tools** | highest learned spell ranks on action bars; role-play quest invitations; fishing water markers; quest reward and instance drop browsers |
+| **Extra tools** | world-map questing levels; highest learned spell ranks; quest invitations; fishing waters; quest reward and instance drop browsers |
 
 Every line is one click: a **check box** switches, a **choice** (`< value >`) moves to the next one (right click goes
 back), a **number** (`- 10 +`) counts up with the left button and down with the right one (Shift = bigger steps), and
@@ -405,9 +405,20 @@ tracker follows you, your quick chat key (or that it is not set) and how many pr
 **Good news has a sound** (switch it off under General): a soft ping when someone accepts a quest you shared or a
 party member running Quest Sharing finishes one you share. Never during combat.
 
-## Extra tools: spell ranks, quest invitations, fishing, quest rewards and instance drops
+## Extra tools: zone levels, spell ranks, quest invitations, fishing, quest rewards and instance drops
 
 Open `/qs settings` > **Extra tools** for these tools; fishing and the reward browser have independent switches.
+
+**Questing levels on the world map.** Open the map normally with `M`: continent maps display level badges
+over outdoor zones, and a small **Questing levels** panel shows the range for the zone you view or hover.
+Choose a continent/zone from the world overview to see its details. This is enabled by default; switch
+**Show zone questing level ranges** off in Extra tools to hide it. Labels do not intercept map clicks and
+follow map resizing/zoom.
+
+Ranges come from the game's player-level map data, including supported Forever zones; no extra addon is
+required. **?** or **range unavailable** means the client has not supplied valid data for that zone; the addon
+does not invent a range. These are general map level recommendations, not a guarantee that every quest is
+available to your class or faction. Quest symbols and minimap markers remain removed.
 
 **Highest learned spell ranks on your action bars.** Enable **Auto-update spells to highest learned rank**
 in Extra tools (off by default). It upgrades existing player spell buttons across normal action-bar pages,
@@ -717,6 +728,7 @@ python tests/test_equipment.py        # 36 tests: one window, shared filters, ra
 python tests/test_instance_focus.py   # 24 tests: current dungeon, batched loads, manual browsing, wing identity and Extra tools
 python tests/test_stats.py            # 20 tests: combined stat minimums, native APIs, cache refresh, live inputs and reset
 python tests/test_spell_ranks.py      # 48 tests: learned rank upgrades, normal pages, cursor/combat guards and client APIs
+python tests/test_zone_levels.py      # 30 tests: native map ranges, zone bounds, hover, zoom, lifecycle and read-only labels
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 ```
 Expected: every line ends in `passed` with all tests green (1121 in total).
@@ -746,6 +758,7 @@ Expected: every line ends in `passed` with all tests green (1121 in total).
 | `QuestSharing/Rewards.lua` | optional QuestieDB equipment rewards, filters, item comparisons and quest routes |
 | `QuestSharing/EquipmentUI.lua` | one equipment window, shared item type/slot/level/stat filters, item cards and inline details |
 | `QuestSharing/SpellRanks.lua` | opt-in highest learned spell ranks on existing normal action-bar buttons |
+| `QuestSharing/ZoneLevels.lua` | native outdoor-zone questing ranges, click-through map badges and hover panel |
 | `QuestSharing/OptionalUI.lua` | shared controls for the optional tools |
 | `QuestSharing/Adventure.lua` | role-play quest invitation preview and chat preparation in a chosen channel |
 | `QuestSharing/Loot.lua` | searchable instance loot, encounter sources, AtlasLoot adapter and partial QuestieDB fallback |

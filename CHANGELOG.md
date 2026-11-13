@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.11
+- Added **zone questing level ranges** to the world map, enabled by default with an **Extra tools > Show zone
+  questing level ranges** toggle. Continent maps show a level badge over each mapped outdoor zone; a compact
+  panel shows the selected or hovered zone's range. World/cosmic views prompt you to choose a continent/zone.
+- Reads the game's player level ranges and zone bounds, including supported Forever zones, without requiring
+  another addon. Missing/invalid ranges show **?** or **range unavailable**; no zone levels are guessed.
+- Labels follow map size/zoom, remain click-through and hide when disabled or the map closes. Native map
+  navigation, pins, quest symbols and minimap markers are not changed or restored.
+
 ## 0.4.10
 - Added opt-in **Auto-update spells to highest learned rank** under **Extra tools**, plus **Check spell ranks
   now**. Updates lower-ranked player spell buttons on normal action-bar pages, including duplicate buttons
