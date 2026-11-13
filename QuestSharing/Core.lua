@@ -34,7 +34,7 @@ ns.defaults = {
     fishingMap = false, -- optional fishing notes on the world map
     rewardBrowser = false, -- optional quest reward catalogue
     autoSpellRanks = false, -- opt-in: highest learned ranks on existing player spell buttons
-    zoneLevels = true, -- questing level ranges on the world map
+    zoneLevels = false, -- opt-in: questing level ranges on the world map
     bagMarks = true,    -- quest items marked in the bags: gold = a quest of this zone, blue = a quest elsewhere
     hideTracker = false, -- hide the game's quest tracker (outside fights)
     debug = false,      -- the debug log: every action and its outcome (QuestSharingLog, saved on /reload or logout)
@@ -255,6 +255,11 @@ ns.on("ADDON_LOADED", function(_, name)
     ns.newInstall = (QuestSharingDB == nil) or (next(QuestSharingDB) == nil)
     QuestSharingDB = QuestSharingDB or {}
     local savedVersion = QuestSharingDB.dbVersion or 0            -- read before the defaults fill the gaps
+    if QuestSharingDB.zoneLevelsOptInMigrated ~= true then
+        -- 0.4.11 enabled this by default; require a fresh opt-in once, then preserve the choice.
+        QuestSharingDB.zoneLevels = false
+        QuestSharingDB.zoneLevelsOptInMigrated = true
+    end
     for k, v in pairs(ns.defaults) do
         if QuestSharingDB[k] == nil then QuestSharingDB[k] = v end
     end

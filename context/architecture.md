@@ -43,6 +43,7 @@ QuestSharing/  # Repository root
 ├── build_release.py  # Build install ZIP and release notes
 ├── context/  # Session continuity and live architecture
 │   ├── BUGS/  # Verified bug methodology and regressions
+│   │   ├── 2026-11-13-zone-levels-opt-in.md  # Once-only migration from auto-enabled map ranges
 │   │   ├── 2026-11-13-spell-rank-zero-spec.md  # Numeric-zero active specialization in Lua
 │   │   ├── 2026-11-13-spell-rank-cursor-read.md  # Preserve readability separately from an empty cursor
 │   │   ├── 2026-11-13-spell-rank-hidden-pages.md  # Native slot range differs from visible pages
@@ -175,6 +176,7 @@ sequenceDiagram
     participant Core as Core.lua
     participant Saved as QuestSharingDB
     Game->>Core: ADDON_LOADED(addon name)
+    Core->>Saved: Once-only zoneLevels opt-in migration, then preserve later choices
     Core->>Saved: Fill missing defaults and migrate dbVersion
     Core->>Core: ns.db = QuestSharingDB
     Core->>Core: Refresh settings if available
@@ -308,6 +310,7 @@ classDiagram
         rewardBrowser
         autoSpellRanks
         zoneLevels
+        zoneLevelsOptInMigrated
         fishingWaters
         hideTracker
     }

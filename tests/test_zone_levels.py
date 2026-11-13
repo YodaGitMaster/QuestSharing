@@ -41,8 +41,10 @@ end
 '''
 
 
-def game(style,extra=""):
-    g=Game(style,DATA+extra,fresh=True);g.start();g.advance(2);return g
+def game(style,extra="",enabled=True):
+    g=Game(style,DATA+extra,fresh=True);g.start();g.advance(2)
+    if enabled:g.eval("NS.setSetting")("zoneLevels",True)
+    return g
 
 
 def show(g,map=1415):
@@ -56,10 +58,14 @@ def labels(v):
     return {p.zone.id:p for p in v.labels.values() if p.shown}
 
 
-def test_default_enabled_no_native_queries_while_map_closed(style):
-    g=game(style)
-    assert g.eval("NS.db.zoneLevels") and g.eval("NS.zoneLevels._view()")==None
+def test_default_off_requires_explicit_opt_in_even_when_map_is_open(style):
+    g=game(style,enabled=False)
+    assert not g.eval("NS.db.zoneLevels") and g.eval("NS.zoneLevels._view()")==None
+    g.run('WORLDMAP_ID=1415;WorldMapFrame.shown=true')
     g.advance(10);assert g.eval("NATIVE_READS")==g.eval("CHILD_READS")==0
+    assert g.eval("NS.zoneLevels._view()")==None
+    g.eval("NS.setSetting")("zoneLevels",True)
+    assert g.eval("NS.zoneLevels._view().panel.shown")
 
 
 def test_continent_badges_include_classic_forever_and_unknown_ranges(style):
@@ -177,6 +183,24 @@ def test_extra_tools_toggle_fits_settings_and_saved_false_stays_false(style):
     assert not g.eval('QuestSharingDB.zoneLevels')
     h=Game(style,DATA,fresh=True);h.run('QuestSharingDB={zoneLevels=false,dbVersion=3}');h.start()
     assert not h.eval('NS.db.zoneLevels')
+
+
+def test_old_default_is_switched_off_once_then_explicit_opt_in_survives_reload(style):
+    g=Game(style,DATA,fresh=True)
+    g.run('QuestSharingDB={zoneLevels=true,dbVersion=3}')
+    g.start();assert not g.eval('NS.db.zoneLevels')
+    assert g.eval('QuestSharingDB.zoneLevelsOptInMigrated')
+    g.eval('NS.setSetting')('zoneLevels',True)
+    g.fire('ADDON_LOADED','QuestSharing')
+    assert g.eval('NS.db.zoneLevels') and g.eval('QuestSharingDB.zoneLevelsOptInMigrated')
+
+
+def test_reset_returns_optional_ranges_to_off_without_repeating_migration(style):
+    g=game(style);assert g.eval('NS.db.zoneLevels')
+    g.eval('NS.resetSettings')();assert not g.eval('NS.db.zoneLevels')
+    assert g.eval('QuestSharingDB.zoneLevelsOptInMigrated')
+    g.eval('NS.setSetting')('zoneLevels',True);g.fire('ADDON_LOADED','QuestSharing')
+    assert g.eval('NS.db.zoneLevels')
 
 
 if __name__=="__main__":

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.12
+- Zone questing ranges are now **optional and off by default**, like other Extra tools features. Enable
+  **Extra tools > Show zone questing level ranges** when you want the map badges and panel.
+- Existing v0.4.11 installations are switched off once on update; your subsequent explicit choice is saved
+  across reloads. Reset settings returns the option to off.
+
 ## 0.4.11
 - Added **zone questing level ranges** to the world map, enabled by default with an **Extra tools > Show zone
   questing level ranges** toggle. Continent maps show a level badge over each mapped outdoor zone; a compact

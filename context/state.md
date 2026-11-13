@@ -2,10 +2,12 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Questing level ranges on world-map zones completed and published as v0.4.11; remote tag and downloaded install ZIP verified.
-- No remaining feature work; native game-client rendering/data QA remains unavailable in this environment.
+- Zone questing ranges corrected to opt-in/off by default, including one-time migration of v0.4.11 installs; 0.4.12 packaging/publication pending.
+- Standing preference: Extra tools additions stay optional and default off unless explicitly requested otherwise.
 
 ## Last completed
+- Changed zoneLevels default to false and added once-only opt-in migration; later choices persist and Reset returns to off. Renderer unchanged.
+- All 33 suites / 1,247 checks pass, including 34 zone-level workflows; diff whitespace clean.
 - Published v0.4.11 at `f18d8258a33bee3270967c6afdaaf57c258a31ef`; downloaded 32-file ZIP byte-matches source-verified build.
 - Added zoneLevels=true, Extra tools toggle, native continent zone badges and selected/hovered outdoor-zone panel; click-through own frames only, unknown data labelled, existing quest/minimap overlays remain retired.
 - Zone data comes from client C_Map APIs including supported Forever zones; no bundled speculative ranges or Questie dependency. Settings layout still fits.
@@ -35,7 +37,7 @@ Last updated: 2026-11-13
 
 ## Implemented tools
 - Extra tools tab in `/qs settings`; fishing layer and quest reward browser default off.
-- World-map questing ranges: default on; native badges on continent outdoor zones, selected/hovered-zone panel; Extra tools toggle. World/cosmic overview prompts choosing a continent/zone; missing client data is unknown.
+- World-map questing ranges: default off; enable via Extra tools toggle for native continent badges and selected/hovered-zone panel. World/cosmic overview prompts choosing a continent/zone; missing client data is unknown.
 - Extra tools > Auto-update spells to highest learned rank: default off; upgrades existing player spell buttons across normal/hidden/form pages on enable/login/learning/action changes; Check spell ranks now reports results. Waits during combat/temporary bars/dragging; macros/pet/items remain; refusal pauses until reload.
 - `/qs fishing`: persistent per-water editor; `/qs fishing on`: world-map layer, with Alt-click placement where supported. Water notes survive settings reset and are deleted explicitly.
 - `/qs rewards`: shared explorer quest tab; equipment rewards by class/level/faction, slot/search filters, native comparisons and quest routes; requires recent QuestieDB and enum tables.
