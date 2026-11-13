@@ -5,6 +5,7 @@
 - Original loot fixture gave cloth a weapon slot and explicitly tested its inclusion; corrected realistic slots and expected scope.
 - Common `Rewards.itemInfo().slot` is sufficient to classify weapons and wearable gear without adding API/provider dependencies; unknown details stay hidden until cache events.
 - Failed-first regression suite then passed 58 loot cases; all 27 suites / 1,055 checks passed. Built and source-verified v0.4.3 ZIP (29 files).
+- Published correction v0.4.3 at `72d7d35`; downloaded release ZIP matches tested local bytes (SHA256 `af209ddb41dc6ca695b1364b56c00c3dade5ef7281b385ae19010ccbec0f0cd1`).
 
 ## 2026-11-13 — Release 0.4.2 published
 - Re-ran all 27 suites: 1,043 checks passed; rebuilt and verified 29 addon files.
