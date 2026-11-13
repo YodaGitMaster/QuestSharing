@@ -2,16 +2,18 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Implemented user's request to exclude green quality and lower from both equipment tabs; version 0.4.6.
-- Completed push and stable v0.4.6 release; tag and downloaded ZIP verified, no publication work remains.
+- Completed equipment usability redesign for 0.4.7; final regression/package passed and publication verification pending.
+- Existing ongoing push/release authorization applies; no additional feature work remains.
 
 ## Last completed
-- Published v0.4.6 at `401c9508c14088f9464dd6c06033e8e23fe04a3c`; downloaded asset matches verified local bytes.
-- All 28 suites / 1,091 checks passed; source-verified 30-file ZIP `dist/QuestSharing-0.4.6.zip`, SHA256 `8efb93d2f4bdb21766d1ffd6c96eb59711bede03e363ff5c33c65d8c51d02dec`.
-- EquipmentUI.matches now requires confirmed native quality >=3 (Rare/blue), covering quest rewards, dungeon results and source choices; Reset filters preserves the minimum.
-- Unknown-quality equipment stays hidden until native item-cache events refresh it. Header and README explain the rule.
-- Added five integration cases across both API styles; failing-before verification then 36/36 shared-explorer cases passed. Optional 42/42 and loot 58/58 passed.
-- Baseline fixture gear is now Rare; explicit low-quality cases verify grey/white/green exclusion. No provider, window, eligibility or SavedVariables changes.
+- Searchable direct dropdowns replace sequential cycling for filters/class/faction/source; one child popup supports search, wheel and keyboard confirmation.
+- Live search/range/character inputs, Clear controls, My level, sorting, wheel/arrow list navigation, automatic/stable inline selection and helpful empty/loading states.
+- Clear filters recovers from combined searches/location/source and broadens quest levels without losing character context or Rare+.
+- Brighter readable rarity hues/strips, persistent selection, difficulty labels and accurately named Map directions action; game-wide keys are not captured.
+- All 29 suites / 1,121 checks passed, including 30 usability workflows; diff whitespace clean.
+- Built source-verified 30-file `dist/QuestSharing-0.4.7.zip`; SHA256 `f8b13b1b34f17348296fe718f7e399c8dc2301ec8401f73ea28df78e46d779b9`.
+- Caught/reproduced/fixed two unreleased navigation defects (delayed Apply reset and offscreen dropdown focus); reusable reports in context/BUGS.
+- Reviewed approximate native-widget geometry; actual game rendering remains unverified.
 
 ## Implemented tools
 - Optional tab in `/qs settings`; fishing layer and quest reward browser default off.

@@ -447,26 +447,40 @@ The fishing layer works alongside Questie.
 and a source line; hover for the game's comparison tooltip. Click a row to update the route or drop-source pane
 on the right. Selecting more items never opens additional route/source windows.
 **Only Rare (blue) quality and above are listed** in both tabs; green, white and grey items are excluded.
-Items with unknown quality stay hidden until their details load. Reset filters keeps this quality minimum.
+Items with unknown quality stay hidden until their details load. Clear filters keeps this quality minimum.
 
-The filter bar applies to both tabs. Choose **Weapons**, **Armor** or **Accessories**, then a specific **Item type**
-(swords, staves, cloth, leather, mail, plate, shields, jewelry, etc.) and/or an equipment **Slot**. Left-click a
-choice to go forward, right-click to go back. For **Level range measures**, choose **Required level** or **Item
-level**, enter **Min** and **Max**, then press Enter or **Apply**. Bounds are inclusive; blank means unrestricted.
-Invalid or reversed ranges show a message and keep the last valid range. **Reset filters** clears the shared bar;
-the quest tab's character/class/faction and eligibility controls remain separate.
+The filter bar applies to both tabs. Click a **dropdown** and choose directly; type in its search field to
+find an option, scroll for more choices, or use Up/Down and Enter. Escape dismisses the list. Choose **Weapons**,
+**Armor** or **Accessories**, then a specific **Item type** and/or **Slot**. Changing category clears an incompatible
+slot/type selection. Class, faction and dungeon source also use direct dropdowns.
+
+**Search as you type** for an item, quest, boss, zone or dungeon; Enter still applies immediately. The **Clear**
+button or Escape in a search field clears it. Scroll over results or the dungeon list with the **mouse wheel**;
+Up/Down while the result search field has focus selects items and moves between pages. Previous/Next are still
+available and become inactive at list boundaries. Details open automatically for the first visible result;
+click or arrow to another item, and selection stays put across item-data refreshes when still visible.
+
+For **Level range measures**, choose **Required level** or **Item level**, then enter **Min**/**Max**. Bounds update
+while typing; Enter or **Apply** works too. Bounds are inclusive and blank means unrestricted. Invalid or reversed
+ranges keep the last valid range and explain the problem. **My level** sets the required-level maximum to your
+current level without a lower bound. **Sort** by highest item level, lowest required level, or name.
+
+**Clear filters** clears the shared type/slot/range/sort controls and the active tab's searches. On the dungeon tab
+it also returns to All dungeons/All encounters; on the quest tab it shows all quest levels while keeping completed
+quests hidden and preserving character/class/faction. Blue quality and above remains enforced. Empty results
+explain how to broaden the search; pending item data is labelled as loading.
 
 **Find quest equipment for your character.** `/qs rewards` opens the browser and enables it. It starts with your
 class, current level and faction. Change class or faction with their buttons, edit the character level and
-press Enter, or search for an item, quest or zone. **Near my level** shows quests from ten levels below to three
+wait briefly or press Enter, or search for an item, quest or zone. **Quest levels: near** shows quests from ten levels below to three
 above your selected level, while still requiring their minimum acceptance level and the item's required level to
-be within reach. Switch that filter off to browse lower-level rewards too; **Completed quests** includes quests
+be within reach. Switch that filter off to browse lower-level rewards too; the completed-quest toggle includes quests
 already completed when requested. **My character** restores your own filters.
 
 Each result shows the item, its item/required levels, quest and starting zone; the details pane includes the slot and quest level. Hover to see the
 game's item tooltip and equipped-item comparison. Click for the quest giver, coordinates and prerequisite quests.
 For example, a level-20 Alliance Druid can find staffs, leather and cloth rewards from ordinary quests as well as
-Druid quests. Results are sorted by item level; compare the actual stats for healing, casting or feral play.
+Druid quests. Results start sorted by item level; compare the actual stats for healing, casting or feral play.
 Class equipment families follow Classic rules, so item-specific restrictions and any Forever proficiency changes
 must be checked in the tooltip. Race restrictions use QuestieDB's active faction masks and your own race when
 browsing your faction. Prerequisites, reputation, skills and other quest conditions may still block acceptance;
@@ -479,10 +493,10 @@ Map controls give directions: open the map yourself with `M`, avoiding this clie
 Both tools are covered by Lua mock tests; their rendering and item tooltips still need verification in the game.
 
 **Instance drops and who drops them.** Open *Settings > Optional > Search instance loot and who drops it*, click
-**Instance drops** tab in the equipment explorer, or type `/qs loot`. Use **Find dungeon** and press Enter to narrow
+**Instance drops** tab in the equipment explorer, or type `/qs loot`. Use **Find dungeon** to narrow
 the list on the left, then click a dungeon to browse its drops. **Search item, ID, boss or dungeon** searches
 within the selected dungeon; **All dungeons** searches the dungeon catalogue. You can also start with
-`/qs loot VanCleef` or `/qs loot 5191`. The **Source** button cycles through that instance's encounters, including
+`/qs loot VanCleef` or `/qs loot 5191`. The **Source** dropdown lets you choose an encounter directly, including
 trash and chest groups with equipment drops. Both instance and item lists have Previous/Next pages.
 Only weapons and wearable equipment are shown: armor, shields, necklaces, rings, trinkets and offhands;
 materials, consumables, bags and other non-equipment are excluded.
@@ -662,6 +676,7 @@ python tests/test_menu.py             # 60 tests: the right-click menu, Questie'
 python tests/test_done.py             # 20 tests: a quest you finished is never shared, announced or listed
 python tests/test_box.py              # 46 tests: messages into the chat box, refused calls written down (line, stack), sharing on your clicks
 python tests/test_ping.py             # 27 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
+python tests/test_usability.py        # 30 tests: direct choices, live searches, sorting, scrolling, selection and recovery
 python tests/test_zone.py             # 10 tests: only the quests of where you are (Teldrassil vs Stormwind)
 python tests/test_items.py            # 24 tests: quest item icons in the tracker, the item key and button
 python tests/test_emotes.py           # 34 tests: the emote rings behind the mouse wheel, editing them, only the ones that work
@@ -674,7 +689,7 @@ python tests/test_adventure.py        # 32 tests: role-play quest invitations, p
 python tests/test_equipment.py        # 36 tests: one window, shared filters, rare+ quality, dungeon/raid identity and cancellation
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 ```
-Expected: every line ends in `passed` with all tests green (1091 in total).
+Expected: every line ends in `passed` with all tests green (1121 in total).
 
 ## Files
 | File | Purpose |

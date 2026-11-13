@@ -263,7 +263,7 @@ def test_reward_browser_pages_and_never_opens_or_redraws_world_map(style):
     g.run('for _,f in ipairs(FRAMES) do if f.text=="Next" then f.scripts.OnClick(f,"LeftButton"); break end end')
     assert w.rows[1].result.questID!=first
     w.rows[1].frame.scripts.OnClick(w.rows[1].frame)
-    g.run('for _,f in ipairs(FRAMES) do if f.text=="Find starting zone on map" then f.scripts.OnClick(f,"LeftButton"); break end end')
+    g.run('for _,f in ipairs(FRAMES) do if f.text=="Map directions (open M)" then f.scripts.OnClick(f,"LeftButton"); break end end')
     assert g.eval("#MAP_OPENS")==0 and "open your world map (M)" in "\n".join(g.printed())
 
 

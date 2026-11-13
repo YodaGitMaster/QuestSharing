@@ -59,12 +59,14 @@ def test_quest_rewards_share_type_and_level_filters_without_losing_eligibility(s
     assert quest_ids(g)==[(800,8000),(801,8001)]
 
 
-def test_filter_controls_apply_reset_and_reverse_cycle(style):
+def test_filter_controls_offer_direct_choices_and_apply_reset(style):
     g=loot_game(style);g.slash("loot");_,c,_,_=controls(g)
-    click(c.category); assert g.eval("NS.equipmentUI.filters.category")=="Weapons"
-    c.category.scripts.OnClick(c.category,"RightButton")
-    assert g.eval("NS.equipmentUI.filters.category")=="All equipment"
-    c.min.SetText(c.min,"22");c.max.SetText(c.max,"25");click(c.mode);click(c.apply)
+    click(c.category);menu=g.eval("NS.equipmentUI._menu()")
+    choice=next(r for r in menu.rows.values() if r.entry=="Weapons")
+    click(choice);assert g.eval("NS.equipmentUI.filters.category")=="Weapons"
+    click(c.mode);menu=g.eval("NS.equipmentUI._menu()")
+    click(next(r for r in menu.rows.values() if r.entry=="Item level"))
+    c.min.SetText(c.min,"22");c.max.SetText(c.max,"25");click(c.apply)
     assert {r[0] for r in loot_results(g)}=={10001,10002}
     click(c.reset)
     assert len(loot_results(g))==5 and c.min.GetText(c.min)==""
@@ -165,9 +167,9 @@ def test_dungeon_results_and_sources_exclude_green_or_lower_even_after_reset(sty
     g.eval("NS.loot.search")("Captain",None,None);assert loot_results(g)==[]
     g.eval("NS.loot.search")("",None,None);g.eval("NS.equipmentUI.reset")()
     assert {r[0] for r in loot_results(g)}=={10002,10005}
-    w=g.eval("NS.loot._window()");labels=set()
-    for _ in range(5):click(w.boss);labels.add(w.boss.text)
-    assert "Source: Edwin VanCleef" not in labels and "Source: Cookie" not in labels
+    w=g.eval("NS.loot._window()");click(w.boss)
+    labels=set(g.eval("NS.equipmentUI._menu().filtered").values())
+    assert "Edwin VanCleef" not in labels and "Cookie" not in labels
 
 
 def test_quality_boundary_keeps_blue_epic_and_legendary_but_not_grey_white_green(style):

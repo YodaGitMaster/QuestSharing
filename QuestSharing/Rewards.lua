@@ -6,7 +6,9 @@ ns.rewards = R
 local index, results, quests, window = {}, {}, {}, nil
 local loading, ready, generation, pending = false, false, 0, false
 local page, PAGE, scanDone, scanTotal = 1, 7, 0, 0
-local filters
+local unknownItems = 0
+local filters, selectedKey
+local function resultKey(r) return r.itemID .. ":" .. r.questID end
 local catalogueError = "Needs a recent QuestieDB with an enumerable item catalogue."
 local function get(kind, id, key) return ns.questie.get(kind, id, key) end
 local function num(v) return tonumber(v) or 0 end
@@ -146,6 +148,8 @@ R.detail = detail
 function R.search(f)
     filters = f or filters or defaults()
     results = {}
+    unknownItems=0
+    local waiting={}
     local f = filters
     local needle = string.lower(f.text or "")
     local level = num(f.level)
@@ -157,6 +161,9 @@ function R.search(f)
                 local q = quest(qid)
                 if eligible(q, f) then
                     itemInfo = itemInfo or info(item.id)
+                    if (not itemInfo or type(itemInfo.quality)~="number") and not waiting[item.id] then
+                        unknownItems=unknownItems+1;waiting[item.id]=true
+                    end
                     local name = itemInfo and itemInfo.name or item.name or ("Item " .. item.id)
                     local slot = itemInfo and itemInfo.slot
                     local starter = ns.questie.starter(qid)
@@ -173,11 +180,9 @@ function R.search(f)
             end
         end
     end
-    table.sort(results, function(a, b)
-        if a.itemLevel ~= b.itemLevel then return a.itemLevel > b.itemLevel end
-        if a.name ~= b.name then return a.name < b.name end
-        if a.questID ~= b.questID then return a.questID < b.questID end
-        return a.itemID < b.itemID
+    E.sortResults(results,function(r) return r.info end,function(r) return r.name end,function(a,b)
+        if a.questID~=b.questID then return a.questID<b.questID end
+        return a.itemID<b.itemID
     end)
     return results
 end
@@ -185,20 +190,31 @@ end
 local function paint()
     if not window then return end
     page = math.max(1, math.min(page, math.max(1, math.ceil(#results / PAGE))))
-    window.status:SetText(loading and ("Reading QuestieDB items: " .. scanDone .. "/" .. scanTotal)
+    window.status:SetText(window.levelError or (loading and ("Reading QuestieDB items: " .. scanDone .. "/" .. scanTotal)
         or (not ready and catalogueError)
-        or (#results .. " reward options — page " .. page .. "/" .. math.max(1, math.ceil(#results / PAGE))
-            .. ". Sorted by item level; compare stats for your build."))
+        or E.pageStatus((page-1)*PAGE+1,PAGE,#results))
+        .. (unknownItems>0 and (" • "..unknownItems.." item details loading") or ""))
+    E.pageButtons(window.prev,window.next,#results,page,PAGE)
     for i, row in ipairs(window.rows) do
         local r = results[(page - 1) * PAGE + i]
         row.result = r
         if r then
-            row.edge:Hide()
             E.paintRow(row, r.info, r.name .. " · iLvl " .. r.itemLevel .. " · req " .. tostring(r.info and r.info.required or "?"),
                 r.questName .. " — " .. r.zone)
             row.frame:Show()
         else row.frame:Hide() end
     end
+    if not E.focusRows(window.rows,selectedKey,resultKey) then
+        selectedKey,window.routeMap=nil,nil
+        window.setRoute((loading or unknownItems>0) and "Loading equipment details… Eligible blue+ items appear as the game supplies their data." or (not ready and catalogueError)
+            or "No matching blue-or-better equipment.\n\nClear filters or broaden your search. Your character's class, faction and quest requirements still apply.")
+    end
+end
+
+function R.go(delta)
+    local nextPage=math.max(1,math.min(math.max(1,math.ceil(#results/PAGE)),page+delta))
+    if nextPage==page then return false end
+    page=nextPage;paint();return true
 end
 
 function R.refresh()
@@ -213,6 +229,7 @@ local function schedule()
 end
 
 function R.scan()
+    E.dismissMenu()
     generation = generation + 1
     local token = generation
     index, quests, results = {}, {}, {}
@@ -257,23 +274,17 @@ function R.scan()
     return true
 end
 
-local function cycle(parent, label, x, y, width, choices, key)
-    local b = S.button(parent, "", width, function()
-        local at = 0
-        for i, value in ipairs(choices) do if filters[key] == value then at = i end end
-        filters[key] = choices[at % #choices + 1]
-        page = 1; R.updateControls(); R.refresh()
+local function choice(parent,label,x,y,width,choices,key)
+    return E.dropdown(parent,label,x,y,width,choices,function() return filters[key] end,function(value)
+        filters[key]=value;page=1;R.updateControls();R.refresh()
     end)
-    b:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
-    b.filterKey, b.caption = key, label
-    return b
 end
 
 function R.updateControls()
     if not window then return end
-    for _, b in ipairs(window.controls) do b:SetLabel(b.caption .. ": " .. tostring(filters[b.filterKey] or "unknown")) end
-    window.near:SetLabel("Near my level: " .. (filters.near and "yes" or "all levels"))
-    window.completed:SetLabel("Completed quests: " .. (filters.completed and "show" or "hide"))
+    for _, b in ipairs(window.controls) do b.refresh() end
+    window.near:SetLabel("Quest levels: " .. (filters.near and ("near "..filters.level) or "all"))
+    window.completed:SetLabel(filters.completed and "Showing completed quests" or "Hiding completed quests")
 end
 
 local function build()
@@ -285,28 +296,45 @@ local function build()
     for k, v in pairs(classKeys()) do if type(v) == "number" and v > 0 and not string.find(k, "ALL", 1, true) and k ~= "NONE" then classes[#classes + 1] = k end end
     if #classes == 0 then for k in pairs(WEAPONS) do classes[#classes + 1] = k end end
     table.sort(classes)
-    window.controls[1] = cycle(f, "Class", 0, 8, 165, classes, "class")
-    window.controls[2] = cycle(f, "Faction", 175, 8, 165, { "Alliance", "Horde" }, "faction")
+    local names=LOCALIZED_CLASS_NAMES_MALE or {}
+    for i,key in ipairs(classes) do
+        local label=names[key] or (key=="DEATHKNIGHT" and "Death Knight") or (string.upper(string.sub(key,1,1))..string.lower(string.sub(key,2)))
+        classes[i]={value=key,label=label}
+    end
+    window.controls[1] = choice(f, "Class", 0, 8, 165, classes, "class")
+    window.controls[2] = choice(f, "Faction", 175, 8, 165, { "Alliance", "Horde" }, "faction")
     window.level = U.box(f, "Character level", 350, 0, 110, filters.level, 4)
-    window.level:SetScript("OnEnterPressed", function(self)
-        local n = tonumber(self:GetText())
-        if n and n >= 1 and n <= 1000 and n % 1 == 0 then filters.level = n; page = 1; R.refresh() end
-        self:SetText(tostring(filters.level)); self:ClearFocus()
+    E.liveBox(window.level,"quests",function(text)
+        local n=tonumber(text)
+        if n and n>=1 and n<=1000 and n%1==0 then
+            filters.level=n;window.levelError=nil;page=1;R.updateControls();R.refresh()
+        else
+            window.levelError=S.RED.."Character level must be a whole number from 1 to 1000.|r";paint()
+        end
+    end)
+    window.level:SetScript("OnEscapePressed",function(self)
+        self:SetText(tostring(filters.level));self.cancel();window.levelError=nil;self:ClearFocus();R.refresh()
     end)
     local mine = S.button(f, "My character", 180, function()
-        filters = defaults(); window.level:SetText(tostring(filters.level)); window.search:SetText("")
+        E.dismissMenu()
+        filters = defaults();window.levelError=nil;window.level:SetText(tostring(filters.level));window.level.cancel();window.search:SetText("");window.search.cancel()
         page = 1; R.updateControls(); R.refresh()
     end)
     mine:SetPoint("TOPLEFT", f, "TOPLEFT", 470, -18)
-    window.near = S.button(f, "", 165, function() filters.near = not filters.near; page = 1; R.updateControls(); R.refresh() end)
+    window.near = S.button(f, "", 165, function() E.dismissMenu();filters.near = not filters.near; page = 1; R.updateControls(); R.refresh() end)
     window.near:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -54)
-    window.completed = S.button(f, "", 165, function() filters.completed = not filters.completed; page = 1; R.updateControls(); R.refresh() end)
+    window.completed = S.button(f, "", 165, function() E.dismissMenu();filters.completed = not filters.completed; page = 1; R.updateControls(); R.refresh() end)
     window.completed:SetPoint("TOPLEFT", f, "TOPLEFT", 175, -54)
-    window.search = U.box(f, "Search item, quest or zone (Enter)", 350, 42, 300, "", 100)
-    window.search:SetScript("OnEnterPressed", function(self) filters.text = self:GetText(); page = 1; R.refresh(); self:ClearFocus() end)
+    window.search,window.clearSearch = E.searchBox(f,"Search item, quest or zone",350,42,300,"quests",function(text)
+        filters.text=text;page=1;R.refresh()
+    end)
     window.status = U.text(f, "", 0, 92, 650)
+    window.list=CreateFrame("Frame",nil,f)
+    window.list:SetPoint("TOPLEFT",f,"TOPLEFT",0,-120);window.list:SetWidth(650);window.list:SetHeight(371)
+    E.wheel(window.list,R.go)
     for i = 1, PAGE do
-        local row = E.row(f, 0, 120 + (i-1)*53, 650, i)
+        local row = E.row(window.list, 0, (i-1)*53, 650, i)
+        E.wheel(row.frame,R.go)
         local b = row.frame
         row.quest = row.from
         b:SetScript("OnEnter", function(self)
@@ -323,29 +351,39 @@ local function build()
                 end)
             else U.tip(self, r.name, (detail(r))) end
         end)
-        b:SetScript("OnLeave", function() row.bg:SetVertexColor(1,1,1); U.hideTip() end)
-        b:SetScript("OnClick", function()
+        b:SetScript("OnLeave", function() local tint=row.selected and 1.15 or 1;row.bg:SetVertexColor(tint,tint,tint);U.hideTip() end)
+        row.choose=function(auto)
+            if auto~=true then E.dismissMenu() end
             local r = row.result
             if not r then return end
             local lines, starter = detail(r)
+            selectedKey=resultKey(r)
             E.select(window.rows, row)
             window.setRoute(table.concat(lines, "\n"))
             window.routeMap = starter and starter.area and ns.questie.uiMapOf(starter.area)
-        end)
+        end
+        b:SetScript("OnClick",row.choose)
         window.rows[i] = row
     end
-    window.prev = S.button(f, "Previous", 100, function() page = math.max(1, page - 1); paint() end)
+    window.prev = S.button(f, "Previous", 100, function() R.go(-1) end)
     window.prev:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -500)
-    window.next = S.button(f, "Next", 100, function() page = page + 1; paint() end)
+    window.next = S.button(f, "Next", 100, function() R.go(1) end)
     window.next:SetPoint("TOPLEFT", f, "TOPLEFT", 110, -500)
     window.reload = S.button(f, "Refresh data", 120, function() R.scan() end)
     window.reload:SetPoint("TOPLEFT", f, "TOPLEFT", 530, -500)
     U.text(f, "Compare stats for your build. Quest chains, reputation and skills may affect availability.", 0, 536, 650)
     window.routeFrame, window.route, window.setRoute = E.details(f, 674, 358, "Quest route")
-    local map = S.button(window.routeFrame, "Find starting zone on map", 260, function()
+    local map = S.button(window.routeFrame, "Map directions (open M)", 260, function()
         if not U.mapHint(window.routeMap) then ns.print("this quest has no known map for its starting zone") end
     end)
     map:SetPoint("BOTTOMLEFT", window.routeFrame, "BOTTOMLEFT", 14, 18)
+    E.navigation(window.search,window.rows,R.go)
+    f.clear=function()
+        filters.text,filters.near,filters.completed="",false,false
+        window.search:SetText("");window.search.cancel()
+        window.levelError=nil;window.level:SetText(tostring(filters.level));window.level.cancel()
+        page=1;R.updateControls();R.refresh()
+    end
     f.refresh = function() page=1; R.refresh() end
     f.suspend = function()
         generation = generation + 1
@@ -361,6 +399,7 @@ function R.open()
     filters = filters or defaults()
     if not build() then return end
     R.updateControls(); E.show("quests")
+    for _,box in ipairs({window.search,window.level}) do if box.dirty then box.flush() end end
     if not ready and not loading then R.scan() else R.refresh() end
 end
 

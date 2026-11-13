@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.7
+- Replaced click-through filter controls with **searchable dropdowns**: choose equipment, item type, slot,
+  level measure, class, faction and dungeon source directly. A single reusable popup supports scrolling,
+  keyboard arrows/Enter, and Escape to dismiss.
+- **Live search** updates quest, item and dungeon lists while typing; Clear buttons and Escape clear the text.
+  Level bounds and character level also update without Enter. **My level** sets an inclusive required-level cap.
+- Browse result and dungeon lists with the **mouse wheel**; use Up/Down in the result search field to select
+  items and cross pages. Previous/Next remain available and fade/disable at list boundaries.
+- **Sort** either tab by highest item level, lowest required level, or name. Details appear automatically for the
+  first visible item, and your selected item stays selected across data refreshes when it is still visible.
+- **Clear filters** now also clears the active tab's searches and dungeon/source selection. On the quest tab it
+  broadens quest levels, keeps completed quests hidden, and preserves class/faction/character level.
+- Clearer loading/empty messages, brighter item-name colors, selection highlighting and difficulty labels make
+  results easier to read. Map directions explicitly tell you to open M. Rare+ and dungeon scope remain enforced.
+
 ## 0.4.6
 - Both equipment tabs now show only **Rare (blue) quality and above**. Green, white and grey items are excluded
   from quest rewards, dungeon results and source choices, including the partial QuestieDB fallback.
