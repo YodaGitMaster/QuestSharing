@@ -32,6 +32,7 @@ QuestSharing/  # Repository root
 │   ├── Rewards.lua  # On-demand QuestieDB reward catalogue, eligibility filters and item comparisons
 │   ├── Settings.lua  # the settings window.   /qs settings   (also: the minimap button, the "Settings" link on the Party quests
 │   ├── Share.lua  # notice a new party, push the quests of the area one by one, read the game's replies
+│   ├── SpellRanks.lua  # Opt-in learned spell-rank upgrades across player action-bar pages
 │   ├── Status.lua  # what to say about a quest you click in the tracker, and the hooks that notice the click
 │   ├── Style.lua  # one look for every window of the addon (settings, Party quests, reports)
 │   ├── Sync.lua  # party members who also run Quest Sharing tell each other exactly which quests they have
@@ -41,6 +42,9 @@ QuestSharing/  # Repository root
 ├── build_release.py  # Build install ZIP and release notes
 ├── context/  # Session continuity and live architecture
 │   ├── BUGS/  # Verified bug methodology and regressions
+│   │   ├── 2026-11-13-spell-rank-zero-spec.md  # Numeric-zero active specialization in Lua
+│   │   ├── 2026-11-13-spell-rank-cursor-read.md  # Preserve readability separately from an empty cursor
+│   │   ├── 2026-11-13-spell-rank-hidden-pages.md  # Native slot range differs from visible pages
 │   │   ├── 2026-11-13-dropdown-offscreen-selection.md  # Mixed wheel/keyboard dropdown navigation
 │   │   ├── 2026-11-13-debounced-filter-reapply.md  # Range commit debounce cancellation playbook
 │   │   └── 2026-11-13-instance-loot-non-equipment.md  # Equipment filtering reproduction and fix
@@ -75,6 +79,7 @@ QuestSharing/  # Repository root
     ├── test_ringtest.py  # Tests for ringtest
     ├── test_settings.py  # Tests for settings
     ├── test_stats.py  # Shared stat minimums, native API compatibility, live controls and cache invalidation
+    ├── test_spell_ranks.py  # Learned ranks, guarded action-slot swaps, combat/cursor deferral and API compatibility
     ├── test_team.py  # Tests for team
     ├── test_together.py  # Tests for together
     ├── test_tracker.py  # Tests for tracker
@@ -100,6 +105,10 @@ flowchart TD
     Equipment --> Rewards
     Equipment --> Loot
     Equipment --> StatAPI[WoW GetItemStats: lazy link cache, invalidated on item events]
+    Settings --> Ranks[SpellRanks.lua: opt-in action-bar rank updates]
+    Core --> Ranks
+    Ranks --> SpellBook[WoW learned player spell book]
+    Ranks --> ActionSlots[WoW normal action slots, out of combat and cursor clear]
     OptionalUI --> Fishing
     OptionalUI --> Rewards
     Fishing --> Waters[(QuestSharingDB.fishingWaters)]
@@ -120,6 +129,24 @@ flowchart TD
 ```
 
 ## Sequence diagrams
+```mermaid
+sequenceDiagram
+    participant User
+    participant Settings as Settings.lua / Core.lua
+    participant Ranks as SpellRanks.lua
+    participant Game as WoW spell book and action bars
+    User->>Settings: Enable highest learned ranks in Extra tools
+    Settings->>Ranks: Debounce update; also login / learned spells / placed actions
+    Ranks->>Game: Read learned player spells and existing normal bar slots
+    alt Combat, temporary bar or cursor occupied
+        Ranks->>Ranks: Wait for combat/cursor/bar event
+    else Ready
+        Ranks->>Game: Pick up higher learned rank; verify cursor; place in same spell slot
+        Game-->>Ranks: Revalidate target after pickup; read back replacement and release swapped old rank
+        Ranks->>User: Updated count or client limitation
+    end
+```
+
 ```mermaid
 sequenceDiagram
     participant Game as WoW
@@ -248,6 +275,7 @@ classDiagram
         rewards
         loot
         equipmentUI
+        spellRanks
     }
     class Settings {
         dbVersion
@@ -255,6 +283,7 @@ classDiagram
         bagMarks
         fishingMap
         rewardBrowser
+        autoSpellRanks
         fishingWaters
         hideTracker
     }
@@ -332,6 +361,14 @@ classDiagram
         min_1_to_100000
     }
     EquipmentFilter --> StatCondition : three AND conditions
+    class LearnedSpellRank {
+        id
+        name
+        rank_numeric
+        index
+        ambiguous_optional
+    }
+    Namespace --> LearnedSpellRank : spellRanks builds ephemeral highest-rank catalogue
     Namespace --> EquipmentFilter : equipmentUI owns session filters
     Namespace --> LootDrop : loot builds an on-demand index
     Namespace --> InvitationDraft : adventure session-only composer

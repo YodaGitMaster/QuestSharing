@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.10
+- Added opt-in **Auto-update spells to highest learned rank** under **Extra tools**, plus **Check spell ranks
+  now**. Updates lower-ranked player spell buttons on normal action-bar pages, including duplicate buttons
+  and hidden/form pages, using ranks actually learned in your spell book.
+- Checks on enable, login, learned-spell changes and placed actions. Numeric rank comparison handles ranks
+  above 9 and localized rank labels; passive, unlearned, off-spec and ambiguous spells are excluded.
+- Waits during combat, temporary/vehicle bars or cursor dragging, then resumes when ready. Macros, items,
+  empty slots, pet actions and unranked abilities remain unchanged; this does not buy or train spells.
+- Confirms cursor contents and replacement before continuing. Unsupported client APIs explain the limitation;
+  a refused/unconfirmed replacement pauses updates until reload rather than repeatedly changing buttons.
+
 ## 0.4.9
 - Opening **Instance drops** inside a recognized dungeon automatically selects that dungeon and brings its
   navigation row into view. Works on first load and reopening, including a catalogue loaded in batches.

@@ -1,5 +1,12 @@
 # Insights
 
+## 2026-11-13 — Learned spell ranks and action bars
+- Verified modern spell-book entry/skill-line fields and pickup arguments against [Blizzard Forever spell-book declarations](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/SpellBookDocumentation.lua); rank subtext comes from [spell API declarations](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/SpellDocumentation.lua).
+- [Myslot's action-bar import implementation](https://github.com/tg123/myslot/blob/master/Myslot.lua) confirms public GetActionInfo/PickupSpell/PlaceAction/ClearCursor workflow and legacy offSpecID=0. No third-party code/data bundled.
+- Initial dedicated tests reproduced active-zero specialization rejection and unreadable-cursor mutation; corrected explicit zero handling and fallible cursor/combat guards before publication. Rank 10 must beat rank 2 numerically, and action spell IDs may refer to ranks hidden from the current book view.
+- Verification: all 32 suites / 1,213 checks pass, including 48 spell-rank workflows. Tests cover combat beginning during pickup, occupied/unreadable cursor, wrong pickup/no-op/refused/partial placement, normal hidden/form pages, offspec/future/passive filtering, event coalescing and other addons changing target slots synchronously.
+- No game client available; live native bar permissions and actual spell-book payloads remain in-game QA items, with refusal/unsupported behavior explicitly reported by the feature.
+
 ## 2026-11-13 — Current dungeon context
 - Blizzard's [instance API declaration](https://github.com/Gethe/wow-ui-source/blob/classic/Interface/AddOns/Blizzard_APIDocumentationGenerated/InstanceDocumentation.lua) confirms instanceID is GetInstanceInfo's eighth return; optionalUI.call intentionally returns only three, so use protected direct invocation here.
 - Actual compatible AtlasLoot catalogue has several Scarlet Monastery entries sharing ID 189 and Dire Maul entries with omitted/commented ID 429, area 2557 and SubAreaIDs; ID-only matching needs localized subarea disambiguation and a tie guard.

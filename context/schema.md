@@ -2,7 +2,7 @@
 Last updated: 2026-11-13
 
 ## Addon loading and persistence
-- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.9; declares file load order and SavedVariables.
+- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.10; declares file load order and SavedVariables.
 - Lua modules receive `local ADDON, ns = ...`; `ns` is the shared namespace, not a class.
 - `Core.lua`: `ns.defaults`; `ns.db` initially copies defaults. On `ADDON_LOADED`, missing settings are filled and `ns.db` aliases saved `QuestSharingDB`; current `dbVersion = 3`.
 - SavedVariables: `QuestSharingDB` (settings), `QuestSharingLog` (debug log); persisted by the game.
@@ -13,6 +13,9 @@ Last updated: 2026-11-13
 - `Sync.lua`: addon channel messages separated by `|`; `H|1` hello, `L|i|n|entries` quest-list parts, `P|entry` quest update. Entry: `questID:complete(0/1):objectives`; consult encoder/parser before changing wire format.
 
 ## Optional tools (2026-11-13)
+- `autoSpellRanks`: SavedVariables boolean, default false; existing missing-default fill, no dbVersion change. `ns.spellRanks` exposes update(report), schedule(report), settingChanged(), status().
+- Spell-rank catalogue is session-only: exact localized spell name -> highest numeric learned rank `{id,name,rank,index,ambiguous?}`, plus spellID -> entry; modern C_SpellBook or legacy player bank only. Passive, future/off-spec, unranked and ambiguous highest ranks are excluded.
+- Out-of-combat normal action-slot replacements use confirmed spell IDs and learned numeric ranks; verify picked-up cursor, revalidate target after pickup callbacks, and read back placed action. Scan at least 180 standard slots (or greater native MAX_ACTION_BUTTONS, capped at 1000), independently of visible page counts; unsupported slots are ignored. Macros/items/pet actions/empty slots remain. Combat/temporary bars/busy cursor defer to events; client refusals pause until reload.
 - `ns.db.fishingMap` / `ns.db.rewardBrowser`: new booleans, default `false`; filled by existing missing-default migration, dbVersion remains 3.
 - `ns.db.fishingWaters[id]`: local positive numeric ID -> `{name, map, x, y, minSkill?, safeSkill?, fish, notes}`.
   - `map`: positive integral UiMapID; `x` and `y`: 0..100.
