@@ -3,9 +3,10 @@ Last updated: 2026-11-13
 
 ## Active task
 - User requested Seek fellow adventurers directly after Tell the party in the quest right-click menu.
-- Implemented in version 0.4.4; validated and ready to push/publish under the ongoing release authorization.
+- Completed in version 0.4.4; pushed main/tag and published the stable release with verified install ZIP.
 
 ## Last completed
+- Published v0.4.4 at `0c1a51246fbe943e099a9a55ab8a41e2e1738454`; downloaded asset matches source-verified local ZIP (29 addon files).
 - Confirmed existing action was row 3, then moved it to row 2 (before Offer it to the party).
 - Updated existing menu-order expectation and user documentation. Selecting the action still opens that quest's invitation composer.
 - Targeted verification: 60/60 menu and 32/32 adventure checks passed on modern/classic paths; diff whitespace clean.
@@ -33,6 +34,6 @@ Last updated: 2026-11-13
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
-- v0.4.3: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.3
-- Tag `72d7d3528629ca2c24c518275440195be3b0a703`; ZIP 144,596 bytes with verified SHA256 above.
-- Main also includes a documentation follow-up recording publication. Previous 0.4.2 tag and ZIP preserved.
+- v0.4.4: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.4
+- Tag `0c1a51246fbe943e099a9a55ab8a41e2e1738454`; ZIP 144,598 bytes; SHA256 `893ba47c0cc1b68c523a9fa3c140b716b6d66d3c168d4f01ac05d33b2715e92d`.
+- Main also includes a documentation follow-up recording publication. Previous release tags and ZIPs preserved.

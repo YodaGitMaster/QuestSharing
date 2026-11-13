@@ -4,6 +4,7 @@
 - Existing invitation action was row 3 after Offer it to the party; user requested it directly after Tell the party.
 - Moved to row 2. Existing 60 menu and 32 adventure checks passed across modern/classic paths.
 - Runtime change only reorders existing actions; no new frames, chat or state behavior.
+- Published v0.4.4 at `0c1a512`; downloaded asset byte-matches source-verified 29-file ZIP (SHA256 `893ba47c0cc1b68c523a9fa3c140b716b6d66d3c168d4f01ac05d33b2715e92d`).
 
 ## 2026-11-13 — Equipment-only instance drops
 - Provider filtering correctly found dungeon sources, but all positive item IDs reached results; both providers needed the same equipment predicate.
