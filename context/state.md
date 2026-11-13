@@ -3,9 +3,10 @@ Last updated: 2026-11-13
 
 ## Active task
 - Implemented user's request to exclude green quality and lower from both equipment tabs; version 0.4.6.
-- Final validation and package passed; push/publication verification pending under ongoing release authorization.
+- Completed push and stable v0.4.6 release; tag and downloaded ZIP verified, no publication work remains.
 
 ## Last completed
+- Published v0.4.6 at `401c9508c14088f9464dd6c06033e8e23fe04a3c`; downloaded asset matches verified local bytes.
 - All 28 suites / 1,091 checks passed; source-verified 30-file ZIP `dist/QuestSharing-0.4.6.zip`, SHA256 `8efb93d2f4bdb21766d1ffd6c96eb59711bede03e363ff5c33c65d8c51d02dec`.
 - EquipmentUI.matches now requires confirmed native quality >=3 (Rare/blue), covering quest rewards, dungeon results and source choices; Reset filters preserves the minimum.
 - Unknown-quality equipment stays hidden until native item-cache events refresh it. Header and README explain the rule.
@@ -33,6 +34,6 @@ Last updated: 2026-11-13
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
-- v0.4.5: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.5
-- Tag `fdea2529e34811b6dc8b13125fb5b66c14d5ac37`; ZIP 148,397 bytes; SHA256 `9c447ef0f5f30eb456992e698e1b63386608154d7ced95b8631fd6f3f70e802c`.
+- v0.4.6: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.6
+- Tag `401c9508c14088f9464dd6c06033e8e23fe04a3c`; ZIP 148,480 bytes; SHA256 `8efb93d2f4bdb21766d1ffd6c96eb59711bede03e363ff5c33c65d8c51d02dec`.
 - Main also includes a documentation follow-up recording publication. Previous release tags and ZIPs preserved.

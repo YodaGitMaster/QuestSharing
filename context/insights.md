@@ -6,6 +6,7 @@
 - Existing fixtures used quality 2 for all equipment; changed baseline gear to Rare and added explicit mixed-quality boundary cases rather than discarding existing feature coverage.
 - Existing uncached quest test now expects hidden gear until native details arrive, then verifies its return.
 - Final all-suite validation: 28 scripts / 1,091 checks passed. Built/source-verified v0.4.6 ZIP, 30 files.
+- Published v0.4.6 at `401c950`; downloaded 148,480-byte asset matches the tested local ZIP (SHA256 `8efb93d2f4bdb21766d1ffd6c96eb59711bede03e363ff5c33c65d8c51d02dec`).
 
 ## 2026-11-13 — Unified equipment explorer
 - User clarified that Forever dungeons must remain included; exclude raids/world bosses via actual dungeon identity, not merely a positive InstanceID or UIMapType.Dungeon.
