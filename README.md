@@ -417,10 +417,13 @@ Choose a continent/zone from the world overview to see its details. This is **of
 follow map resizing/zoom.
 When upgrading from v0.4.11, the option is switched off once; your subsequent choice stays saved across reloads.
 
-Ranges come from the game's player-level map data, including supported Forever zones; no extra addon is
-required. **?** or **range unavailable** means the client has not supplied valid data for that zone; the addon
-does not invent a range. These are general map level recommendations, not a guarantee that every quest is
-available to your class or faction. Quest symbols and minimap markers remain removed.
+Valid player-level map data from the client takes priority. When it is missing or zero, built-in **Zone guide**
+ranges cover the 39 Classic questing zones, Zephras Isle and Riverglades, without another addon. Mount Hyjal
+and Shen'dralas have explicitly labelled **Known quests** spans from verified quest records; these show the
+levels of known quests, rather than claiming a complete recommended bracket. Hover/view a zone to see the
+source label. Cities and Moonglade show **City** or **Sanctuary**. Native data arriving later replaces a guide.
+**?** or **range unavailable** is reserved for areas without either valid native data or a verified fallback.
+Ranges do not guarantee quest availability for your class or faction. Quest/minimap symbols remain removed.
 
 **Highest learned spell ranks on your action bars.** Enable **Auto-update spells to highest learned rank**
 in Extra tools (off by default). It upgrades existing player spell buttons across normal action-bar pages,
@@ -735,7 +738,7 @@ python tests/test_equipment_grouping.py # 28 tests: unique names, merged sources
 python tests/test_instance_focus.py   # 24 tests: current dungeon, batched loads, manual browsing, wing identity and Extra tools
 python tests/test_stats.py            # 20 tests: combined stat minimums, native APIs, cache refresh, live inputs and reset
 python tests/test_spell_ranks.py      # 48 tests: learned rank upgrades, normal pages, cursor/combat guards and client APIs
-python tests/test_zone_levels.py      # 34 tests: optional default/migration, map ranges, bounds, hover, zoom and lifecycle
+python tests/test_zone_levels.py      # 50 tests: native/fallback ranges, full-map missing data, hover, geometry, lifecycle and opt-in overlays
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 ```
 Expected: every line ends in `passed` with all tests green (1121 in total).

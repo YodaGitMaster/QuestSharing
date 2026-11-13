@@ -43,6 +43,7 @@ QuestSharing/  # Repository root
 ├── build_release.py  # Build install ZIP and release notes
 ├── context/  # Session continuity and live architecture
 │   ├── BUGS/  # Verified bug methodology and regressions
+│   │   ├── 2026-11-13-zone-levels-empty-native-data.md  # Standalone guide fallbacks when native ranges are empty
 │   │   ├── 2026-11-13-equipment-duplicate-rows.md  # Filtered name grouping with complete source retention
 │   │   ├── 2026-11-13-zone-levels-opt-in.md  # Once-only migration from auto-enabled map ranges
 │   │   ├── 2026-11-13-spell-rank-zero-spec.md  # Numeric-zero active specialization in Lua
@@ -120,6 +121,7 @@ flowchart TD
     Settings --> ZoneLevels[ZoneLevels.lua: zone questing ranges]
     Core --> ZoneLevels
     ZoneLevels --> NativeMap[C_Map level ranges, zone bounds and hover info]
+    ZoneLevels --> ZoneGuides[Local UI-map guides and labelled known-quest spans; fallback only]
     ZoneLevels --> MapLabels[Own click-through map labels and panel]
     OptionalUI --> Fishing
     OptionalUI --> Rewards
@@ -150,6 +152,12 @@ sequenceDiagram
     User->>Map: Open or navigate map normally
     Levels->>Map: Read shown map, canvas and normalized cursor
     Levels->>Data: Read outdoor zone levels and child-zone rectangles
+    alt Native range missing, zero or invalid
+        Levels->>Levels: Use verified UI-map guide or labelled known-quest span; cities/sanctuary have role labels
+        Note over Levels: Do not cache fallback; unknown future areas remain unknown
+    else Valid native range
+        Levels->>Levels: Cache native range; prefer over guide
+    end
     Levels->>Map: Draw own click-through range badges and information panel
     Note over Levels,Map: Never opens, navigates or refreshes Blizzard map/pins
     User->>Map: Hover or view another zone
@@ -421,8 +429,9 @@ classDiagram
         y_normalized
         min_optional
         max_optional
+        source_optional
     }
-    Namespace --> ZoneLevelRange : zoneLevels builds viewed-map labels from native data
+    Namespace --> ZoneLevelRange : native geometry with native or verified fallback range
     Namespace --> EquipmentFilter : equipmentUI owns session filters
     Namespace --> LootDrop : loot builds an on-demand index
     Namespace --> InvitationDraft : adventure session-only composer

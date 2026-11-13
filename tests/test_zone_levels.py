@@ -1,4 +1,4 @@
-"""Read-only world-map questing ranges from native player-level and zone geometry data."""
+"""Read-only map ranges from native data and verified standalone zone guides."""
 import sys
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parent))
@@ -134,7 +134,7 @@ def test_dungeon_ranges_are_not_presented_as_outdoor_questing(style):
 
 def test_missing_level_api_or_data_has_explicit_unknown_state_and_recovers(style):
     for extra in ('C_Map.GetMapLevels=nil','C_Map.GetMapLevels=function()error("not ready")end'):
-        g=game(style,extra);v=show(g,1429)
+        g=game(style,extra);v=show(g,2002)
         assert "range unavailable" in v.text.text
         g.run('C_Map.GetMapLevels=function()return 1,10 end');g.advance(2.2)
         assert "1–10" in v.text.text
@@ -147,7 +147,8 @@ def test_malformed_ranges_rectangles_duplicate_children_are_not_invented(style):
         C_Map.GetMapChildrenInfo=function(...)local t=old(...);t[#t+1]=MAP_INFO[1429];t[#t+1]=42;return t end''')
     v=show(g)
     assert set(labels(v))=={1429,1436,2001}
-    assert all("?" in p.text.text for p in labels(v).values())
+    assert "1–12" in labels(v)[1429].text.text and "10–20" in labels(v)[1436].text.text
+    assert "?" in labels(v)[2001].text.text  # Invalid metadata never invents a range for unknown maps.
     for id in (0,-1,1.5):assert g.eval("NS.zoneLevels.range")(id)==None
 
 
@@ -201,6 +202,86 @@ def test_reset_returns_optional_ranges_to_off_without_repeating_migration(style)
     assert g.eval('QuestSharingDB.zoneLevelsOptInMigrated')
     g.eval('NS.setSetting')('zoneLevels',True);g.fire('ADDON_LOADED','QuestSharing')
     assert g.eval('NS.db.zoneLevels')
+
+
+def test_zero_client_ranges_still_show_known_zone_guides_across_the_map(style):
+    g=game(style,'C_Map.GetMapLevels=function()return 0,0 end');v=show(g)
+    assert "1–12" in labels(v)[1429].text.text and "10–20" in labels(v)[1436].text.text
+    v=show(g,1436)
+    assert "Zone guide" in v.text.text and "10–20" in v.text.text
+
+
+def test_guide_fallback_handles_absent_throwing_and_invalid_native_api(style):
+    for extra in ('C_Map.GetMapLevels=nil','C_Map.GetMapLevels=function()error("not ready")end',
+                  'C_Map.GetMapLevels=function()return 0,0 end','C_Map.GetMapLevels=function()return 20,10 end'):
+        g=game(style,extra);v=show(g,1429)
+        assert "1–12" in v.text.text and "Zone guide" in v.text.text
+
+
+def test_native_range_can_replace_a_fallback_without_clearing_cache(style):
+    g=game(style,'MAP_LEVELS[1429]={0,0}');show(g,1429)
+    assert g.eval('NS.zoneLevels.range(1429)')[:2]==(1,12)
+    g.run('MAP_LEVELS[1429]={1,10}');g.advance(.4)
+    assert "1–10" in g.eval('NS.zoneLevels._view().text.text')
+    assert "Zone guide" not in g.eval('NS.zoneLevels._view().text.text')
+
+
+def test_all_standard_questing_zone_ids_have_standalone_fallbacks(style):
+    g=game(style,'C_Map.GetMapLevels=nil;LibQuestieDB=nil;QuestieLoader=nil')
+    # Outdoor questing maps; continents, cities, sanctuary and instances are not leveling brackets.
+    maps=[1411,1412,1413,*range(1416,1450),1451,1452]
+    for map_id in maps:
+        value=g.eval('NS.zoneLevels.range')(map_id)
+        assert value is not None and 1<=value[0]<=value[1]<=60,map_id
+    assert g.eval('NS.zoneLevels.range')(99999) is None
+
+
+def test_forever_fallbacks_use_real_ui_map_ids_and_label_known_quest_spans(style):
+    g=game(style,'C_Map.GetMapLevels=nil')
+    for map_id,name,low,high,source in ((2521,"Zephras Isle",1,12,"Zone guide"),
+            (2548,"Riverglades",35,45,"Zone guide"),(2482,"Mount Hyjal",56,60,"Known quests"),
+            (2652,"Shen'dralas",38,43,"Known quests")):
+        g.run(f'MAP_INFO[{map_id}]={{mapID={map_id},name="{name}",mapType=3}}')
+        v=show(g,map_id)
+        assert f"{low}–{high}" in v.text.text and source in v.text.text,(map_id,v.text.text)
+    # AreaTable IDs are not UI map IDs and must never accidentally select a range.
+    assert g.eval('NS.zoneLevels.range')(16593) is None
+
+
+def test_city_and_sanctuary_maps_are_labeled_instead_of_unknown_levels(style):
+    g=game(style,'C_Map.GetMapLevels=function()return 0,0 end')
+    for map_id,name,kind in ((1453,"Stormwind City","City"),(1454,"Orgrimmar","City"),
+            (1455,"Ironforge","City"),(1456,"Thunder Bluff","City"),(1457,"Darnassus","City"),
+            (1458,"Undercity","City"),(1450,"Moonglade","Sanctuary")):
+        g.run(f'MAP_INFO[{map_id}]={{mapID={map_id},name="{name}",mapType=3}}')
+        v=show(g,map_id)
+        assert kind in v.text.text and "unavailable" not in v.text.text
+
+
+def test_fallback_uses_map_ids_with_localized_names_and_leaves_unknown_data_unknown(style):
+    g=game(style,'C_Map.GetMapLevels=nil;MAP_INFO[1429].name="Forêt d’Elwynn"')
+    v=show(g,1429)
+    assert "1–12" in v.text.text and "Forêt d’Elwynn" in v.text.text
+    v=show(g,2002);assert "range unavailable" in v.text.text
+    assert g.eval('NS.zoneLevels.range')(2002) is None and g.eval('NATIVE_WRITES')==0
+
+
+def test_entire_known_world_map_has_readable_badges_when_client_returns_zero(style):
+    g=game(style,'''C_Map.GetMapLevels=function()return 0,0 end
+        C_Map.GetMapChildrenInfo=function()
+            local out={};local ids={1411,1412,1413,1450,1451,1452,1453,1454,1455,1456,1457,1458,2482,2521,2548,2652}
+            for id=1416,1449 do ids[#ids+1]=id end
+            for i,id in ipairs(ids) do
+                MAP_INFO[id]={mapID=id,name="Zone "..id,mapType=3};out[#out+1]=MAP_INFO[id]
+                local x,y=((i-1)%10)/10,math.floor((i-1)/10)/5
+                RECTS[id]={x,x+.08,y,y+.15}
+            end
+            return out
+        end''')
+    v=show(g);p=labels(v)
+    assert len(p)==50 and all("?" not in badge.text.text for badge in p.values())
+    assert "City" in p[1453].text.text and "Sanctuary" in p[1450].text.text
+    assert g.eval('NATIVE_WRITES')==0 and all(not badge.mouseEnabled for badge in p.values())
 
 
 if __name__=="__main__":

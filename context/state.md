@@ -2,10 +2,13 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Equipment explorer name grouping completed and published as v0.4.13; remote tag and downloaded install ZIP verified.
+- Zone-level missing-data fallback completed; all checks pass, packaging/publishing 0.4.14.
 - Standing preference: Extra tools additions stay optional and default off unless explicitly requested otherwise.
 
 ## Last completed
+- Built `dist/QuestSharing-0.4.14.zip`: 32 source-identical files, 163,779 bytes; SHA256 `d272c5586915eb3de82d0a2242dc4a715a1ed7cc56f408491f995326e1c6a5b8`. Publication pending.
+- All 34 suites / 1,291 checks pass, including 50 zone workflows and all 50 known outdoor/city/sanctuary map labels with zero native ranges; diff whitespace clean.
+- Added 39 verified Classic guides, two Blizzard Forever guides and two labelled known-quest spans; cities/sanctuary labelled. Native data still preferred; fallback not cached so late native data can replace it. Extra tools option remains off by default.
 - Published v0.4.13 at `1bf2789ca1d7ddbbc7ee9039e4f06cb22a525361`; latest stable release, remote tag/main verified and downloaded 32-file ZIP byte-matches source-verified build.
 - `dist/QuestSharing-0.4.13.zip`: 162,652 bytes; SHA256 `f22e068e8c9403c2b566f9f13811267ea7636820f9b782e1ebbd0262c1e187e3`.
 - All 34 suites / 1,275 checks pass, including 28 grouping workflows; diff whitespace clean. Native game rendering remains unverified.

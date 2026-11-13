@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.14
+- Fixed world-map questing levels showing question marks across the map when the client supplies empty,
+  zero or invalid level metadata. Includes standalone fallback guides for all 39 Classic questing zones,
+  plus Zephras Isle and Riverglades; no additional addon is required.
+- Mount Hyjal and Shen'dralas can show explicitly labelled **Known quests** spans from verified quest data
+  when native ranges are absent. These describe known quests, not a complete recommended level bracket.
+- Cities and Moonglade show **City** or **Sanctuary**. Hover/view a zone to see whether its fallback comes
+  from a **Zone guide** or **Known quests**; valid native ranges still take priority and can arrive later.
+- Zone levels remain optional/off by default. Unknown future areas retain an honest unavailable state;
+  map navigation, click-through labels and the removal of quest/minimap symbols remain unchanged.
+
 ## 0.4.13
 - Equipment explorer now shows **one row per item name** in both quest rewards and instance drops.
 - Shared dungeon drops list every matching boss, creature or loot group together in the existing details pane;
