@@ -3,9 +3,10 @@ Last updated: 2026-11-13
 
 ## Active task
 - User clarified instance drop search should show equipment only; corrected in version 0.4.3, validated and packaged.
-- Next: commit, push and publish the correction under the existing release authorization; verify remote tag and ZIP.
+- Completed push and stable v0.4.3 publication; remote tag and downloaded ZIP verified, no release work remains.
 
 ## Last completed
+- Published v0.4.3 at `72d7d3528629ca2c24c518275440195be3b0a703`; downloaded GitHub ZIP matches the verified local package byte for byte.
 - Reproduced Silken Cloth leakage on modern/classic paths; corrected unrealistic fixture slots and added failing-first tests.
 - `Loot.lua` now requires recognized `Rewards.itemInfo().slot` for results and encounter choices. Weapons and wearable gear remain; materials, consumables, bags and unknown classifications stay hidden.
 - Existing asynchronous item-cache events reveal equipment after details load; provider indexing, batching and source attribution remain intact.
@@ -34,6 +35,6 @@ Last updated: 2026-11-13
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
-- v0.4.2: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.2
-- Tag `5dbb839731f7ce33ff2bd1c6f5fb4353b6dd06cc`; previously verified install asset byte equality.
-- v0.4.3 correction publication pending; preserve the published 0.4.2 tag and ZIP.
+- v0.4.3: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.3
+- Tag `72d7d3528629ca2c24c518275440195be3b0a703`; ZIP 144,596 bytes with verified SHA256 above.
+- Main also includes a documentation follow-up recording publication. Previous 0.4.2 tag and ZIP preserved.

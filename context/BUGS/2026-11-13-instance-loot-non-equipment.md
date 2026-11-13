@@ -30,13 +30,13 @@
 ## Fix
 - Runtime: `QuestSharing/Loot.lua`; manifest version 0.4.3.
 - Supporting changes: `tests/test_loot.py`, README, changelog and continuity notes.
-- Commit / PR: recorded in git history under the 0.4.3 correction.
+- Commit / PR: `72d7d3528629ca2c24c518275440195be3b0a703`; release https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.3
 - Workaround? no.
 
 ## Verification
 - Before fix: Silken Cloth visible on modern/classic paths; new equipment-only assertions failed (38/58 loot checks passed).
 - After fix: 58/58 loot checks and all 27 suites / 1,055 checks passed.
-- Verified 0.4.3 install ZIP: 29 files match addon source, retired quest renderer absent.
+- Verified 0.4.3 install ZIP: 29 files match addon source, retired quest renderer absent; downloaded published asset matches local bytes.
 - Game-client rendering remains unverified; no client available.
 
 ## If it shows up again
