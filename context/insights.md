@@ -7,6 +7,7 @@
 - Native edit-box API verified against [Blizzard generated API documentation](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_APIDocumentationGenerated/SimpleEditBoxAPIDocumentation.lua); optional SetAltArrowKeyMode(false) supports arrow navigation without capturing global keys.
 - Caught and fixed delayed Apply callbacks resetting pagination after a scroll; the new workflow case failed on both API styles before cancelling both input serials at the common commit path. See `context/BUGS/2026-11-13-debounced-filter-reapply.md`.
 - Final all-suite validation: 29 scripts / 1,121 checks passed; built/source-verified 30-file v0.4.7 ZIP.
+- Published v0.4.7 at `13d718f`; downloaded 152,730-byte asset matches the tested ZIP (SHA256 `f8b13b1b34f17348296fe718f7e399c8dc2301ec8401f73ea28df78e46d779b9`).
 - Mixed wheel/keyboard dropdown case also failed before correction; keep the Enter cursor inside the visible option slice. See `context/BUGS/2026-11-13-dropdown-offscreen-selection.md`.
 - Reviewed approximate native-widget geometry previews under `/tmp/questsharing-equipment-{quests,dungeons}.png`; these are layout approximations, not game screenshots.
 

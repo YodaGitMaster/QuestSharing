@@ -2,10 +2,11 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Completed equipment usability redesign for 0.4.7; final regression/package passed and publication verification pending.
+- Completed equipment usability redesign and stable v0.4.7 publication; tag and downloaded ZIP verified.
 - Existing ongoing push/release authorization applies; no additional feature work remains.
 
 ## Last completed
+- Published v0.4.7 at `13d718f8212f084b7748c8f311d8ea5a2113664d`; downloaded asset matches the tested local ZIP byte for byte.
 - Searchable direct dropdowns replace sequential cycling for filters/class/faction/source; one child popup supports search, wheel and keyboard confirmation.
 - Live search/range/character inputs, Clear controls, My level, sorting, wheel/arrow list navigation, automatic/stable inline selection and helpful empty/loading states.
 - Clear filters recovers from combined searches/location/source and broadens quest levels without losing character context or Rare+.
@@ -36,6 +37,6 @@ Last updated: 2026-11-13
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
-- v0.4.6: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.6
-- Tag `401c9508c14088f9464dd6c06033e8e23fe04a3c`; ZIP 148,480 bytes; SHA256 `8efb93d2f4bdb21766d1ffd6c96eb59711bede03e363ff5c33c65d8c51d02dec`.
+- v0.4.7: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.7
+- Tag `13d718f8212f084b7748c8f311d8ea5a2113664d`; ZIP 152,730 bytes; SHA256 `f8b13b1b34f17348296fe718f7e399c8dc2301ec8401f73ea28df78e46d779b9`.
 - Main also includes a documentation follow-up recording publication. Previous release tags and ZIPs preserved.
