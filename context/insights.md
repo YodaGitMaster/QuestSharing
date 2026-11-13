@@ -6,6 +6,7 @@
 - Checked every Classic guide/map ID against author source; Forever IDs verified against QuestieDB mappings. Reference checkout/downloads stay in `/tmp/questsharing-zone-reference`, not the addon package.
 - Do not cache a fallback as native success: late API data must replace it without needing a manual refresh.
 - All 34 suites / 1,291 checks pass, including 50 zone workflows and a zero-metadata 50-map badge scenario; native game rendering remains unverified.
+- Published latest stable v0.4.14 at `73831bc7880ca8bcaab56af17ce4f020b4cff92a`; downloaded 163,779-byte ZIP matches source-verified 32-file build, SHA256 `d272c5586915eb3de82d0a2242dc4a715a1ed7cc56f408491f995326e1c6a5b8`.
 
 ## 2026-11-13 — Equipment identity differs from source identity
 - Reproduced three Captain's Blade rows for two mobs/two modes and two Druid Staff rows for two quests. Raw exact-source dedup was correct; presentation needed a second grouping layer.

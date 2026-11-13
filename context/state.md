@@ -2,11 +2,12 @@
 Last updated: 2026-11-13
 
 ## Active task
-- Zone-level missing-data fallback completed; all checks pass, packaging/publishing 0.4.14.
+- Zone-level missing-data fallback completed and published as v0.4.14; remote tag and downloaded install ZIP verified.
 - Standing preference: Extra tools additions stay optional and default off unless explicitly requested otherwise.
 
 ## Last completed
-- Built `dist/QuestSharing-0.4.14.zip`: 32 source-identical files, 163,779 bytes; SHA256 `d272c5586915eb3de82d0a2242dc4a715a1ed7cc56f408491f995326e1c6a5b8`. Publication pending.
+- Published v0.4.14 at `73831bc7880ca8bcaab56af17ce4f020b4cff92a`; latest stable release, remote tag/main verified and downloaded ZIP byte-matches source-verified build.
+- `dist/QuestSharing-0.4.14.zip`: 32 runtime files, 163,779 bytes; SHA256 `d272c5586915eb3de82d0a2242dc4a715a1ed7cc56f408491f995326e1c6a5b8`.
 - All 34 suites / 1,291 checks pass, including 50 zone workflows and all 50 known outdoor/city/sanctuary map labels with zero native ranges; diff whitespace clean.
 - Added 39 verified Classic guides, two Blizzard Forever guides and two labelled known-quest spans; cities/sanctuary labelled. Native data still preferred; fallback not cached so late native data can replace it. Extra tools option remains off by default.
 - Published v0.4.13 at `1bf2789ca1d7ddbbc7ee9039e4f06cb22a525361`; latest stable release, remote tag/main verified and downloaded 32-file ZIP byte-matches source-verified build.
@@ -46,7 +47,7 @@ Last updated: 2026-11-13
 
 ## Implemented tools
 - Extra tools tab in `/qs settings`; fishing layer and quest reward browser default off.
-- World-map questing ranges: default off; enable via Extra tools toggle for native continent badges and selected/hovered-zone panel. World/cosmic overview prompts choosing a continent/zone; missing client data is unknown.
+- World-map questing ranges: default off; Extra tools toggle enables continent badges and selected/hovered-zone panel. Native levels preferred, 39 Classic/two published Forever guides plus two labelled known-quest spans provide standalone fallback; six cities/Moonglade have role labels. Future unverified areas stay unknown.
 - Extra tools > Auto-update spells to highest learned rank: default off; upgrades existing player spell buttons across normal/hidden/form pages on enable/login/learning/action changes; Check spell ranks now reports results. Waits during combat/temporary bars/dragging; macros/pet/items remain; refusal pauses until reload.
 - `/qs fishing`: persistent per-water editor; `/qs fishing on`: world-map layer, with Alt-click placement where supported. Water notes survive settings reset and are deleted explicitly.
 - `/qs rewards`: shared explorer quest tab; one row per equipment name with all eligible quest routes inline; class/level/faction, slot/search filters, native comparisons; requires recent QuestieDB and enum tables.
@@ -67,6 +68,6 @@ Last updated: 2026-11-13
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
-- v0.4.13: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.13
-- Tag `1bf2789ca1d7ddbbc7ee9039e4f06cb22a525361`; ZIP 162,652 bytes; SHA256 `f22e068e8c9403c2b566f9f13811267ea7636820f9b782e1ebbd0262c1e187e3`.
+- v0.4.14: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.14
+- Tag `73831bc7880ca8bcaab56af17ce4f020b4cff92a`; ZIP 163,779 bytes; SHA256 `d272c5586915eb3de82d0a2242dc4a715a1ed7cc56f408491f995326e1c6a5b8`.
 - Main also includes a documentation follow-up recording publication. Previous release tags and ZIPs preserved.
