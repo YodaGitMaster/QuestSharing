@@ -1,5 +1,12 @@
 # Insights
 
+## 2026-11-13 — Equipment identity differs from source identity
+- Reproduced three Captain's Blade rows for two mobs/two modes and two Druid Staff rows for two quests. Raw exact-source dedup was correct; presentation needed a second grouping layer.
+- Group after every filter, by normalized name; retain raw source arrays and all matching IDs. Highest native level/lowest ID selects the comparison version; stable name key survives cache arrivals.
+- Supplier lists combine modes per dungeon/mob/provider; quest lists preserve independent routes/requirements. Hover previews bounded at six; full scrollable details remain in the same window.
+- Existing paging fixtures incorrectly used repeated sources of one item as different results; replaced with distinct equipment and kept separate raw-source coverage.
+- All 34 suites / 1,275 checks pass, including 28 grouping workflows; native rendering still requires the game client.
+
 ## 2026-11-13 — Optional means off until explicitly enabled
 - User corrected the map-range default: all future Extra tools additions should be opt-in unless explicitly requested otherwise.
 - Reproduced six failing modern/legacy assertions for fresh installs, v0.4.11 saved true values and Reset. A changed default cannot distinguish an old auto-enabled saved value from an explicit choice; the once-only migration marker requires a new choice and then preserves it.

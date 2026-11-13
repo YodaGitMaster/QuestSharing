@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.13
+- Equipment explorer now shows **one row per item name** in both quest rewards and instance drops.
+- Shared dungeon drops list every matching boss, creature or loot group together in the existing details pane;
+  each supplier appears once with its combined difficulty labels. Shared quest rewards list all eligible routes,
+  locations and prerequisites together. Counts and pagination refer to unique equipment names.
+- Different item IDs with the same name stay together, with each version's level shown in details. Native
+  tooltips compare the highest-level matching version. Quality, equipment, level, stat, source and quest
+  eligibility filters apply before grouping, and selection survives newly loaded matching versions.
+
 ## 0.4.12
 - Zone questing ranges are now **optional and off by default**, like other Extra tools features. Enable
   **Extra tools > Show zone questing level ranges** when you want the map badges and panel.

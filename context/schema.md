@@ -2,7 +2,7 @@
 Last updated: 2026-11-13
 
 ## Addon loading and persistence
-- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.12; declares file load order and SavedVariables.
+- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.13; declares file load order and SavedVariables.
 - Lua modules receive `local ADDON, ns = ...`; `ns` is the shared namespace, not a class.
 - `Core.lua`: `ns.defaults`; `ns.db` initially copies defaults. On `ADDON_LOADED`, missing settings are filled and `ns.db` aliases saved `QuestSharingDB`; current `dbVersion = 3`.
 - SavedVariables: `QuestSharingDB` (settings), `QuestSharingLog` (debug log); persisted by the game.
@@ -30,7 +30,8 @@ Last updated: 2026-11-13
   - Summary stays separate from water records; Forever provisional flag retained; no bundled catalogue.
 - `ItemDB.GetAllIds()`: shared read-only ascending item ID list; recent QuestieDB needed.
 - Equipment index: `{id,kind,sub,quests,name,level,required}` from item `class`, `subClass`, `questRewards`, `name`, `itemLevel`, `requiredLevel`.
-- RewardOption: `{itemID,name,link?,itemLevel,slot,questID,questName,questLevel,requiredLevel,zone,cached}`; ephemeral, sorted by item level descending.
+- RewardOption source: `{itemID,name,info,link?,itemLevel,slot,questID,questName,questLevel,requiredLevel,zone,cached}`; ephemeral, filtered before name grouping.
+- Grouped quest result: representative RewardOption fields plus common EquipmentGroup fields below and `routes[]={questID,questName,questLevel,requiredLevel,zone,itemIDs,seenIDs}`; routes unique by quest ID, ordered by ID. Detail preserves every eligible route; map action uses routes[1].
 - Filter defaults: own class/level/faction, all slots, quest level from level-10 to level+3, completed quests hidden, text empty.
 - `LibQuestieDB.Enum.{classKeys,factionRaceMasks,raceMaskById}`: required for reliable eligibility; use arithmetic mask intersection to preserve bits above 31.
 - `Questie.lua` starter spawn records now include `area` alongside `zone,x,y,dungeon`, including item-drop starters.
@@ -60,13 +61,16 @@ Last updated: 2026-11-13
 - `dropdown`: reusable unnamed child popup, direct/searchable choices, ten visible options, scroll/arrow/Enter/Escape; class values retain tokens with localized display labels. No Blizzard dropdown templates.
 - `liveBox` / `searchBox`: 180ms debounce, serial cancellation, `dirty`, `flush` and `cancel`; hidden pages do not apply pending work and resume dirty fields on return. Enter applies; Escape/search Clear clears immediately.
 - `sortResults`, `go`/`goInstances`, `wheel`, `navigation`: shared ordering and bounded paging; keyboard stays scoped to focused edit boxes rather than capturing game-wide movement keys.
-- Result selection uses stable keys (quest itemID:questID; loot itemID/instance/source/difficulty), survives visible refreshes, and falls back to the first visible result. Inline detail panels update automatically; empty/loading states replace stale details.
+- EquipmentGroup: representative source fields plus `{key,sources[],itemIDs[],versions[]}`. `key` = trimmed, color-stripped lowercase item name; sources retain filtered raw records sorted by module source ordering; itemIDs/one-source-per-ID versions sort numerically. Representative is highest native item level, lowest item ID on ties, first sorted source for identical IDs. No raw/provider table mutation.
+- `groupItems` runs after filtering; `versionLines` labels distinct IDs and native levels when a name has multiple versions. Counts/pages use grouped results, sorting uses representative metadata.
+- Result selection uses stable normalized name keys, survives visible refreshes/new versions, and falls back to the first visible result. Inline detail panels update automatically; empty/loading states replace stale details.
 - Clear filters clears shared controls plus active search/location/source; quest character eligibility stays, near-level restriction is removed and completed quests hidden. My level caps item required level at native UnitLevel without a minimum.
 - No standalone reward/loot/route/source top-level windows remain; shared tab filters survive tab switches, not logout.
 
 ## Instance loot search (2026-11-13)
 - `ns.loot`: `open`, `close`, `scan`, `search(text, instanceKey?, encounter?)`, `instances(text?)`; session-only data, no SavedVariables.
 - LootDrop: `{itemID,item,instanceKey,instanceName,who,difficulty,provider,sourceID,kind}`; `item` references shared local item cache `{id,name,cached,info?}`.
+- Grouped loot result: representative LootDrop fields plus EquipmentGroup fields and `suppliers[]={who,instanceName,provider,modes[],ids[],seenModes,seenIDs}`; unique dungeon-key/mob/provider entries with sorted combined difficulties/IDs. Full list stays in the scrollable detail pane; native hover shows up to six sources and prompts click for the remainder.
 - Visibility: loot results and encounter choices require shared native `item.info.slot` to be recognized by `Rewards.lua`; unknown/unloaded items and non-equipment remain hidden. Item-cache events refresh eligibility.
 - Instance record: `{key,name,count,instanceID?,subzones?}`. Atlas key = module/content; Questie fallback key = `area:<AreaTable ID>`. `subzones` is a set of localized names from provider SubAreaIDs. Dire Maul area 2557 maps to verified instance ID 429 when the provider omits it.
 - Open captures session-only `focusTarget={name,subzone,id?,text?}` for a party instance. Match compatible exact native IDs first, localized name/subzone second; ties are not selected arbitrarily. Apply after catalogue completion (or immediately if ready), reset stale search/source and reveal the chosen navigation page; preserve shared equipment filters and explicit slash search. Manual search/location/source/reset/suspend cancels pending focus; dirty search fields also block focus before their debounce fires. Outside/unknown/raid locations retain browsing.

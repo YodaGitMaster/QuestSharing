@@ -253,10 +253,10 @@ def test_fishing_editor_paginates_and_master_switch_hides_it(style):
 
 
 def test_reward_browser_pages_and_never_opens_or_redraws_world_map(style):
-    g=game(style,'''REWARD_ITEMS[800].questRewards={}
-        for id=9000,9017 do
+    g=game(style,'''for id=9000,9017 do
             QUESTIE_QUESTS[id]={name="Route "..id,requiredLevel=15,questLevel=20,startedBy={{197}}}
-            table.insert(REWARD_ITEMS[800].questRewards,id)
+            REWARD_ITEMS[id]={name="Staff "..id,class=2,subClass=10,itemLevel=25,requiredLevel=18,
+                questRewards={id},loc="INVTYPE_2HWEAPON"}
         end''')
     g.slash("rewards"); w=g.eval("NS.rewards._window()")
     first=w.rows[1].result.questID
