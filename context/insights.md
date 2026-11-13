@@ -1,5 +1,12 @@
 # Insights
 
+## 2026-11-13 — Minimum Rare equipment quality
+- One shared predicate covers quests, dungeon results and source choices. Added confirmed native quality >=3 before type/slot/level filters; unknown quality is hidden until cache events supply it.
+- New integration cases failed before the filter (26/36 shared-explorer checks passed), then 36/36 passed. Optional 42/42 and loot 58/58 also passed.
+- Existing fixtures used quality 2 for all equipment; changed baseline gear to Rare and added explicit mixed-quality boundary cases rather than discarding existing feature coverage.
+- Existing uncached quest test now expects hidden gear until native details arrive, then verifies its return.
+- Final all-suite validation: 28 scripts / 1,091 checks passed. Built/source-verified v0.4.6 ZIP, 30 files.
+
 ## 2026-11-13 — Unified equipment explorer
 - User clarified that Forever dungeons must remain included; exclude raids/world bosses via actual dungeon identity, not merely a positive InstanceID or UIMapType.Dungeon.
 - Verified AtlasLoot [content category API](https://github.com/HoliestWoW/AtlasLootClassic/blob/master/AtlasLootClassic/ItemDB/ItemDB.lua) and [Classic/Forever catalogue](https://github.com/HoliestWoW/AtlasLootClassic/blob/master/AtlasLootClassic_DungeonsAndRaids/data.lua).

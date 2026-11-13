@@ -147,7 +147,7 @@ def test_cross_encounter_links_cannot_smuggle_raid_loot_into_dungeons(style):
 def test_unknown_database_subclass_is_not_mistaken_for_an_axe(style):
     g=loot_game(style,'''local old=GetItemInfo
         GetItemInfo=function(id)
-            if id==10001 then return "Unknown weapon","item:10001",2,25,18,"","",1,"INVTYPE_WEAPON","icon" end
+            if id==10001 then return "Unknown weapon","item:10001",3,25,18,"","",1,"INVTYPE_WEAPON","icon" end
             return old(id)
         end
         QUESTIE_ITEMS[10001]={name="Unknown weapon",class=0,subClass=0}''')
@@ -155,6 +155,61 @@ def test_unknown_database_subclass_is_not_mistaken_for_an_axe(style):
     assert not any(r[0]==10001 for r in loot_results(g))
     choose(g,"Weapons")
     assert any(r[0]==10001 for r in loot_results(g))
+
+
+def test_dungeon_results_and_sources_exclude_green_or_lower_even_after_reset(style):
+    g=loot_game(style,'''LOOT_ITEMS[10001].quality=2
+        LOOT_ITEMS[10002].quality=4;LOOT_ITEMS[10003].quality=0''')
+    g.slash("loot")
+    assert {r[0] for r in loot_results(g)}=={10002,10005}
+    g.eval("NS.loot.search")("Captain",None,None);assert loot_results(g)==[]
+    g.eval("NS.loot.search")("",None,None);g.eval("NS.equipmentUI.reset")()
+    assert {r[0] for r in loot_results(g)}=={10002,10005}
+    w=g.eval("NS.loot._window()");labels=set()
+    for _ in range(5):click(w.boss);labels.add(w.boss.text)
+    assert "Source: Edwin VanCleef" not in labels and "Source: Cookie" not in labels
+
+
+def test_quality_boundary_keeps_blue_epic_and_legendary_but_not_grey_white_green(style):
+    g=loot_game(style);g.slash("loot")
+    for quality in range(6):
+        g.run(f"LOOT_ITEMS[10001].quality={quality}");g.eval("NS.loot.scan")()
+        assert any(r[0]==10001 for r in loot_results(g))==(quality>=3),quality
+
+
+def test_quest_rewards_filter_quality_and_refresh_after_item_data_changes(style):
+    g=quest_game(style,"REWARD_ITEMS[800].quality=2");g.slash("rewards")
+    assert quest_ids(g)==[(801,8001)]
+    g.run("REWARD_ITEMS[800].quality=4; REWARD_ITEMS[801].quality=1")
+    g.fire("GET_ITEM_INFO_RECEIVED",800,True);g.fire("GET_ITEM_INFO_RECEIVED",801,True);g.advance(0.3)
+    assert quest_ids(g)==[(800,8000)]
+    g.eval("NS.equipmentUI.reset")();assert quest_ids(g)==[(800,8000)]
+
+
+def test_unknown_native_quality_is_hidden_until_the_cache_supplies_it(style):
+    g=loot_game(style,'''local old=GetItemInfo
+        QUALITY_READY=false
+        GetItemInfo=function(id)
+            if id==10001 and not QUALITY_READY then
+                return "Captain's Blade","item:10001",nil,25,18,"","",1,"INVTYPE_WEAPON","icon",0,2,7
+            end
+            return old(id)
+        end''')
+    g.slash("loot")
+    assert not any(r[0]==10001 for r in loot_results(g))
+    g.run("QUALITY_READY=true");g.fire("GET_ITEM_INFO_RECEIVED",10001,True);g.advance(0.3)
+    assert any(r[0]==10001 for r in loot_results(g))
+
+
+def test_partial_questie_dungeon_sources_respect_the_same_quality_floor(style):
+    g=loot_game(style,'''AtlasLoot=nil
+        LOOT_ITEMS[10001].quality=2
+        ItemDB.GetAllIds=function()return {10001,10002}end
+        QUESTIE_ITEMS[10001]={name="Green sword",npcDrops={639}}
+        QUESTIE_ITEMS[10002]={name="Blue staff",npcDrops={639}}
+        QUESTIE_NPCS[639]={name="Dungeon boss",spawns={[1581]={{-1,-1}}}}''')
+    g.slash("loot")
+    assert {r[0] for r in loot_results(g)}=={10002}
 
 
 if __name__=="__main__":

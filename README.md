@@ -446,6 +446,8 @@ The fishing layer works alongside Questie.
 **Quest rewards** and **Instance drops** with its tabs. Item rows have icons, quality colors, item/required levels
 and a source line; hover for the game's comparison tooltip. Click a row to update the route or drop-source pane
 on the right. Selecting more items never opens additional route/source windows.
+**Only Rare (blue) quality and above are listed** in both tabs; green, white and grey items are excluded.
+Items with unknown quality stay hidden until their details load. Reset filters keeps this quality minimum.
 
 The filter bar applies to both tabs. Choose **Weapons**, **Armor** or **Accessories**, then a specific **Item type**
 (swords, staves, cloth, leather, mail, plate, shields, jewelry, etc.) and/or an equipment **Slot**. Left-click a
@@ -669,10 +671,10 @@ python tests/test_ringtest.py         # 14 tests: /qs quick test: every slot run
 python tests/test_log.py              # 35 tests: the debug log: every action and its outcome, kept small, the log window
 python tests/test_optional.py         # 42 tests: fishing water notes, map drawing, reward filters and item comparisons
 python tests/test_adventure.py        # 32 tests: role-play quest invitations, preview, channels and preserved chat drafts
-python tests/test_equipment.py        # 26 tests: one window, shared filters, dungeon/raid identity and cancellation
+python tests/test_equipment.py        # 36 tests: one window, shared filters, rare+ quality, dungeon/raid identity and cancellation
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 ```
-Expected: every line ends in `passed` with all tests green (1081 in total).
+Expected: every line ends in `passed` with all tests green (1091 in total).
 
 ## Files
 | File | Purpose |

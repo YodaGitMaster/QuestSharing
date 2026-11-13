@@ -91,7 +91,7 @@ flowchart TD
     Sync --> API
     Settings[Settings.lua: Optional tab] --> Fishing[Fishing.lua: water notes]
     Settings --> Rewards[Rewards.lua: reward browser]
-    OptionalUI[OptionalUI.lua] --> Equipment[EquipmentUI.lua: shared explorer]
+    OptionalUI[OptionalUI.lua] --> Equipment[EquipmentUI.lua: shared explorer, Rare+ only]
     Equipment --> Rewards
     Equipment --> Loot
     OptionalUI --> Fishing
@@ -196,7 +196,7 @@ sequenceDiagram
     Loot->>Loot: Index up to 100 rows per timer batch
     Loot->>Game: Load up to 10 item details per timer batch (Rewards.itemInfo)
     User->>Loot: Filter dungeon, encounter or item/boss text; shared type/slot/level filters
-    Loot->>Loot: Require recognized weapon or wearable slot; hide unknown items
+    Loot->>Loot: Require recognized equipment slot and native quality 3+; hide unknown items
     Loot->>User: Paginated equipment with supplier and difficulty
     Game-->>Loot: GET_ITEM_INFO_RECEIVED
     Loot->>User: Debounced equipment classification and name refresh
@@ -211,7 +211,7 @@ sequenceDiagram
     E->>Page: Hide old page and suspend pending work
     E->>Page: Show selected child in same host
     User->>E: Apply type, slot or inclusive level range
-    E->>Page: Refresh with shared equipment filters
+    E->>Page: Require native quality 3+ and apply shared equipment filters
     User->>Page: Select item card
     Page->>E: Update inline route/source pane
     User->>E: Close explorer
