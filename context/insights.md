@@ -1,5 +1,11 @@
 # Insights
 
+## 2026-11-13 — Native zone level ranges
+- Verified [Blizzard Forever map API declarations](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/MapDocumentation.lua): GetMapLevels returns player min/max before pet min/max; GetMapRectOnMap returns minX,maxX,minY,maxY, requiring a four-value protected read rather than optionalUI.call's three-value helper.
+- Native zone descendants, rectangles and player ranges avoid inaccurate static Classic/Forever mappings. UI map type Zone filters out dungeon level ranges; world/cosmic overviews avoid stacking every world's zone labels.
+- New 30-check integration suite covers supported custom/Forever maps, unknown/recovering data, player-vs-pet ranges, hover reset, scale/resize, stale-label cleanup, delayed map load, canvas replacement, settings persistence and no native map mutations. Actual game rendering/data coverage remains unverified.
+- All 33 suites / 1,243 checks pass; settings geometry still fits and native map/protected-call guards remain intact. Range precedes zone name in the panel so long localized names cannot hide the level value.
+
 ## 2026-11-13 — Learned spell ranks and action bars
 - Verified modern spell-book entry/skill-line fields and pickup arguments against [Blizzard Forever spell-book declarations](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/SpellBookDocumentation.lua); rank subtext comes from [spell API declarations](https://github.com/Gethe/wow-ui-source/blob/forever/Interface/AddOns/Blizzard_APIDocumentationGenerated/SpellDocumentation.lua).
 - [Myslot's action-bar import implementation](https://github.com/tg123/myslot/blob/master/Myslot.lua) confirms public GetActionInfo/PickupSpell/PlaceAction/ClearCursor workflow and legacy offSpecID=0. No third-party code/data bundled.

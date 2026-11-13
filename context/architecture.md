@@ -37,7 +37,8 @@ QuestSharing/  # Repository root
 │   ├── Style.lua  # one look for every window of the addon (settings, Party quests, reports)
 │   ├── Sync.lua  # party members who also run Quest Sharing tell each other exactly which quests they have
 │   ├── Team.lua  # "Picked up [Wolves Among Us] - Anna has it too. Want to do it together?"
-│   └── Track.lua  # keeps the quest tracker (the list on the right) filled with the quests closest to you
+│   ├── Track.lua  # keeps the quest tracker (the list on the right) filled with the quests closest to you
+│   └── ZoneLevels.lua  # Read-only map questing ranges, outdoor zone badges and hover panel
 ├── README.md  # User documentation
 ├── build_release.py  # Build install ZIP and release notes
 ├── context/  # Session continuity and live architecture
@@ -86,7 +87,8 @@ QuestSharing/  # Repository root
     ├── test_triggers.py  # Tests for triggers
     ├── test_usability.py  # Direct choices, live searches, sorting, selection and navigation workflows
     ├── test_where.py  # Tests for where
-    └── test_zone.py  # Tests for zone
+    ├── test_zone.py  # Tests for zone
+    └── test_zone_levels.py  # Native map ranges, geometry, hover, lifecycle, settings and safe read-only behavior
 ```
 
 ## Flowchart
@@ -109,6 +111,10 @@ flowchart TD
     Core --> Ranks
     Ranks --> SpellBook[WoW learned player spell book]
     Ranks --> ActionSlots[WoW normal action slots, out of combat and cursor clear]
+    Settings --> ZoneLevels[ZoneLevels.lua: zone questing ranges]
+    Core --> ZoneLevels
+    ZoneLevels --> NativeMap[C_Map level ranges, zone bounds and hover info]
+    ZoneLevels --> MapLabels[Own click-through map labels and panel]
     OptionalUI --> Fishing
     OptionalUI --> Rewards
     Fishing --> Waters[(QuestSharingDB.fishingWaters)]
@@ -129,6 +135,22 @@ flowchart TD
 ```
 
 ## Sequence diagrams
+```mermaid
+sequenceDiagram
+    participant User
+    participant Map as Existing world map
+    participant Levels as ZoneLevels.lua
+    participant Data as C_Map
+    User->>Map: Open or navigate map normally
+    Levels->>Map: Read shown map, canvas and normalized cursor
+    Levels->>Data: Read outdoor zone levels and child-zone rectangles
+    Levels->>Map: Draw own click-through range badges and information panel
+    Note over Levels,Map: Never opens, navigates or refreshes Blizzard map/pins
+    User->>Map: Hover or view another zone
+    Levels->>Data: Read hovered zone and its range
+    Levels->>Map: Update own text only
+```
+
 ```mermaid
 sequenceDiagram
     participant User
@@ -276,6 +298,7 @@ classDiagram
         loot
         equipmentUI
         spellRanks
+        zoneLevels
     }
     class Settings {
         dbVersion
@@ -284,6 +307,7 @@ classDiagram
         fishingMap
         rewardBrowser
         autoSpellRanks
+        zoneLevels
         fishingWaters
         hideTracker
     }
@@ -369,6 +393,15 @@ classDiagram
         ambiguous_optional
     }
     Namespace --> LearnedSpellRank : spellRanks builds ephemeral highest-rank catalogue
+    class ZoneLevelRange {
+        id
+        name
+        x_normalized
+        y_normalized
+        min_optional
+        max_optional
+    }
+    Namespace --> ZoneLevelRange : zoneLevels builds viewed-map labels from native data
     Namespace --> EquipmentFilter : equipmentUI owns session filters
     Namespace --> LootDrop : loot builds an on-demand index
     Namespace --> InvitationDraft : adventure session-only composer

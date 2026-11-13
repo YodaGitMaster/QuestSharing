@@ -18,11 +18,14 @@ ns.settingTabs = {
     { id = "tracker", title = "Tracker",      intro = "Keep the quests near you in sight, and find the creatures you need." },
     { id = "quick",   title = "Quick chat",   intro = "Hold your key, point at a message, let go. Pick a message below to edit it." },
     { id = "actions", title = "Pings & items", intro = "One key pings your quest target for the party, one uses your quest item." },
-    { id = "optional", title = "Extra tools", intro = "Spell ranks, quest invitations, fishing, quest rewards and instance drops." },
+    { id = "optional", title = "Extra tools", intro = "Zone levels, spell ranks, quest invitations, fishing, rewards and dungeon drops." },
 }
 
 -- kind = header | bool | choice | number | action | key.   desc = the grey line under the label (also its tooltip)
 ns.settingRows = {
+    { tab = "optional", kind = "header", label = "Questing levels on the world map" },
+    { tab = "optional", kind = "bool", key = "zoneLevels", label = "Show zone questing level ranges",
+      desc = "Level badges and selected/hovered zone ranges from the game; includes supported Forever zones." },
     { tab = "optional", kind = "header", label = "Spell ranks on my action bars" },
     { tab = "optional", kind = "bool", key = "autoSpellRanks", label = "Auto-update spells to highest learned rank",
       desc = "All normal action-bar pages; waits for combat/dragging. Macros and pet actions stay unchanged." },

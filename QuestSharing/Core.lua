@@ -34,6 +34,7 @@ ns.defaults = {
     fishingMap = false, -- optional fishing notes on the world map
     rewardBrowser = false, -- optional quest reward catalogue
     autoSpellRanks = false, -- opt-in: highest learned ranks on existing player spell buttons
+    zoneLevels = true, -- questing level ranges on the world map
     bagMarks = true,    -- quest items marked in the bags: gold = a quest of this zone, blue = a quest elsewhere
     hideTracker = false, -- hide the game's quest tracker (outside fights)
     debug = false,      -- the debug log: every action and its outcome (QuestSharingLog, saved on /reload or logout)
@@ -361,6 +362,7 @@ function ns.setSetting(key, value)
         if (key == "fishingMap" or key == "enabled") and ns.fishing then ns.fishing.refresh() end
         if (key == "rewardBrowser" or key == "enabled") and ns.rewards then ns.rewards.settingChanged() end
         if (key == "autoSpellRanks" or key == "enabled") and ns.spellRanks then ns.spellRanks.settingChanged() end
+        if (key == "zoneLevels" or key == "enabled") and ns.zoneLevels then ns.zoneLevels.refresh() end
         if key == "enabled" and not value and ns.adventure then ns.adventure.close() end
         if key == "enabled" and not value and ns.loot then ns.loot.close() end
         if (key == "bagMarks" or key == "enabled") and ns.refreshBagMarks then ns.refreshBagMarks() end
