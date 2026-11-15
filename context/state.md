@@ -1,11 +1,22 @@
 # State
-Last updated: 2026-11-13
+Last updated: 2026-11-15
 
 ## Active task
+- User-requested publication checkpoint: v0.4.14 remains the latest stable release; runtime, build script and changelog match its tag. Routing research saved in this documentation-only checkpoint; implementation remains the next decision.
+- Shortest Path Forever implementation study completed; `context/shortest-path-source-study.md` traces generation, hierarchical search, floor handling, scheduling, smoothing and both map renderers. Internal routing is feasible with maintained terrain data; no implementation chosen or runtime changes made.
+- Walkable quest-route feasibility research completed; see `context/walkable-routing-research.md`. Shortest Path Forever offers terrain routing and both map renderers plus a public API; optional integration recommended, not implemented. Strict dry-land-only walking is not a documented API option; live accuracy remains untested.
 - Zone-level missing-data fallback completed and published as v0.4.14; remote tag and downloaded install ZIP verified.
 - Standing preference: Extra tools additions stay optional and default off unless explicitly requested otherwise.
 
 ## Last completed
+- 2026-11-15: fetched origin and verified main/tag/release state; all 34 suites / 1,291 checks pass. Rebuilt v0.4.14 and downloaded the published ZIP: both contain 32 files matching current source, 163,779 bytes, SHA256 `d272c5586915eb3de82d0a2242dc4a715a1ed7cc56f408491f995326e1c6a5b8`. Current runtime already published; preserve existing release/tag and save routing research on main rather than create a duplicate release.
+- 2026-11-15: recreated expired `/tmp/questsharing-test-env` with Python venv and lupa 2.8; Lua 5.1 tests run successfully. No runtime or dependency files changed.
+- 2026-11-14: cave-specific follow-up traced height catalogue generation and destination/player floor handling. Confirmed classic-db x/y/z source, API npc/explicit-z gating, maps 0/1 coverage and unknown-floor arrival ambiguity; source-study notes updated, no runtime edits.
+- 2026-11-14: traced pinned upstream code (`bc9eaa9`) from destinations to drawn paths and inspected obstacle/water/floor/direction test cases (not run). Recorded source map, flows, data/cost decisions and reusable design; added source-study doc to live architecture.
+- 2026-11-14: completed full WoW-doc reading and synthesis; confirmed offline-data/runtime-query architecture and practical provider API. Newly documented namigator's client-movement restriction warning and the Forever provider's explicitly pending live checks. Feasible integration remains a recommendation; no runtime changes.
+- 2026-11-14: user clarified documentation must be specific to WoW pathfinding. Prioritized provider terrain baker/API and verified original stoneharry movement-map guide plus namigator; added WoW-specific documentation index and distinguished emulator tooling from addon integration.
+- 2026-11-14: follow-up literature search identified HPA* (2004), Cui/Shi's A*-based pathfinding review (2011, includes WoW/Halaa example), official Recast docs and namigator. Added sources and evidence limits to routing research; no academic validation of the current Forever addon found.
+- 2026-11-14: inspected current quest-location/ranking code and primary provider/API/terrain-generator sources; recorded feasibility, limitations and proposed bridge. Runtime remains v0.4.14; documentation-only work, no release or runtime tests required.
 - Published v0.4.14 at `73831bc7880ca8bcaab56af17ce4f020b4cff92a`; latest stable release, remote tag/main verified and downloaded ZIP byte-matches source-verified build.
 - `dist/QuestSharing-0.4.14.zip`: 32 runtime files, 163,779 bytes; SHA256 `d272c5586915eb3de82d0a2242dc4a715a1ed7cc56f408491f995326e1c6a5b8`.
 - All 34 suites / 1,291 checks pass, including 50 zone workflows and all 50 known outdoor/city/sanctuary map labels with zero native ranges; diff whitespace clean.

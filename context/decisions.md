@@ -1,5 +1,16 @@
 # Decisions
 
+## 2026-11-15 — Save research and verify the current publication
+- User requested push/release before continuing. Current addon is still v0.4.14, already published as latest stable; runtime/build/changelog have no changes from that tag.
+- Commit/push all completed routing research and continuity notes to main; preserve immutable v0.4.14 rather than invent a version bump or replace its asset for documentation-only changes.
+- Re-run 34 suites / 1,291 checks, rebuild and source-check the ZIP, verify remote tag and latest release, download and byte-compare the published asset. All pass; no new runtime release required.
+
+## 2026-11-14 — Routing research recommendation (not implemented)
+- User requested feasibility research only. Recommend an optional, default-off Shortest Path Forever bridge using existing quest destinations and provider-owned calculation/rendering, instead of building/bundling a new terrain system.
+- No implementation, dependency, settings or release changes authorized by this research task. Existing map restrictions and retired overlays remain as implemented.
+- Do not advertise strict dry-land walking or mathematically exact shortest paths: documented API optimizes a multimodal estimated journey and has no explicit walk-only request option.
+- Evidence, source links, integration contracts and remaining validation: `context/walkable-routing-research.md`.
+
 ## 2026-11-13 — Native level metadata needs a standalone fallback
 - User reports `???` in every zone. Reproduced with GetMapLevels returning 0,0 on modern/classic paths; API also explicitly permits no return. Previous native-only implementation and happy-path mocks did not establish real coverage.
 - Keep native validated bounds preferred and cached. Add 39 Classic outdoor brackets checked against LibTourist Classic Era revision 246 (`d2380757a8fe2b1cb2d341817e36e1cd0bccee3a`, MIT; author repo https://repos.curseforge.com/wow/libtourist-classic-era). These are general Zone guide ranges; no runtime library dependency or copied library implementation.

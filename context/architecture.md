@@ -1,5 +1,5 @@
 # Architecture
-Last updated: 2026-11-13
+Last updated: 2026-11-15
 
 ## File tree
 ```text
@@ -56,7 +56,9 @@ QuestSharing/  # Repository root
 │   ├── decisions.md  # Choices and rationale
 │   ├── insights.md  # Timestamped findings
 │   ├── schema.md  # Data structures and formats
-│   └── state.md  # Current task and handoff
+│   ├── shortest-path-source-study.md  # External router implementation trace; no runtime dependency
+│   ├── state.md  # Current task and handoff
+│   └── walkable-routing-research.md  # Terrain-routing feasibility, provider sources and proposed integration (not implemented)
 └── tests/  # Python tests and Lua API harness
     ├── harness.py  # Mock WoW APIs and load Lua addon
     ├── test_adventure.py  # Invitation generation, chat routes, preview and draft preservation

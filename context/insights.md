@@ -1,5 +1,20 @@
 # Insights
 
+## 2026-11-15 — Publication checkpoint
+- Current runtime equals published v0.4.14; only routing research/continuity notes were pending. All 34 suites / 1,291 checks pass; rebuilt/downloaded ZIPs source-match and byte-match the recorded digest. Existing release/tag retained.
+- Temporary test venv had expired; recreated with lupa 2.8. No repo dependency changes needed.
+
+## 2026-11-14 — Walkable quest routing exists for Forever
+- Cave follow-up: generated target heights come from classic-db spawn z (generator maps 0/1), and API auto lookup requires npc or explicit z. Player floor inference can remain unknown after reload/teleport; upstream test explicitly falls back to horizontal arrival while unknown. Multi-floor graph support is not a guarantee of correct cave quest targeting.
+- Source study (`context/shortest-path-source-study.md`): terrain graph is the hard dependency; pure Lua algorithms alone cannot infer walkability. Found 3x swimming preference, checked smoothing preserving lake detours, NPC extra-height catalogue, movement-based player-floor inference, 2 ms shared search budget, pooled/rotated/clipped map drawing, and preview geometry that is not proof of a legal path. Source tests include actual Stormwind gate, Dun Algaz tunnel and Loch Modan routes; inspected, not executed.
+- Full-doc reading: namigator README explicitly does not honor client-side movement restrictions; server navmesh routes are not automatically player-walkable. Forever baker uses player-oriented slope/step/floor rules. Provider live-navigation-verification.md explicitly leaves some real-client checks pending; headless tests establish neither secure UI nor live loading performance.
+- User clarification: research scope is WoW-specific pathfinder documentation, not general academic algorithms; prioritize Forever baker/API and WoW movement-map generation/debugging sources.
+- Follow-up: published HPA* research (Botea et al., 2004) supports large-map acceleration; Cui/Shi (2011) illustrates navmesh vs waypoints using WoW's Halaa. Established algorithms/engineering examples do not establish current Forever addon accuracy; source details and fetch limits recorded in routing research.
+- Shortest Path Forever ships compressed collision-derived walking graphs; hierarchical A*/8-yard grids, slopes, directed drops/floors, water costs, and world-map/minimap rendering. Public Navigate/NavigateRoute can accept destinations from our existing Questie.lua adapter.
+- QuestieDB NPC `waypoints` means NPC movement paths, not a player navigation mesh. Current Q.nearest is normalized 2D proximity only.
+- Fastest journey differs from shortest dry-land walk: transport, swimming and preference costs may apply; no explicit strict walking-only API option found. Estimate omits endpoint terrain searches and cannot establish exact reachability.
+- Research and proposed bridge: `context/walkable-routing-research.md`; runtime unchanged, in-game validation outstanding.
+
 ## 2026-11-13 — Empty native zone levels caused map-wide question marks
 - Native GetMapLevels may return nothing; valid client/API availability alone does not establish data coverage. Zero metadata reproduces all-unknown badges on both API mocks; user's affected scope is every zone.
 - Standalone guides now cover 39 Classic questing maps and Zephras/Riverglades. Hyjal/Shen'dralas use explicitly labelled known-quest spans, not invented official brackets; six cities and Moonglade have meaningful role labels.
