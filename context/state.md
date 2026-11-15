@@ -2,7 +2,7 @@
 Last updated: 2026-11-15
 
 ## Active task
-- 2026-11-15: user authorized push/release of v0.4.15 and approved the layout repair. Quest automation controls now live in Tracker > Quest offers and turn-ins. Full suite passes (34 files, 1,291 checks); ZIP built and whitespace check passes. Next: commit/push, tag/publish 0.4.15, verify remote asset; then resume the missing quest-badge investigation.
+- 2026-11-15: v0.4.15 is published and verified. Next continue the unresolved missing quest-badge investigation using fresh `/qs highlight` output; user says visible yellow enemy bars but earlier doctor reported nameplates off.
 - 2026-11-15: user clarifies yellow enemy health bars are visible while `/qs doctor` still reports enemy nameplates off. Treat visual nameplates as enabled; the doctor's raw `nameplateShowEnemies == "1"` check now conflicts with the visual report. Ask for `/qs highlight` output (which shows both helper status and CVar status) before blaming objective matching or changing code.
 - 2026-11-15: user says `/qs doctor` still reports enemy nameplates off after the prior advice. The CVar helper refuses changes during combat (`Highlight.lua:setHighlightCVars`); ask for the helper's exact chat response and fresh `/qs highlight` status before changing code.
 - 2026-11-15: user reports the creature quest marker is still missing after the prior nameplate diagnosis. That report identified an off CVar in the earlier snapshot but does not verify the CVar helper worked or that an active objective unit passes `C.isQuestCreature`; request fresh `/qs highlight` / `/qs doctor` output and confirm the target is an active quest creature before changing marker code.
@@ -15,6 +15,7 @@ Last updated: 2026-11-15
 - Standing preference: Extra tools additions stay optional and default off unless explicitly requested otherwise.
 
 ## Last completed
+- 2026-11-15: published Quest Sharing 0.4.15 from commit `5a15985ac9b5fcd2fe7990ed6ced28609d6ee72c`; pushed `main` and annotated tag `v0.4.15`. GitHub lists it as Latest. All 34 test files / 1,291 checks pass; downloaded release ZIP byte-matches local build, 33 addon files, SHA256 `78c5d1436ef4d4615673067c3d0407f611b237dabc0d425e8b80d810d23e4848`.
 - 2026-11-15: moved the three quest-automation settings rows from overflowing Extra tools to Tracker; measured Tracker bottom at 512px, leaving 88px below the 600px content limit. Updated tab intro, README and changelog. Full 34-file suite passed (1,291 checks); built the 33-file v0.4.15 ZIP, SHA256 `78c5d1436ef4d4615673067c3d0407f611b237dabc0d425e8b80d810d23e4848`. Publication is next.
 - 2026-11-15: inspected 0.4.15 changes and fetched origin (main had no remote commits ahead); ran release suite and reproduced optional-settings overflow on both client paths (`40/42` layout cases, failing only optional tab at 676>600). No tag/release or source commit/push created. New quest automation lacks dedicated tests.
 - 2026-11-15: traced the unsuccessful nameplate step: the helper returns early during combat and prints that game settings cannot be changed until afterward. User reports the doctor still shows nameplates off; the helper response is unknown, so the setter failure mode remains unverified. No runtime code changed.
@@ -93,6 +94,8 @@ Last updated: 2026-11-15
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
+- v0.4.15: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.15
+- Tag target `5a15985ac9b5fcd2fe7990ed6ced28609d6ee72c`; ZIP: 33 addon files, 161 KB; SHA256 `78c5d1436ef4d4615673067c3d0407f611b237dabc0d425e8b80d810d23e4848`.
 - v0.4.14: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.14
 - Tag `73831bc7880ca8bcaab56af17ce4f020b4cff92a`; ZIP 163,779 bytes; SHA256 `d272c5586915eb3de82d0a2242dc4a715a1ed7cc56f408491f995326e1c6a5b8`.
 - Main also includes a documentation follow-up recording publication. Previous release tags and ZIPs preserved.

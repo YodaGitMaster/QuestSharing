@@ -1,12 +1,12 @@
 # Decisions
 
-## 2026-11-15 — Optional quest dialog automation
-- Add independent `autoAcceptQuests=false` and `autoCompleteQuests=false` controls under Extra tools; a player can enable either action without enabling the other.
+## 2026-11-15 — Optional quest dialog automation (published)
+- Add independent `autoAcceptQuests=false` and `autoCompleteQuests=false` controls under Tracker; a player can enable either action without enabling the other.
 - Use the game's `QUEST_DETAIL`, `QUEST_PROGRESS` and `QUEST_COMPLETE` events with the same quest APIs used by the built-in UI; never synthesize clicks on Blizzard frames.
 - Only auto-advance when `IsQuestCompletable()` says the progress stage is ready. Claim automatically only when there are zero/one choice rewards and no required money payment; leave uncertain/multi-choice cases to the player.
 - Require Quest Sharing's master switch and no combat. New settings use the existing missing-default migration; no dbVersion bump.
 - Place both controls under Tracker > Quest offers and turn-ins, because the Extra tools tab overflowed the fixed-height settings window; Tracker has adequate space and the options concern quest behavior. Both remain off by default.
-- User authorized push/release of 0.4.15 on 2026-11-15. The release check found optional-tab overflow and was paused; user approved moving the rows into Tracker before publication.
+- User authorized push/release of 0.4.15 on 2026-11-15. Initial release check found optional-tab overflow; after approval, moved the rows into Tracker and reran all 1,291 checks. Published release/tag `v0.4.15` from `5a15985ac9b5fcd2fe7990ed6ced28609d6ee72c`; downloaded ZIP matches the local build byte for byte.
 
 ## 2026-11-15 — Routing implementation plan canceled
 - User explicitly said to stop and scrap the active plan. No route feature is implemented or ongoing.

@@ -26,7 +26,7 @@
 
 ## Fix
 - Files changed: `QuestSharing/Settings.lua`, `README.md`, `CHANGELOG.md`.
-- Commit / PR: pending release commit.
+- Commit / PR: [`v0.4.15` release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.15), tag target `5a15985ac9b5fcd2fe7990ed6ced28609d6ee72c`.
 - Workaround? no.
 
 ## Verification
