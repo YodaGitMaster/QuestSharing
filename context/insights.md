@@ -1,5 +1,21 @@
 # Insights
 
+## 2026-11-15 — Missing creature badge was blocked by game nameplates
+- User-provided `/qs doctor` output from Quest Sharing 0.4.13 reports quest creature icons `[OK]` but explicitly says enemy nameplates are off and recommends `/qs highlight cvars on`. With no enemy nameplates, the addon has no creature plate to overlay; `markMobs` being on alone cannot display the badge.
+- The same report's 30 secret-string errors name `Friends.lua`, `Share.lua`, and `Diagnostics.lua`, not the marker path; treat these as a separate issue.
+- This diagnosis needs no code change. Menu discoverability improvement should group the creature badge and the nameplate-settings helper together.
+- Follow-up: user says the badge is still missing. The original diagnosis was a prerequisite failure in the captured snapshot, not proof that the CVar command took effect or that a given unit qualifies. Verify fresh helper/nameplate status and active quest-unit matching before changing code.
+- Follow-up: user says `/qs doctor` still reports enemy nameplates off after the advice. `Highlight.lua:setHighlightCVars` deliberately refuses to set CVars during combat and prints “game settings cannot be changed in combat; try again afterwards”; obtain that command's actual response before concluding the setter is broken.
+- Follow-up: user reports visible yellow enemy health bars while doctor still says nameplates are off. This contradicts the prior assumption that no plates are present; separate actual visible plates from the raw CVar check via `/qs highlight` before investigating marker matching.
+
+## 2026-11-15 — Quest dialog action boundaries
+- Blizzard's live QuestFrame source handles `QUEST_DETAIL`, `QUEST_PROGRESS`, and `QUEST_COMPLETE`; accept uses `AcceptQuest()`, ready progress uses `CompleteQuest()`, and reward confirmation uses `GetQuestReward(itemChoice)`. Source: [QuestFrame.lua](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_UIPanels_Game/Mainline/QuestFrame.lua).
+- Its reward handler selects item 1 only when there is exactly one choice; it asks the player when choices remain and opens a confirmation for turn-ins that cost money. QuestSharing follows those boundaries and keeps ambiguous/payment cases manual.
+
+## 2026-11-15 — Routing implementation canceled
+- User selected a Shortest Path Forever integration earlier, clarified that the UI should live in QuestSharing, then explicitly stopped and scrapped the active plan. Keep its prior feasibility and source study as reference; make no runtime changes unless asked to resume.
+- A built-in routing prototype was removed before release. Its terrain/source volume and cave-floor questions are documented in `shortest-path-source-study.md`; this was not a shipped implementation.
+
 ## 2026-11-15 — Publication checkpoint
 - Current runtime equals published v0.4.14; only routing research/continuity notes were pending. All 34 suites / 1,291 checks pass; rebuilt/downloaded ZIPs source-match and byte-match the recorded digest. Existing release/tag retained.
 - Temporary test venv had expired; recreated with lupa 2.8. No repo dependency changes needed.

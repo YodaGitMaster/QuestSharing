@@ -405,10 +405,15 @@ tracker follows you, your quick chat key (or that it is not set) and how many pr
 **Good news has a sound** (switch it off under General): a soft ping when someone accepts a quest you shared or a
 party member running Quest Sharing finishes one you share. Never during combat.
 
-## Extra tools: zone levels, spell ranks, quest invitations, fishing, quest rewards and instance drops
+## Extra tools: quest automation, zone levels, spell ranks, quest invitations, fishing, quest rewards and instance drops
 
 Open `/qs settings` > **Extra tools** for these tools; fishing and the reward browser have independent switches.
 Extra tools are opt-in: enable their switches or open a tool explicitly when you need it.
+
+**Quest acceptance and turn-ins.** Under `/qs settings` > **Tracker** > **Quest offers and turn-ins**, enable **Auto-accept offered quests** to
+accept a quest when an NPC or party member presents it. Enable **Auto-complete ready quests** to continue a ready
+turn-in and take its reward when there is no choice or only one reward choice. Quests with multiple choices or a
+required payment stay open for you. Both options are independent and off by default.
 
 **Questing levels on the world map.** Open the map normally with `M`: continent maps display level badges
 over outdoor zones, and a small **Questing levels** panel shows the range for the zone you view or hover.
@@ -741,7 +746,7 @@ python tests/test_spell_ranks.py      # 48 tests: learned rank upgrades, normal 
 python tests/test_zone_levels.py      # 50 tests: native/fallback ranges, full-map missing data, hover, geometry, lifecycle and opt-in overlays
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 ```
-Expected: every line ends in `passed` with all tests green (1121 in total).
+Expected: every line ends in `passed` with all tests green (1291 in total).
 
 ## Files
 | File | Purpose |
@@ -774,6 +779,7 @@ Expected: every line ends in `passed` with all tests green (1121 in total).
 | `QuestSharing/Loot.lua` | searchable instance loot, encounter sources, AtlasLoot adapter and partial QuestieDB fallback |
 | `QuestSharing/Marker.lua` | positions on the world map, a pin where a teammate found the items |
 | `QuestSharing/Team.lua` | "picked up a quest someone has - let's do it together?" (once per quest, not for shared ones) |
+| `QuestSharing/QuestAutomation.lua` | optional quest acceptance and safe quest turn-ins |
 | `QuestSharing/Style.lua` | one look for every window (dialog and on-screen frames, buttons, check boxes, chat colours) and the good-news sound |
 | `QuestSharing/Settings.lua` | the tabbed settings window (sections, check boxes, key capture) with the message editor, and the options entry |
 | `QuestSharing/Status.lua` | the status message, tracker / link hooks, `/qs probe` |

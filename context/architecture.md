@@ -25,6 +25,7 @@ QuestSharing/  # Repository root
 │   ├── Panel.lua  # shows which party members share your quests
 │   ├── Ping.lua  # one key (or a click on the ring) pings the nearest creature one of your quests needs with the game's
 │   ├── Progress.lua  # notices when the objectives of one of your quests are all done, tells the party
+│   ├── QuestAutomation.lua  # opt-in quest offer acceptance and safe turn-ins
 │   ├── QuestItems.lua  # quest items you can USE (a torch to light, a flare to throw...)
 │   ├── QuestSharing.toc  # Addon metadata and module load order
 │   ├── Questie.lua  # if the Questie addon is installed, its quest database tells us where a quest starts and which quests
@@ -122,6 +123,9 @@ flowchart TD
     Ranks --> ActionSlots[WoW normal action slots, out of combat and cursor clear]
     Settings --> ZoneLevels[ZoneLevels.lua: zone questing ranges]
     Core --> ZoneLevels
+    Settings --> QuestAutomation[QuestAutomation.lua: optional event-driven quest actions]
+    Core --> QuestAutomation
+    QuestAutomation --> QuestAPI[WoW QUEST_DETAIL / QUEST_PROGRESS / QUEST_COMPLETE and quest action APIs]
     ZoneLevels --> NativeMap[C_Map level ranges, zone bounds and hover info]
     ZoneLevels --> ZoneGuides[Local UI-map guides and labelled known-quest spans; fallback only]
     ZoneLevels --> MapLabels[Own click-through map labels and panel]
@@ -195,6 +199,30 @@ sequenceDiagram
     Core->>Saved: Fill missing defaults and migrate dbVersion
     Core->>Core: ns.db = QuestSharingDB
     Core->>Core: Refresh settings if available
+```
+
+```mermaid
+sequenceDiagram
+    participant Game as WoW quest dialog
+    participant Automation as QuestAutomation.lua
+    participant Settings as Extra tools settings
+    Settings->>Automation: Persist independent auto-accept / auto-complete flags
+    Game->>Automation: QUEST_DETAIL
+    alt Auto-accept enabled and not in combat
+        Automation->>Game: AcceptQuest()
+    else Disabled or unsafe
+        Automation->>Automation: Leave offer for the player
+    end
+    Game->>Automation: QUEST_PROGRESS / QUEST_COMPLETE
+    alt Auto-complete enabled and objectives are ready
+        Automation->>Game: CompleteQuest()
+        Game->>Automation: QUEST_COMPLETE
+        alt 0 or 1 reward choice, no payment, APIs available
+            Automation->>Game: GetQuestReward(0 or 1)
+        else Multiple choices or required payment
+            Automation->>Automation: Leave reward panel open for the player
+        end
+    end
 ```
 
 
@@ -328,6 +356,8 @@ classDiagram
         rewardBrowser
         autoSpellRanks
         zoneLevels
+        autoAcceptQuests
+        autoCompleteQuests
         zoneLevelsOptInMigrated
         fishingWaters
         hideTracker

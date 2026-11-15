@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.15
+- Added optional, independent quest-dialog automation switches under **Tracker**. Auto-accept accepts NPC and party quest offers when they are shown; auto-complete advances a ready turn-in and claims a reward when there is no choice or only one choice.
+- Multi-choice rewards and quests that require paying money remain open for you. Both switches are off by default.
+
 ## 0.4.14
 - Fixed world-map questing levels showing question marks across the map when the client supplies empty,
   zero or invalid level metadata. Includes standalone fallback guides for all 39 Classic questing zones,

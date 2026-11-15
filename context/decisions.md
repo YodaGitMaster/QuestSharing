@@ -1,5 +1,18 @@
 # Decisions
 
+## 2026-11-15 — Optional quest dialog automation
+- Add independent `autoAcceptQuests=false` and `autoCompleteQuests=false` controls under Extra tools; a player can enable either action without enabling the other.
+- Use the game's `QUEST_DETAIL`, `QUEST_PROGRESS` and `QUEST_COMPLETE` events with the same quest APIs used by the built-in UI; never synthesize clicks on Blizzard frames.
+- Only auto-advance when `IsQuestCompletable()` says the progress stage is ready. Claim automatically only when there are zero/one choice rewards and no required money payment; leave uncertain/multi-choice cases to the player.
+- Require Quest Sharing's master switch and no combat. New settings use the existing missing-default migration; no dbVersion bump.
+- Place both controls under Tracker > Quest offers and turn-ins, because the Extra tools tab overflowed the fixed-height settings window; Tracker has adequate space and the options concern quest behavior. Both remain off by default.
+- User authorized push/release of 0.4.15 on 2026-11-15. The release check found optional-tab overflow and was paused; user approved moving the rows into Tracker before publication.
+
+## 2026-11-15 — Routing implementation plan canceled
+- User explicitly said to stop and scrap the active plan. No route feature is implemented or ongoing.
+- Before canceling, the user had selected a Shortest Path Forever integration and clarified that route entry points should live inside QuestSharing. Do not reinterpret that as permission to bundle the engine; ask only if the user later resumes the feature and its scope is unclear.
+- Removed the uncommitted built-in-engine attempt and restored runtime/build files to the v0.4.14 baseline. Keep the earlier feasibility/source-study documents as research only.
+
 ## 2026-11-15 — Save research and verify the current publication
 - User requested push/release before continuing. Current addon is still v0.4.14, already published as latest stable; runtime/build/changelog have no changes from that tag.
 - Commit/push all completed routing research and continuity notes to main; preserve immutable v0.4.14 rather than invent a version bump or replace its asset for documentation-only changes.

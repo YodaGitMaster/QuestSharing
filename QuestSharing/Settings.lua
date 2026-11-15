@@ -15,14 +15,19 @@ ns.settingTabs = {
     { id = "general", title = "General",      intro = "Start here: set your quick chat key, check that everything works; the debug log." },
     { id = "sharing", title = "Sharing",      intro = "What happens when you group up, and what a click on a quest does." },
     { id = "party",   title = "Party",        intro = "The Party quests window, what a click posts, showing each other where you are, friends." },
-    { id = "tracker", title = "Tracker",      intro = "Keep the quests near you in sight, and find the creatures you need." },
+    { id = "tracker", title = "Tracker",      intro = "Keep quests near you, find the creatures you need, and choose how quest offers and turn-ins work." },
     { id = "quick",   title = "Quick chat",   intro = "Hold your key, point at a message, let go. Pick a message below to edit it." },
     { id = "actions", title = "Pings & items", intro = "One key pings your quest target for the party, one uses your quest item." },
-    { id = "optional", title = "Extra tools", intro = "Zone levels, spell ranks, quest invitations, fishing, rewards and dungeon drops." },
+    { id = "optional", title = "Extra tools", intro = "Quest automation, zone levels, spell ranks, fishing, rewards and dungeon drops." },
 }
 
 -- kind = header | bool | choice | number | action | key.   desc = the grey line under the label (also its tooltip)
 ns.settingRows = {
+    { tab = "tracker", kind = "header", label = "Quest offers and turn-ins" },
+    { tab = "tracker", kind = "bool", key = "autoAcceptQuests", label = "Auto-accept offered quests",
+      desc = "Accept quests shown by an NPC or party member. Off by default." },
+    { tab = "tracker", kind = "bool", key = "autoCompleteQuests", label = "Auto-complete ready quests",
+      desc = "Turn in when no reward choice is needed or there is only one; multi-choice and pay-to-complete quests stay open." },
     { tab = "optional", kind = "header", label = "Questing levels on the world map" },
     { tab = "optional", kind = "bool", key = "zoneLevels", label = "Show zone questing level ranges",
       desc = "Level badges and selected/hovered zone ranges from the game; includes supported Forever zones." },

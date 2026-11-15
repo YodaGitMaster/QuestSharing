@@ -35,6 +35,8 @@ ns.defaults = {
     rewardBrowser = false, -- optional quest reward catalogue
     autoSpellRanks = false, -- opt-in: highest learned ranks on existing player spell buttons
     zoneLevels = false, -- opt-in: questing level ranges on the world map
+    autoAcceptQuests = false, -- opt-in: accept quests when their offer is shown
+    autoCompleteQuests = false, -- opt-in: finish safe quest turn-ins without a reward decision
     bagMarks = true,    -- quest items marked in the bags: gold = a quest of this zone, blue = a quest elsewhere
     hideTracker = false, -- hide the game's quest tracker (outside fights)
     debug = false,      -- the debug log: every action and its outcome (QuestSharingLog, saved on /reload or logout)

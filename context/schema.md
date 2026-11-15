@@ -1,8 +1,8 @@
 # Schema
-Last updated: 2026-11-13
+Last updated: 2026-11-15
 
 ## Addon loading and persistence
-- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.14; declares file load order and SavedVariables.
+- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.15; declares file load order and SavedVariables.
 - Lua modules receive `local ADDON, ns = ...`; `ns` is the shared namespace, not a class.
 - `Core.lua`: `ns.defaults`; `ns.db` initially copies defaults. On `ADDON_LOADED`, missing settings are filled and `ns.db` aliases saved `QuestSharingDB`; current `dbVersion = 3`.
 - SavedVariables: `QuestSharingDB` (settings), `QuestSharingLog` (debug log); persisted by the game.
@@ -12,7 +12,8 @@ Last updated: 2026-11-13
 - `Share.lua`: `ns.known[questID][lowercasedMemberName] = status`; `ns.offered[questID][lowercasedMemberName] = true` after an offer reaches a member.
 - `Sync.lua`: addon channel messages separated by `|`; `H|1` hello, `L|i|n|entries` quest-list parts, `P|entry` quest update. Entry: `questID:complete(0/1):objectives`; consult encoder/parser before changing wire format.
 
-## Optional tools (2026-11-13)
+## Optional tools (updated 2026-11-15)
+- `autoAcceptQuests`, `autoCompleteQuests`: independent SavedVariables booleans, default false; missing values use the existing defaults fill. `QuestAutomation.lua` only acts on `QUEST_DETAIL`, a completable `QUEST_PROGRESS`, and `QUEST_COMPLETE`, when the master switch is on and the player is not in combat. Multiple reward choices, missing decision APIs, and turn-ins that require a money payment remain manual.
 - `zoneLevels`: SavedVariables boolean, default false; `ns.zoneLevels` owns read-only click-through badges and a selected/hovered-zone panel. `range(id)` returns min?,max?,source?: City/Sanctuary for known non-leveling maps, otherwise validates C_Map.GetMapLevels bounds 1..1000 and caches native success. Empty/zero/invalid native data uses a verified guide; unknown maps remain unknown. Fallbacks are not cached so late native data supersedes them; refresh clears native cache.
 - ZoneLevels local guides: UI-map-ID -> `{min,max,source?}`. 39 Classic brackets, Zephras/Riverglades published guides (default source "Zone guide"), Hyjal/Shen'dralas known quest-level spans (source "Known quests", incomplete coverage explicitly labelled). Local places map: six city IDs plus Moonglade Sanctuary. No runtime Questie/LibTourist dependency or database scan.
 - `zoneLevelsOptInMigrated`: SavedVariables migration marker, not a user setting/default. ADDON_LOADED forces zoneLevels=false and sets this true once if missing/non-true; later explicit true/false choices survive reload. Reset leaves the marker intact and resets zoneLevels=false. dbVersion remains 3.
