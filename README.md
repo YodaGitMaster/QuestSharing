@@ -2,7 +2,7 @@
 
 A World of Warcraft addon for playing quests together.
 
-[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.17)
+[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.18)
 
 ## Your first party, in four steps
 1. **Install it** (see [Install](#install)) and log in. A short welcome in chat tells you it is ready. Everything is
@@ -424,7 +424,7 @@ Extra tools are opt-in: enable their switches or open a tool explicitly when you
 
 **Quest planner.** Open **Extra tools > Plan my quests** or type `/qs plan`. It is off by default. When enabled, it opens a route panel on login and rebuilds the plan when you enter a zone or your quest log changes. Use it outdoors in a zone: it will not scan in towns, cities, dungeons, or continent maps, and it clears or rebuilds the plan if you enter a town or change zones. Questie and a recent QuestieDB are needed for its quest catalogue, prerequisites and locations.
 
-The planner uses Questie's quest-ID catalogue to find quests with start points in your current zone, then plans from those local quests and your current quest log. QuestieDB does not expose a zone-only ID list through this addon, so it checks the catalogue in small batches; the plan itself stays in your current zone. It uses Questie's eligibility check when available, includes quests you already have, and looks up quests you can take now. It can also look ahead by up to four prerequisite layers when Questie marks a quest as blocked only by known prerequisites and those earlier quests are available or can be planned here. It respects both prerequisite rules: **any one** quest in a single-prerequisite list is enough, while **every** quest in a group-prerequisite list is required. A quest with unknown eligibility or location is not guessed into the plan.
+The planner uses Questie's quest-ID catalogue to find quests with start points in your current zone, then plans from those local quests and your current quest log. QuestieDB does not expose a zone-only ID list through this addon, so it checks the catalogue in small batches; the plan itself stays in your current zone. It uses Questie's eligibility check when available and only includes quests whose difficulty is **green or yellow** for your current level. When you arrive with no active quests, it still lists available pickups by giver, with each quest on its own line. It can also look ahead by up to four prerequisite layers when Questie marks a quest as blocked only by known prerequisites and those earlier quests are available or can be planned here. It respects both prerequisite rules: **any one** quest in a single-prerequisite list is enough, while **every** quest in a group-prerequisite list is required. A quest with unknown eligibility, level color or location is not guessed into the plan.
 
 Each route is a sequence of useful stops:
 
@@ -434,7 +434,7 @@ Each route is a sequence of useful stops:
 
 The order always follows known prerequisite and pickup/objective/turn-in dependencies. It groups each quest's giver, work sites and turn-in into an outing, combines outings that share a giver, objective camp or prerequisite chain, then estimates the full trip from where you are. Larger groups get credit for sharing the outing. If Shortest Path Forever is installed, its walking-distance API can choose the reachable first outing; later trip ordering still uses map-distance estimates. Without it, all ordering uses map distance. Neither method estimates kill time or guarantees the globally shortest full-zone plan. If Questie has a drop percentage for a collect-item target, the panel shows progress and the best known drop percentage; the percentage does not affect stop order or estimate time-to-farm.
 
-The route appears in a compact panel beside the game's quest tracker. Its header shows active, ready and later quests. Stops show their outing number, action, coordinates and known giver/camp names; objective rows show progress when available. Click a stop to put its regular game waypoint on the map. With Shortest Path Forever installed, **Follow with SPF** hands the selected stop to SPF to draw and guide the walk on both maps. This is an explicit action and replaces the route currently being followed. You can also use `/qs plan follow`. Scroll in the panel to see more stops; it updates after quest progress, and **Refresh** is available if needed. `/qs plan next` selects the next stop and sets its regular waypoint; `/qs plan refresh` rebuilds the list; `/qs plan hide` closes the panel; `/qs plan on` enables the tool; `/qs plan off` disables it and closes the panel. Following a stop does not move your character or accept/complete quests for you.
+The route appears in a compact, movable panel beside the game's quest tracker; drag it to place it where you want. Its header shows active, ready and later quests. Stops show their outing number, action, coordinates and known giver/camp names; pickup quests are listed line by line and objective rows show progress when available. Left-click a stop to set its waypoint; right-click to mark that location too. Open the map with `M` to see the pin. If every mapped quest in the zone is below green, the planner says **This zone is too low level for you.** Long rows grow to fit their text while scrolling. With Shortest Path Forever installed, **Follow with SPF** hands the selected stop to SPF to draw and guide the walk on both maps. This is an explicit action and replaces the route currently being followed. You can also use `/qs plan follow`. It updates after quest progress, and **Refresh** is available if needed. `/qs plan next` selects the next stop and sets its regular waypoint; `/qs plan refresh` rebuilds the list; `/qs plan hide` closes the panel; `/qs plan on` enables the tool; `/qs plan off` disables it and closes the panel. Following a stop does not move your character or accept/complete quests for you.
 
 **Travel limits:** SPF is optional. Its walk estimates follow SPF's data and water-walking settings; no strict no-swimming promise is made. Later stops still use map-distance estimates, and SPF may combine travel modes when guiding. Questie points often have no height, so cave entrances, stacked floors, elevators and underground connections need in-game checking; an unknown floor is not guaranteed correct. Without SPF, the game's waypoint marks the stop but does not draw a path. The planner may miss quests whose Questie points cannot be mapped to your current area.
 
@@ -619,7 +619,7 @@ If an unloaded AtlasLoot module cannot load during combat, it is retried after c
 Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check.
 
 ## Install
-**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.17), unzip `QuestSharing-<version>.zip` and drop the
+**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.18), unzip `QuestSharing-<version>.zip` and drop the
 `QuestSharing` folder into `Interface\AddOns`. Or:
 1. Copy the folder `QuestSharing` (the one containing `QuestSharing.toc`, not this README's folder) into
    the game's `Interface\AddOns` folder, so you have `...\AddOns\QuestSharing\QuestSharing.toc`.
@@ -792,8 +792,9 @@ python tests/test_spell_ranks.py      # 48 tests: learned rank upgrades, normal 
 python tests/test_zone_levels.py      # 50 tests: native/fallback ranges, full-map missing data, hover, geometry, lifecycle and opt-in overlays
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 python tests/test_quest_planner_path.py # 10 tests: SPF API detection, walk costs, async cancellation, outing ordering and fallbacks
+python tests/test_quest_planner_ui.py   # 6 tests: movable panel, wrapped rows, level filter, pickup list and map actions
 ```
-Expected: every line ends in `passed` with all tests green (1324 in total).
+Expected: every line ends in `passed` with all tests green (1330 in total).
 
 ## Files
 | File | Purpose |

@@ -14,8 +14,33 @@ local nextStopID = 0
 local PLAN_ROW_HEIGHT, PLAN_LIST_HEIGHT, PLAN_WIDTH = 56, 280, 320
 local panelDismissed, refreshQueued, refreshForce, refreshZoneEntry = false, false, false, false
 local lastLogMembers, lastLogStructure, lastLogProgress = nil, nil, nil
+local panelMoved, lastLevelStats = false, { localCount = 0, below = 0, above = 0, eligible = 0, unknown = 0 }
 
 local function questie() return ns.questie end
+
+local function questLevelBand(level)
+    level = tonumber(level)
+    if not level or level <= 0 or type(GetQuestDifficultyColor) ~= "function" then return "unknown" end
+    local ok, color = pcall(GetQuestDifficultyColor, level)
+    local palette = QuestDifficultyColors or QuestDifficultyColor
+    if not (ok and type(color) == "table" and type(palette) == "table") then return "unknown" end
+    local function matches(key)
+        local expected = palette[key]
+        return type(expected) == "table" and type(expected.r) == "number" and type(expected.g) == "number"
+            and type(expected.b) == "number" and type(color.r) == "number" and type(color.g) == "number"
+            and type(color.b) == "number" and math.abs(color.r - expected.r) < 0.001
+            and math.abs(color.g - expected.g) < 0.001 and math.abs(color.b - expected.b) < 0.001
+    end
+    if matches("standard") then return "green" end
+    if matches("difficult") then return "yellow" end
+    if matches("trivial") then return "below" end
+    if matches("verydifficult") or matches("impossible") then return "above" end
+    return "unknown"
+end
+
+local function isInLevelRange(band)
+    return band == "green" or band == "yellow"
+end
 local function distance(a, b)
     if not (a and b and a.x and a.y and b.x and b.y and a.map == b.map) then return math.huge end
     local dx, dy = a.x - b.x, a.y - b.y
@@ -84,6 +109,7 @@ end
 local function clearPlan(reason)
     if Path then Path.cancelWalkEstimates() end
     loading, catalog, route, selected, plannedMap = false, {}, {}, 1, nil
+    lastLevelStats = { localCount = 0, below = 0, above = 0, eligible = 0, unknown = 0 }
     selectionLocked = false
     if message then message:SetText(reason) end
     if emptyText then emptyText:SetText(reason) end
@@ -126,11 +152,11 @@ local function statusFor(id, log)
     return "unknown"
 end
 
-local function newCandidate(id, starter, log)
-    local data = questie().plannerQuest(id)
+local function newCandidate(id, starter, log, data)
+    data = data or questie().plannerQuest(id)
     if not data then return nil end
     data.status = statusFor(id, log)
-    data.starterPoint = nearestPoint(starter)
+    data.starterPoint = nearestSource(starter)
     data.starterRows = starter or {}
     data.entry = log[id]
     data.depth = 0
@@ -158,6 +184,8 @@ local function scan()
     local oldSelected = selected
     local oldSelectedKey = keepSelection and route[selected] and stopIdentity(route[selected]) or nil
     local inZone, index = {}, 1
+    local levelStats = { localCount = 0, below = 0, above = 0, eligible = 0, unknown = 0 }
+    lastLevelStats = levelStats
     loading, catalog, route, selected, plannedMap = true, {}, {}, 1, zoneMap
     if message then message:SetText("Looking through Questie quests for this area…") end
     if emptyText then emptyText:SetText("Checking quest locations…") end
@@ -178,14 +206,25 @@ local function scan()
         while index <= stopAt do
             local id = ids[index]; index = index + 1
             local active = log[id] ~= nil
-            local starters, startPoint, candidate
+            local starters, startPoint, candidate, data, band
             if active then
-                candidate = newCandidate(id, {}, log)
+                data = q.plannerQuest(id)
+                band = data and questLevelBand(data.level) or "unknown"
+                if data and isInLevelRange(band) then candidate = newCandidate(id, {}, log, data) end
             else
                 starters = q.plannerStarters(id)
-                startPoint = nearestPoint(starters)
-                if startPoint and q.questComplete(id) ~= true then
-                    candidate = newCandidate(id, starters, log)
+                startPoint = nearestSource(starters)
+                if startPoint then
+                    data = q.plannerQuest(id)
+                    band = data and questLevelBand(data.level) or "unknown"
+                    levelStats.localCount = levelStats.localCount + 1
+                    if band == "below" then levelStats.below = levelStats.below + 1
+                    elseif band == "above" then levelStats.above = levelStats.above + 1
+                    elseif isInLevelRange(band) then levelStats.eligible = levelStats.eligible + 1
+                    else levelStats.unknown = levelStats.unknown + 1 end
+                    if data and q.questComplete(id) ~= true and isInLevelRange(band) then
+                        candidate = newCandidate(id, starters, log, data)
+                    end
                 end
             end
             if candidate and (active or candidate.status == "ready" or candidate.status == "any" or candidate.status == "all") then
@@ -199,6 +238,7 @@ local function scan()
         end
         if thisGeneration ~= generation then return end
         catalog = inZone
+        lastLevelStats = levelStats
         buildGraph(log)
         buildRoute()
         if keepSelection then
@@ -556,6 +596,7 @@ local function mapLine(stop)
 end
 
 local function dockPanel()
+    if panelMoved then return end
     local tracker = ObjectiveTrackerFrame or WatchFrame or QuestWatchFrame
     panel:ClearAllPoints()
     if tracker and tracker.GetTop then
@@ -570,9 +611,8 @@ local function ensurePanel()
     if not (CreateFrame and UIParent) then return false end
     panel = S.window("QuestSharingPlannerPanel", PLAN_WIDTH, 380, "Quest plan", "hud")
     if not panel then return false end
-    panel:SetMovable(false)
-    panel:SetScript("OnDragStart", nil)
-    panel:SetScript("OnDragStop", nil)
+    panel.title:SetText("Quest plan — drag to move")
+    panel.onMoved = function() panelMoved = true end
     panel:EnableMouse(true)
     message = U.text(panel, "", 12, 34, PLAN_WIDTH - 24)
     planScroll = CreateFrame("ScrollFrame", nil, panel)
@@ -585,6 +625,7 @@ local function ensurePanel()
     planContent:SetHeight(PLAN_LIST_HEIGHT)
     planScroll:SetScrollChild(planContent)
     emptyText = U.text(planContent, "", 8, 8, PLAN_WIDTH - 36)
+    emptyText:SetWordWrap(true)
     planScroll:SetScript("OnMouseWheel", function(self, delta)
         local pos = self:GetVerticalScroll() - delta * PLAN_ROW_HEIGHT
         self:SetVerticalScroll(math.max(0, math.min(self:GetVerticalScrollRange(), pos)))
@@ -617,10 +658,35 @@ local function rowTaskText(stop)
     return table.concat(tasks, " • ")
 end
 
+local function rowDetailsText(stop)
+    local tasks = {}
+    local limit = stop.kind == "pickup" and #stop.tasks or math.min(#stop.tasks, 4)
+    for i = 1, limit do tasks[#tasks + 1] = stop.tasks[i] end
+    if #stop.tasks > limit then tasks[#tasks + 1] = string.format("+%d more tasks", #stop.tasks - limit) end
+    if stop.kind ~= "pickup" then
+        local quests = stopLabel(stop)
+        if quests ~= "" then tasks[#tasks + 1] = "Quests: " .. quests end
+    end
+    return table.concat(tasks, "\n")
+end
+
+local function showStopOnMap(index)
+    if not selectStop(index) then return false end
+    local stop = route[selected]
+    if not (stop and stop.point) then return ns.print("this stop has no map location") end
+    if InCombatLockdown and InCombatLockdown() then return ns.print("mark this location after combat") end
+    local p = stop.point
+    if not ns.compat.setWaypoint(p.map, p.x, p.y) then
+        return ns.print("the game cannot mark this location on the map")
+    end
+    return true
+end
+
 showPlanRows = function()
     if not planContent then return end
     if emptyText then if #route == 0 then emptyText:Show() else emptyText:Hide() end end
     for _, row in ipairs(planRows) do row:Hide() end
+    local contentY = 0
     for i, stop in ipairs(route) do
         local row = planRows[i]
         if not row then
@@ -636,27 +702,41 @@ showPlanRows = function()
             row.title:SetPoint("TOPLEFT", row, "TOPLEFT", 7, -4)
             row.title:SetWidth(PLAN_WIDTH - 36)
             row.title:SetJustifyH("LEFT")
+            row.title:SetWordWrap(true)
             row.detail = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-            row.detail:SetPoint("TOPLEFT", row, "TOPLEFT", 7, -22)
+            row.detail:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -3)
             row.detail:SetWidth(PLAN_WIDTH - 36)
             row.detail:SetJustifyH("LEFT")
             row.detail:SetWordWrap(true)
             planRows[i] = row
         end
         row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", planContent, "TOPLEFT", 0, -((i - 1) * PLAN_ROW_HEIGHT))
+        row:SetPoint("TOPLEFT", planContent, "TOPLEFT", 0, -contentY)
         row:SetWidth(PLAN_WIDTH - 20)
         local kind = stop.kind == "pickup" and "PICK UP" or stop.kind == "turnin" and "TURN IN" or "OBJECTIVES"
         local pointText = stop.point and string.format("%.1f, %.1f", stop.point.x * 100, stop.point.y * 100) or "location unknown"
         row.title:SetText(string.format("%02d  TRIP %d  ·  %s  ·  %s", i, stop.outingID or 1, kind, pointText))
-        row.detail:SetText(rowTaskText(stop) .. " — " .. stopLabel(stop))
+        row.detail:SetText(rowDetailsText(stop))
+        local titleHeight = row.title.GetStringHeight and row.title:GetStringHeight() or 12
+        local detailHeight = row.detail.GetStringHeight and row.detail:GetStringHeight() or 12
+        local rowHeight = math.max(PLAN_ROW_HEIGHT - 3, titleHeight + detailHeight + 16)
+        row:SetHeight(rowHeight)
+        contentY = contentY + rowHeight + 3
         row.bg:SetVertexColor(i == selected and 1.35 or 1, i == selected and 1.05 or 1, i == selected and 0.55 or 1)
         local rowIndex = i
-        row:SetScript("OnClick", function() if selectStop(rowIndex) then P.pin() end end)
+        row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        row:SetScript("OnClick", function(_, button)
+            if button == "RightButton" then showStopOnMap(rowIndex)
+            elseif selectStop(rowIndex) then P.pin() end
+        end)
+        row:SetScript("OnEnter", function(self)
+            U.tip(self, "Quest location", { "Left-click: set a waypoint.", "Right-click: mark this location on the map." })
+        end)
+        row:SetScript("OnLeave", function() U.hideTip() end)
         row:SetEnabled(stop.point ~= nil)
         row:Show()
     end
-    planContent:SetHeight(math.max(PLAN_LIST_HEIGHT, #route * PLAN_ROW_HEIGHT))
+    planContent:SetHeight(math.max(PLAN_LIST_HEIGHT, contentY))
 end
 
 render = function(zone)
@@ -676,8 +756,23 @@ render = function(zone)
                 or "Open this panel outdoors in a zone.")
         end
         if emptyText then
-            emptyText:SetText((active + ready + future == 0) and "No active or eligible quests found in this zone."
-                or "Quest data was found, but no route locations are mapped here.")
+            local stats = lastLevelStats or {}
+            local reason
+            if (stats.localCount or 0) > 0 and stats.below == stats.localCount then
+                reason = "This zone is too low level for you."
+            elseif (stats.localCount or 0) > 0 and stats.eligible == 0 and stats.above == stats.localCount then
+                reason = "The quests in this zone are above your level range."
+            elseif (stats.localCount or 0) > 0 and stats.eligible == 0 and stats.unknown == stats.localCount then
+                reason = "Quest levels are not available for this zone."
+            elseif (stats.localCount or 0) > 0 and stats.eligible == 0 then
+                reason = "No quests here are green or yellow for your level."
+            elseif active + ready + future == 0 then
+                reason = (stats.localCount or 0) == 0 and "Questie has no mapped quest givers here."
+                    or "No active or ready quests found here."
+            else
+                reason = "Quest data was found, but no route locations are mapped here."
+            end
+            emptyText:SetText(reason)
         end
         showPlanRows()
         return

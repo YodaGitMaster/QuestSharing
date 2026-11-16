@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.4.18
+- Made the quest planner movable; after you drag it, it stays where you placed it for the rest of the session.
+- Fixed long quest names and wrapped details overlapping while scrolling; rows now grow to fit their text.
+- Added a new-zone pickup list: available green/yellow quests appear line by line under their giver, even when you have no quests active. Right-click a stop to mark its location; open the map yourself to see the pin.
+- The planner now uses WoW's quest difficulty colors to show only green and yellow quests. Empty plans explain when a zone is too low level or when quest levels/locations are unavailable.
+
 ## 0.4.17
 - Shortest Path Forever is now an optional route engine for the quest planner: **Follow with SPF** (or `/qs plan follow`) draws guidance on the map/minimap, and its walking costs can promote the closest reachable first outing. Existing map-distance and waypoint behavior remains when SPF or its API is unavailable.
 - Quest planner now builds on login/zone entry, updates after quest changes and progress, and groups giver-to-objective-to-turn-in trips from your current location; stops show trip numbers and known giver names.

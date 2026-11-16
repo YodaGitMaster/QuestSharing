@@ -77,9 +77,26 @@ local function newObject()
     function o:IsVisible() return self.shown end
     function o:SetText(t) self.text = t; self.sets = (self.sets or 0) + 1 end
     function o:GetText() return self.text end
+    function o:GetStringHeight()
+        local text, width = tostring(self.text or ""), self.width or 300
+        local charsPerLine = math.max(1, math.floor(width / 6))
+        local lines = 0
+        for line in (text .. "\n"):gmatch("(.-)\n") do
+            lines = lines + (self.wordWrap and math.max(1, math.ceil(#line / charsPerLine)) or 1)
+        end
+        return lines * 12
+    end
     function o:SetEnabled(v) self.enabled = v end
-    function o:CreateFontString() return newObject() end
-    function o:CreateTexture() return newObject() end
+    function o:CreateFontString()
+        local child = newObject(); child.parent, child.isFontString = self, true
+        self.children = self.children or {}; self.children[#self.children + 1] = child
+        return child
+    end
+    function o:CreateTexture()
+        local child = newObject(); child.parent, child.isTexture = self, true
+        self.children = self.children or {}; self.children[#self.children + 1] = child
+        return child
+    end
     function o:SetTexture(path) self.texture = path end
     function o:SetTexCoord(...) self.coords = { ... } end
     function o:GetWidth() return self.width or 100 end
@@ -103,19 +120,24 @@ local function newObject()
     function o:SetVerticalScroll(v) self.vscroll = v end
     function o:GetVerticalScroll() return self.vscroll or 0 end
     function o:GetVerticalScrollRange() return self.scrollRange or 0 end
-    for _, name in ipairs({ "SetBackdrop", "SetBackdropColor", "SetFrameStrata", "SetMovable", "EnableMouse",
+    for _, name in ipairs({ "SetBackdrop", "SetBackdropColor", "SetFrameStrata", "EnableMouse",
                             "RegisterForDrag", "SetJustifyH", "StartMoving", "StopMovingOrSizing", "SetAllPoints",
                             "ClearAllPoints", "SetFontObject", "SetAutoFocus", "SetMaxLetters", "ClearFocus", "SetFocus",
                             "SetMultiLine", "HighlightText", "SetFrameLevel", "RegisterForClicks", "SetHighlightTexture",
-                            "SetAlpha", "SetBlendMode", "SetColorTexture", "SetDesaturated", "SetNormalFontObject", "EnableMouseWheel", "SetClampedToScreen", "SetPushedTexture", "SetPropagateKeyboardInput", "SetTextInsets", "SetJustifyV", "SetWordWrap",
+                            "SetAlpha", "SetBlendMode", "SetColorTexture", "SetDesaturated", "SetNormalFontObject", "EnableMouseWheel", "SetClampedToScreen", "SetPushedTexture", "SetPropagateKeyboardInput", "SetTextInsets", "SetJustifyV",
                             }) do
         o[name] = function() end
     end
+    function o:SetMovable(v) self.movable = v end
+    function o:SetWordWrap(v) self.wordWrap = v end
     return o
 end
 
-function CreateFrame()
+function CreateFrame(_, name, parent)
     local f = newObject()
+    f.name, f.parent = name, parent
+    if parent then parent.children = parent.children or {}; parent.children[#parent.children + 1] = f end
+    if name then _G[name] = f end
     FRAMES[#FRAMES + 1] = f
     return f
 end

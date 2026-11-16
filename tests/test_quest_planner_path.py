@@ -177,6 +177,8 @@ end }
 Enum = { UIMapType = { Zone = 3 } }
 C_Map.GetMapInfo = function(map) if map == 1429 then return {name="Elwynn Forest", mapType=3} end end
 C_Map.IsCityMap = function() return false end
+QuestDifficultyColors = { standard={r=0.1,g=0.8,b=0.1}, difficult={r=1,g=1,b=0} }
+GetQuestDifficultyColor = function() return QuestDifficultyColors.standard end
 '''
     g = Game("modern", setup, fresh=True)
     install_spf(g)
