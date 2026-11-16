@@ -207,3 +207,5 @@
 - Shared exact NPC/object IDs are safe merge keys; proximity grouping is a heuristic, so a nearby camp can serve multiple quests without claiming identical objective credit.
 - Questie readiness combines requirements beyond prerequisites; only current actionable and explicitly prerequisite-blocked candidates should enter this local plan. Unknown state is not guessed.
 - Quest Sharing can provide a useful route list and waypoints from Questie points, but map geometry is not pathfinding. Keep cave/floor routing and drop-weighted travel-time optimization as explicit future work.
+
+- Published v0.4.16 on 2026-11-16: commit `7c3cc2c1f821aa71204c1ce7dc1b99f0fb9e740b`, tag `v0.4.16`, release https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.16. The uploaded 36-file ZIP matches the local build byte for byte (SHA256 `4f709ffd200182bb90432de74e7d171d514fc75f4d8d0fe0541ee71c91161fb7`). README now documents planner behavior and limitations and links to this release. Tests were not run; native game behavior remains unverified.

@@ -2,7 +2,7 @@
 Last updated: 2026-11-16
 
 ## Active task
-- 2026-11-16: Preparing v0.4.16 publication at user request. README now documents all quest-planner behavior and limits, links to GitHub Releases, TOC/changelog are set to 0.4.16, and the 36-file ZIP builds cleanly. Need commit/push/tag/release, verify published asset, and record final release URL/hash. No test suite run (not requested); new planner/adapter Lua parse and the ZIP integrity check pass; full-addon `luac` is not a valid check because the system compiler is Lua 5.5 and existing Lua 5.1-compatible `Core.lua` assigns to a generic-for variable.
+- None. Latest publication is Quest Sharing v0.4.16; its release link and complete quest-planner guide are in README.
 
 - 2026-11-16: direct quest-group questions complete locally: right-click quest > Ask in chat to do this quest fills `Anyone need [quest]? Wanna group up?` in current chat without opening the role-play editor; Enter sends. Select World first to use it. Current-chat assumption stated after optional destination question received no reply. All 1,314 checks pass across full run plus affected-tooltip-suite rerun. Role-play editor remains in Extra tools and `/qs adventure`; no release requested.
 
@@ -23,7 +23,7 @@ Last updated: 2026-11-16
 - Standing preference: Extra tools additions stay optional and default off unless explicitly requested otherwise.
 
 ## Last completed
-- 2026-11-16: documented the complete planner in README and prepared the v0.4.16 package. New planner and Questie adapter parse with system Lua; ZIP integrity verified; test suite not run. Publication pending.
+- 2026-11-16: published Quest Sharing v0.4.16. README has a full planner guide and direct release link. Commit `7c3cc2c1f821aa71204c1ce7dc1b99f0fb9e740b`; annotated tag `v0.4.16`; GitHub release https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.16 is Latest. Built 36-file ZIP and downloaded asset byte-match, SHA256 `4f709ffd200182bb90432de74e7d171d514fc75f4d8d0fe0541ee71c91161fb7`. Planner/adapter parse and package integrity checks pass; test suite not run; full-addon Lua 5.5 parse is incompatible with existing Lua 5.1 syntax in Core.lua; in-game planner behavior remains unverified.
 
 - 2026-11-16: reproduced unwanted recruitment composer on both clients, wrote failing workflow test, added direct linked question action reusing existing chat preparation; updated panel tooltip and docs. 34 test files / 1,314 checks pass across full run and rerun of corrected tooltip expectations. Native game unavailable. Methodology: `context/BUGS/2026-11-16-quest-recruitment-extra-editor.md`.
 
