@@ -1,5 +1,5 @@
 # Schema
-Last updated: 2026-11-15
+Last updated: 2026-11-16
 
 ## Addon loading and persistence
 - `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.15; declares file load order and SavedVariables.
@@ -23,6 +23,9 @@ Last updated: 2026-11-15
 - Spell-rank catalogue is session-only: exact localized spell name -> highest numeric learned rank `{id,name,rank,index,ambiguous?}`, plus spellID -> entry; modern C_SpellBook or legacy player bank only. Passive, future/off-spec, unranked and ambiguous highest ranks are excluded.
 - Out-of-combat normal action-slot replacements use confirmed spell IDs and learned numeric ranks; verify picked-up cursor, revalidate target after pickup callbacks, and read back placed action. Scan at least 180 standard slots (or greater native MAX_ACTION_BUTTONS, capped at 1000), independently of visible page counts; unsupported slots are ignored. Macros/items/pet actions/empty slots remain. Combat/temporary bars/busy cursor defer to events; client refusals pause until reload.
 - `ns.db.fishingMap` / `ns.db.rewardBrowser`: new booleans, default `false`; filled by existing missing-default migration, dbVersion remains 3.
+- `ns.db.itemSources` / `ns.db.vendorSearch`: independent booleans, default `false`; filled by the existing missing-default logic, dbVersion remains 3.
+- `ItemSources.lua`: `ns.itemSources.sources(itemID)` returns sorted unique vendor titles (`Npc.subName`, falling back to `Vendor`) plus `Mining` only when a linked object name matches a known localized ore-node word. The database has object names, not a mining profession field, so this label is a conservative heuristic.
+- `VendorMap.lua`: builds a session-only, timer-batched index from enumerable `ItemDB.GetAllIds()`: item `{id,name,key,vendorIDs}` and vendor `{id,title,spawns}`. Search matches every query word as a substring in an item name or vendor title, so `tail` matches `Senior Master Tailor`; live suggestions offer matching title words, full vendor titles and buyable item names, with click/Tab completion. Item suggestion opens Sellers view; exact typed item searches do too. Map view draws every matching spawn on the shown map; Sellers view scroll-lists every location as `{vendorTitle, zone, x, y}`. Only vendor-linked items produce results, so craft/gather-only items do not invent a seller. Closest fallback compares normalized world-map positions on the player's continent and provides a waypoint button. Ctrl-right-click searches the current map only.
 - `ns.db.fishingWaters[id]`: local positive numeric ID -> `{name, map, x, y, minSkill?, safeSkill?, fish, notes}`.
   - `map`: positive integral UiMapID; `x` and `y`: 0..100.
   - Skill fields: whole numbers 0..10000, absent when unknown; no-getaway >= minimum when both known.
@@ -38,14 +41,24 @@ Last updated: 2026-11-15
 - `LibQuestieDB.Enum.{classKeys,factionRaceMasks,raceMaskById}`: required for reliable eligibility; use arithmetic mask intersection to preserve bits above 31.
 - `Questie.lua` starter spawn records now include `area` alongside `zone,x,y,dungeon`, including item-drop starters.
 
+## Quest planner (2026-11-16)
+- `QuestSharingDB.questPlanner`: boolean, default `false`; enabling/opening the feature is opt-in. No new persisted route data.
+- `Questie.plannerQuest(id)`: session projection `{id,name,level,requiredLevel,beforeAny[],beforeAll[],starters[],targets[],turnIns[]}`. Questie remains the read-only source; objective sources are uncapped for this projection.
+- `QuestCandidate`: projection plus `{status=active|ready|future,starterRows,starterPoint,entry,depth,prereqIDs}`. Future candidates are limited to four planned prerequisite layers and only when known gates can be satisfied by active/ready/future or completed quests.
+- `PlannerStop`: `{id,kind=pickup|objective|turnin,point={map,x,y},quests,tasks,deps}`. Exact single-source IDs merge first; otherwise objective points within 0.065 normalized map units may merge. Pickup/turn-in proximity uses 0.045.
+- Route order respects dependency IDs, then chooses the nearest ready stop by straight projected map distance. This is a local estimate, not a walkable/terrain route; cave/floor transitions and unavailable spawns are not planned.
+- Loot targets can show a Questie DropDB percentage when available; missing/unknown rate stays unshown. The current route score does not use drop chance or estimate kill time.
+- UI is session-only: `/qs plan [refresh|next|on|off]`, settings action, previous/next stop, and user waypoint. It never auto-accepts quests.
+
 ## Quest invitations (2026-11-13)
-- `ns.adventure`: `entries`, `message`, `route`, `prepare`, `open`, `command`, `close`; loaded after OptionalUI.
+- `ns.adventure`: `entries`, `message`, `question`, `ask`, `route`, `prepare`, `open`, `command`, `close`; loaded after OptionalUI.
 - Session-only composer: selected quest ID, wording index 1..3, editable preview and channel input; no SavedVariables changes.
 - `message(e, style)`: fresh unfinished log entry -> invitation <=255 bytes. Keeps full quest link when possible, omits zone for quests outside current area, falls back to UTF-8-safe plain title for unusually long links.
 - `route(input)`: `prefix, isCurrent` or `nil, error`; accepts current, standard chat aliases, whisper recipient and joined channel number/name (`GetChannelName` when available).
 - `prepare(e, text, route)`: revalidates quest and byte limit, then preserves/appends to active chat for current or calls ChatFrame_OpenChat with channel prefix. Never sends automatically.
 - Explicit channel changes refuse nonempty existing drafts; duplicate quests and combined drafts >255 bytes are rejected without mutation.
-- Entry points: quest right-click menu (8 rows total; invitation is row 2, immediately after Tell the party how I am doing), Optional settings action, `/qs adventure [quest ID | exact title | quest link]`.
+- Quest right-click menu (8 rows): row 2 is **Ask in chat to do this quest**; `ask(e)` generates `Anyone need [quest]? Wanna group up?` and calls `prepare` for the current chat, without opening the composer. Keeps full quest link when it fits; UTF-8-safe plain-title fallback limits text to 255 bytes.
+- Optional role-play composer entry points: Extra tools > Seek fellow adventurers and `/qs adventure [quest ID | exact title | quest link]`; no saved settings added.
 
 ## Retired quest overlay (2026-11-13)
 - `QuestMap.lua` deleted and removed from load order. No `ns.questMap` runtime table, renderer, refresh timers or setting row.
@@ -76,7 +89,7 @@ Last updated: 2026-11-15
 - Visibility: loot results and encounter choices require shared native `item.info.slot` to be recognized by `Rewards.lua`; unknown/unloaded items and non-equipment remain hidden. Item-cache events refresh eligibility.
 - Instance record: `{key,name,count,instanceID?,subzones?}`. Atlas key = module/content; Questie fallback key = `area:<AreaTable ID>`. `subzones` is a set of localized names from provider SubAreaIDs. Dire Maul area 2557 maps to verified instance ID 429 when the provider omits it.
 - Open captures session-only `focusTarget={name,subzone,id?,text?}` for a party instance. Match compatible exact native IDs first, localized name/subzone second; ties are not selected arbitrarily. Apply after catalogue completion (or immediately if ready), reset stale search/source and reveal the chosen navigation page; preserve shared equipment filters and explicit slash search. Manual search/location/source/reset/suspend cancels pending focus; dirty search fields also block focus before their debounce fires. Outside/unknown/raid locations retain browsing.
-- Settings tab id remains `optional` for compatibility; displayed title is **Extra tools**. Standard tabs use width 72, Quick chat 100, Pings & items 108, Extra tools 96; fits the 660-wide settings window.
+- Settings category id `optional` retains the displayed title **Extra tools**. Settings uses a 900x650 window with a 180px sidebar, 656px content area, 484px scroll viewport and automatic screen fitting; existing category IDs remain valid.
 - Dungeon identity: AtlasLoot public content type must identify Dungeons when present; known Classic/Forever instance IDs cover older providers. Raid flags/content types, oversized groups, unknown IDs without classification and zero-ID extras excluded. Missing InstanceID supported only for recognized dungeon areas (Dire Maul). Cross-encounter links must target an eligible dungeon.
 - Primary provider: compatible `AtlasLoot.ItemDB.Storage` or `AtlasLootContinued.ItemDB.Storage`, modules named `*DungeonsAndRaids*`, content classified as an eligible dungeon.
   - Encounter `items[bossID]`: name, `IgnoreAsSource`, numeric difficulty keys, optional cross-encounter `link`.
@@ -90,3 +103,9 @@ Last updated: 2026-11-15
 ## Artifacts
 - `build_release.py`: reads manifest version and matching CHANGELOG section; packages Lua/TOC/XML into `dist/QuestSharing-<version>.zip`, rooted at `QuestSharing/`; writes `dist/RELEASE_NOTES.md`.
 - `tests/harness.py`: WoW API mocks and real addon loading through `lupa.lua51.LuaRuntime`.
+
+## Settings interface (2026-11-16)
+- `Settings.lua`: `ns.settingTabs` defines category `{id,title,intro}`; order: general, objectives, tracker, dialogs, sharing, party, actions, quick, maps, optional.
+- `ns.settingRows`: `{tab,kind,key?,label,desc,values?,names?,help?,min?,max?,step?,which?,button?,action?}`; `help[value]` supplies the visible explanation for a selected choice. Every non-header has `desc`; saved setting keys/defaults unchanged.
+- `W.rows`: reusable frames allocated to cover every row; no 18-row truncation. Labels/descriptions wrap using game font measurements. Choice buttons select values directly; minus/plus reuse bounded `settingsClick` stepping.
+- `W.rowBody`: all category rows plus the Quick chat editor when selected; `contentHeight` determines clamped scrolling. `settingsScroll(delta)` drives wheel/buttons and footer hint. Refresh preserves offset; category switch resets to top.

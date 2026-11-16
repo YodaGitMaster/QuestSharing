@@ -590,7 +590,7 @@ def test_a_row_has_a_tooltip_with_everybodys_status(style):
     g.eval("function(r) r.scripts.OnEnter(r) end")(row)
     lines = list(g.eval("TOOLTIP.lines").values())
     assert g.eval("TOOLTIP.text") == "Wolves Among Us" and "Anna: 5/8, 1/4" in lines and "Bob: has it" in lines
-    assert any("Left click: offer it" in l for l in lines) and any("Right click: more" in l for l in lines)
+    assert any("Left click: offer it" in l for l in lines) and any("Right click: ask in chat to do this quest" in l for l in lines)
 
 
 def test_alone_the_window_lists_my_quests_and_the_menu_says_what_needs_a_party(style):

@@ -1,10 +1,5 @@
--- Settings.lua: the settings window.   /qs settings   (also: the minimap button, the "Settings" link on the Party quests
--- window, and an entry under Game Menu > Options > AddOns)
---
--- Tabs, each about one thing you do: General (getting started), Sharing (when you group up), Party window, Tracker
--- (finding your quests), Quick chat (the ring and its messages), Social. Every line is one click: a check box switches,
--- a choice moves to the next value (right click goes back), a number counts up (left click) or down (right click, Shift
--- = bigger steps). The grey line under each setting says what it does. The Quick chat tab also holds the message editor.
+-- Settings.lua: plain-language settings grouped by the thing the player wants to change.
+-- Sidebar categories, visible explanations, direct choices, and explicit number controls.
 local ADDON, ns = ...
 local C = ns.compat
 local S = ns.style
@@ -12,173 +7,217 @@ local S = ns.style
 local ON, OFF = "|cff55ff55[ON] |r", "|cffff5555[OFF]|r"
 
 ns.settingTabs = {
-    { id = "general", title = "General",      intro = "Start here: set your quick chat key, check that everything works; the debug log." },
-    { id = "sharing", title = "Sharing",      intro = "What happens when you group up, and what a click on a quest does." },
-    { id = "party",   title = "Party",        intro = "The Party quests window, what a click posts, showing each other where you are, friends." },
-    { id = "tracker", title = "Tracker",      intro = "Keep quests near you, find the creatures you need, and choose how quest offers and turn-ins work." },
-    { id = "quick",   title = "Quick chat",   intro = "Hold your key, point at a message, let go. Pick a message below to edit it." },
-    { id = "actions", title = "Pings & items", intro = "One key pings your quest target for the party, one uses your quest item." },
-    { id = "optional", title = "Extra tools", intro = "Quest automation, zone levels, spell ranks, fishing, rewards and dungeon drops." },
+    { id = "general", title = "General", intro = "Start here: turn the addon on, choose how messages are sent, or check your setup." },
+    { id = "objectives", title = "Quest markers", intro = "Add ! above quest enemies and help find your next quest objective." },
+    { id = "tracker", title = "Quest list", intro = "Choose which quests appear in the game's quest list on the right of your screen." },
+    { id = "dialogs", title = "Accept & turn in", intro = "Let the addon accept quest offers or finish ready quests when you talk to an NPC." },
+    { id = "sharing", title = "Quest sharing", intro = "Offer your quests to party members and choose which updates go to party chat." },
+    { id = "party", title = "Party window", intro = "Show who has each quest, choose what clicks do, and manage party friends." },
+    { id = "actions", title = "Pings & quest items", intro = "Point out quest targets and use the items your quests need." },
+    { id = "quick", title = "Quick chat", intro = "Send a saved message from a ring of choices. Set the key and edit messages below." },
+    { id = "maps", title = "Map & sellers", intro = "Find sellers, see zone levels, and show party locations on the world map." },
+    { id = "optional", title = "Extra tools", intro = "Optional tools for quest planning, spell ranks, fishing, finding equipment, and invites." },
 }
 
--- kind = header | bool | choice | number | action | key.   desc = the grey line under the label (also its tooltip)
+-- Every setting explains the visible result; choices also explain the selected value.
 ns.settingRows = {
-    { tab = "tracker", kind = "header", label = "Quest offers and turn-ins" },
-    { tab = "tracker", kind = "bool", key = "autoAcceptQuests", label = "Auto-accept offered quests",
-      desc = "Accept quests shown by an NPC or party member. Off by default." },
-    { tab = "tracker", kind = "bool", key = "autoCompleteQuests", label = "Auto-complete ready quests",
-      desc = "Turn in when no reward choice is needed or there is only one; multi-choice and pay-to-complete quests stay open." },
-    { tab = "optional", kind = "header", label = "Questing levels on the world map" },
-    { tab = "optional", kind = "bool", key = "zoneLevels", label = "Show zone questing level ranges",
-      desc = "Level badges and selected/hovered zone ranges from the game; includes supported Forever zones." },
+    { tab = "general", kind = "header", label = "Start here" },
+    { tab = "general", kind = "bool", key = "enabled", label = "Turn on Quest Sharing",
+      desc = "Turn on to enable the addon. Each feature below still uses its own setting." },
+    { tab = "general", kind = "bool", key = "minimap", label = "Show the minimap button",
+      desc = "Turn on to add a button beside the minimap. Left-click: settings. Right-click: Party quests. Drag to move it." },
+    { tab = "general", kind = "choice", key = "mode", label = "How to send quest progress messages", values = { "box", "send", "print" },
+      names = { box = "Draft in chat", send = "Send immediately", print = "Only show me" },
+      desc = "Choose what happens when you post quest progress. Quick chat has its own send setting.",
+      help = { box = "Draft in chat: fills your chat box; you review it and press Enter to send.",
+               send = "Send immediately: posts without Enter where the game allows it; otherwise leaves a draft.",
+               print = "Only show me: prints the message for you. Nobody else receives it." } },
+    { tab = "general", kind = "bool", key = "sound", label = "Play a sound when a shared quest is accepted or finished",
+      desc = "Turn on for a soft sound when someone accepts your quest or a teammate finishes a shared quest. Silent during combat." },
+    { tab = "general", kind = "header", label = "Try it and check your setup" },
+    { tab = "general", kind = "key", label = "Quick chat key",
+      desc = "Click Set key, then press a key. Hold it in game to open the message ring. Escape cancels." },
+    { tab = "general", kind = "action", label = "Show the ring", button = "Preview ring",
+      desc = "Click to preview the quick chat ring. Edit its messages under Quick chat.", action = function() ns.quickOpen(true) end },
+    { tab = "general", kind = "action", label = "Check my setup", button = "Run check",
+      desc = "Click for a report of working features, missing addons, and game settings that need attention.", action = function() ns.doctor() end },
+    { tab = "general", kind = "header", label = "Troubleshooting and reset" },
+    { tab = "general", kind = "bool", key = "debug", label = "Record addon actions for troubleshooting",
+      desc = "Turn on to record what the addon tried and what happened. The record is saved when you reload or log out." },
+    { tab = "general", kind = "action", label = "Show the debug log", button = "View log",
+      desc = "Click to read or copy recent addon actions. Also available with /qs log.", action = function() ns.logCommand() end },
+    { tab = "general", kind = "action", label = "Show the errors", button = "View errors",
+      desc = "Click to read or copy recorded addon errors. Also available with /qs errors.", action = function() ns.errorsCommand(nil, true) end },
+    { tab = "general", kind = "action", label = "Reset everything to the defaults", button = "Reset settings",
+      desc = "Click to restore default settings and quick chat messages. Your saved fishing notes are kept.", action = function() ns.resetSettings() end },
+
+    { tab = "objectives", kind = "header", label = "! above quest enemies" },
+    { tab = "objectives", kind = "bool", key = "markMobs", label = "Show ! above quest enemies",
+      desc = "Turn on to add a gold ! above enemies needed for your active quests. Enemy health bars (nameplates) must be visible." },
+    { tab = "objectives", kind = "bool", key = "highlightCVars", label = "Turn on enemy health bars and nearby object icons",
+      desc = "Turn on if quest ! marks are missing: enables enemy nameplates and game icons over nearby objects. Off restores your previous game settings." },
+    { tab = "objectives", kind = "header", label = "Direction to the nearest quest" },
+    { tab = "objectives", kind = "bool", key = "nearPin", label = "Follow my nearest quest with a waypoint",
+      desc = "Turn on to point the game's waypoint at your nearest quest. Requires Quest list > Automatically track nearby quests, plus game distance and waypoint support." },
+
+    { tab = "tracker", kind = "header", label = "The game's quest list" },
+    { tab = "tracker", kind = "bool", key = "hideTracker", label = "Hide the game's quest list on the right",
+      desc = "Turn on to hide the game's tracker outside combat. You can use the separate Party quests window instead." },
+    { tab = "tracker", kind = "bool", key = "near", label = "Automatically track nearby quests",
+      desc = "Turn on to keep nearby quests in the tracker as you move. Turn off to restore your previous tracked quests." },
+    { tab = "tracker", kind = "number", key = "nearCount", label = "Maximum quests to track", min = 1, max = function() return C.maxWatch() end,
+      desc = "Choose how many quests the addon keeps in your list when automatic tracking is on." },
+    { tab = "tracker", kind = "choice", key = "nearMode", label = "Which quests count as nearby", values = { "auto", "distance", "zone" },
+      names = { auto = "Automatic", distance = "Nearest first", zone = "Current zone" },
+      desc = "Used when Automatically track nearby quests is on.",
+      help = { auto = "Automatic: tracks the closest quests if the game supplies distances; otherwise uses your current zone.",
+               distance = "Nearest first: tracks the closest quests. Falls back to your current zone if distances are unavailable.",
+               zone = "Current zone: only tracks quests for the zone you are standing in." } },
+    { tab = "tracker", kind = "number", key = "nearPause", label = "Pause after I edit the quest list (seconds)", min = 5, max = 300,
+      desc = "After you manually track or untrack a quest, the addon waits this long before changing the list again." },
+
+    { tab = "dialogs", kind = "header", label = "When a quest offer opens" },
+    { tab = "dialogs", kind = "bool", key = "autoAcceptQuests", label = "Accept quest offers automatically",
+      desc = "Turn on to accept a quest as soon as its offer opens, including offers from party members. You still choose which NPC to talk to." },
+    { tab = "dialogs", kind = "header", label = "When I talk to a quest giver to turn in" },
+    { tab = "dialogs", kind = "bool", key = "autoCompleteQuests", label = "Turn in completed quests automatically",
+      desc = "Turn on to finish ready quests with no reward choice or one reward. Multiple rewards and quests costing money wait for your click." },
+
+    { tab = "sharing", kind = "header", label = "Offering quests to your party" },
+    { tab = "sharing", kind = "bool", key = "auto", label = "Share my quests when someone joins the party",
+      desc = "Turn on to offer quests when you join a party or another player joins yours. Each offer is sent once per sharing round." },
+    { tab = "sharing", kind = "choice", key = "area", label = "Which quests to share", values = { "zone", "all" },
+      names = { zone = "Current zone only", all = "All my quests" },
+      desc = "Choose whether sharing offers quests for your current zone or your whole quest log." },
+    { tab = "sharing", kind = "number", key = "gap", label = "Seconds between shared quests", min = 2, max = 30,
+      desc = "Wait this many seconds between quest offers so party members have time to read each one." },
+    { tab = "sharing", kind = "bool", key = "shareNew", label = "Share new quests as I accept them",
+      desc = "Turn on to offer each newly accepted quest to your current party." },
+    { tab = "sharing", kind = "bool", key = "shareByClick", label = "Require a Share click for each quest offer",
+      desc = "Turn on to prepare offers but send each only after you click Share. Overrides automatic offers; some clients require this." },
+    { tab = "sharing", kind = "header", label = "Messages in party chat" },
+    { tab = "sharing", kind = "bool", key = "chat", label = "Announce quests in common in party chat",
+      desc = "Turn on to tell the party which quests you all have. Requires General > Send immediately." },
+    { tab = "sharing", kind = "bool", key = "announce", label = "Tell the party when I finish a shared quest",
+      desc = "Turn on to announce once when you finish all objectives of a quest you share with the party." },
+    { tab = "sharing", kind = "bool", key = "pickup", label = "Tell the party when I accept a quest a teammate has",
+      desc = "Turn on to suggest doing a quest together when you accept one a party member already has." },
+    { tab = "sharing", kind = "bool", key = "coords", label = "Include where I found quest items in progress messages",
+      desc = "Turn on to add the item location to your message when a party member still needs those quest items." },
+    { tab = "sharing", kind = "header", label = "Quest information between addon users" },
+    { tab = "sharing", kind = "bool", key = "sync", label = "Sync quest lists with other Quest Sharing users",
+      desc = "Turn on to exchange quest lists and progress with party members using this addon. Needed for exact shared-quest information." },
+    { tab = "sharing", kind = "bool", key = "markers", label = "Mark shared quests with a star in my quest log",
+      desc = "Turn on to add a star and party members' names beside shared quests in the quest log. This does not add ! above enemies." },
+
+    { tab = "party", kind = "header", label = "The separate Party quests window" },
+    { tab = "party", kind = "bool", key = "panel", label = "Show the Party quests window",
+      desc = "Turn on to show nearby quests and which party members have them. Left-click offers a quest; right-click opens its action menu." },
+    { tab = "party", kind = "bool", key = "panelSolo", label = "Also show the Party quests window when playing alone",
+      desc = "Turn on to show your nearby quests without a party. Requires Show the Party quests window to be on." },
+    { tab = "party", kind = "bool", key = "panelCombat", label = "Hide the Party quests window during combat",
+      desc = "Turn on to hide this window during fights and bring it back afterward." },
+    { tab = "party", kind = "number", key = "panelScale", label = "Party quests window size (%)", min = 70, max = 150, step = 10,
+      desc = "100 is the normal size. Increase to make the window and its text bigger." },
+    { tab = "party", kind = "action", label = "Move the Party quests window back to its starting position", button = "Move back",
+      desc = "Click if you dragged the window somewhere hard to find.", action = function() if ns.resetPanelPosition then ns.resetPanelPosition() end end },
+    { tab = "party", kind = "header", label = "Posting progress by clicking" },
+    { tab = "party", kind = "bool", key = "click", label = "Click tracked quests to prepare a progress message",
+      desc = "Turn on to post progress by clicking a quest in the game's tracker or its progress in Party quests. Several clicks combine into one message." },
+    { tab = "party", kind = "bool", key = "link", label = "Shift-click quest links in chat to post my progress",
+      desc = "Turn on to add your progress when you Shift-click a quest link in chat." },
+    { tab = "party", kind = "header", label = "Adding party members as friends" },
+    { tab = "party", kind = "bool", key = "friends", label = "Automatically add party members as friends (beta)",
+      desc = "Turn on to add people you group with to your friends list. Skips existing friends, ignored players, and random groups." },
+    { tab = "party", kind = "action", label = "Add my current party to my friends list", button = "Add friends",
+      desc = "Click to add your current party once, without enabling automatic friend requests.", action = function() ns.addPartyFriends(true) end },
+
+    { tab = "actions", kind = "header", label = "Point out quest targets to the party" },
+    { tab = "actions", kind = "key", which = "ping", label = "Key to target and ping a quest enemy",
+      desc = "Click Set key, then press a key. Use it in game to target and ping the nearest quest enemy. Escape cancels." },
+    { tab = "actions", kind = "choice", key = "pingGap", label = "Minimum time between pings", values = { 5, 10, 15 },
+      names = { [5] = "5 seconds", [10] = "10 seconds", [15] = "15 seconds" },
+      desc = "Choose the wait between pings. Hold Shift while pressing your ping key to bypass the wait." },
+    { tab = "actions", kind = "bool", key = "pingObjects", label = "Also ping quest objects I am facing",
+      desc = "Turn on to ping a quest object in front of you when no quest enemy is nearby." },
+    { tab = "actions", kind = "header", label = "Find and use quest items" },
+    { tab = "actions", kind = "bool", key = "bagMarks", label = "Mark quest items in my bags",
+      desc = "Turn on for gold marks on items needed by nearby quests. Blue marks mean the quest is elsewhere." },
+    { tab = "actions", kind = "bool", key = "questItems", label = "Show usable item buttons beside tracked quests",
+      desc = "Turn on to add a clickable item icon beside a quest in the tracker. Click the icon to use the item." },
+    { tab = "actions", kind = "key", which = "item", label = "Key to use my nearest quest's item",
+      desc = "Click Set key, then press a key. Use it in game to activate the item for your closest quest. Escape cancels." },
+    { tab = "actions", kind = "bool", key = "itemButton", label = "Show a separate button for my nearest quest's item",
+      desc = "Turn on for a movable item button with a cooldown. Red means your target is out of range. Shift-drag to move it." },
+
+    { tab = "quick", kind = "header", label = "Open the message ring" },
+    { tab = "quick", kind = "bool", key = "quick", label = "Enable the quick chat ring",
+      desc = "Turn on to use your key to open a ring of saved messages and emotes." },
+    { tab = "quick", kind = "key", label = "Key that opens the ring",
+      desc = "Click Set key, then press the key you want to use. Escape cancels." },
+    { tab = "quick", kind = "choice", key = "quickMode", label = "How the quick chat key works", values = { "hold", "toggle" },
+      names = { hold = "Hold key", toggle = "Press key" },
+      desc = "Choose how to open the ring and select a message.",
+      help = { hold = "Hold key: hold it down, point at a message, then release to select it.",
+               toggle = "Press key: press once to open the ring, then click a message." } },
+    { tab = "quick", kind = "bool", key = "quickSend", label = "Send quick chat messages without pressing Enter",
+      desc = "Turn on to send your selected message immediately. Turn off to review it in chat first. Some clients require Enter." },
+    { tab = "quick", kind = "choice", key = "quickSize", label = "Message ring size", values = { "small", "normal", "large" },
+      names = { small = "Small", normal = "Normal", large = "Large" },
+      desc = "Choose how far the message choices sit from the center of the ring." },
+    { tab = "quick", kind = "choice", key = "quickChannel", label = "Who receives messages set to Automatic", values = { "auto", "say", "party", "whisper" },
+      names = { auto = "Automatic", say = "Nearby (/say)", party = "Party", whisper = "Whisper player" },
+      desc = "Applies to messages whose individual channel is Auto.",
+      help = { auto = "Automatic: whispers a player you target or point at outside your party; otherwise uses party chat, or /say when alone.",
+               say = "Nearby (/say): players near your character can read the message.",
+               party = "Party: only your current party receives the message.",
+               whisper = "Whisper player: sends privately to the player you target or point at when opening the ring." } },
+
+    { tab = "maps", kind = "header", label = "Find items and sellers (requires Questie data)" },
+    { tab = "maps", kind = "bool", key = "itemSources", label = "Show where items come from when I hover over them",
+      desc = "Turn on for seller types and known Mining sources in bag and recipe tooltips. Requires Questie data." },
+    { tab = "maps", kind = "bool", key = "vendorSearch", label = "Add item and seller search to the world map",
+      desc = "Turn on, open the map, and type an item or seller type, such as General Goods. Select an item to list its sellers. Requires Questie data." },
+    { tab = "maps", kind = "header", label = "Zone level guides" },
+    { tab = "maps", kind = "bool", key = "zoneLevels", label = "Show zone questing level ranges",
+      desc = "Turn on to display level ranges on the world map, such as 10-20. These are zone guides, not the level of every quest." },
+    { tab = "maps", kind = "header", label = "Party locations" },
+    { tab = "maps", kind = "bool", key = "mapPins", label = "Show Quest Sharing party members on my world map",
+      desc = "Turn on for class icons showing teammates using this addon. Requires Quest sharing > Sync quest lists." },
+    { tab = "maps", kind = "bool", key = "teamWaypoint", label = "Add a waypoint where a teammate found quest items",
+      desc = "Turn on to mark a location a teammate shares for quest items you still need. Requires a client with waypoints." },
+
+    { tab = "optional", kind = "header", label = "Plan nearby quests" },
+    { tab = "optional", kind = "bool", key = "questPlanner", label = "Enable the quest planner",
+      desc = "Turn on to suggest an order for nearby quests, shared camps and turn-ins. Requires Questie data; distances are map estimates." },
+    { tab = "optional", kind = "action", label = "Plan my quests", button = "Open plan",
+      desc = "Click to plan nearby quests. The plan respects known prerequisites, groups shared objectives and sets a waypoint for your chosen stop.",
+      action = function() ns.questPlanner.open() end },
     { tab = "optional", kind = "header", label = "Spell ranks on my action bars" },
     { tab = "optional", kind = "bool", key = "autoSpellRanks", label = "Auto-update spells to highest learned rank",
-      desc = "All normal action-bar pages; waits for combat/dragging. Macros and pet actions stay unchanged." },
-    { tab = "optional", kind = "action", label = "Check spell ranks now", button = "Update",
-      desc = "Enable auto-update first. Updates learned ranks or explains why the update is waiting.",
+      desc = "Turn on to replace old spell ranks on your action bars with the best rank you already learned. Waits during combat; leaves macros and pet bars alone." },
+    { tab = "optional", kind = "action", label = "Check spell ranks now", button = "Update ranks",
+      desc = "First turn on Auto-update spells above, then click to check your action bars now. Reports any update or reason it must wait.",
       action = function() ns.spellRanks.update(true) end },
-    { tab = "optional", kind = "header", label = "Instance drops" },
-    { tab = "optional", kind = "action", label = "Search instance loot and who drops it", button = "Browse",
-      desc = "Search by instance, item or boss. AtlasLoot tables, or partial QuestieDB drop sources.",
-      action = function() ns.loot.open() end },
-    { tab = "optional", kind = "header", label = "Find quest companions" },
-    { tab = "optional", kind = "action", label = "Seek fellow adventurers", button = "Write invite",
-      desc = "A role-play invitation for your quest, in any chat you choose; you press Enter to send.",
-      action = function() ns.adventure.open() end },
-    { tab = "optional", kind = "header", label = "Fishing on the big map" },
-    { tab = "optional", kind = "bool", key = "fishingMap", label = "Show fishing waters on the world map",
-      desc = "Your water markers with skill levels and fish. Optional AnglerAtlas adds zone summaries." },
-    { tab = "optional", kind = "action", label = "Add or edit a body of water", button = "Open",
-      desc = "Name the water, set its map coordinates, fishing skill and fish; saved between sessions.",
-      action = function() ns.fishing.open() end },
-    { tab = "optional", kind = "header", label = "Quest rewards for my character" },
-    { tab = "optional", kind = "bool", key = "rewardBrowser", label = "Quest reward equipment browser",
-      desc = "Filter by class, level, faction and equipment slot. Needs QuestieDB's item catalogue." },
-    { tab = "optional", kind = "action", label = "Find quest rewards", button = "Browse",
-      desc = "See the item, quest, where it starts and its prerequisites; hover to compare equipment.",
+    { tab = "optional", kind = "header", label = "Find equipment" },
+    { tab = "optional", kind = "bool", key = "rewardBrowser", label = "Enable the quest reward equipment browser",
+      desc = "Turn on to browse quest equipment for your class, level, and faction. Requires Questie data." },
+    { tab = "optional", kind = "action", label = "Find quest rewards", button = "Browse rewards",
+      desc = "Click to enable and open the reward browser. See quest gear and how to start each quest; hover over gear to compare it with yours.",
       action = function() ns.rewards.open() end },
-    -- General
-    { tab = "general", kind = "header", label = "Getting started" },
-    { tab = "general", kind = "key", label = "Quick chat key",
-      desc = "Click, then press the key you want (Esc cancels). Hold it in game to open the ring of messages." },
-    { tab = "general", kind = "action", label = "Show the ring", button = "Show",
-      desc = "See your quick chat messages the way they look in play.", action = function() ns.quickOpen(true) end },
-    { tab = "general", kind = "action", label = "Check my setup", button = "Check",
-      desc = "A short report: what works on this game client, and what to switch on.", action = function() ns.doctor() end },
-    { tab = "general", kind = "header", label = "Basics" },
-    { tab = "general", kind = "bool", key = "enabled", label = "Quest Sharing enabled", desc = "The master switch for everything below." },
-    { tab = "general", kind = "bool", key = "minimap", label = "Minimap button",
-      desc = "Left click: this window. Right click: the Party quests window. Drag it around the map." },
-    { tab = "general", kind = "choice", key = "mode", label = "My messages...", values = { "box", "send", "print" },
-      names = { box = "go into the chat box (I press Enter)", send = "are sent at once (if the game allows it)", print = "are only shown to me" },
-      desc = "Some game clients do not let addons send chat messages; in the chat box you just press Enter." },
-    { tab = "general", kind = "bool", key = "sound", label = "A soft sound for good news",
-      desc = "When someone accepts a quest you shared, or a party member finishes one you share. Never in combat." },
-    { tab = "general", kind = "header", label = "Debugging" },
-    { tab = "general", kind = "bool", key = "debug", label = "Debug log: write down every action and its outcome",
-      desc = "Saved to the addon's file on /reload or logout (SavedVariables/QuestSharing.lua)." },
-    { tab = "general", kind = "action", label = "Show the debug log", button = "Show",
-      desc = "The newest lines in a window you can copy from (/qs log).", action = function() ns.logCommand() end },
-    { tab = "general", kind = "action", label = "Show the errors", button = "Show",
-      desc = "Only the errors, with where they came from (/qs errors).", action = function() ns.errorsCommand(nil, true) end },
-    { tab = "general", kind = "action", label = "Reset everything to the defaults", button = "Reset",
-      desc = "Every setting and your quick chat messages.", action = function() ns.resetSettings() end },
-    -- Sharing
-    { tab = "sharing", kind = "header", label = "When I join a party" },
-    { tab = "sharing", kind = "bool", key = "auto", label = "Share my quests when I join a party or someone joins",
-      desc = "Once per member, never repeated, never again to someone who declined." },
-    { tab = "sharing", kind = "choice", key = "area", label = "Which quests to share", values = { "zone", "all" },
-      names = { zone = "this zone only", all = "all my quests" } },
-    { tab = "sharing", kind = "number", key = "gap", label = "Seconds between shared quests", min = 2, max = 30,
-      desc = "So nobody gets a pile of popups at once." },
-    { tab = "sharing", kind = "bool", key = "shareNew", label = "Share a quest when I accept it (in a party)",
-      desc = "Offers just the new quest, once." },
-    { tab = "sharing", kind = "bool", key = "shareByClick", label = "Share only when I click Share",
-      desc = "One quest per click. Comes on by itself where the game refuses automatic sharing." },
-    { tab = "sharing", kind = "header", label = "Party chat" },
-    { tab = "sharing", kind = "bool", key = "chat", label = "Announce quests in common in party chat",
-      desc = "\"Hey! Looks like we have these quests in common...\" Automatic: needs My messages = sent at once." },
-    { tab = "sharing", kind = "bool", key = "announce", label = "Announce when a quest we share is done",
-      desc = "Once for the whole party, even when you finish together." },
-    { tab = "sharing", kind = "bool", key = "pickup", label = "Say when I pick up a quest someone in the party has",
-      desc = "\"Picked up [quest] - Anna has it too. Want to do it together?\" Once per quest, never for shared ones." },
-    { tab = "sharing", kind = "bool", key = "coords", label = "Tell where I found the quest items",
-      desc = "Map coordinates in my done / progress message, only when someone in the party still needs them." },
-    { tab = "sharing", kind = "header", label = "Behind the scenes" },
-    { tab = "sharing", kind = "bool", key = "sync", label = "Sync quest lists with other Quest Sharing users",
-      desc = "Exact \"who has what\" and progress for party members who also run the addon." },
-    { tab = "sharing", kind = "bool", key = "markers", label = "Mark shared quests in the quest log", desc = "A star and the names." },
-    -- Party
-    { tab = "party", kind = "header", label = "The Party quests window" },
-    { tab = "party", kind = "bool", key = "panel", label = "Show the Party quests window while in a party",
-      desc = "Your nearest quests (scroll for the rest of the zone) and who has them. Left click: offer it. Right click: tell the party." },
-    { tab = "party", kind = "bool", key = "panelSolo", label = "Show it when I am not in a party too",
-      desc = "Your nearest quests of the zone and your progress (no member columns): handy on your own." },
-    { tab = "party", kind = "bool", key = "panelCombat", label = "Hide it during combat", desc = "It comes back when the fight is over." },
-    { tab = "party", kind = "number", key = "panelScale", label = "Size (%)", min = 70, max = 150, step = 10 },
-    { tab = "party", kind = "action", label = "Put it back where it started", button = "Move back",
-      desc = "If you dragged it somewhere you cannot find it.", action = function() if ns.resetPanelPosition then ns.resetPanelPosition() end end },
-    { tab = "party", kind = "header", label = "Clicking a quest" },
-    { tab = "party", kind = "bool", key = "click", label = "Click a tracked quest to write its status in chat",
-      desc = "In the game's tracker or the Party quests window. Click more quests to add them to the same message." },
-    { tab = "party", kind = "bool", key = "link", label = "Shift-click quest links add the status" },
-    { tab = "party", kind = "header", label = "Showing where we are" },
-    { tab = "party", kind = "bool", key = "mapPins", label = "Quest Sharing users on my world map",
-      desc = "A class icon where each of them is, and your position to them." },
-    { tab = "party", kind = "bool", key = "teamWaypoint", label = "A map pin where a teammate found the quest items",
-      desc = "When they tell the party where the items were, for a quest you still work on." },
-    { tab = "party", kind = "header", label = "Friends" },
-    { tab = "party", kind = "bool", key = "friends", label = "(beta) Add people I group with to my friends list",
-      desc = "Automatic. Skips friends, ignored players and random-dungeon groups." },
-    { tab = "party", kind = "action", label = "Add my party to my friends now", button = "Add",
-      desc = "Once, for the party you are in (the same as /qs friends).", action = function() ns.addPartyFriends(true) end },
-    -- Tracker
-    { tab = "tracker", kind = "header", label = "The quest list on the right" },
-    { tab = "tracker", kind = "bool", key = "hideTracker", label = "Hide the game's quest tracker",
-      desc = "Hidden outside fights (the game does not allow it during one); the Party quests window still shows your quests." },
-    { tab = "tracker", kind = "bool", key = "near", label = "Tracker follows me (shows the nearest quests)",
-      desc = "Fills the quest tracker with the quests closest to you. Switching it off puts your old list back." },
-    { tab = "tracker", kind = "number", key = "nearCount", label = "Quests the tracker keeps", min = 1, max = function() return C.maxWatch() end },
-    { tab = "tracker", kind = "choice", key = "nearMode", label = "Tracker mode", values = { "auto", "distance", "zone" },
-      names = { auto = "automatic", distance = "by distance", zone = "by zone" } },
-    { tab = "tracker", kind = "number", key = "nearPause", label = "Seconds it waits after I change the tracker myself", min = 5, max = 300,
-      desc = "When you add or remove a tracked quest by hand, the tracker and the pin leave your choice alone for this long." },
-    { tab = "tracker", kind = "header", label = "Finding objectives" },
-    { tab = "tracker", kind = "bool", key = "nearPin", label = "Pin the nearest quest in the world",
-      desc = "The game's own quest marker follows the closest quest as you move." },
-    { tab = "tracker", kind = "bool", key = "markMobs", label = "Quest icon above creatures that are part of my quests",
-      desc = "On their nameplates. Needs enemy nameplates switched on in the game." },
-    { tab = "tracker", kind = "bool", key = "highlightCVars", label = "Switch on the game settings the highlights need",
-      desc = "Enemy nameplates and icons over objects. Switching this off puts your own values back." },
-    -- Quick chat
-    { tab = "quick", kind = "bool", key = "quick", label = "Quick chat ring (hold a key, point, release or click)" },
-    { tab = "quick", kind = "key", label = "Key that opens the ring", desc = "Click, then press a key (Esc cancels)." },
-    { tab = "quick", kind = "choice", key = "quickMode", label = "The quick chat key", values = { "hold", "toggle" },
-      names = { hold = "hold, point, release", toggle = "press to open, click a message" } },
-    { tab = "quick", kind = "bool", key = "quickSend", label = "Send the message at once (no Enter)",
-      desc = "Off: it goes into the chat box and you press Enter. Switches itself off if the game refuses it." },
-    { tab = "quick", kind = "choice", key = "quickSize", label = "Ring size", values = { "small", "normal", "large" },
-      names = { small = "small", normal = "normal", large = "large" } },
-    { tab = "quick", kind = "choice", key = "quickChannel", label = "Auto messages go to", values = { "auto", "say", "party", "whisper" },
-      names = { auto = "a player I pick outside my party (whisper), else the party, else nearby", say = "everybody nearby", party = "the party only", whisper = "the player I pick" } },
-    -- Pings & items
-    { tab = "actions", kind = "header", label = "Pinging quest targets" },
-    { tab = "actions", kind = "key", which = "ping", key = nil, label = "Ping key",
-      desc = "Press it: the nearest creature your quests need gets the Attack ping (and becomes your target)." },
-    { tab = "actions", kind = "choice", key = "pingGap", label = "Ping again after", values = { 5, 10, 15 },
-      names = { [5] = "5 seconds", [10] = "10 seconds", [15] = "15 seconds" },
-      desc = "Or as soon as the one you pinged is dead. Shift + the key pings anyway." },
-    { tab = "actions", kind = "bool", key = "pingObjects", label = "Ping quest objects too (look here)",
-      desc = "With no quest creature in sight: the thing to pick up or use (gear / hand icon) you are facing." },
-    { tab = "actions", kind = "header", label = "Quest items" },
-    { tab = "actions", kind = "bool", key = "bagMarks", label = "Mark quest items in my bags",
-      desc = "Gold: for a quest of this zone. Blue: for a quest elsewhere, the bank can keep it." },
-    { tab = "actions", kind = "bool", key = "questItems", label = "Item icons next to the quests in the tracker",
-      desc = "For quest items in your bags you can use (a torch, a flare...): click the icon to use it." },
-    { tab = "actions", kind = "key", which = "item", label = "Quest item key",
-      desc = "Press it: uses the item of your nearest quest that has one (also in combat, the one it had before)." },
-    { tab = "actions", kind = "bool", key = "itemButton", label = "A button with the nearest quest's item",
-      desc = "Shift + drag to move it. It shows the cooldown, and turns red when your target is out of range." },
+    { tab = "optional", kind = "action", label = "Search instance loot and who drops it", button = "Browse drops",
+      desc = "Click to find dungeon equipment by item, boss, or dungeon. AtlasLoot provides fuller data; Questie results may be incomplete.",
+      action = function() ns.loot.open() end },
+    { tab = "optional", kind = "header", label = "Saved fishing spots" },
+    { tab = "optional", kind = "bool", key = "fishingMap", label = "Show fishing waters on the world map",
+      desc = "Turn on to display fishing spots you saved. AnglerAtlas can also provide zone fishing information." },
+    { tab = "optional", kind = "action", label = "Add or edit a fishing spot", button = "Edit spots",
+      desc = "Click to save a water's location, fishing skill, fish, and notes. You enter this information yourself.",
+      action = function() ns.fishing.open() end },
+    { tab = "optional", kind = "header", label = "Find people to quest with" },
+    { tab = "optional", kind = "action", label = "Seek fellow adventurers", button = "Write invite",
+      desc = "Click to draft an invitation for an unfinished quest. Choose a chat, review the text, and press Enter to send.",
+      action = function() ns.adventure.open() end },
 }
 
 local function limit(v) if type(v) == "function" then return v() end return v end
@@ -239,10 +278,11 @@ end
 
 -- The window -----------------------------------------------------------------------------------------------------
 local W = { win = nil, tab = "general", rows = {}, tabs = {}, ed = { selected = nil }, capturing = false }
-local WIDTH, HEIGHT, LEFT = 660, 630, 24
-local TOP = 98                     -- where the first row starts (below the title, the tabs and the intro line)
-local ROW_H, HEADER_H, DESC_H = 22, 24, 12
-local MAX_ROWS = 18
+local WIDTH, HEIGHT, LEFT = 900, 650, 216
+local CONTENT = WIDTH - LEFT - 28
+local TOP, VIEW_H = 118, HEIGHT - 166
+local ROW_H, HEADER_H = 26, 32
+local MIN_ROWS = 18
 
 local function shorten(s, n) if #s <= n then return s end return string.sub(s, 1, n - 3) .. "..." end
 
@@ -390,29 +430,27 @@ function ns.editorShowRing() ns.db.quickPage = ed.page or 1; ns.quickOpen(true) 
 
 local function buildEditor(parent)
     local f = CreateFrame("Frame", nil, parent)
-    f:SetWidth(WIDTH - 2 * LEFT)
-    f:SetHeight(320)
+    f:SetWidth(CONTENT)
+    f:SetHeight(448)
     ed.frame, ed.lines = f, {}
     -- which ring to edit: your messages, or one of the emote rings (the mouse wheel flips them in play)
     local ringCap = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     ringCap:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -2)
     ringCap:SetText("Ring:")
     ed.pageButtons = {}
-    local px = 40
     for i = 1, 6 do
         local btn = clickable(f, 100, 16, function() ns.editorPage(i) end)
-        btn:SetPoint("TOPLEFT", f, "TOPLEFT", px, 0)
+        btn:SetPoint("TOPLEFT", f, "TOPLEFT", 40 + ((i - 1) % 3) * 190, -math.floor((i - 1) / 3) * 20)
         local t = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         t:SetPoint("LEFT", btn, "LEFT", 0, 0)
         ed.pageButtons[i] = { frame = btn, text = t }
-        px = px + 104
     end
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -20)
-    title:SetText("On the ring (up to 8, clockwise from the top)")
+    title:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -40)
+    title:SetText("1. Choose a message to edit (up to 8, clockwise from the top)")
     for i = 1, 8 do
-        local line = clickable(f, WIDTH - 2 * LEFT, 18, function() ns.editorSelect(i) end)
-        line:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -40 - (i - 1) * 18)
+        local line = clickable(f, CONTENT, 18, function() ns.editorSelect(i) end)
+        line:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -62 - (i - 1) * 18)
         local mark = S.fill(line, "BACKGROUND", 1, 0.82, 0, 0.12)            -- the selected message is lit
         mark:SetAllPoints(line)
         mark:Hide()
@@ -426,16 +464,16 @@ local function buildEditor(parent)
         ed.lines[i] = { frame = line, text = t, mark = mark }
     end
     local cap1 = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    cap1:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -192)
-    cap1:SetText("Label (on the ring, 14 letters)")
+    cap1:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -216)
+    cap1:SetText("2. Short label (14 letters)")
     local cap2 = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    cap2:SetPoint("TOPLEFT", f, "TOPLEFT", 170, -192)
-    cap2:SetText("Message or emote (Enter saves): {name} {here} {need} {mine} {quest}..., @invite, @ping, or an emote like /dance")
+    cap2:SetPoint("TOPLEFT", f, "TOPLEFT", 170, -216)
+    cap2:SetText("3. Message or emote (press Enter to save)")
     local function box(width, x, max)
         local b = CreateFrame("EditBox", nil, f)
         b:SetWidth(width)
         b:SetHeight(20)
-        b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -206)
+        b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -234)
         local bg = S.fill(b, "BACKGROUND", 0, 0, 0, 0.6)
         bg:SetAllPoints(b)
         if ChatFontNormal then b:SetFontObject(ChatFontNormal) end
@@ -446,9 +484,15 @@ local function buildEditor(parent)
         b:SetScript("OnEscapePressed", function() b:ClearFocus() end)
         return b
     end
-    ed.labelBox, ed.textBox = box(150, 0, 14), box(WIDTH - 2 * LEFT - 170, 170, 200)
+    ed.labelBox, ed.textBox = box(150, 0, 14), box(CONTENT - 170, 170, 200)
+    local examples = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    examples:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -262)
+    examples:SetWidth(CONTENT); examples:SetWordWrap(true)
+    examples:SetText("Examples: Hello {name}!   {quest} = your quest, {here} = your location. For an emote, type /wave.")
     ed.preview = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    ed.preview:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -232)
+    ed.preview:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -298)
+    ed.preview:SetWidth(CONTENT)
+    ed.preview:SetWordWrap(true)
     local x = 0
     ed.buttons = {}
     for _, b in ipairs({
@@ -458,78 +502,133 @@ local function buildEditor(parent)
     }) do
         local w = (b[1] == "Show the ring") and 110 or 70
         local btn = S.button(f, b[1], w, b[2])
-        btn:SetPoint("TOPLEFT", f, "TOPLEFT", x, -252)
+        btn:SetPoint("TOPLEFT", f, "TOPLEFT", x, -340)
         ed.buttons[b[1]] = btn
         x = x + w + 6
     end
     -- the channel of the selected message: one click on a choice
     ed.channelCaption = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    ed.channelCaption:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -282)
+    ed.channelCaption:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -380)
     ed.channelCaption:SetText("Channel:")
     ed.routeButtons = {}
     local TITLES = { auto = "Auto", nearby = "Nearby", say = "/s Say", yell = "/y Yell", party = "/p Party", whisper = "/w Whisper" }
     local rx = 56
     for _, r in ipairs(ns.QUICK_ROUTES) do
         local btn = clickable(f, 80, 16, function() ns.editorRoute(r) end)
-        btn:SetPoint("TOPLEFT", f, "TOPLEFT", rx, -280)
+        btn:SetPoint("TOPLEFT", f, "TOPLEFT", rx, -378)
         local t = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         t:SetPoint("LEFT", btn, "LEFT", 0, 0)
         ed.routeButtons[#ed.routeButtons + 1] = { route = r, title = TITLES[r], frame = btn, text = t }
         rx = rx + 84
     end
     ed.routeText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    ed.routeText:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -300)
+    ed.routeText:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -404)
+    ed.routeText:SetWidth(CONTENT)
+    ed.routeText:SetWordWrap(true)
     return f
 end
 
 -- tabs and rows ---------------------------------------------------------------------------------------------------------
+local function description(row)
+    local help = row.help and row.help[ns.db[row.key]]
+    return help or row.desc or ""
+end
+
+local function textHeight(font, text, width, size)
+    -- The actual font measurement handles wrapping and localized game fonts.
+    font:SetWidth(width)
+    font:SetText(text)
+    local h = font.GetStringHeight and font:GetStringHeight()
+    return math.max(size, h or math.ceil(#text / math.max(1, math.floor(width / (size * 0.55)))) * size)
+end
+
 local function paintRow(r, row)
     local d = ns.db
     r.box:Hide(); r.tick:Hide(); r.value:SetText(""); r.button:Hide(); r.line:Hide()
+    r.less:Hide(); r.more:Hide()
+    for _, b in ipairs(r.choices) do b:Hide() end
     r.text:ClearAllPoints()
-    r.desc:SetText(row.desc and (S.GREY .. row.desc .. "|r") or "")
+    r.desc:ClearAllPoints()
     if row.kind == "header" then
-        r.text:SetPoint("BOTTOMLEFT", r.frame, "BOTTOMLEFT", 0, 6)
+        r.desc:SetText("")
+        r.text:SetPoint("BOTTOMLEFT", r.frame, "BOTTOMLEFT", 0, 8)
+        r.text:SetWidth(CONTENT)
         r.text:SetText(S.GOLD .. row.label .. "|r")
         r.line:Show()
         return HEADER_H
     end
-    r.text:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 30, -4)
-    r.text:SetText(row.label)
+    local inset = row.kind == "bool" and 30 or 0
+    local reserved = (row.kind == "bool" and 56) or ((row.kind == "number" or row.kind == "action" or row.kind == "key") and 150) or 0
+    r.text:SetPoint("TOPLEFT", r.frame, "TOPLEFT", inset, -4)
+    local labelH = textHeight(r.text, row.label, CONTENT - inset - reserved, 14)
+    local y = math.max(ROW_H, labelH + 10)
     if row.kind == "bool" then
         r.box:Show()
         if d[row.key] then r.tick:Show() end
-        if d.enabled == false and row.key ~= "enabled" then r.text:SetText(S.GREY .. row.label .. "|r") end   -- greyed: master switch off
+        r.value:SetText(d[row.key] and (S.GREEN .. "On|r") or (S.GREY .. "Off|r"))
+        if d.enabled == false and row.key ~= "enabled" then r.text:SetText(S.GREY .. row.label .. "|r") end
     elseif row.kind == "choice" then
-        r.value:SetText(S.BLUE .. "< " .. ((row.names and row.names[d[row.key]]) or tostring(d[row.key])) .. " >|r")
+        local w = (CONTENT - (#row.values - 1) * 6) / #row.values
+        for i, value in ipairs(row.values) do
+            local b = r.choices[i]
+            local selected = d[row.key] == value
+            b.value = value
+            b:SetWidth(w)
+            b:ClearAllPoints(); b:SetPoint("TOPLEFT", r.frame, "TOPLEFT", (i - 1) * (w + 6), -y)
+            b:SetLabel((selected and S.GOLD or S.WHITE) .. (selected and "[x] " or "[ ] ") .. ((row.names and row.names[value]) or tostring(value)) .. "|r")
+            b:Show()
+        end
+        y = y + 30
     elseif row.kind == "number" then
-        r.value:SetText(S.BLUE .. "-  " .. tostring(d[row.key] or 0) .. "  +|r")
+        r.value:SetText(S.BLUE .. tostring(d[row.key] or 0) .. "|r")
+        r.value:ClearAllPoints(); r.value:SetPoint("TOPRIGHT", r.frame, "TOPRIGHT", -52, -5)
+        r.less:Show(); r.more:Show()
     elseif row.kind == "key" then
         local mine = W.capturing and (W.captureFor == row.which)
-        r.button:SetLabel(mine and (S.GOLD .. "press a key...|r") or (keyName(row) or (S.RED .. "not set|r")))
+        r.button:SetLabel(mine and (S.GOLD .. "press a key...|r") or (keyName(row) or "Set key"))
         r.button:Show()
     elseif row.kind == "action" then
-        r.button:SetLabel(row.button or "Do it")
+        r.button:SetLabel(row.button or "Open")
         r.button:Show()
     end
-    return ROW_H + (row.desc and DESC_H or 0)
+    if row.kind ~= "number" then
+        r.value:ClearAllPoints(); r.value:SetPoint("TOPRIGHT", r.frame, "TOPRIGHT", -6, -5)
+    end
+    local desc = description(row)
+    r.desc:SetPoint("TOPLEFT", r.frame, "TOPLEFT", inset, -y)
+    local h = textHeight(r.desc, desc, CONTENT - inset, 13)
+    r.desc:SetText("|cffbbc2cf" .. desc .. "|r")
+    return y + h + 12
+end
+
+local buildRow
+
+function ns.settingsScroll(delta)
+    if not W.rowScroll then return end
+    local maximum = math.max(0, (W.contentHeight or 0) - VIEW_H)
+    local offset = math.max(0, math.min(maximum, W.rowScroll:GetVerticalScroll() + delta))
+    W.rowScroll:SetVerticalScroll(offset)
+    W.scrollHint:SetText(maximum > 0 and (offset >= maximum and "End of page" or "More options below - scroll") or "All options shown")
+    if maximum > 0 then W.scrollUp:Show(); W.scrollDown:Show() else W.scrollUp:Hide(); W.scrollDown:Hide() end
 end
 
 function ns.refreshSettings()
     if not W.win then return end
     local list = rowsOf(W.tab)
-    local y = TOP
-    for n = 1, MAX_ROWS do
+    local y = 0
+    for n = 1, math.max(MIN_ROWS, #list, #W.rows) do
+        if not W.rows[n] then buildRow(W.rowBody, n) end
         local r = W.rows[n]
         local idx = list[n]
+        r.hover:Hide()
         if idx then
             r.index = idx
             local h = paintRow(r, ns.settingRows[idx])
             r.frame:ClearAllPoints()
-            r.frame:SetPoint("TOPLEFT", W.win, "TOPLEFT", LEFT, -y)
+            r.frame:SetPoint("TOPLEFT", W.rowBody, "TOPLEFT", 0, -y)
             r.frame:SetHeight(h)
             r.frame:Show()
-            y = y + h + 2
+            y = y + h + 4
         else
             r.index = nil
             r.frame:Hide()
@@ -538,23 +637,31 @@ function ns.refreshSettings()
     for _, t in ipairs(ns.settingTabs) do
         local tab = W.tabs[t.id]
         local open = (t.id == W.tab)
-        tab.text:SetText((open and "|cffffd100" or "|cff55ccff") .. t.title .. "|r")
+        tab.text:SetText((open and S.GOLD or S.BLUE) .. t.title .. "|r")
         if open then tab.under:Show(); tab.bg:SetVertexColor(1.6, 1.6, 1.6) else tab.under:Hide(); tab.bg:SetVertexColor(1, 1, 1) end
-        if open then W.intro:SetText(S.GREY .. t.intro .. "|r") end
+        if open then W.heading:SetText(t.title); W.intro:SetText("|cffbbc2cf" .. t.intro .. "|r") end
     end
     if W.tab == "quick" then
         ed.frame:ClearAllPoints()
-        ed.frame:SetPoint("TOPLEFT", W.win, "TOPLEFT", LEFT, -(y + 10))
+        ed.frame:SetPoint("TOPLEFT", W.rowBody, "TOPLEFT", 0, -(y + 12))
         ed.frame:Show()
         ns.editorRefresh()
+        y = y + 12 + ed.frame:GetHeight()
     else
         ed.frame:Hide()
     end
-    W.bottom = y
+    W.bottom, W.contentHeight = TOP + y, y
+    W.rowBody:SetHeight(math.max(VIEW_H, y))
+    ns.settingsScroll(0) -- Keep the reading position when a setting changes.
 end
 
 function ns.settingsTab(id)
-    for _, t in ipairs(ns.settingTabs) do if t.id == id then W.tab = id end end
+    for _, t in ipairs(ns.settingTabs) do
+        if t.id == id then
+            if W.tab ~= id and W.rowScroll then W.rowScroll:SetVerticalScroll(0) end
+            W.tab = id
+        end
+    end
     if W.capturing then stopCapture() end
     ns.refreshSettings()
 end
@@ -568,42 +675,46 @@ local function tooltip(owner, text)
     end)
 end
 
-local function buildRow(f, n)
-    local r = {}
-    local frame = clickable(f, WIDTH - 2 * LEFT, ROW_H, nil)
+buildRow = function(f, n)
+    local r = { choices = {} }
+    local frame = clickable(f, CONTENT, ROW_H, nil)
     r.frame = frame
     r.hover = S.fill(frame, "BACKGROUND", 1, 1, 1, 0.06)
-    r.hover:SetAllPoints(frame)
-    r.hover:Hide()
+    r.hover:SetAllPoints(frame); r.hover:Hide()
     r.box, r.tick = S.checkBox(frame)
     r.box:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 1)
     r.text = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    r.text:SetJustifyH("LEFT")
+    r.text:SetJustifyH("LEFT"); r.text:SetWordWrap(true)
     r.desc = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    r.desc:SetPoint("TOPLEFT", frame, "TOPLEFT", 30, -19)
-    r.desc:SetJustifyH("LEFT")
-    r.desc:SetWidth(WIDTH - 2 * LEFT - 150)
+    r.desc:SetJustifyH("LEFT"); r.desc:SetWordWrap(true)
     r.value = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    r.value:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -6, -4)
     r.value:SetJustifyH("RIGHT")
-    r.line = S.fill(frame, "ARTWORK", 1, 0.82, 0, 0.35)                  -- the thin gold line under a section title
+    r.line = S.fill(frame, "ARTWORK", 1, 0.82, 0, 0.35)
     r.line:SetHeight(1)
     r.line:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 2)
     r.line:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 2)
-    r.button = S.button(frame, "", 120, function(_, which) if r.index then ns.settingsClick(r.index, which) end end)
+    r.button = S.button(frame, "", 140, function(_, which) if r.index then ns.settingsClick(r.index, which) end end)
     r.button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -1)
+    r.less = S.button(frame, "-", 32, function() if r.index then ns.settingsClick(r.index, "RightButton") end end)
+    r.less:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -100, -1)
+    r.more = S.button(frame, "+", 32, function() if r.index then ns.settingsClick(r.index, "LeftButton") end end)
+    r.more:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -1)
+    for i = 1, 4 do
+        local b = S.button(frame, "", 100, function(self)
+            local row = r.index and ns.settingRows[r.index]
+            if row and row.kind == "choice" then ns.setSetting(row.key, self.value); ns.refreshSettings() end
+        end)
+        r.choices[i] = b
+    end
     frame:SetScript("OnMouseUp", function(_, button)
         local row = r.index and ns.settingRows[r.index]
-        if row and row.kind ~= "header" and row.kind ~= "action" and row.kind ~= "key" then ns.settingsClick(r.index, button) end
+        if row and row.kind == "bool" then ns.settingsClick(r.index, button) end
     end)
     frame:SetScript("OnEnter", function(self)
         local row = r.index and ns.settingRows[r.index]
         if not row or row.kind == "header" then return end
         r.hover:Show()
-        local tip = row.desc
-        if row.kind == "choice" then tip = (tip and (tip .. "\n") or "") .. "Click: next choice. Right click: back."
-        elseif row.kind == "number" then tip = (tip and (tip .. "\n") or "") .. "Click: more. Right click: less. Shift: bigger steps." end
-        tooltip(self, tip)
+        tooltip(self, description(row))
     end)
     frame:SetScript("OnLeave", function()
         r.hover:Hide()
@@ -624,30 +735,57 @@ local function build()
     version:SetText(S.GREY .. "version " .. tostring(ns.version or "?") .. "|r")
     W.close = S.closeButton(f, function() f:Hide() end, -6, -6)
 
-    local x = LEFT
-    for _, t in ipairs(ns.settingTabs) do
-        local width = t.id == "quick" and 100 or (t.id == "actions" and 108 or (t.id == "optional" and 96 or 72))
-        local b = clickable(f, width, 24, function() ns.settingsTab(t.id) end)
-        b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -42)
+    local sidebar = S.fill(f, "BACKGROUND", 0.08, 0.1, 0.15, 0.9)
+    sidebar:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -48)
+    sidebar:SetWidth(180); sidebar:SetHeight(HEIGHT - 72)
+    local navTitle = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    navTitle:SetPoint("TOPLEFT", f, "TOPLEFT", 30, -60)
+    navTitle:SetText("WHAT DO YOU WANT TO CHANGE?")
+    navTitle:SetWidth(154); navTitle:SetWordWrap(true)
+    for i, t in ipairs(ns.settingTabs) do
+        local b = clickable(f, 164, 36, function() ns.settingsTab(t.id) end)
+        b:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -(100 + (i - 1) * 40))
         local bg = S.fill(b, "BACKGROUND", 0.12, 0.14, 0.2, 0.9)
         bg:SetAllPoints(b)
         local under = S.fill(b, "ARTWORK", 1, 0.82, 0, 0.9)
-        under:SetHeight(2)
-        under:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", 0, 0)
-        under:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 0, 0)
+        under:SetWidth(3); under:SetHeight(36)
+        under:SetPoint("LEFT", b, "LEFT", 0, 0)
         local text = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        text:SetPoint("CENTER", b, "CENTER", 0, 0)
+        text:SetPoint("LEFT", b, "LEFT", 10, 0)
+        text:SetWidth(150); text:SetJustifyH("LEFT"); text:SetWordWrap(true)
         W.tabs[t.id] = { frame = b, text = text, under = under, bg = bg }
-        x = x + width + 4
     end
+    W.heading = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    W.heading:SetPoint("TOPLEFT", f, "TOPLEFT", LEFT, -52)
     W.intro = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    W.intro:SetPoint("TOPLEFT", f, "TOPLEFT", LEFT, -76)
+    W.intro:SetPoint("TOPLEFT", f, "TOPLEFT", LEFT, -78)
+    W.intro:SetWidth(CONTENT); W.intro:SetWordWrap(true)
 
-    for n = 1, MAX_ROWS do buildRow(f, n) end
-    buildEditor(f)
-    local foot = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    foot:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", LEFT, 16)
-    foot:SetText(S.GREY .. "Type /qs for all commands.  /qs doctor checks your setup.  /qs errors shows problems.|r")
+    W.rowScroll = CreateFrame("ScrollFrame", nil, f)
+    W.rowScroll:SetPoint("TOPLEFT", f, "TOPLEFT", LEFT, -TOP)
+    W.rowScroll:SetWidth(CONTENT); W.rowScroll:SetHeight(VIEW_H)
+    W.rowScroll:EnableMouseWheel(true)
+    W.rowScroll:SetScript("OnMouseWheel", function(_, delta) ns.settingsScroll(-delta * 64) end)
+    W.rowBody = CreateFrame("Frame", nil, W.rowScroll)
+    W.rowBody:SetWidth(CONTENT); W.rowBody:SetHeight(VIEW_H)
+    W.rowScroll:SetScrollChild(W.rowBody)
+    for n = 1, MIN_ROWS do buildRow(W.rowBody, n) end
+    buildEditor(W.rowBody)
+    W.scrollHint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    W.scrollHint:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", LEFT, 24)
+    W.scrollUp = S.button(f, "Scroll up", 92, function() ns.settingsScroll(-VIEW_H * 0.75) end)
+    W.scrollUp:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -128, 16)
+    W.scrollDown = S.button(f, "Scroll down", 92, function() ns.settingsScroll(VIEW_H * 0.75) end)
+    W.scrollDown:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28, 16)
+    local saved = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    saved:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 30, 32)
+    saved:SetText("Changes save automatically.")
+    saved:SetWidth(150); saved:SetWordWrap(true)
+    -- Keep this wider layout usable on short or narrow screens.
+    if UIParent.GetWidth and UIParent.GetHeight then
+        local scale = math.min(1, (UIParent:GetWidth() - 24) / WIDTH, (UIParent:GetHeight() - 48) / HEIGHT)
+        if scale > 0 then f:SetScale(scale) end
+    end
     f:SetScript("OnHide", function() if W.capturing then stopCapture() end end)
     if UISpecialFrames then table.insert(UISpecialFrames, "QuestSharingSettings") end       -- Esc closes it
     f:Hide()

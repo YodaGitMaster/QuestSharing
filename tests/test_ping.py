@@ -168,7 +168,7 @@ def test_the_ping_key_can_be_set_in_the_settings_by_pressing_it(style):
     g.slash("settings")
     g.eval("NS.settingsTab")("actions")
     W = g.eval("NS._settingsWindow()")
-    row = next(W.rows[n] for n in range(1, 19) if W.rows[n].frame.shown and plain(W.rows[n].text.text) == "Ping key")
+    row = next(W.rows[n] for n in range(1, 19) if W.rows[n].frame.shown and plain(W.rows[n].text.text) == "Key to target and ping a quest enemy")
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(row.button)
     assert "press a key" in row.button.text
     g.eval("NS.captureKeyPressed")("G")

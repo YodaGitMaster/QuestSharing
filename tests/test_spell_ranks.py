@@ -88,7 +88,8 @@ def test_opt_in_default_and_settings_window_layout(style):
     assert not g.eval("NS.db.autoSpellRanks") and g.eval("BOOK_READS")==g.eval("PICKUPS")==0
     g.slash("settings");g.eval("NS.settingsTab")("optional")
     w=g.eval("NS._settingsWindow()")
-    assert w.bottom<w.win.height-30
+    assert w.rowBody.height>=w.contentHeight
+    assert -w.rowScroll.point[5]+w.rowScroll.height<=w.win.height-30
     g.run('for i,r in ipairs(NS.settingRows)do if r.key=="autoSpellRanks"then NS.settingsClick(i,"LeftButton")end end')
     g.advance(.6);assert g.eval("ACTION_SLOTS[1][2]")==103
 

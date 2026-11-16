@@ -178,10 +178,10 @@ def test_the_settings_tab(style):
     g.eval("NS.settingsTab")("actions")
     W = g.eval("NS._settingsWindow()")
     labels = [re.sub(r"\|c[0-9a-fA-F]{8}|\|r", "", W.rows[n].text.text) for n in range(1, 19) if W.rows[n].frame.shown]
-    for want in ("Pinging quest targets", "Ping key", "Quest items", "Item icons next to the quests in the tracker",
-                 "Quest item key", "A button with the nearest quest's item"):
+    for want in ("Point out quest targets to the party", "Key to target and ping a quest enemy", "Find and use quest items", "Show usable item buttons beside tracked quests",
+                 "Key to use my nearest quest's item", "Show a separate button for my nearest quest's item"):
         assert want in labels, (want, labels)
-    row = next(W.rows[n] for n in range(1, 19) if W.rows[n].frame.shown and W.rows[n].text.text == "Quest item key")
+    row = next(W.rows[n] for n in range(1, 19) if W.rows[n].frame.shown and W.rows[n].text.text == "Key to use my nearest quest's item")
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(row.button)
     g.eval("NS.captureKeyPressed")("Q")
     assert g.eval("BINDINGS.Q") == "CLICK QuestSharingItemButton:LeftButton"

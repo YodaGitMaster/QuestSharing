@@ -1,5 +1,6 @@
 -- Menu.lua: the small menu a right click on a quest in the Party quests window opens.
 --   Tell the party how I am doing    "I still need Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8). What about you?"
+--   Ask in chat to do this quest    "Anyone need [quest]? Wanna group up?" in the current chat; Enter sends
 --   Offer it to the party            the quest popup, for whoever does not have it (the same as a left click)
 --   Tell them where to get it        with Questie: "Bob: [quest] starts at Marshal Dughan in Elwynn Forest (42.1, 65.9)"
 --   Trace back the chain             with Questie, one line: every quest before it, where the first and this one start
@@ -143,7 +144,7 @@ function ns.questMenuItems(e)
     local items = {}
     local function add(text, run, why) items[#items + 1] = { text = text, run = run, why = why } end
     add("Tell the party how I am doing", function() ns.askParty(e) end, (not inParty) and "you are not in a party" or nil)
-    add("Seek fellow adventurers", function() ns.adventure.open(e) end,
+    add("Ask in chat to do this quest", function() ns.adventure.ask(e) end,
         C.doneByMe(e) and "you have finished this quest" or nil)
     add("Offer it to the party", function() ns.offerQuest(e) end,
         (not inParty and "you are not in a party") or (raid and "not in a raid") or (not C.pushable(e) and "the game does not let this quest be shared")

@@ -47,36 +47,44 @@ def printed(g):
 def test_every_tab_has_a_short_intro_and_sections(style):
     g = game(style)
     W = window(g)
-    for t in ("general", "sharing", "party", "tracker", "quick", "actions", "optional"):
+    for t in ("general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "optional"):
         g.eval("NS.settingsTab")(t)
         assert len(plain(W.intro.text)) > 20, t
     g.eval("NS.settingsTab")("sharing")
     headers = [plain(r.text.text) for r in rows(W) if r.line.shown]
-    assert headers == ["When I join a party", "Party chat", "Behind the scenes"]
+    assert headers == ["Offering quests to your party", "Messages in party chat", "Quest information between addon users"]
     g.eval("NS.settingsTab")("party")
-    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["The Party quests window", "Clicking a quest", "Showing where we are", "Friends"]
+    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["The separate Party quests window", "Posting progress by clicking", "Adding party members as friends"]
     g.eval("NS.settingsTab")("general")
-    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Getting started", "Basics", "Debugging"]
+    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Start here", "Try it and check your setup", "Troubleshooting and reset"]
 
 
 def test_rows_are_laid_out_top_to_bottom_without_overlapping_and_fit_in_the_window(style):
     g = game(style)
     W = window(g)
-    for t in ("general", "sharing", "party", "tracker", "quick", "actions", "optional"):
+    for t in ("general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "optional"):
         g.eval("NS.settingsTab")(t)
         tops = [-r.frame.point[5] for r in rows(W)]
         heights = [r.frame.height for r in rows(W)]
         for (a, h), b in zip(zip(tops, heights), tops[1:]):
             assert b >= a + h, (t, a, h, b)
-        bottom = W.bottom + (320 + 10 if t == "quick" else 0)
-        assert bottom <= W.win.height - 30, (t, bottom)
+        # All content belongs to the clipped scroll body, including the message editor.
+        assert W.rowBody.height >= W.contentHeight
+        assert -W.rowScroll.point[5] + W.rowScroll.height <= W.win.height - 30
+        g.eval("NS.settingsScroll")(10000)
+        assert W.rowScroll.vscroll == max(0, W.contentHeight - W.rowScroll.height)
+        if t == "quick":
+            assert -W.ed.frame.point[5] >= tops[-1] + heights[-1]
+            assert -W.ed.frame.point[5] + W.ed.frame.height <= W.rowBody.height
+        g.eval("NS.settingsScroll")(-10000)
+        assert W.rowScroll.vscroll == 0
 
 
 def test_a_check_box_shows_the_setting_and_a_description_says_what_it_does(style):
     g = game(style)
     W = window(g)
-    r = row(W, "Minimap button")
-    assert r.box.shown and r.tick.shown and "Drag it around the map" in r.desc.text
+    r = row(W, "Show the minimap button")
+    assert r.box.shown and r.tick.shown and "Drag to move it" in r.desc.text
     g.slash("minimap off")
     assert r.box.shown and r.tick.shown is False
 
@@ -85,15 +93,22 @@ def test_with_the_master_switch_off_the_other_lines_are_greyed(style):
     g = game(style)
     W = window(g)
     g.slash("off")
-    assert row(W, "Minimap button").text.text.startswith("|cff9d9d9d")
-    assert not row(W, "Quest Sharing enabled").text.text.startswith("|cff9d9d9d")
+    assert row(W, "Show the minimap button").text.text.startswith("|cff9d9d9d")
+    assert not row(W, "Turn on Quest Sharing").text.text.startswith("|cff9d9d9d")
 
 
 def test_choices_and_numbers_show_their_value_on_the_right(style):
     g = game(style)
     W = window(g, "sharing")
-    assert plain(row(W, "Which quests to share").value.text) == "< this zone only >"
-    assert plain(row(W, "Seconds between shared quests").value.text) == "-  4  +"
+    choice = row(W, "Which quests to share")
+    assert plain(choice.choices[1].text) == "[x] Current zone only"
+    assert plain(choice.choices[2].text) == "[ ] All my quests"
+    number = row(W, "Seconds between shared quests")
+    assert plain(number.value.text) == "4" and number.less.shown and number.more.shown
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(number.more)
+    assert g.eval("NS.db.gap") == 5
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(number.less)
+    assert g.eval("NS.db.gap") == 4
 
 
 def test_the_size_setting_moves_in_steps_of_ten(style):
@@ -110,7 +125,7 @@ def test_action_lines_have_a_button(style):
     g = game(style)
     W = window(g)
     check = row(W, "Check my setup")
-    assert check.button.shown and check.button.text == "Check"
+    assert check.button.shown and check.button.text == "Run check"
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(check.button)
     assert g.eval("NS._reportWindow()")[0].shown is True, "the setup report opened"
     ring = row(W, "Show the ring")
@@ -138,7 +153,7 @@ def test_click_then_press_a_key_binds_it(style):
     g = game(style)
     W = window(g)
     r = row(W, "Quick chat key")
-    assert "not set" in r.button.text
+    assert r.button.text == "Set key"
     capture_and_press(g, W, "E")
     assert g.eval("BINDINGS.E") == "QUESTSHARING_QUICKCHAT" and r.button.text == "E"
     assert g.eval("NS._settingsWindow().capturing") is False

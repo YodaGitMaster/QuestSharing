@@ -13,6 +13,7 @@ local C = ns.compat
 
 local Q = {}
 ns.questie = Q
+local spawnList
 
 local function call(f, ...)
     if type(f) ~= "function" then return nil end
@@ -20,11 +21,16 @@ local function call(f, ...)
     if ok then return v end
 end
 
-local function legacy()
+local function questieModule()
     if not (QuestieLoader and QuestieLoader.ImportModule) then return nil end
     if Questie and Questie.started == false then return nil end             -- still starting (or failed to start)
     local ok, mod = pcall(QuestieLoader.ImportModule, QuestieLoader, "QuestieDB")
-    if ok and type(mod) == "table" and type(mod.QueryQuestSingle) == "function" then return mod end
+    if ok and type(mod) == "table" then return mod end
+end
+
+local function legacy()
+    local mod = questieModule()
+    if mod and type(mod.QueryQuestSingle) == "function" then return mod end
 end
 
 -- one field of one record: kind = "quest" | "npc" | "object" | "item"
@@ -362,6 +368,179 @@ end
 -- Where things are: QuestieDB's zones (area IDs) on the game's maps (UI map IDs) ---------------------------------------
 Q.get = field                                                   -- one field of one record, shared by data-driven tools
 
+-- Enumerable IDs are available in current QuestieDB / LibQuestieDB builds. Older Questie versions can still
+-- answer direct item queries, but cannot build a whole-catalogue map search.
+function Q.ids(kind)
+    local db = _G[NEW[kind]]
+    if type(db) == "table" and type(db.GetAllIds) == "function" then
+        local ids = call(db.GetAllIds)
+        if type(ids) == "table" then return ids end
+    end
+    db = libTable(kind)
+    if type(db) == "table" and type(db.GetAllIds) == "function" then
+        local ids = call(db.GetAllIds)
+        if type(ids) == "table" then return ids end
+    end
+end
+
+-- Quest planner reads a complete, uncapped projection. Q.targets() is intentionally a short chat/display summary;
+-- using it for optimization would silently lose alternate mobs and item sources.
+local function appendSources(out, kind, ids)
+    if type(ids) ~= "table" then return end
+    for _, id in ipairs(ids) do
+        if type(id) == "number" then
+            out[#out + 1] = { kind = kind, id = id, name = field(kind, id, "name"), spawns = spawnList(kind, id) }
+        end
+    end
+end
+
+local function objectiveIds(rows, fieldIndex)
+    local ids = {}
+    for _, row in ipairs(type(rows) == "table" and rows or {}) do
+        if type(row) == "table" and type(row[fieldIndex]) == "number" then ids[#ids + 1] = row[fieldIndex] end
+    end
+    return ids
+end
+
+local function itemSources(itemID)
+    local out = {}
+    appendSources(out, "npc", field("item", itemID, "npcDrops"))
+    appendSources(out, "object", field("item", itemID, "objectDrops"))
+    return out
+end
+
+local function allStarters(questID)
+    local out, by = {}, field("quest", questID, "startedBy")
+    if type(by) ~= "table" then return out end
+    appendSources(out, "npc", by[1])
+    appendSources(out, "object", by[2])
+    for _, itemID in ipairs(type(by[3]) == "table" and by[3] or {}) do
+        for _, source in ipairs(itemSources(itemID)) do
+            source.startsFrom = { id = itemID, name = field("item", itemID, "name") }
+            out[#out + 1] = source
+        end
+    end
+    return out
+end
+function Q.plannerStarters(questID) return allStarters(questID) end
+
+local function plannerTargets(questID)
+    local out, objs = {}, field("quest", questID, "objectives")
+    if type(objs) == "table" then
+        for _, id in ipairs(objectiveIds(objs[1], 1)) do
+            local sources = {}; appendSources(sources, "npc", { id })
+            out[#out + 1] = { kind = "kill", name = field("npc", id, "name"), sources = sources }
+        end
+        for _, row in ipairs(type(objs[5]) == "table" and objs[5] or {}) do
+            local ids = type(row) == "table" and type(row[1]) == "table" and row[1] or nil
+            local sources = {}; appendSources(sources, "npc", ids)
+            if #sources > 0 then
+                local names = {}; for _, s in ipairs(sources) do if s.name then names[#names + 1] = s.name end end
+                out[#out + 1] = { kind = "kill", name = table.concat(names, " or "), sources = sources }
+            end
+        end
+        for _, id in ipairs(objectiveIds(objs[2], 1)) do
+            local sources = {}; appendSources(sources, "object", { id })
+            out[#out + 1] = { kind = "object", name = field("object", id, "name"), sources = sources }
+        end
+        for _, itemID in ipairs(objectiveIds(objs[3], 1)) do
+            out[#out + 1] = { kind = "loot", name = field("item", itemID, "name"), itemID = itemID, sources = itemSources(itemID) }
+        end
+    end
+    local trigger = field("quest", questID, "triggerEnd")
+    if type(trigger) == "table" and type(trigger[2]) == "table" then
+        local points = {}
+        for area, locations in pairs(trigger[2]) do
+            for _, pt in ipairs(type(locations) == "table" and locations or {}) do
+                if type(pt) == "table" and pt[1] and pt[2] then
+                    points[#points + 1] = { area = area, map = Q.uiMapOf(area), x = pt[1], y = pt[2] }
+                end
+            end
+        end
+        out[#out + 1] = { kind = "explore", name = type(trigger[1]) == "string" and trigger[1] or "Explore", points = points, sources = {} }
+    end
+    for _, target in ipairs(out) do
+        target.points = target.points or {}
+        for _, source in ipairs(target.sources or {}) do
+            for _, point in ipairs(source.spawns or {}) do target.points[#target.points + 1] = point end
+        end
+    end
+    return out
+end
+
+function Q.plannerQuest(questID)
+    local name = field("quest", questID, "name")
+    if not name then return nil end
+    local single, group = field("quest", questID, "preQuestSingle"), field("quest", questID, "preQuestGroup")
+    local finish = field("quest", questID, "finishedBy")
+    local turnIns = {}
+    if type(finish) == "table" then
+        appendSources(turnIns, "npc", finish[1])
+        appendSources(turnIns, "object", finish[2])
+    end
+    return {
+        id = questID, name = name, level = tonumber(field("quest", questID, "questLevel")) or 0,
+        requiredLevel = tonumber(field("quest", questID, "requiredLevel")) or 0,
+        beforeAny = type(single) == "table" and single or {},
+        beforeAll = type(group) == "table" and group or {},
+        starters = allStarters(questID), targets = plannerTargets(questID), turnIns = turnIns,
+    }
+end
+
+-- Questie's own policy check accounts for more than prerequisite fields (race, class, level, phase, event, etc.).
+-- It is optional because older Questie builds expose a different API; callers must treat nil as unknown.
+function Q.questDoable(questID)
+    local mod = questieModule()
+    if mod and type(mod.IsDoable) == "function" then
+        local value = call(mod.IsDoable, questID)
+        if type(value) == "boolean" then return value end
+    end
+end
+
+function Q.questBlockReason(questID)
+    local mod = questieModule()
+    if not (mod and type(mod.IsDoableVerbose) == "function") then return nil end
+    local ok, _, blocked, reason = pcall(mod.IsDoableVerbose, questID, false, true, true)
+    if not ok then return nil end
+    if blocked ~= true then return nil end
+    local states = mod.DoableStates or {}
+    if reason == states.NO_PREQUESTSINGLE then return "any" end
+    if reason == states.NO_PREQUESTGROUP then return "all" end
+    return "other"
+end
+
+function Q.questComplete(questID)
+    if C_QuestLog and type(C_QuestLog.IsQuestFlaggedCompleted) == "function" then
+        local value = call(C_QuestLog.IsQuestFlaggedCompleted, questID)
+        if value ~= nil then return value and true or false end
+    end
+    local complete = type(Questie) == "table" and type(Questie.db) == "table"
+        and type(Questie.db.char) == "table" and Questie.db.char.complete
+    if type(complete) == "table" then return complete[questID] == true end
+end
+
+-- Questie keeps drop percentages in a separate DropDB. Normalize only an unambiguous numeric result;
+-- an unfamiliar provider shape stays unknown rather than being guessed.
+function Q.itemDropRate(itemID, npcID)
+    if not (QuestieLoader and QuestieLoader.ImportModule) then return nil end
+    local ok, drops = pcall(QuestieLoader.ImportModule, QuestieLoader, "DropDB")
+    local rate = ok and type(drops) == "table" and type(drops.GetItemDroprate) == "function"
+        and call(drops.GetItemDroprate, itemID, npcID)
+    if type(rate) == "number" and rate > 0 then return rate <= 1 and rate * 100 or rate end
+    if type(rate) == "string" then
+        local value = tonumber(string.match(rate, "([%d%.]+)"))
+        if value and value > 0 then return value end
+    elseif type(rate) == "table" then
+        for _, value in pairs(rate) do
+            if type(value) == "number" and value > 0 then return value <= 1 and value * 100 or value end
+            if type(value) == "string" then
+                local parsed = tonumber(string.match(value, "([%d%.]+)"))
+                if parsed and parsed > 0 then return parsed end
+            end
+        end
+    end
+end
+
 local areaToMap
 local function decodeTable(s)
     if type(s) == "table" then return s end
@@ -391,7 +570,7 @@ end
 function Q._resetMaps() areaToMap = nil end                    -- for the tests
 
 -- every spawn of an npc or object: { { area, map, x, y (0..100), dungeon }, ... }
-local function spawnList(kind, id)
+spawnList = function(kind, id)
     local out = {}
     local spawns = field(kind, id, "spawns")
     if type(spawns) ~= "table" then return out end

@@ -68,13 +68,18 @@ def test_command_quest_id_name_and_link_select_same_quest(style):
     assert not g.opened() and not g.sent()
 
 
-def test_menu_action_is_available_without_party_or_questie(style):
+def test_menu_action_fills_a_simple_question_without_opening_another_window(style):
     g = game(style)
+    g.run('NS.db.mode="send"; NS.db.quickSend=true')
     g.eval("NS.openQuestMenu")(quest(g))
     menu, lines = g.eval("NS._questMenu()")
-    invite = next(b for b in lines.values() if b.shown and "Seek fellow" in b.text)
-    invite.scripts.OnClick(invite, "LeftButton")
-    assert not menu.shown and g.eval("NS.adventure._window().frame.shown")
+    g.eval("NS.questMenuPick")(2)
+    assert not menu.shown
+    assert g.eval("NS.adventure._window()") is None, "the extra invitation editor must not open"
+    assert len(g.opened()) == 1, "the question goes straight into game chat"
+    assert "Anyone need " in g.opened()[0] and "|Hquest:100:" in g.opened()[0]
+    assert g.opened()[0].endswith("Wanna group up?")
+    assert not g.sent(), "the player sends by pressing Enter"
 
 
 def test_preview_can_change_wording_quest_and_edit_text(style):
@@ -176,6 +181,69 @@ def test_multiline_or_oversized_user_edit_is_rejected(style):
     g = game(style)
     for text in ("", "a\nb", "é" * 128):
         assert not g.eval("NS.adventure.prepare")(quest(g), text, "say")[0]
+    assert not g.opened() and not g.sent()
+
+
+def test_direct_question_keeps_the_selected_world_chat(style):
+    g = game(style)
+    g.run('ACTIVE_BOX=EDITBOX; EDITBOX.text=""; EDITBOX.chat="CHANNEL"; EDITBOX.channelTarget=4')
+    assert g.eval("NS.adventure.ask")(quest(g))[0]
+    assert g.eval("EDITBOX.chat") == "CHANNEL" and g.eval("EDITBOX.channelTarget") == 4
+    assert g.eval("EDITBOX.text").startswith("Anyone need ")
+    assert "|Hquest:100:" in g.eval("EDITBOX.text") and not g.sent()
+    assert not g.opened() and g.eval("NS.adventure._window()") is None
+
+
+def test_direct_question_uses_the_clicked_quest_and_works_without_party(style):
+    g = game(style)
+    g.eval("NS.openQuestMenu")(quest(g, 102))
+    g.eval("NS.questMenuPick")(2)
+    assert "|Hquest:102:" in g.opened()[0] and "|Hquest:100:" not in g.opened()[0]
+    assert not g.sent()
+
+
+def test_direct_question_preserves_drafts_and_rejects_duplicates_and_full_chat(style):
+    g = game(style)
+    g.run('ACTIVE_BOX=EDITBOX; EDITBOX.text="Hello!"; EDITBOX.chat="CHANNEL"; EDITBOX.channelTarget=4')
+    assert g.eval("NS.adventure.ask")(quest(g))[0]
+    text = g.eval("EDITBOX.text")
+    assert text.startswith("Hello! Anyone need ") and g.eval("EDITBOX.channelTarget") == 4
+    assert not g.eval("NS.adventure.ask")(quest(g))[0]
+    assert g.eval("EDITBOX.text") == text and "already in the chat" in " ".join(g.printed())
+    g.run('EDITBOX.text=string.rep("x",250)')
+    assert not g.eval("NS.adventure.ask")(quest(g))[0]
+    assert g.eval("#EDITBOX.text") == 250 and not g.sent()
+
+
+def test_direct_question_revalidates_quest_before_filling_chat(style):
+    g = game(style)
+    g.eval("NS.openQuestMenu")(quest(g))
+    g.run('BYID(100).complete=true')
+    g.eval("NS.questMenuPick")(2)
+    assert not g.opened() and not g.sent()
+    assert "unfinished quest" in " ".join(g.printed())
+    g.run('QUESTS={}')
+    assert g.eval("NS.adventure.question")(quest(g)) is None
+
+
+def test_direct_question_fits_long_unicode_titles_without_broken_links(style):
+    g = game(style)
+    g.run('BYID(100).title=string.rep("é",200)')
+    text = g.eval("NS.adventure.question")(quest(g))
+    assert len(text.encode()) <= 255 and text.startswith("Anyone need [") and text.endswith("]? Wanna group up?")
+    assert "|Hquest:" not in text
+    assert g.eval("NS.adventure.ask")(quest(g))[0]
+    assert g.opened() == [text]
+
+
+def test_direct_question_reports_disabled_addon_and_missing_chat_api(style):
+    g = game(style)
+    g.run('NS.db.enabled=false')
+    assert not g.eval("NS.adventure.ask")(quest(g))[0]
+    assert "Switch Quest Sharing on" in " ".join(g.printed())
+    g.run('NS.db.enabled=true; ChatFrame_OpenChat=nil')
+    assert not g.eval("NS.adventure.ask")(quest(g))[0]
+    assert "cannot open the chat box" in " ".join(g.printed())
     assert not g.opened() and not g.sent()
 
 

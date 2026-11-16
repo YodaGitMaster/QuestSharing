@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+## 0.4.16
+- Added an optional quest planner to Extra tools and `/qs plan`. Questie prerequisites build up to four local quest layers; shared objectives and nearby camps become route stops, with pickups, objectives and turn-ins ordered by dependencies and straight map distance. Known Questie drop percentages are shown but do not affect route order. A selected stop can set a game waypoint. The planner is off by default and does not calculate walkable paths or cave/floor routing.
+- Right-click a quest and choose **Ask in chat to do this quest** to fill the current chat with a linked question directly; press Enter to send. The optional role-play invite editor remains available in Extra tools and `/qs adventure`.
+- Reorganized settings into clear categories with plain explanations, visible On/Off states, direct choices, separate +/- buttons, and scrolling pages. Quest markers, the quest list, and quest acceptance/turn-ins have their own categories. Existing saved settings stay intact.
+- Made the enemy option say **Show ! above quest enemies** and explained that game nameplates must be on for it to work.
+- Added optional Questie item-source hints and world-map seller search, including multi-word partial matching, autocomplete, map pins and a Sellers list with every known location. Item suggestions open the seller list; the Map tab shows matching pins.
+
 ## 0.4.15
 - Added optional, independent quest-dialog automation switches under **Tracker**. Auto-accept accepts NPC and party quest offers when they are shown; auto-complete advances a ready turn-in and claims a reward when there is no choice or only one choice.
 - Multi-choice rewards and quests that require paying money remain open for you. Both switches are off by default.

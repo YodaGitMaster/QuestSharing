@@ -1,5 +1,13 @@
 # Decisions
 
+## 2026-11-16 — Local quest planner first pass
+- Implement the user's graph idea as two connected views: prerequisite gates (`preQuestSingle` = any, `preQuestGroup` = all) determine which quest layers can unlock; a stop graph connects shared exact sources and nearby objective points.
+- Keep the planner in Quest Sharing as an opt-in Extra tools action and `/qs plan`; default `questPlanner=false`, no route data persisted and no automatic quest acceptance.
+- Scan QuestieDB's enumerable quest catalogue in small `ns.after` batches. Use Questie's own readiness check where available; include active log quests and nearby quests Questie reports ready or prerequisite-blocked. Unknown eligibility remains excluded.
+- Build pickups, objectives and turn-ins as explicit stops. Schedule only dependency-ready stops, then use nearest straight map distance to choose among them. Keep drop-rate percentages informational; do not pretend this first score estimates farming time.
+- Do not add Shortest Path Forever or claim walkability in this pass. User-facing route says map-distance estimate; no cave/floor traversal. Follow up with in-game QA and terrain routing research before claiming a walkable route.
+- Scope preserves earlier user authorization to build the quest planner; code and docs remain local/unreleased pending any separate release request.
+
 ## 2026-11-15 — Optional quest dialog automation (published)
 - Add independent `autoAcceptQuests=false` and `autoCompleteQuests=false` controls under Tracker; a player can enable either action without enabling the other.
 - Use the game's `QUEST_DETAIL`, `QUEST_PROGRESS` and `QUEST_COMPLETE` events with the same quest APIs used by the built-in UI; never synthesize clicks on Blizzard frames.
@@ -158,3 +166,36 @@
 ## 2026-11-11 — Publish 0.3.9
 - Pushing `main` alone did not publish a GitHub Release. Explicitly created release `v0.3.9` and attached the ZIP built by `python3 build_release.py`.
 - Match existing release naming: `Quest Sharing 0.3.9`, asset `QuestSharing-0.3.9.zip`.
+# 2026-11-16 — Item-source hints and vendor map search
+- Use QuestieDB's item `vendors` IDs and NPC `subName`/`spawns` fields as the single seller source. Show the NPC category/title only, never its specific name in item hints.
+- Search builds a lazy timer-batched index from the provider's enumerable item IDs. Results require an explicit item vendor link; do not infer vendors from recipes, drops, or gathering sources.
+- QuestieDB has no mining-profession or recipe-crafting relationship in the item/object metadata. Label Mining only for linked object names matching known localized ore-node terms; present this as a partial hint, not complete source coverage.
+- World map renders only addon-owned pins on Blizzard's current map. Clicking a seller pin sets a user waypoint. When none match the shown map, compare normalized coordinates only on the player's continent, label that fallback as geographically closest by map position, and offer a waypoint; do not claim a walkable route or compare separate continents.
+- Add independent false-by-default `itemSources` and `vendorSearch` switches under Extra tools. Because this adds rows near the tab's vertical limit, settings rows live in a scroll frame instead of silently overflowing.
+- Feature remains local/unreleased until the user requests publication; preserve the existing local settings-copy edits.
+
+## 2026-11-16 — Partial vendor-title search and autocomplete
+- Match each entered word as a substring in item names and vendor titles, so short input such as `tail` finds `Senior Master Tailor` too.
+- Show live suggestions ordered as matching role words, full vendor titles, then item names. A click or Tab selects/completes and searches the suggestion; Enter still searches the text as typed.
+
+## 2026-11-16 — Seller map and list views
+- Show every matching Questie spawn on the current map; remove the earlier 80-pin cap. The scrollable Sellers view lists category/title, zone and coordinates, never NPC names, consistent with the original request.
+- Selecting an item suggestion opens Sellers; exact buyable item names entered directly also open Sellers. The Map view keeps every pin visible. Item/reagent sellers are only returned from explicit Questie `Item.vendors` links.
+- Ensure `OptionalUI.lua` loads before `ItemSources.lua` and `VendorMap.lua`; both capture the shared helper during initialization.
+
+## 2026-11-16 — Settings redesigned around visible game actions
+- User says all settings are chaotic and asks for explicit explanations such as adding ! over quest mobs; authorized implementation covers the whole settings UI.
+- Replace cramped horizontal tabs with ten sidebar categories; separate Quest markers, Quest list and Accept & turn in, move location/source controls to Map & sellers. Keep old category IDs and all saved setting keys/defaults.
+- Each switch explains its visible result and dependencies. Enemy ! and quest-log shared stars are distinguished; nameplate helper explains restoration when disabled.
+- Show all named choices as direct buttons, On/Off alongside checkboxes, and real minus/plus buttons. Reuse existing handlers and feature code.
+- Use measured wrapped text in a clipped scroll body; editor scrolls with its page. Preserve scroll during refresh, reset on category changes, expose scroll buttons/hint, scale window for small screens. Existing Extra tools remain opt-in.
+- No publication requested; preserve unrelated local vendor/item-source work. Native in-game rendering remains unavailable.
+- Verified all 34 suites / 1,302 checks after adapting old fixed-height assertions to the scroll viewport. Baseline ItemSources test errors were isolated with HEAD Settings.lua and resolved by adding the missing GameTooltip HookScript mock, without editing unrelated runtime modules.
+
+## 2026-11-16 — Direct quest-group question from the right-click menu
+- User reports the World-chat recruitment path opens an unwanted menu/editor and wants a simple question asking who needs the quest and wants to group.
+- Reproduced on modern/classic harness: Menu.lua row 2 calls Adventure.open, creates the composer and leaves game chat empty. A failing workflow test confirms the extra window before edits.
+- Replace row 2 with **Ask in chat to do this quest**; `Adventure.ask` reuses `prepare` with a short linked question and the current chat. No extra editor; player presses Enter to send. Destination preference was asked asynchronously; absent a reply, current chat was stated as the assumption so selecting World first uses World.
+- Keep optional role-play editor under Extra tools and `/qs adventure`; no saved settings/default changes. Reuse draft preservation, duplicate detection, byte limits and unfinished-quest checks rather than duplicate chat-routing logic.
+- Runtime scope: Adventure.lua, Menu.lua and Panel.lua tooltip; tests and user/continuity docs updated. No release requested.
+- Verification: Adventure 44/44, menu 60/60; full 34-file run plus updated tooltip-suite rerun passes all 1,314 checks. Bug report: `context/BUGS/2026-11-16-quest-recruitment-extra-editor.md`; native client unavailable.

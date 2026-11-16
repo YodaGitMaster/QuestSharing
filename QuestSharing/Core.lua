@@ -35,6 +35,9 @@ ns.defaults = {
     rewardBrowser = false, -- optional quest reward catalogue
     autoSpellRanks = false, -- opt-in: highest learned ranks on existing player spell buttons
     zoneLevels = false, -- opt-in: questing level ranges on the world map
+    itemSources = false, -- opt-in: QuestieDB source hints on item tooltips
+    vendorSearch = false, -- opt-in: vendor search on the world map
+    questPlanner = false, -- opt-in: prerequisite-aware quest route suggestions
     autoAcceptQuests = false, -- opt-in: accept quests when their offer is shown
     autoCompleteQuests = false, -- opt-in: finish safe quest turn-ins without a reward decision
     bagMarks = true,    -- quest items marked in the bags: gold = a quest of this zone, blue = a quest elsewhere
@@ -370,6 +373,8 @@ function ns.setSetting(key, value)
         if (key == "rewardBrowser" or key == "enabled") and ns.rewards then ns.rewards.settingChanged() end
         if (key == "autoSpellRanks" or key == "enabled") and ns.spellRanks then ns.spellRanks.settingChanged() end
         if (key == "zoneLevels" or key == "enabled") and ns.zoneLevels then ns.zoneLevels.refresh() end
+        if (key == "itemSources" or key == "enabled") and ns.itemSources then ns.itemSources.refresh() end
+        if (key == "vendorSearch" or key == "enabled") and ns.vendorMap then ns.vendorMap.refresh() end
         if key == "enabled" and not value and ns.adventure then ns.adventure.close() end
         if key == "enabled" and not value and ns.loot then ns.loot.close() end
         if (key == "bagMarks" or key == "enabled") and ns.refreshBagMarks then ns.refreshBagMarks() end
@@ -427,6 +432,7 @@ local help = {
     "/qs adventure [quest ID or title]  prepare a role-play invitation in any chat channel",
     "/qs fishing [on|off]  fishing waters on the big map; no argument opens the water editor",
     "/qs rewards [on|off]  browse quest reward equipment for your class, level and faction",
+    "/qs plan [refresh|next|on|off]  plan nearby quests and set a waypoint for a stop",
     "/qs settings         open the settings window (click a line to switch it on or off)",
     "/qs share            share your quests in this area with the party now",
     "/qs stop             cancel a share that is in progress",
@@ -481,6 +487,7 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     local d = ns.db
     if cmd == "share" then ns.shareClick()
     elseif cmd == "loot" then ns.loot.open(arg)
+    elseif cmd == "plan" then ns.questPlanner.command(arg)
     elseif cmd == "questmap" then ns.print("quest symbols on the world map and minimap have been removed")
     elseif cmd == "adventure" then ns.adventure.command(arg)
     elseif cmd == "fishing" or cmd == "rewards" then

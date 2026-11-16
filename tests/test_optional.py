@@ -215,7 +215,9 @@ def test_optional_tabs_fit_window(style):
     for tab in w.tabs.values():
         assert tab.frame.point[4]+tab.frame.width<=w.win.width-20
     g.eval("NS.settingsTab")("optional")
-    assert w.bottom<w.win.height-30
+    assert w.rowBody.height>=w.contentHeight
+    g.eval("NS.settingsScroll")(10000)
+    assert w.rowScroll.vscroll == max(0,w.contentHeight-w.rowScroll.height)
 
 
 def test_alt_click_adds_water_at_viewed_map_without_opening_game_map(style):

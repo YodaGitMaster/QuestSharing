@@ -157,7 +157,7 @@ def test_choice_rows_cycle_with_left_and_right_clicks(style):
     assert g.eval("NS.db.mode") == "box"
     click(g, "mode", "RightButton")
     assert g.eval("NS.db.mode") == "print", "right click goes backwards"
-    assert "are only shown to me" in row_text(g, "mode")
+    assert "Only show me" in row_text(g, "mode")
 
 
 def test_number_rows_step_stay_in_range_and_shift_steps_by_five(style):
@@ -244,9 +244,9 @@ def test_the_window_opens_closes_and_follows_commands(style):
     g.slash("settings")
     W = window(g)
     assert W.win.shown is True and W.tab == "general"
-    assert row_on(W, "Quest Sharing enabled") is True
+    assert row_on(W, "Turn on Quest Sharing") is True
     g.slash("minimap off")                                # a command changes it: the window shows it at once
-    assert row_on(W, "Minimap button") is False
+    assert row_on(W, "Show the minimap button") is False
     g.slash("config")
     assert W.win.shown is False
     g.slash("options")
@@ -259,7 +259,7 @@ def test_every_setting_is_on_exactly_one_tab(style):
     n = int(g.eval("#NS.settingRows"))
     tabs = [g.eval("NS.settingRows[%d].tab" % i) for i in range(1, n + 1)]
     ids = [g.eval("NS.settingTabs[%d].id" % i) for i in range(1, int(g.eval("#NS.settingTabs")) + 1)]
-    assert ids == ["general", "sharing", "party", "tracker", "quick", "actions", "optional"]
+    assert ids == ["general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "optional"]
     assert all(t in ids for t in tabs)
     assert all(tabs.count(t) >= 1 for t in ids), "no empty tab"
     keys = [g.eval("NS.settingRows[%d].key" % i) for i in range(1, n + 1) if g.eval("NS.settingRows[%d].key" % i)]
@@ -274,7 +274,7 @@ def test_tabs_show_only_their_own_rows(style):
     g.eval("NS.settingsTab")("tracker")
     tracker = visible_texts(W)
     assert W.tab == "tracker" and not set(general) & set(tracker)
-    assert any("Tracker follows me" in t for t in tracker) and any("Seconds it waits after I change the tracker" in t for t in tracker)
+    assert any("Automatically track nearby quests" in t for t in tracker) and any("Pause after I edit the quest list" in t for t in tracker)
     assert W.tabs.tracker.text.text.startswith("|cffffd100") and W.tabs.general.text.text.startswith("|cff55ccff"), "the open tab is gold"
     assert W.ed.frame.shown is False, "the message editor belongs to the Quick chat tab only"
     g.eval("NS.settingsTab")("quick")
@@ -298,9 +298,9 @@ def test_clicking_a_row_in_the_window_frame_works(style):
     g.eval("function(f, b) f.scripts.OnMouseUp(f, b) end")(W.rows[n].frame, "LeftButton")
     assert g.eval("NS.db.sync") is False and W.rows[n].tick.shown is False
     g.eval("NS.settingsTab")("tracker")
-    n = next(i for i in range(1, 19) if W.rows[i].frame.shown and "Tracker follows me" in W.rows[i].text.text)
+    n = next(i for i in range(1, 19) if W.rows[i].frame.shown and "Automatically track nearby quests" in W.rows[i].text.text)
     g.eval("function(f) f.scripts.OnEnter(f) end")(W.rows[n].frame)
-    assert "puts your old list back" in g.eval("TOOLTIP.text")
+    assert "restore your previous tracked quests" in g.eval("TOOLTIP.text")
 
 
 def test_the_panels_settings_link_opens_the_window(style):
@@ -331,6 +331,107 @@ def test_status_help_and_probe_mention_the_window(style):
     assert "near on" in text and "panel on" in text and "/qs settings" in text and "/qs reset" in text
     assert "settings window: /qs settings | entry in the game's options: yes" in text
 
+
+
+def visible_by_key(g, W, key):
+    return next(r for r in W.rows.values() if r.index and g.eval("NS.settingRows")[r.index].key == key)
+
+
+def press(g, button):
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(button)
+
+
+def test_named_choices_select_exact_value_and_explain_the_result(style):
+    g = fresh(style)
+    g.slash("settings")
+    W = window(g)
+    r = visible_by_key(g, W, "mode")
+    press(g, r.choices[3])
+    assert g.eval("NS.db.mode") == "print"
+    assert "Nobody else receives it" in r.desc.text
+    assert "[x] Only show me" in r.choices[3].text
+    press(g, r.choices[1])
+    assert g.eval("NS.db.mode") == "box" and "press Enter" in r.desc.text
+    # A label/background click no longer cycles a choice by accident.
+    g.eval("function(f) f.scripts.OnMouseUp(f, 'LeftButton') end")(r.frame)
+    assert g.eval("NS.db.mode") == "box"
+
+
+def test_scrolling_keeps_position_on_changes_and_category_switch_resets_it(style):
+    g = fresh(style)
+    g.slash("settings")
+    W = window(g)
+    press(g, W.scrollDown)
+    offset = W.rowScroll.vscroll
+    assert offset > 0
+    press(g, visible_by_key(g, W, "mode").choices[2])
+    assert W.rowScroll.vscroll == offset
+    g.eval("NS.settingsTab")("objectives")
+    assert W.rowScroll.vscroll == 0 and not W.scrollDown.shown
+    assert W.scrollHint.text == "All options shown"
+    g.eval("NS.settingsTab")("quick")
+    g.eval("NS.settingsScroll")(100000)
+    assert W.rowScroll.vscroll == W.contentHeight - W.rowScroll.height
+    assert W.scrollHint.text == "End of page" and W.ed.frame.shown
+
+
+def test_all_controls_have_visible_plain_language_help_and_correct_categories(style):
+    g = fresh(style)
+    rows = list(g.eval("NS.settingRows").values())
+    assert all(r.desc for r in rows if r.kind != "header")
+    by_key = {r.key: r for r in rows if r.key}
+    assert by_key["markMobs"].tab == "objectives"
+    assert by_key["markMobs"].label == "Show ! above quest enemies"
+    assert "nameplates" in by_key["markMobs"].desc
+    assert by_key["near"].tab == "tracker"
+    assert by_key["autoAcceptQuests"].tab == by_key["autoCompleteQuests"].tab == "dialogs"
+    assert by_key["vendorSearch"].tab == by_key["zoneLevels"].tab == "maps"
+    assert "Requires Questie" in by_key["vendorSearch"].desc
+    assert "Multiple rewards" in by_key["autoCompleteQuests"].desc
+
+
+def test_settings_does_not_drop_rows_after_eighteen_and_last_row_is_reachable(style):
+    g = fresh(style)
+    g.run("""for i = 1, 25 do table.insert(NS.settingRows, {
+        tab='optional',kind='bool',key='extra'..i,label='Extra option '..i,
+        desc='Explanation of the extra option.'}) end""")
+    g.slash("settings")
+    g.eval("NS.settingsTab")("optional")
+    W = window(g)
+    last = visible_by_key(g, W, "extra25")
+    g.eval("NS.settingsScroll")(100000)
+    assert -last.frame.point[5] + last.frame.height - W.rowScroll.vscroll <= W.rowScroll.height
+    g.eval("function(f) f.scripts.OnMouseUp(f, 'LeftButton') end")(last.frame)
+    assert g.eval("NS.db.extra25") and last.tick.shown
+
+
+def test_wrapped_game_font_measurements_increase_row_height(style):
+    g = fresh(style)
+    g.slash("settings")
+    W = window(g)
+    r = visible_by_key(g, W, "minimap")
+    # Simulate a client/font requiring multiple lines for both the label and help.
+    g.eval("function(r) r.text.GetStringHeight=function() return 56 end; r.desc.GetStringHeight=function() return 65 end end")(r)
+    g.eval("NS.refreshSettings")()
+    assert r.frame.height >= 56 + 65
+    following = W.rows[4]
+    assert -following.frame.point[5] >= -r.frame.point[5] + r.frame.height
+
+
+def test_quest_marker_checkbox_changes_the_visible_enemy_marker():
+    g = fresh("modern")
+    g.run('ADD_PLATE("nameplate1", true)')
+    g.slash("settings")
+    g.eval("NS.settingsTab")("objectives")
+    W = window(g)
+    r = visible_by_key(g, W, "markMobs")
+    assert g.eval("NS.markerFor(PLATES.nameplate1).shown")
+    g.eval("function(f) f.scripts.OnMouseUp(f, 'LeftButton') end")(r.frame)
+    assert not g.eval("NS.markerFor(PLATES.nameplate1).shown")
+    assert "Off" in r.value.text and not r.tick.shown
+    g.eval("function(f) f.scripts.OnMouseUp(f, 'LeftButton') end")(r.frame)
+    assert g.eval("NS.markerFor(PLATES.nameplate1).shown")
+    assert "On" in r.value.text and r.tick.shown
 
 if __name__ == "__main__":
     import inspect

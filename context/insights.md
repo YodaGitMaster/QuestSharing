@@ -7,6 +7,8 @@
 - Follow-up: user says the badge is still missing. The original diagnosis was a prerequisite failure in the captured snapshot, not proof that the CVar command took effect or that a given unit qualifies. Verify fresh helper/nameplate status and active quest-unit matching before changing code.
 - Follow-up: user says `/qs doctor` still reports enemy nameplates off after the advice. `Highlight.lua:setHighlightCVars` deliberately refuses to set CVars during combat and prints “game settings cannot be changed in combat; try again afterwards”; obtain that command's actual response before concluding the setter is broken.
 - Follow-up: user reports visible yellow enemy health bars while doctor still says nameplates are off. This contradicts the prior assumption that no plates are present; separate actual visible plates from the raw CVar check via `/qs highlight` before investigating marker matching.
+- 2026-11-16: verified release `v0.4.15` ZIP includes the `markMobs` setting row under Tracker. New quest-automation rows appear first in that tab, pushing **Finding objectives** and its creature-marker option lower; the setting is immediately after **Pin the nearest quest in the world**.
+- 2026-11-16: `markMobs` is an independent checkbox (default on); clicking once toggles the gold quest badge off or on. `/qs highlight mobs off` turns it off directly. Plain-language copy now states this visibly.
 
 ## 2026-11-15 — Quest dialog action boundaries
 - Blizzard's live QuestFrame source handles `QUEST_DETAIL`, `QUEST_PROGRESS`, and `QUEST_COMPLETE`; accept uses `AcceptQuest()`, ready progress uses `CompleteQuest()`, and reward confirmation uses `GetQuestReward(itemChoice)`. Source: [QuestFrame.lua](https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_UIPanels_Game/Mainline/QuestFrame.lua).
@@ -166,3 +168,42 @@
 ## 2026-11-11
 - Local tracking refs alone are insufficient evidence of a published GitHub Release; query the release list.
 - `python` was absent; `python3 build_release.py` successfully built the 0.3.9 asset (25 addon files).
+# 2026-11-16 — Item sources and vendor search
+- QuestieDB `Item.vendors` gives NPC IDs; `Npc.subName` is the localized role/title and `Npc.spawns` gives map coordinates. This supports category-only item hints and vendor map pins.
+- QuestieDB item records have no `craftedBy` field, and object records have no gathering-profession field. Their `objectDrops` IDs plus localized object names support only a cautious mining-node heuristic; craft/gather labels are not complete.
+- A whole-catalogue search needs current QuestieDB's enumerable item IDs. The index scans in timer batches and remains session-only; direct tooltip lookups do not need the catalogue scan.
+- Vendor search matches all typed words as substrings, so a partial word like `tail` finds titles such as `Senior Master Tailor`. Suggestions list matching title words first, then full roles and item names; click or Tab completes and searches the selected text.
+- Closest fallback can compare normalized map points on one continent using `C_Map.GetMapRectOnMap`; those coordinates are a geographic approximation, not a travel or walkability route. Cross-continent proximity is not claimed.
+
+## 2026-11-16 — Quest data feasibility for quest optimizer
+- QuestieDB documents quest, NPC, item, and object records plus support datasets for zone/UI-map mappings and drop tables; Quest records expose prerequisites and objective data through the public API.
+- Quest Sharing's `Questie.lua` already reads quest starters, `preQuestSingle`/`preQuestGroup`, kill/loot/object/explore objectives, NPC/object spawn points, and turn-ins. Its existing target helpers cap some alternate drop/kill-credit sources, so they are display-oriented and not yet a complete optimizer index.
+- This is enough to support a useful best-known quest planner, not a promise of complete data or optimal walkable routes. The planner still must evaluate player eligibility/progress, missing data, and travel across terrain, caves, and floors.
+- Sources reviewed: QuestieDB public API and support-data docs; Questie's QuestieDB integration guide.
+- Follow-up (2026-11-16): Questie runtime has `QuestieDB.GetItemDroprate(itemId, npcId)` backed by its DropDB; basic QuestieDB Item `npcDrops`/`objectDrops` fields are source lists, not percentages. Quest Sharing currently has no drop-rate lookup. Treat recorded percentages as estimates/data-specific, and show unknown when absent.
+
+## 2026-11-16 — Quest optimizer prior art
+- Existing projects validate the concept in distinct ways: Dreamway makes prerequisite-aware quest batches manually; QuestFlow and QuestRoute group live objectives into geographic stops; QuestTrail describes camp/area clustering plus walkable paths; Factoruide simulates and searches a whole leveling route.
+- Useful first design: prerequisite graph + player state => eligible quest actions => merge exact shared targets, then nearby objective areas => score path/farming/travel effort => short stable look-ahead route. Treat quest pickups and turn-ins as explicit stops and preserve player control.
+- QuestRoute's documented heuristic is nearest-neighbor plus 2-opt with drop chance penalties; Factoruide documents greedy/region construction and local-search route improvements. Reuse ideas only; inspect licenses before copying code or data.
+- Details and source links: `context/quest-optimization-research.md`.
+
+## 2026-11-16 — Settings clarity and layout verification
+- Settings confusion came from mixed purposes and hidden cycling interactions: quest markers, tracker selection and quest-dialog actions now have separate categories; every switch names its visible effect.
+- `markMobs` draws the game's gold quest badge over a unit nameplate; describe it as ! over quest enemies and state that enemy nameplates must be visible. Shared quest-log stars (`markers`) are a separate feature.
+- Settings descriptions/labels must use measured wrapped heights; Quick chat editor must be in the same scroll body. A fixed row pool previously risked silently losing controls after row 18; allocate for all rows.
+- Full suite initially failed in unrelated diagnostics because the existing ItemSources.lua calls GameTooltip:HookScript while the mock lacked it. Reproduced with HEAD Settings.lua, then supplied real hook registration in harness; no unrelated feature code changed.
+- Verification: 34 files / 1,302 checks pass (11 new settings workflows); layout simulation uses real Lua row positions/text plus Arial font metrics. Actual game appearance/font, clipping and mouse-wheel routing remain for in-game QA.
+
+## 2026-11-16 — Recruitment should go straight to game chat
+- The extra recruitment window was caused by a deliberate Menu.lua -> Adventure.open call, not a chat API failure. Reproduce entry-point behavior before blaming delivery.
+- `Adventure.question` creates the short linked question; `Adventure.ask` reuses existing current-chat preparation. No need for another sender, settings, or migration.
+- Preserve active custom-chat attributes so World selection remains selected; no auto-detect/fallback to another audience. Optional role-play editor stays available separately.
+- Tests: 44 invitation/direct-question checks; 60 menu checks; full 34-file run plus tooltip-suite rerun yields 1,314 passing checks. Native game flow remains unverified.
+
+
+## 2026-11-16 — Quest planner first pass
+- Separate quest unlock logic from travel order: any-of and all-of prerequisite edges form layers; stops form a second graph, with quest action dependencies attached to pickups/objectives/turn-ins.
+- Shared exact NPC/object IDs are safe merge keys; proximity grouping is a heuristic, so a nearby camp can serve multiple quests without claiming identical objective credit.
+- Questie readiness combines requirements beyond prerequisites; only current actionable and explicitly prerequisite-blocked candidates should enter this local plan. Unknown state is not guessed.
+- Quest Sharing can provide a useful route list and waypoints from Questie points, but map geometry is not pathfinding. Keep cave/floor routing and drop-weighted travel-time optimization as explicit future work.

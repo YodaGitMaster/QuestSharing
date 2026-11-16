@@ -38,6 +38,11 @@ UISpecialFrames = {}
 OPTIONS_ADDED = {}
 TOOLTIP = {}
 GameTooltip = {
+    HookScript = function(self, event, fn)
+        self.posthooks = self.posthooks or {}
+        self.posthooks[event] = self.posthooks[event] or {}
+        table.insert(self.posthooks[event], fn)
+    end,
     SetOwner = function() TOOLTIP.lines = {} end,
     SetText = function(_, t) TOOLTIP.text = t end,
     AddLine = function(_, t) TOOLTIP.lines = TOOLTIP.lines or {}; TOOLTIP.lines[#TOOLTIP.lines + 1] = t end,

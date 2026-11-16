@@ -270,7 +270,7 @@ local function rowTooltip(row)
     local where = ns.questie and ns.questie.available() and ns.questie.whereText(row.entry.questID)
     if where then GameTooltip:AddLine(S.BLUE .. "It " .. where .. "|r", 1, 1, 1, true) end          -- wraps: it can be long
     GameTooltip:AddLine(S.GREY .. "Left click: offer it to whoever does not have it|r")
-    GameTooltip:AddLine(S.GREY .. "Right click: more (tell the party, where to get it, focus on the map...)|r")
+    GameTooltip:AddLine(S.GREY .. "Right click: ask in chat to do this quest, tell the party, or see quest details|r")
     GameTooltip:Show()
 end
 

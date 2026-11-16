@@ -178,7 +178,7 @@ def test_provider_data_stays_unchanged_and_valid_ranges_are_cached(style):
 
 
 def test_extra_tools_toggle_fits_settings_and_saved_false_stays_false(style):
-    g=game(style);g.slash('settings');g.eval('NS.settingsTab')('optional')
+    g=game(style);g.slash('settings');g.eval('NS.settingsTab')('maps')
     w=g.eval('NS._settingsWindow()');assert w.bottom<w.win.height-30
     g.run('for i,r in ipairs(NS.settingRows)do if r.key=="zoneLevels"then NS.settingsClick(i,"LeftButton")end end')
     assert not g.eval('QuestSharingDB.zoneLevels')

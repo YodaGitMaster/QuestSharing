@@ -2,6 +2,8 @@
 
 A World of Warcraft addon for playing quests together.
 
+[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.16)
+
 ## Your first party, in four steps
 1. **Install it** (see [Install](#install)) and log in. A short welcome in chat tells you it is ready. Everything is
    on, except the automatic party chat: **you** decide when to talk.
@@ -9,7 +11,7 @@ A World of Warcraft addon for playing quests together.
    (for example `V`, or `E` if you do not strafe with it).
 3. **Group up.** Your quests of this area are offered to the newcomers (once each), and the
    **Party quests** window shows your nearest quests with a check or an X for every member. **Left click** a quest to
-   offer it, **right click** to open its menu: tell the party your progress or choose **Seek fellow adventurers** directly below it.
+   offer it, **right click** to open its menu: tell the party your progress or choose **Ask in chat to do this quest** directly below it.
 4. **Talk with one key:** hold it, point at *Hello*, *Team up?* ("Doing [your quest] here - anyone want to group up?"
    in /s), *What I need*... and let go. Each message's channel is yours to choose in the settings.
 
@@ -21,7 +23,7 @@ Hover the map button any time for a quick status (party, tracker, your key, prob
 at all (the game says "tried to call the protected function UNKNOWN()"), but typing into the chat box always works.
 So what the addon writes for you (the right-click menu, quest clicks, Post all) is typed into the chat box with the
 right channel set (`/p`, `/s`, `/w Name`, ...). The quick chat ring has its own switch and sends at once by default
-(see below). *Settings > General > My messages* (or
+(see below). *Settings > General > How to send quest progress messages* (or
 `/qs mode send`) sends at once instead where the game allows it; if the game refuses, the addon switches back to the
 chat box by itself and says so once. The automatic party messages need "sent at once" (typing them into your chat box
 unasked would take your keys while you play).
@@ -54,11 +56,11 @@ the game's tracker still tells the party you are done, because that is your own 
    **Where the game only lets an addon share from your own click** (it refuses an automatic share: "tried to call
    the protected function QuestLogPushQuest()"), the addon notices it, says so once and remembers it: a round then
    waits, and each click on **Share** in the Party quests window (or `/qs share`) offers the next quest; clicking a
-   quest offers that one. *Settings > Sharing > Share only when I click Share* (`/qs shareclick on|off`) shows and
+   quest offers that one. *Settings > Quest sharing > Require a Share click for each quest offer* (`/qs shareclick on|off`) shows and
    changes it. If the game refuses even a share from your click, sharing switches off until you `/reload`.
 
    If you switch on the party chat
-   announcement (**off by default**: *Settings > Sharing > Party chat*), it also tells the party which quests you have
+   announcement (**off by default**: *Settings > Quest sharing > Messages in party chat*), it also tells the party which quests you have
    in common:
 
    > Hey Anna! Looks like we have these quests in common: [Wolves Among Us], [Report to Goldshire] Let's do them together :)
@@ -109,7 +111,7 @@ the game's tracker still tells the party you are done, because that is your own 
      takes more than two lines (the rest is "and 6 more"). What you send yourself (quest clicks, the ring) is never
      limited.
 
-   `/qs pickup on|off`, `/qs coords on|off`, or *Settings > Sharing > Party chat*.
+   `/qs pickup on|off`, `/qs coords on|off`, or *Settings > Quest sharing > Messages in party chat*.
 
 5. **Can announce when a shared quest is done** (off by default). When all objectives of a quest that a party
    member also has are finished, it says so in party chat, once for the whole party.
@@ -143,7 +145,7 @@ the game's tracker still tells the party you are done, because that is your own 
    - **Right click** a quest: a **small menu** opens (Esc or moving away closes it; a grey line says why it cannot be
      used right now):
      - **Tell the party how I am doing** (see below),
-     - **Seek fellow adventurers**: open a role-play invitation for this quest, choose a chat and prepare the message,
+     - **Ask in chat to do this quest**: fills your current chat with `Anyone need [quest]? Wanna group up?`; select World chat first to ask there, then press Enter to send,
      - **Offer it to the party** (the same as a left click),
      - **Tell them where to get it**: with the [Questie](https://github.com/Questie/Questie) addon installed, the party
        hears where it starts, which quest comes before it, **where that earlier quest starts**, and how many steps lie
@@ -178,7 +180,7 @@ the game's tracker still tells the party you are done, because that is your own 
    - **Share** offers your quests of this area to the party now. **Post all** puts your progress on the quests someone
      in the party has in the chat box, in one message. **-** folds the window to its title.
    - It **hides during combat** and comes back afterwards, its **size** can be changed (70-150 %), it is as wide as
-     your party, and *Settings > Party > Move back* finds it if you lost it.
+     your party, and *Settings > Party window > Move back* finds it if you lost it.
 
 7. **Shows each other where you are.**
    - **Quest Sharing users on your world map:** a class icon where each of them is (their addons send their position
@@ -189,7 +191,7 @@ the game's tracker still tells the party you are done, because that is your own 
      has, otherwise simply your nearest quest.
 
 8. **Pings the quest target for the party** (where the game has its ping system: `/qs doctor` says so).
-   Bind a **ping key** (*Settings > Tracker > Ping key*: click, press the key; or `/qs pingkey G`). Each press:
+   Bind a **ping key** (*Settings > Pings & quest items > Key to target and ping a quest enemy*: click, press the key; or `/qs pingkey G`). Each press:
    - **the nearest creature one of your quests needs** becomes your target and gets the game's **Attack** ping, so
      the party sees what to kill ("nearest" = within about 28 yards, then the one closest to the middle of your
      screen: the game gives addons no distance to enemies);
@@ -214,12 +216,12 @@ the game's tracker still tells the party you are done, because that is your own 
    bags (a torch to light, a flare to throw...). Click it to use the item. Which item goes with which quest: the bag's
    own quest info, an objective that names the item, or (with Questie) the item the quest gives you or needs; items
    without a "Use:" effect get nothing, and quests that already have the game's button are left to the game.
-   - **Quest item key** (*Settings > Pings & items*, or `/qs itemkey Q`): uses the item of your **nearest** quest that
+   - **Quest item key** (*Settings > Pings & quest items*, or `/qs itemkey Q`): uses the item of your **nearest** quest that
      has one, also in combat (the item it had before the fight).
    - **A small button** with that item (Shift + drag to move it): cooldown, count, red when your target is out of range.
    - Using an item is protected by the game, so these are secure buttons prepared outside combat; during a fight they
      keep what they had and the tracker icons are put in place again afterwards.
-   - **Quest items marked in your bags** (*Settings > Pings & items > Mark quest items in my bags*, `/qs bagmarks
+   - **Quest items marked in your bags** (*Settings > Pings & quest items > Mark quest items in my bags*, `/qs bagmarks
      on|off`, on by default): a **gold** border on items for a quest of the zone you are in, a **blue** one on items
      for one of your quests somewhere else, so the bank can keep those and you only carry what this zone needs. The
      item's tooltip says which quest and where. An item counts for a quest when an objective names it ("Wolf Pelt:
@@ -228,7 +230,7 @@ the game's tracker still tells the party you are done, because that is your own 
      their own buttons and are not marked. Clicks go through to the item.
 
 10. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. **Hide the game's
-    tracker** altogether: *Settings > Tracker > Hide the game's quest tracker* (`/qs hidetracker on`; outside fights, as
+    tracker** altogether: *Settings > Quest list > Hide the game's quest list on the right* (`/qs hidetracker on`; outside fights, as
     the game requires; the Party quests window still shows your quests). It fills the
    tracker (the list on the right) with the quests closest to you and **re-checks every 2 seconds as you
    move**, so the list follows you instead of changing only when you cross into another zone.
@@ -316,7 +318,7 @@ the game's tracker still tells the party you are done, because that is your own 
    **You see where it goes before you send it.** Every dot on the ring has the colour of the chat it goes to, the
    game's own chat colours: **party blue**, **whisper pink**, **say white**, **yell red**, gold for the invite. The
    middle of the ring shows the message and, under it, "to the party", "whispered to Lia" or "to everybody nearby
-   (/s)". *Settings > Quick chat > Ring size*: small, normal or large.
+   (/s)". *Settings > Quick chat > Message ring size*: small, normal or large.
 
    **Why `/say` needs a click.** The game only lets an addon say things to everybody nearby (`/say`, `/yell`,
    `/emote`) as the direct result of a key *press* or a mouse *click*, never from a key *release*; that is what
@@ -378,26 +380,36 @@ the game's tracker still tells the party you are done, because that is your own 
     - `/qs highlight mobs|pin|cvars [on|off]`; the same switches are in `/qs settings`.
 
 ## Settings window
-**Everything is switched on by default** (except the friends beta and the game-settings helper). To change
-anything, left-click the map button, type `/qs settings`, click **Settings** on the Party quests window, or open
-*Game Menu > Options > AddOns > Quest Sharing*. Each tab is about one thing you do, opens with a one-line
-explanation, and groups its settings in short sections:
+Open `/qs settings`, left-click the minimap button, click **Settings** in Party quests, or use
+*Game Menu > Options > AddOns > Quest Sharing*. Choose what you want to change from the left-hand menu:
 
-| Tab | What is on it |
+| Category | What you can change |
 |---|---|
-| **General** | *Getting started*: your **quick chat key** (click, then press the key), **Show the ring**, **Check my setup**. *Basics*: the master switch, how your messages go out, the map button, a soft sound for good news; *Debugging*: the debug log and **Show the debug log**; reset |
-| **Sharing** | *When I join a party*, *Party chat* (in common, done, picked up a quest someone has, where the items were), *Behind the scenes* (sync, quest-log markers) |
-| **Party** | the Party quests window (show it in a party, hide it in combat, its size, move it back), *Clicking a quest* (what a click on the game's tracker posts) *Showing where we are* (the map icons, a teammate's pin) and *Friends* (the beta) |
-| **Tracker** | *The quest list on the right* (hide the game's tracker, follows you, how many, distance or zone, the pause), *Finding objectives* (the world pin, quest icons over creatures, the game-settings helper)  |
-| **Quick chat** | the ring, its key, hold or toggle, its size, where Auto messages go, and the **message editor** |
-| **Pings & items** | *Pinging quest targets* (the ping key, the anti-spam time, objects too) and *Quest items* (quest items marked in your bags, icons in the tracker, the quest item key, the item button) |
-| **Extra tools** | world-map questing levels; highest learned spell ranks; quest invitations; fishing waters; quest reward and instance drop browsers |
+| **General** | Turn the addon on/off, show its minimap button, choose how progress messages are sent, preview quick chat, check your setup, view logs, reset settings |
+| **Quest markers** | **Show ! above quest enemies**, turn on the enemy health bars those marks need, follow the nearest quest with a waypoint |
+| **Quest list** | Hide the game's tracker or automatically fill it with nearby quests; choose how many and how long to pause after your own edits |
+| **Accept & turn in** | Automatically accept quest offers and turn in ready quests; each has its own switch |
+| **Quest sharing** | Offer quests to your party, require a manual Share click, announce progress, sync quest information, mark shared quests in the quest log |
+| **Party window** | Show/hide/resize the separate Party quests window, restore its position, post progress by clicking, add party friends |
+| **Pings & quest items** | Bind target-ping and quest-item keys, mark bag items, show usable item buttons |
+| **Quick chat** | Set the ring key, choose hold/press, choose where messages go, edit each message or emote |
+| **Map & sellers** | Add item/seller search, item source hints, zone level guides, party map icons and shared item-location waypoints |
+| **Extra tools** | Plan nearby quests, update learned spell ranks, browse quest/dungeon equipment, edit fishing spots, draft quest invitations |
 
-Every line is one click: a **check box** switches, a **choice** (`< value >`) moves to the next one (right click goes
-back), a **number** (`- 10 +`) counts up with the left button and down with the right one (Shift = bigger steps), and
-**buttons** do what they say. The grey line under a setting says what it does; with the master switch off the other
-lines are greyed. The same things can be done with `/qs` commands, and a change in either place shows up in the other
-at once. Settings saved by an earlier version get the new defaults; every other choice you made is kept.
+Every option has a visible explanation of what turning it on does and any requirements.
+For example, **Quest markers > Show ! above quest enemies** adds a gold ! above enemies needed for your active
+quests; **Turn on enemy health bars and nearby object icons** enables the game's nameplates those marks need.
+The shared-quest star in the quest log has its own setting under **Quest sharing**.
+
+Checkboxes show **On** or **Off**. For choices, click the named option you want; the selected option is marked
+**[x]** and its explanation appears below. Numbers have separate **-** and **+** buttons (Shift changes five steps).
+For a key binding, click **Set key**, then press the key; Escape cancels. Actions use named buttons such as
+**Run check** and **Browse rewards**. Changes save automatically.
+
+Long pages scroll, including the Quick chat message editor. Use your mouse wheel or the visible **Scroll up** /
+**Scroll down** buttons. Changing a setting keeps your reading position; changing category starts at the top.
+Your existing saved choices and defaults are kept. Quest automation, map extras, spell-rank automation, fishing,
+reward browsing, friend automation, and the game-settings helper remain opt-in.
 
 **The map button's tooltip** shows how things are right now: your party and how many quests you share, whether the
 tracker follows you, your quick chat key (or that it is not set) and how many problems were recorded.
@@ -405,20 +417,49 @@ tracker follows you, your quick chat key (or that it is not set) and how many pr
 **Good news has a sound** (switch it off under General): a soft ping when someone accepts a quest you shared or a
 party member running Quest Sharing finishes one you share. Never during combat.
 
-## Extra tools: quest automation, zone levels, spell ranks, quest invitations, fishing, quest rewards and instance drops
+## Extra tools: quest planner, item sources, sellers, quest automation, zone levels, spell ranks, quest invitations, fishing, quest rewards and instance drops
 
-Open `/qs settings` > **Extra tools** for these tools; fishing and the reward browser have independent switches.
+Open `/qs settings` > **Map & sellers** for item sources, seller search, and zone levels; use **Accept & turn in** for quest automation and **Extra tools** for the remaining tools.
 Extra tools are opt-in: enable their switches or open a tool explicitly when you need it.
 
-**Quest acceptance and turn-ins.** Under `/qs settings` > **Tracker** > **Quest offers and turn-ins**, enable **Auto-accept offered quests** to
-accept a quest when an NPC or party member presents it. Enable **Auto-complete ready quests** to continue a ready
+**Quest planner.** Open **Extra tools > Plan my quests** or type `/qs plan`. It is off by default; opening the planner turns it on. Questie and a recent QuestieDB are needed for its quest catalogue, prerequisites and locations.
+
+The planner reads quests in the area you are in and your current quest log. It uses Questie's eligibility check when available, includes quests you already have, and looks up quests you can take now. It can also look ahead by up to four prerequisite layers when Questie marks a quest as blocked only by known prerequisites and those earlier quests are available or can be planned here. It respects both prerequisite rules: **any one** quest in a single-prerequisite list is enough, while **every** quest in a group-prerequisite list is required. A quest with unknown eligibility or location is not guessed into the plan.
+
+Each route is a sequence of useful stops:
+
+- **Pickups:** where to accept quests you can take, plus prerequisite quests that open a later step.
+- **Objectives:** kill creatures, collect items, use objects, or visit places. If the same known creature or object advances multiple quests, the planner combines those tasks at one stop. It also combines close objective locations into a nearby camp when they are on the same map.
+- **Turn-ins:** known quest givers and objects where the plan says to hand quests in after their prerequisite stops.
+
+The order always follows known prerequisite and pickup/objective/turn-in dependencies. Among stops that are currently allowed, it picks the closest map point, then repeats. This is a practical local ordering heuristic; it does not search every possible route or guarantee the globally shortest trip. If Questie has a drop percentage for a collect-item target, the planner shows the best known percentage beside it; the percentage does not affect stop order or estimate time-to-farm.
+
+Use **Previous** and **Next** to select a stop, **Set waypoint** to place the game's waypoint on it, and **Refresh plan** after your quest log changes. `/qs plan next` selects the next stop and sets its waypoint; `/qs plan refresh` rebuilds the list; `/qs plan on` enables the tool; `/qs plan off` disables it and closes the window. Selecting a waypoint does not move your character or accept/complete quests for you.
+
+**Travel limits:** distances are straight map-coordinate estimates. This version does not calculate walkable routes, avoid mountains/water, or understand cave entrances, floors, elevators, or underground connections. It may miss quests whose Questie points cannot be mapped to your current area. A map waypoint marks the stop; it is not a path line.
+
+**Item sources and sellers.** Turn on **Show where items come from when I hover over them** to add vendor types such as **General Goods**
+to bag and recipe item tooltips. Known mining nodes are labelled **Mining**. Questie stores vendor links and object names,
+but does not mark every gathering profession or craft recipe, so unrecognized source types are not guessed.
+Turn on **Add item and seller search to the world map**, open the map with `M`, and search an item name or vendor type such as
+`General Goods`. Suggestions appear as you type; click one or press Tab to complete it. Partial titles also match, so
+`tail` finds vendors titled **Tailor**, **Senior Tailor** or **Senior Master Tailor**. Matching seller locations appear
+as pins; click a pin to set a waypoint. The **Sellers** tab lists every matching seller location on the shown map with
+its vendor type and coordinates. Clicking an item suggestion opens that list; the **Map** tab shows all its pins.
+Buyable items and reagents appear when Questie links them to vendors. If there is no seller on the shown map, the
+search offers the closest mapped seller on your continent by map distance and a **Waypoint** button. Ctrl-right-click
+the map to show matches on that map only. The map search needs a recent QuestieDB item list; only items with a known
+vendor link appear as seller results, so craft-only and gather-only searches do not invent a vendor.
+
+**Quest acceptance and turn-ins.** Under `/qs settings` > **Accept & turn in**, enable **Accept quest offers automatically** to
+accept a quest when an NPC or party member presents it. Enable **Turn in completed quests automatically** to continue a ready
 turn-in and take its reward when there is no choice or only one reward choice. Quests with multiple choices or a
 required payment stay open for you. Both options are independent and off by default.
 
 **Questing levels on the world map.** Open the map normally with `M`: continent maps display level badges
 over outdoor zones, and a small **Questing levels** panel shows the range for the zone you view or hover.
 Choose a continent/zone from the world overview to see its details. This is **off by default**; enable
-**Show zone questing level ranges** in Extra tools to display it. Labels do not intercept map clicks and
+**Show zone questing level ranges** in Map & sellers to display it. Labels do not intercept map clicks and
 follow map resizing/zoom.
 When upgrading from v0.4.11, the option is switched off once; your subsequent choice stays saved across reloads.
 
@@ -443,11 +484,15 @@ and report the problem. Turn the option off to keep lower-ranked buttons; disabl
 Action bars supplied by other addons work when they use the game's normal action slots; custom secure actions
 and spells written inside macros are not edited.
 
-**Seek fellow adventurers.** Right-click a quest in the Party quests window and choose **Seek fellow adventurers**
-just below **Tell the party how I am doing**,
-or use `/qs adventure` (optionally followed by a quest ID, exact title or quest link). You can also open it from
-*Settings > Extra tools > Seek fellow adventurers*. It chooses an unfinished quest from your log; **Next quest** browses
-the others, and **Another wording** cycles through three role-play invitations, for example:
+**Ask in chat to do this quest.** Right-click a quest in the Party quests window and choose this action to put
+`Anyone need [quest]? Wanna group up?` straight into your current chat. The actual quest is linked; no invitation
+editor opens. Select World (or another chat channel) first to ask there, review the message, then press Enter.
+An existing draft is kept, and duplicate quests or messages that exceed the chat limit are rejected.
+
+**Seek fellow adventurers (optional editor).** For a longer role-play invitation, use `/qs adventure`
+(optionally followed by a quest ID, exact title or quest link), or *Settings > Extra tools > Seek fellow adventurers*.
+It chooses an unfinished quest from your log; **Next quest** browses the others. Choose a channel, edit the text,
+and click **Prepare chat** before pressing Enter to send.
 
 > Hail, fellow adventurers! I seek brave companions for [Wolves Among Us] in Elwynn Forest. Who will join me and share the adventure?
 
@@ -574,14 +619,14 @@ If an unloaded AtlasLoot module cannot load during combat, it is retried after c
 Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check.
 
 ## Install
-**Easiest:** download `QuestSharing-<version>.zip` from the GitHub *Releases* page, unzip it and drop the
+**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.16), unzip `QuestSharing-<version>.zip` and drop the
 `QuestSharing` folder into `Interface\AddOns`. Or:
 1. Copy the folder `QuestSharing` (the one containing `QuestSharing.toc`, not this README's folder) into
    the game's `Interface\AddOns` folder, so you have `...\AddOns\QuestSharing\QuestSharing.toc`.
 2. Start the game; on the character screen click **AddOns** and make sure **Quest Sharing** is ticked
    (tick **Load out of date AddOns** if the game says it is out of date).
 3. Optional: install **Questie** too. Quest Sharing only reads its quest database (where quests start, which
-   quests come first) for "Tell them where to get it", and on clients where the game cannot say which creatures your
+   quests come first) for the quest planner and "Tell them where to get it", and on clients where the game cannot say which creatures your
    quests need, it adds their names (only when Questie's language is the game's: names on screen are in the game's
    language). Everything else works without it. **Questie 12 comes as two folders, `Questie` and `QuestieDB`** (its
    quest data): download the `Questie-v...+v....zip` under *Assets* of
@@ -715,7 +760,7 @@ python tests/test_questsharing.py     # 68 tests: sharing, replies, announcement
 python tests/test_features.py         # 96 tests: sync, completion, the Party quests grid, quest-log markers
 python tests/test_triggers.py         # 34 tests: when it shares (once per join / new member / new quest), no nagging
 python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
-python tests/test_settings.py         # 44 tests: everything on by default, migration, the tabbed settings window
+python tests/test_settings.py         # 55 tests: defaults, migration, direct settings controls, scrolling and enemy ! switch
 python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
 python tests/test_quick.py            # 131 tests: the quick chat ring, placeholders, editing, key binding, performance
 python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
@@ -737,7 +782,7 @@ python tests/test_questmap.py         # 15 tests: How to do it, and guards again
 python tests/test_ringtest.py         # 14 tests: /qs quick test: every slot run, checked against what the game did
 python tests/test_log.py              # 35 tests: the debug log: every action and its outcome, kept small, the log window
 python tests/test_optional.py         # 42 tests: fishing water notes, map drawing, reward filters and item comparisons
-python tests/test_adventure.py        # 32 tests: role-play quest invitations, preview, channels and preserved chat drafts
+python tests/test_adventure.py        # 44 tests: direct quest questions, role-play invitations, channels and preserved drafts
 python tests/test_equipment.py        # 36 tests: one window, shared filters, rare+ quality, dungeon/raid identity and cancellation
 python tests/test_equipment_grouping.py # 28 tests: unique names, merged sources/routes, variants, filtering, counts and selection
 python tests/test_instance_focus.py   # 24 tests: current dungeon, batched loads, manual browsing, wing identity and Extra tools
@@ -781,6 +826,6 @@ Expected: every line ends in `passed` with all tests green (1291 in total).
 | `QuestSharing/Team.lua` | "picked up a quest someone has - let's do it together?" (once per quest, not for shared ones) |
 | `QuestSharing/QuestAutomation.lua` | optional quest acceptance and safe quest turn-ins |
 | `QuestSharing/Style.lua` | one look for every window (dialog and on-screen frames, buttons, check boxes, chat colours) and the good-news sound |
-| `QuestSharing/Settings.lua` | the tabbed settings window (sections, check boxes, key capture) with the message editor, and the options entry |
+| `QuestSharing/Settings.lua` | the sidebar settings window (plain explanations, direct choices, scrolling, key capture) with the message editor, and the options entry |
 | `QuestSharing/Status.lua` | the status message, tracker / link hooks, `/qs probe` |
 | `tests/` | the Lua 5.1 test harness with a WoW API mock, and the two test files |

@@ -1,5 +1,5 @@
 # Architecture
-Last updated: 2026-11-15
+Last updated: 2026-11-16
 
 ## File tree
 ```text
@@ -7,7 +7,7 @@ QuestSharing/  # Repository root
 ├── .gitignore  # Exclude caches and release output
 ├── CHANGELOG.md  # Release history
 ├── QuestSharing/  # WoW addon runtime
-│   ├── Adventure.lua  # Role-play quest invitation preview and chosen-channel chat drafts
+│   ├── Adventure.lua  # Direct quest-group question in current chat and optional role-play invitation editor
 │   ├── Bags.lua  # quest items marked in your bags, so you only carry what this zone needs
 │   ├── Bindings.xml  # Game key bindings
 │   ├── Compat.lua  # one place that knows the differences between the classic and the modern quest APIs
@@ -17,6 +17,7 @@ QuestSharing/  # Repository root
 │   ├── EquipmentUI.lua  # Shared equipment explorer, filters, item cards and inline details
 │   ├── Fishing.lua  # Optional world-map water notes, editor and AnglerAtlas zone summaries
 │   ├── Highlight.lua  # make quest objectives easier to find
+│   ├── ItemSources.lua  # optional Questie source hints on bag and recipe item tooltips
 │   ├── Loot.lua  # Equipment-only instance browser with AtlasLoot tables and partial QuestieDB fallback
 │   ├── Marker.lua  # showing each other where you are
 │   ├── Menu.lua  # the small menu a right click on a quest in the Party quests window opens
@@ -29,9 +30,10 @@ QuestSharing/  # Repository root
 │   ├── QuestItems.lua  # quest items you can USE (a torch to light, a flare to throw...)
 │   ├── QuestSharing.toc  # Addon metadata and module load order
 │   ├── Questie.lua  # if the Questie addon is installed, its quest database tells us where a quest starts and which quests
+│   ├── QuestPlanner.lua  # optional prerequisite-layer planner, shared objective stops, and waypoint action
 │   ├── Quick.lua  # a quick-chat wheel
 │   ├── Rewards.lua  # On-demand QuestieDB reward catalogue, eligibility filters and item comparisons
-│   ├── Settings.lua  # the settings window.   /qs settings   (also: the minimap button, the "Settings" link on the Party quests
+│   ├── Settings.lua  # Sidebar categories, plain explanations, direct choices, scrollable settings/editor and key capture
 │   ├── Share.lua  # notice a new party, push the quests of the area one by one, read the game's replies
 │   ├── SpellRanks.lua  # Opt-in learned spell-rank upgrades across player action-bar pages
 │   ├── Status.lua  # what to say about a quest you click in the tracker, and the hooks that notice the click
@@ -39,11 +41,14 @@ QuestSharing/  # Repository root
 │   ├── Sync.lua  # party members who also run Quest Sharing tell each other exactly which quests they have
 │   ├── Team.lua  # "Picked up [Wolves Among Us] - Anna has it too. Want to do it together?"
 │   ├── Track.lua  # keeps the quest tracker (the list on the right) filled with the quests closest to you
+│   ├── VendorMap.lua  # optional item/vendor search and own pins on the world map
 │   └── ZoneLevels.lua  # Read-only map questing ranges, outdoor zone badges and hover panel
 ├── README.md  # User documentation
 ├── build_release.py  # Build install ZIP and release notes
 ├── context/  # Session continuity and live architecture
 │   ├── BUGS/  # Verified bug methodology and regressions
+│   │   ├── 2026-11-16-quest-recruitment-extra-editor.md  # Direct chat recruitment instead of mandatory composer
+│   │   ├── 2026-11-15-settings-extra-tools-overflow.md  # Fixed-height settings overflow diagnosis
 │   │   ├── 2026-11-13-zone-levels-empty-native-data.md  # Standalone guide fallbacks when native ranges are empty
 │   │   ├── 2026-11-13-equipment-duplicate-rows.md  # Filtered name grouping with complete source retention
 │   │   ├── 2026-11-13-zone-levels-opt-in.md  # Once-only migration from auto-enabled map ranges
@@ -56,13 +61,14 @@ QuestSharing/  # Repository root
 │   ├── architecture.md  # Live source map and runtime diagrams
 │   ├── decisions.md  # Choices and rationale
 │   ├── insights.md  # Timestamped findings
+│   ├── quest-optimization-research.md  # Prior art and proposed quest graph/route optimizer design
 │   ├── schema.md  # Data structures and formats
 │   ├── shortest-path-source-study.md  # External router implementation trace; no runtime dependency
 │   ├── state.md  # Current task and handoff
 │   └── walkable-routing-research.md  # Terrain-routing feasibility, provider sources and proposed integration (not implemented)
 └── tests/  # Python tests and Lua API harness
     ├── harness.py  # Mock WoW APIs and load Lua addon
-    ├── test_adventure.py  # Invitation generation, chat routes, preview and draft preservation
+    ├── test_adventure.py  # Direct quest questions, invitation generation, chat routes, preview and draft preservation
     ├── test_bags.py  # Tests for bags
     ├── test_box.py  # Tests for box
     ├── test_done.py  # Tests for done
@@ -77,7 +83,7 @@ QuestSharing/  # Repository root
     ├── test_instance_focus.py  # Current dungeon opening, delayed catalogue focus, manual navigation and Extra tools label
     ├── test_log.py  # Tests for log
     ├── test_loot.py  # Instance loot parsing, search, provider fallback and asynchronous item names
-    ├── test_look.py  # Tests for look
+    ├── test_look.py  # Settings viewport/layout, key capture, sounds and ring appearance
     ├── test_menu.py  # Tests for menu
     ├── test_optional.py  # Optional tool integration, water persistence, reward eligibility and comparisons
     ├── test_ping.py  # Tests for ping
@@ -85,7 +91,7 @@ QuestSharing/  # Repository root
     ├── test_questsharing.py  # Tests for questsharing
     ├── test_quick.py  # Tests for quick
     ├── test_ringtest.py  # Tests for ringtest
-    ├── test_settings.py  # Tests for settings
+    ├── test_settings.py  # Settings persistence, direct controls, wrapped rows, scroll reachability and enemy markers
     ├── test_stats.py  # Shared stat minimums, native API compatibility, live controls and cache invalidation
     ├── test_spell_ranks.py  # Learned ranks, guarded action-slot swaps, combat/cursor deferral and API compatibility
     ├── test_team.py  # Tests for team
@@ -106,9 +112,16 @@ flowchart TD
     Core --> Share[Share.lua: quest offers]
     Core --> Sync[Sync.lua: party addon messages]
     DB[Optional QuestieDB] --> Q[Questie.lua: ns.questie]
+    Settings --> Planner[QuestPlanner.lua: optional local quest plan]
+    Core --> Planner
+    Planner --> Q
+    Planner --> Compat
+    Planner --> MapAPI[C_Map map projection and waypoint]
     Share --> API[WoW APIs via Compat.lua]
     Sync --> API
-    Settings[Settings.lua: Extra tools tab] --> Fishing[Fishing.lua: water notes]
+    Settings[Settings.lua: sidebar categories] --> Fishing[Fishing.lua: water notes]
+    Settings --> ItemSources[ItemSources.lua: item tooltip source hints]
+    Settings --> VendorMap[VendorMap.lua: seller search and map pins]
     Settings --> Rewards[Rewards.lua: reward browser]
     OptionalUI[OptionalUI.lua] --> Equipment[EquipmentUI.lua: shared explorer, Rare+ only]
     Equipment --> Rewards
@@ -134,6 +147,11 @@ flowchart TD
     Fishing --> Waters[(QuestSharingDB.fishingWaters)]
     Atlas[Optional AnglerAtlas] --> Fishing
     Rewards --> Q
+    ItemSources --> Q
+    VendorMap --> Q
+    VendorMap --> ExistingMap[WorldMapFrame and C_Map]
+    VendorMap --> SellerList[Sellers tab: all matching vendor locations and coordinates]
+    VendorMap --> Waypoint[Compat.lua: user waypoint]
     Rewards --> Items[WoW item info and comparison tooltips]
     Settings --> Loot[Loot.lua: instance drop search]
     Loot --> AtlasLoot[Optional AtlasLoot encounter tables]
@@ -141,7 +159,8 @@ flowchart TD
     Loot --> Items
     Loot --> Location[WoW GetInstanceInfo and localized subzone names]
     Loot --> Rewards
-    QuestMenu[Menu.lua: Seek fellow adventurers] --> Adventure[Adventure.lua: invitation composer]
+    QuestMenu[Menu.lua: Ask in chat to do this quest] --> Adventure[Adventure.lua: question and prepare]
+    Adventure --> Composer[Optional editor: Extra tools or qs adventure]
     Core --> Adventure
     Settings --> Adventure
     Adventure --> Compat[Compat.lua: quest log and links]
@@ -149,6 +168,21 @@ flowchart TD
 ```
 
 ## Sequence diagrams
+```mermaid
+sequenceDiagram
+    participant Player
+    participant UI as Settings.lua
+    participant Saved as Core.lua: ns.setSetting
+    participant Feature as Existing feature modules
+    Player->>UI: Choose a sidebar category
+    UI->>UI: Lay out wrapped explanations and controls in scroll body
+    Player->>UI: Toggle checkbox, choose named option or press +/-
+    UI->>Saved: Persist existing setting key and value
+    Saved->>Feature: Apply existing setting side effects
+    UI->>UI: Refresh labels and selected explanation; preserve/clamp scroll
+    Note over UI: Quick chat editor shares the scroll body; category changes reset scroll
+```
+
 ```mermaid
 sequenceDiagram
     participant User
@@ -205,7 +239,7 @@ sequenceDiagram
 sequenceDiagram
     participant Game as WoW quest dialog
     participant Automation as QuestAutomation.lua
-    participant Settings as Extra tools settings
+    participant Settings as Settings.lua: Accept and turn in
     Settings->>Automation: Persist independent auto-accept / auto-complete flags
     Game->>Automation: QUEST_DETAIL
     alt Auto-accept enabled and not in combat
@@ -269,14 +303,19 @@ sequenceDiagram
     participant Adventure as Adventure.lua
     participant Compat as Compat.lua
     participant Chat as WoW chat edit box
-    User->>Menu: Right-click quest; Seek fellow adventurers (row 2)
-    Note over User,Menu: Directly after Tell the party how I am doing; also qs adventure / Extra tools
-    Menu->>Adventure: open quest invitation
-    Adventure->>Compat: Read unfinished quest and link
-    Adventure->>User: Editable invitation, wording and channel
-    User->>Adventure: Prepare chat
-    Adventure->>Compat: Revalidate unfinished quest
-    Adventure->>Chat: Preserve active draft or open chosen channel
+    alt Quest right-click menu
+        User->>Menu: Ask in chat to do this quest (row 2)
+        Menu->>Adventure: ask(clicked quest)
+        Adventure->>Compat: Revalidate unfinished quest and read its link
+        Adventure->>Chat: Anyone need [quest]? Wanna group up? (current channel)
+    else Extra tools or qs adventure
+        User->>Adventure: Open optional invitation editor
+        Adventure->>User: Editable role-play invitation, wording and channel
+        User->>Adventure: Prepare chat
+        Adventure->>Compat: Revalidate unfinished quest
+        Adventure->>Chat: Prepare in chosen channel
+    end
+    Note over Adventure,Chat: Reuse prepare; retain drafts and channel attributes; reject duplicates and oversize text
     User->>Chat: Press Enter to send
 ```
 
@@ -329,6 +368,62 @@ sequenceDiagram
     E->>Page: Cancel unfinished timers and hide child
 ```
 
+```mermaid
+sequenceDiagram
+    participant User
+    participant Tooltip as GameTooltip
+    participant Hints as ItemSources.lua
+    participant DB as QuestieDB
+    User->>Tooltip: Hover bag or recipe item
+    Tooltip->>Hints: OnTooltipSetItem with item link
+    Hints->>DB: Read Item.vendors / objectDrops and source titles
+    DB-->>Hints: Vendor roles and localized object names
+    Hints-->>Tooltip: Add vendor types and recognized Mining hint
+```
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Map as Existing world map
+    participant Search as VendorMap.lua
+    participant DB as QuestieDB
+    User->>Map: Type partial item/type or Ctrl-right-click
+    Search->>DB: Batch-scan item IDs and vendor links
+    DB-->>Search: Item names, vendor IDs, NPC titles and spawns
+    Search-->>User: Suggest matching words, vendor titles and items
+    User->>Search: Click a suggestion or press Tab
+    Search-->>User: Map tab draws all seller pins; Sellers tab lists every location
+    Search->>Map: Draw own pins for matching vendor spawns
+    alt No seller on shown map and same-continent location exists
+        Search->>User: Report nearest map position and offer waypoint
+    else Ctrl-right-click or no mapped nearby seller
+        Search->>User: Show current-map-only or no-location result
+    end
+    User->>Map: Click seller pin or waypoint button
+    Map->>DB: Use vendor map coordinates with Compat.setWaypoint
+```
+
+```mermaid
+sequenceDiagram
+    participant Player
+    participant Entry as Settings.lua / Core.lua
+    participant Planner as QuestPlanner.lua
+    participant Questie as Questie.lua / QuestieDB
+    participant Log as Compat.lua quest log
+    participant Map as C_Map / user waypoint
+    Player->>Entry: Open Quest plan or /qs plan
+    Entry->>Planner: Open and scan
+    Planner->>Questie: Read quest IDs in timer batches
+    Planner->>Log: Read active quests and objectives
+    Planner->>Questie: Read readiness, prerequisites, starters, targets and turn-ins
+    Planner->>Planner: Build prerequisite layers; group exact sources and nearby map points
+    Planner->>Planner: Order legal stops by straight map distance
+    Planner->>Player: Show suggested pickups, camps, objectives and turn-ins
+    Player->>Planner: Select a stop and Set waypoint
+    Planner->>Map: Set the game's waypoint
+    Note over Planner,Map: Map distance only; terrain, caves, floors and walkable paths are not computed
+```
+
 ## Class diagram
 The addon uses Lua tables and a shared namespace; these are data relationships, not declared classes.
 ```mermaid
@@ -340,6 +435,8 @@ classDiagram
         known
         offered
         questie
+        itemSources
+        vendorMap
         adventure
         fishing
         rewards
@@ -347,7 +444,21 @@ classDiagram
         equipmentUI
         spellRanks
         zoneLevels
+        itemSources
+        vendorSearch
+        questPlanner
     }
+    class SettingRow {
+        tab
+        kind
+        key_optional
+        label
+        desc
+        values_optional
+        names_optional
+        help_by_selected_value_optional
+    }
+    Namespace --> SettingRow : settingRows drives Settings.lua
     class Settings {
         dbVersion
         enabled
@@ -358,6 +469,7 @@ classDiagram
         zoneLevels
         autoAcceptQuests
         autoCompleteQuests
+        questPlanner
         zoneLevelsOptInMigrated
         fishingWaters
         hideTracker
@@ -372,6 +484,17 @@ classDiagram
         fish
         notes
     }
+    class VendorItemIndex {
+        itemID
+        localizedName
+        vendorIDs
+    }
+    class VendorLocation {
+        vendorID
+        categoryTitle
+        spawns_area_map_x_y
+    }
+    VendorItemIndex --> VendorLocation : vendorIDs resolve only to known sellers
     class RewardOption {
         itemID
         info
@@ -470,4 +593,32 @@ classDiagram
     Settings --> WaterNote : fishingWaters indexed by local numeric ID
     Namespace --> RewardOption : rewards builds ephemeral catalogue
     Namespace --> Settings : ns.db aliases QuestSharingDB
+    class QuestCandidate {
+        id
+        name
+        status_active_ready_future
+        beforeAny_ids
+        beforeAll_ids
+        starterRows
+        targets
+        turnIns
+        depth
+    }
+    class PlannerStop {
+        id
+        kind_pickup_objective_turnin
+        point_map_x_y
+        quests
+        tasks
+        deps
+    }
+    class QuestPlan {
+        candidates
+        orderedStops
+        selectedStop
+        loadingGeneration
+    }
+    QuestPlan --> QuestCandidate : scans the current area
+    QuestPlan --> PlannerStop : derives and orders
+    PlannerStop --> PlannerStop : prerequisite dependency IDs
 ```

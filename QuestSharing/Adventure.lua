@@ -1,4 +1,4 @@
--- Player-triggered quest invitations: generate a little role-play, preview it, then fill any chosen chat.
+-- Player-triggered quest invitations: a direct chat question, plus an optional role-play editor.
 -- Never sends chat itself, even when the other features use immediate sending.
 local ADDON, ns = ...
 local A, C, U, S = {}, ns.compat, ns.optionalUI, ns.style
@@ -39,6 +39,18 @@ function A.message(e, style)
         text = before .. link .. after
     end
     return text
+end
+
+-- Keep the quest link intact unless an unusually long title exceeds the chat limit.
+function A.question(e)
+    e = live(e)
+    if not e then return nil end
+    local before, after = "Anyone need ", "? Wanna group up?"
+    local link = C.link(e)
+    if #before + #link + #after > 255 then
+        link = "[" .. C.safeCut(literal(e.title), 255 - #before - #after - 2) .. "]"
+    end
+    return before .. link .. after
 end
 
 local ROUTES = { say = "/s ", s = "/s ", yell = "/y ", y = "/y ", party = "/p ", p = "/p ",
@@ -96,6 +108,12 @@ function A.prepare(e, text, route)
     if usedBox and usedBox.SetFocus then usedBox:SetFocus() end
     ns.log("adventure", "prepared quest " .. e.questID .. " invitation; player presses Enter")
     return true
+end
+
+function A.ask(e)
+    local ok, why = A.prepare(e, A.question(e), "current")
+    if not ok then ns.print(why) end
+    return ok, why
 end
 
 local function refresh()
