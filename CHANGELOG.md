@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.4.17
+- Shortest Path Forever is now an optional route engine for the quest planner: **Follow with SPF** (or `/qs plan follow`) draws guidance on the map/minimap, and its walking costs can promote the closest reachable first outing. Existing map-distance and waypoint behavior remains when SPF or its API is unavailable.
+- Quest planner now builds on login/zone entry, updates after quest changes and progress, and groups giver-to-objective-to-turn-in trips from your current location; stops show trip numbers and known giver names.
+- Replaced the large quest-plan window with a compact panel beside the quest tracker. Read the stops there and click one to put its marker on the map; the list scrolls for longer plans.
+- Fixed the quest planner stopping after its last Questie batch; it now works only in outdoor zones, clears its plan in towns, and restarts when you change zones.
+- Simplified world-map item search to one map view, moved the search box to the bottom-right, added an in-field search icon and Clear button, and made clearing the query hide its pins.
+- Reorganized settings into clear categories with plain explanations, visible On/Off states, direct choices, separate +/- controls and scrolling pages. Fixed quest planner Questie data edge cases, distant-camp merging and safe next-stop handling.
+
 ## 0.4.16
 - Added an optional quest planner to Extra tools and `/qs plan`. Questie prerequisites build up to four local quest layers; shared objectives and nearby camps become route stops, with pickups, objectives and turn-ins ordered by dependencies and straight map distance. Known Questie drop percentages are shown but do not affect route order. A selected stop can set a game waypoint. The planner is off by default and does not calculate walkable paths or cave/floor routing.
 - Right-click a quest and choose **Ask in chat to do this quest** to fill the current chat with a linked question directly; press Enter to send. The optional role-play invite editor remains available in Extra tools and `/qs adventure`.

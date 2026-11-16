@@ -30,7 +30,8 @@ QuestSharing/  # Repository root
 │   ├── QuestItems.lua  # quest items you can USE (a torch to light, a flare to throw...)
 │   ├── QuestSharing.toc  # Addon metadata and module load order
 │   ├── Questie.lua  # if the Questie addon is installed, its quest database tells us where a quest starts and which quests
-│   ├── QuestPlanner.lua  # optional prerequisite-layer planner, shared objective stops, and waypoint action
+│   ├── QuestPlanner.lua  # zone-local quest route, tracker panel, native waypoint and optional SPF actions
+│   ├── QuestPlannerPath.lua  # optional SPF API detection, walk-cost requests, cancellation and outing promotion
 │   ├── Quick.lua  # a quick-chat wheel
 │   ├── Rewards.lua  # On-demand QuestieDB reward catalogue, eligibility filters and item comparisons
 │   ├── Settings.lua  # Sidebar categories, plain explanations, direct choices, scrollable settings/editor and key capture
@@ -41,13 +42,16 @@ QuestSharing/  # Repository root
 │   ├── Sync.lua  # party members who also run Quest Sharing tell each other exactly which quests they have
 │   ├── Team.lua  # "Picked up [Wolves Among Us] - Anna has it too. Want to do it together?"
 │   ├── Track.lua  # keeps the quest tracker (the list on the right) filled with the quests closest to you
-│   ├── VendorMap.lua  # optional item/vendor search and own pins on the world map
+│   ├── VendorMap.lua  # optional item/vendor map search, autocomplete and own pins
 │   └── ZoneLevels.lua  # Read-only map questing ranges, outdoor zone badges and hover panel
 ├── README.md  # User documentation
 ├── build_release.py  # Build install ZIP and release notes
 ├── context/  # Session continuity and live architecture
 │   ├── BUGS/  # Verified bug methodology and regressions
 │   │   ├── 2026-11-16-quest-recruitment-extra-editor.md  # Direct chat recruitment instead of mandatory composer
+│   │   ├── 2026-11-16-quest-planner-distant-spawns-and-next-command.md  # Distant objective camps and safe next-stop selection
+│   │   ├── 2026-11-16-quest-planner-empty-level-and-candidate-shape.md  # Missing Questie levels and direct candidate fields
+│   │   ├── 2026-11-16-quest-planner-final-batch-and-zone-scope.md  # Final scan render binding and outdoor-zone guard
 │   │   ├── 2026-11-15-settings-extra-tools-overflow.md  # Fixed-height settings overflow diagnosis
 │   │   ├── 2026-11-13-zone-levels-empty-native-data.md  # Standalone guide fallbacks when native ranges are empty
 │   │   ├── 2026-11-13-equipment-duplicate-rows.md  # Filtered name grouping with complete source retention
@@ -62,6 +66,7 @@ QuestSharing/  # Repository root
 │   ├── decisions.md  # Choices and rationale
 │   ├── insights.md  # Timestamped findings
 │   ├── quest-optimization-research.md  # Prior art and proposed quest graph/route optimizer design
+│   ├── quest-planner-routing-and-validation-plan.md  # SPF integration behavior, automated coverage and pending in-game checks
 │   ├── schema.md  # Data structures and formats
 │   ├── shortest-path-source-study.md  # External router implementation trace; no runtime dependency
 │   ├── state.md  # Current task and handoff
@@ -88,6 +93,7 @@ QuestSharing/  # Repository root
     ├── test_optional.py  # Optional tool integration, water persistence, reward eligibility and comparisons
     ├── test_ping.py  # Tests for ping
     ├── test_questmap.py  # How-to quest text and retired map-overlay guards
+    ├── test_quest_planner_path.py  # Optional SPF API, walk-cost ordering, cancellation and fallback
     ├── test_questsharing.py  # Tests for questsharing
     ├── test_quick.py  # Tests for quick
     ├── test_ringtest.py  # Tests for ringtest
@@ -117,11 +123,14 @@ flowchart TD
     Planner --> Q
     Planner --> Compat
     Planner --> MapAPI[C_Map map projection and waypoint]
+    Planner --> Path[QuestPlannerPath.lua: optional SPF adapter]
+    Path --> SPF[Optional ShortestPathForever.API: EstimateWalks and Navigate]
+    Path -. unsupported or missing .-> Planner
     Share --> API[WoW APIs via Compat.lua]
     Sync --> API
     Settings[Settings.lua: sidebar categories] --> Fishing[Fishing.lua: water notes]
     Settings --> ItemSources[ItemSources.lua: item tooltip source hints]
-    Settings --> VendorMap[VendorMap.lua: seller search and map pins]
+    Settings --> VendorMap[VendorMap.lua: item/vendor search and map pins]
     Settings --> Rewards[Rewards.lua: reward browser]
     OptionalUI[OptionalUI.lua] --> Equipment[EquipmentUI.lua: shared explorer, Rare+ only]
     Equipment --> Rewards
@@ -150,7 +159,6 @@ flowchart TD
     ItemSources --> Q
     VendorMap --> Q
     VendorMap --> ExistingMap[WorldMapFrame and C_Map]
-    VendorMap --> SellerList[Sellers tab: all matching vendor locations and coordinates]
     VendorMap --> Waypoint[Compat.lua: user waypoint]
     Rewards --> Items[WoW item info and comparison tooltips]
     Settings --> Loot[Loot.lua: instance drop search]
@@ -203,6 +211,26 @@ sequenceDiagram
     User->>Map: Hover or view another zone
     Levels->>Data: Read hovered zone and its range
     Levels->>Map: Update own text only
+```
+
+```mermaid
+sequenceDiagram
+    participant Player
+    participant Planner as QuestPlanner.lua
+    participant Path as QuestPlannerPath.lua
+    participant SPF as Optional SPF API
+    participant Maps as SPF map/minimap guidance
+    Player->>Planner: Open plan in an outdoor zone
+    Planner->>Planner: Build prerequisite and outing route
+    Planner->>Path: Estimate eligible first stops from player position
+    Path->>SPF: EstimateWalks (async, same map, <=256 per request)
+    SPF-->>Path: Yard costs or unreachable/loading/data reason
+    Path-->>Planner: Promote reachable outing; preserve dependencies
+    Player->>Planner: Click Follow with SPF
+    Planner->>Path: Navigate selected stop
+    Path->>SPF: Start explicit QuestSharing-owned guidance
+    SPF->>Maps: Draw walk route and guide on both maps
+    Note over Planner,SPF: No provider or failed estimate keeps the map-distance plan and native waypoint
 ```
 
 ```mermaid
@@ -387,19 +415,17 @@ sequenceDiagram
     participant Map as Existing world map
     participant Search as VendorMap.lua
     participant DB as QuestieDB
-    User->>Map: Type partial item/type or Ctrl-right-click
-    Search->>DB: Batch-scan item IDs and vendor links
-    DB-->>Search: Item names, vendor IDs, NPC titles and spawns
-    Search-->>User: Suggest matching words, vendor titles and items
-    User->>Search: Click a suggestion or press Tab
-    Search-->>User: Map tab draws all seller pins; Sellers tab lists every location
-    Search->>Map: Draw own pins for matching vendor spawns
-    alt No seller on shown map and same-continent location exists
-        Search->>User: Report nearest map position and offer waypoint
-    else Ctrl-right-click or no mapped nearby seller
-        Search->>User: Show current-map-only or no-location result
+    Search-->>User: Show suggestions above the bottom-right search panel
+    User->>Search: Choose suggestion, press Enter, or click search icon
+    Search->>Map: Draw every matching vendor pin on the current map
+    alt Query is empty or Clear is clicked
+        Search->>Map: Hide all pins immediately
+    else No matching pin on shown map; nearby mapped result exists
+        Search->>User: Offer closest-by-map-distance waypoint
+    else Ctrl-right-click or no mapped nearby result
+        Search->>User: Show current-map-only or no-location message
     end
-    User->>Map: Click seller pin or waypoint button
+    User->>Map: Click map pin or Waypoint button
     Map->>DB: Use vendor map coordinates with Compat.setWaypoint
 ```
 
@@ -411,16 +437,40 @@ sequenceDiagram
     participant Questie as Questie.lua / QuestieDB
     participant Log as Compat.lua quest log
     participant Map as C_Map / user waypoint
-    Player->>Entry: Open Quest plan or /qs plan
-    Entry->>Planner: Open and scan
-    Planner->>Questie: Read quest IDs in timer batches
-    Planner->>Log: Read active quests and objectives
-    Planner->>Questie: Read readiness, prerequisites, starters, targets and turn-ins
-    Planner->>Planner: Build prerequisite layers; group exact sources and nearby map points
-    Planner->>Planner: Order legal stops by straight map distance
-    Planner->>Player: Show suggested pickups, camps, objectives and turn-ins
-    Player->>Planner: Select a stop and Set waypoint
-    Planner->>Map: Set the game's waypoint
+    Player->>Entry: Enable planner or open /qs plan
+    Entry->>Planner: Open panel and scan
+    Player->>Planner: Enter world or a new zone
+    Planner->>Planner: Debounce zone event; show panel unless manually hidden
+    Planner->>Map: Check outdoor Zone map and city status
+    alt Town, city, dungeon, continent or missing map
+        Planner-->>Player: Clear plan and explain outdoor-zone requirement
+    else Outdoor zone
+        Planner->>Questie: Enumerate quest IDs in timer batches
+        loop Before each batch
+            Planner->>Map: Recheck player map
+            alt Entered town or non-zone map
+                Planner-->>Player: Stop scan and clear plan
+            else Changed outdoor zone
+                Planner->>Planner: Cancel old scan and restart for new zone
+            else Same outdoor zone
+                Planner->>Questie: Keep quests with starter points in this zone
+            end
+        end
+        Planner->>Log: Read active quests and objective progress
+        Planner->>Questie: Read readiness, prerequisites, starters, targets and turn-ins
+        Planner->>Planner: Build prerequisite layers and connected giver/work/turn-in outings
+        Planner->>Planner: Estimate full outing distance from player and favor shared groups
+        Planner->>Player: Show active/ready/later counts and scrollable route stops
+        Player->>Planner: Click a stop row
+        Planner->>Map: Recheck plan map and set stop waypoint
+    end
+    Player->>Planner: Accept/turn in quest or finish an objective
+    Planner->>Log: Compare quest IDs and objective progress after debounce
+    alt Quest list or level changed
+        Planner->>Questie: Rescan zone catalogue
+    else Objective progress changed
+        Planner->>Planner: Rebuild stops and preserve selected useful step
+    end
     Note over Planner,Map: Map distance only; terrain, caves, floors and walkable paths are not computed
 ```
 
@@ -489,6 +539,22 @@ classDiagram
         localizedName
         vendorIDs
     }
+    class VendorMapUI {
+        bottomRightPanel
+        searchEditBox
+        searchIcon
+        clearButton
+        suggestions
+        status
+        waypoint_optional
+    }
+    class VendorPin {
+        vendorID
+        mapID
+        x
+        y
+    }
+    VendorMapUI --> VendorPin : one map view only
     class VendorLocation {
         vendorID
         categoryTitle
@@ -606,6 +672,7 @@ classDiagram
     }
     class PlannerStop {
         id
+        outingID
         kind_pickup_objective_turnin
         point_map_x_y
         quests
@@ -616,9 +683,17 @@ classDiagram
         candidates
         orderedStops
         selectedStop
+        plannedOutdoorMap
         loadingGeneration
+        trackerSidePanel
+        scrollableStopRows
+        activeReadyLaterCounts
+        outingClusters
+        questProgressSnapshot
     }
-    QuestPlan --> QuestCandidate : scans the current area
+    QuestPlan --> QuestCandidate : scans current outdoor-zone candidates
     QuestPlan --> PlannerStop : derives and orders
     PlannerStop --> PlannerStop : prerequisite dependency IDs
+    QuestPlan --> PlannerStop : connected outing clusters
+    QuestPlan --> PlannerStop : click selects and marks waypoint
 ```

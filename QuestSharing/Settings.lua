@@ -15,7 +15,7 @@ ns.settingTabs = {
     { id = "party", title = "Party window", intro = "Show who has each quest, choose what clicks do, and manage party friends." },
     { id = "actions", title = "Pings & quest items", intro = "Point out quest targets and use the items your quests need." },
     { id = "quick", title = "Quick chat", intro = "Send a saved message from a ring of choices. Set the key and edit messages below." },
-    { id = "maps", title = "Map & sellers", intro = "Find sellers, see zone levels, and show party locations on the world map." },
+    { id = "maps", title = "Map & search", intro = "Search for items, see zone levels, and show party locations on the world map." },
     { id = "optional", title = "Extra tools", intro = "Optional tools for quest planning, spell ranks, fishing, finding equipment, and invites." },
 }
 
@@ -173,11 +173,11 @@ ns.settingRows = {
                party = "Party: only your current party receives the message.",
                whisper = "Whisper player: sends privately to the player you target or point at when opening the ring." } },
 
-    { tab = "maps", kind = "header", label = "Find items and sellers (requires Questie data)" },
+    { tab = "maps", kind = "header", label = "Search items and vendors (requires Questie data)" },
     { tab = "maps", kind = "bool", key = "itemSources", label = "Show where items come from when I hover over them",
       desc = "Turn on for seller types and known Mining sources in bag and recipe tooltips. Requires Questie data." },
-    { tab = "maps", kind = "bool", key = "vendorSearch", label = "Add item and seller search to the world map",
-      desc = "Turn on, open the map, and type an item or seller type, such as General Goods. Select an item to list its sellers. Requires Questie data." },
+    { tab = "maps", kind = "bool", key = "vendorSearch", label = "Search items and vendors on the map",
+      desc = "Show matching locations as map pins. Type an item or vendor type, like General Goods. Requires Questie data." },
     { tab = "maps", kind = "header", label = "Zone level guides" },
     { tab = "maps", kind = "bool", key = "zoneLevels", label = "Show zone questing level ranges",
       desc = "Turn on to display level ranges on the world map, such as 10-20. These are zone guides, not the level of every quest." },
@@ -189,9 +189,9 @@ ns.settingRows = {
 
     { tab = "optional", kind = "header", label = "Plan nearby quests" },
     { tab = "optional", kind = "bool", key = "questPlanner", label = "Enable the quest planner",
-      desc = "Turn on to suggest an order for nearby quests, shared camps and turn-ins. Requires Questie data; distances are map estimates." },
+      desc = "Turn on to plan quests for your zone. Requires Questie. Shortest Path Forever can add walk routes and walking-distance ordering." },
     { tab = "optional", kind = "action", label = "Plan my quests", button = "Open plan",
-      desc = "Click to plan nearby quests. The plan respects known prerequisites, groups shared objectives and sets a waypoint for your chosen stop.",
+      desc = "Open the route panel beside the quest tracker. Click a stop to mark it; use Follow with SPF for a walk route when installed.",
       action = function() ns.questPlanner.open() end },
     { tab = "optional", kind = "header", label = "Spell ranks on my action bars" },
     { tab = "optional", kind = "bool", key = "autoSpellRanks", label = "Auto-update spells to highest learned rank",

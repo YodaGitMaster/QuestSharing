@@ -375,6 +375,7 @@ function ns.setSetting(key, value)
         if (key == "zoneLevels" or key == "enabled") and ns.zoneLevels then ns.zoneLevels.refresh() end
         if (key == "itemSources" or key == "enabled") and ns.itemSources then ns.itemSources.refresh() end
         if (key == "vendorSearch" or key == "enabled") and ns.vendorMap then ns.vendorMap.refresh() end
+        if key == "questPlanner" and ns.questPlanner then ns.questPlanner.settingChanged(value) end
         if key == "enabled" and not value and ns.adventure then ns.adventure.close() end
         if key == "enabled" and not value and ns.loot then ns.loot.close() end
         if (key == "bagMarks" or key == "enabled") and ns.refreshBagMarks then ns.refreshBagMarks() end

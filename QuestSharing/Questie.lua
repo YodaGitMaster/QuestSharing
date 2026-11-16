@@ -479,8 +479,8 @@ function Q.plannerQuest(questID)
         appendSources(turnIns, "object", finish[2])
     end
     return {
-        id = questID, name = name, level = tonumber(field("quest", questID, "questLevel")) or 0,
-        requiredLevel = tonumber(field("quest", questID, "requiredLevel")) or 0,
+        id = questID, name = name, level = tonumber(field("quest", questID, "questLevel") or 0) or 0,
+        requiredLevel = tonumber(field("quest", questID, "requiredLevel") or 0) or 0,
         beforeAny = type(single) == "table" and single or {},
         beforeAll = type(group) == "table" and group or {},
         starters = allStarters(questID), targets = plannerTargets(questID), turnIns = turnIns,

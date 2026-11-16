@@ -2,7 +2,7 @@
 
 A World of Warcraft addon for playing quests together.
 
-[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.16)
+[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.17)
 
 ## Your first party, in four steps
 1. **Install it** (see [Install](#install)) and log in. A short welcome in chat tells you it is ready. Everything is
@@ -393,7 +393,7 @@ Open `/qs settings`, left-click the minimap button, click **Settings** in Party 
 | **Party window** | Show/hide/resize the separate Party quests window, restore its position, post progress by clicking, add party friends |
 | **Pings & quest items** | Bind target-ping and quest-item keys, mark bag items, show usable item buttons |
 | **Quick chat** | Set the ring key, choose hold/press, choose where messages go, edit each message or emote |
-| **Map & sellers** | Add item/seller search, item source hints, zone level guides, party map icons and shared item-location waypoints |
+| **Map & search** | Search items and vendor types, show item source hints, zone level guides, party map icons and shared item-location waypoints |
 | **Extra tools** | Plan nearby quests, update learned spell ranks, browse quest/dungeon equipment, edit fishing spots, draft quest invitations |
 
 Every option has a visible explanation of what turning it on does and any requirements.
@@ -417,14 +417,14 @@ tracker follows you, your quick chat key (or that it is not set) and how many pr
 **Good news has a sound** (switch it off under General): a soft ping when someone accepts a quest you shared or a
 party member running Quest Sharing finishes one you share. Never during combat.
 
-## Extra tools: quest planner, item sources, sellers, quest automation, zone levels, spell ranks, quest invitations, fishing, quest rewards and instance drops
+## Extra tools: quest planner, item source hints, map search, quest automation, zone levels, spell ranks, quest invitations, fishing, quest rewards and instance drops
 
-Open `/qs settings` > **Map & sellers** for item sources, seller search, and zone levels; use **Accept & turn in** for quest automation and **Extra tools** for the remaining tools.
+Open `/qs settings` > **Map & search** for item sources, map search, and zone levels; use **Accept & turn in** for quest automation and **Extra tools** for the remaining tools.
 Extra tools are opt-in: enable their switches or open a tool explicitly when you need it.
 
-**Quest planner.** Open **Extra tools > Plan my quests** or type `/qs plan`. It is off by default; opening the planner turns it on. Questie and a recent QuestieDB are needed for its quest catalogue, prerequisites and locations.
+**Quest planner.** Open **Extra tools > Plan my quests** or type `/qs plan`. It is off by default. When enabled, it opens a route panel on login and rebuilds the plan when you enter a zone or your quest log changes. Use it outdoors in a zone: it will not scan in towns, cities, dungeons, or continent maps, and it clears or rebuilds the plan if you enter a town or change zones. Questie and a recent QuestieDB are needed for its quest catalogue, prerequisites and locations.
 
-The planner reads quests in the area you are in and your current quest log. It uses Questie's eligibility check when available, includes quests you already have, and looks up quests you can take now. It can also look ahead by up to four prerequisite layers when Questie marks a quest as blocked only by known prerequisites and those earlier quests are available or can be planned here. It respects both prerequisite rules: **any one** quest in a single-prerequisite list is enough, while **every** quest in a group-prerequisite list is required. A quest with unknown eligibility or location is not guessed into the plan.
+The planner uses Questie's quest-ID catalogue to find quests with start points in your current zone, then plans from those local quests and your current quest log. QuestieDB does not expose a zone-only ID list through this addon, so it checks the catalogue in small batches; the plan itself stays in your current zone. It uses Questie's eligibility check when available, includes quests you already have, and looks up quests you can take now. It can also look ahead by up to four prerequisite layers when Questie marks a quest as blocked only by known prerequisites and those earlier quests are available or can be planned here. It respects both prerequisite rules: **any one** quest in a single-prerequisite list is enough, while **every** quest in a group-prerequisite list is required. A quest with unknown eligibility or location is not guessed into the plan.
 
 Each route is a sequence of useful stops:
 
@@ -432,24 +432,24 @@ Each route is a sequence of useful stops:
 - **Objectives:** kill creatures, collect items, use objects, or visit places. If the same known creature or object advances multiple quests, the planner combines those tasks at one stop. It also combines close objective locations into a nearby camp when they are on the same map.
 - **Turn-ins:** known quest givers and objects where the plan says to hand quests in after their prerequisite stops.
 
-The order always follows known prerequisite and pickup/objective/turn-in dependencies. Among stops that are currently allowed, it picks the closest map point, then repeats. This is a practical local ordering heuristic; it does not search every possible route or guarantee the globally shortest trip. If Questie has a drop percentage for a collect-item target, the planner shows the best known percentage beside it; the percentage does not affect stop order or estimate time-to-farm.
+The order always follows known prerequisite and pickup/objective/turn-in dependencies. It groups each quest's giver, work sites and turn-in into an outing, combines outings that share a giver, objective camp or prerequisite chain, then estimates the full trip from where you are. Larger groups get credit for sharing the outing. If Shortest Path Forever is installed, its walking-distance API can choose the reachable first outing; later trip ordering still uses map-distance estimates. Without it, all ordering uses map distance. Neither method estimates kill time or guarantees the globally shortest full-zone plan. If Questie has a drop percentage for a collect-item target, the panel shows progress and the best known drop percentage; the percentage does not affect stop order or estimate time-to-farm.
 
-Use **Previous** and **Next** to select a stop, **Set waypoint** to place the game's waypoint on it, and **Refresh plan** after your quest log changes. `/qs plan next` selects the next stop and sets its waypoint; `/qs plan refresh` rebuilds the list; `/qs plan on` enables the tool; `/qs plan off` disables it and closes the window. Selecting a waypoint does not move your character or accept/complete quests for you.
+The route appears in a compact panel beside the game's quest tracker. Its header shows active, ready and later quests. Stops show their outing number, action, coordinates and known giver/camp names; objective rows show progress when available. Click a stop to put its regular game waypoint on the map. With Shortest Path Forever installed, **Follow with SPF** hands the selected stop to SPF to draw and guide the walk on both maps. This is an explicit action and replaces the route currently being followed. You can also use `/qs plan follow`. Scroll in the panel to see more stops; it updates after quest progress, and **Refresh** is available if needed. `/qs plan next` selects the next stop and sets its regular waypoint; `/qs plan refresh` rebuilds the list; `/qs plan hide` closes the panel; `/qs plan on` enables the tool; `/qs plan off` disables it and closes the panel. Following a stop does not move your character or accept/complete quests for you.
 
-**Travel limits:** distances are straight map-coordinate estimates. This version does not calculate walkable routes, avoid mountains/water, or understand cave entrances, floors, elevators, or underground connections. It may miss quests whose Questie points cannot be mapped to your current area. A map waypoint marks the stop; it is not a path line.
+**Travel limits:** SPF is optional. Its walk estimates follow SPF's data and water-walking settings; no strict no-swimming promise is made. Later stops still use map-distance estimates, and SPF may combine travel modes when guiding. Questie points often have no height, so cave entrances, stacked floors, elevators and underground connections need in-game checking; an unknown floor is not guaranteed correct. Without SPF, the game's waypoint marks the stop but does not draw a path. The planner may miss quests whose Questie points cannot be mapped to your current area.
 
-**Item sources and sellers.** Turn on **Show where items come from when I hover over them** to add vendor types such as **General Goods**
-to bag and recipe item tooltips. Known mining nodes are labelled **Mining**. Questie stores vendor links and object names,
-but does not mark every gathering profession or craft recipe, so unrecognized source types are not guessed.
-Turn on **Add item and seller search to the world map**, open the map with `M`, and search an item name or vendor type such as
-`General Goods`. Suggestions appear as you type; click one or press Tab to complete it. Partial titles also match, so
-`tail` finds vendors titled **Tailor**, **Senior Tailor** or **Senior Master Tailor**. Matching seller locations appear
-as pins; click a pin to set a waypoint. The **Sellers** tab lists every matching seller location on the shown map with
-its vendor type and coordinates. Clicking an item suggestion opens that list; the **Map** tab shows all its pins.
-Buyable items and reagents appear when Questie links them to vendors. If there is no seller on the shown map, the
-search offers the closest mapped seller on your continent by map distance and a **Waypoint** button. Ctrl-right-click
-the map to show matches on that map only. The map search needs a recent QuestieDB item list; only items with a known
-vendor link appear as seller results, so craft-only and gather-only searches do not invent a vendor.
+**Item source hints and map search.** Turn on **Show where items come from when I hover over them** to add vendor types such as
+**General Goods** to bag and recipe item tooltips. Known mining nodes are labelled **Mining**. Questie stores vendor links
+and object names, but does not mark every gathering profession or craft recipe, so unrecognized source types are not guessed.
+Turn on **Search items and vendors on the map**, open the map with `M`, and type an item name or vendor type such as
+`General Goods`. The search panel sits in the map's bottom-right corner. Suggestions appear as you type; click one or press
+Tab to complete it. Partial titles also match, so `tail` finds **Tailor**, **Senior Tailor** or **Senior Master Tailor**.
+Matching locations appear as pins on the map; click a pin to set a waypoint. Click **Clear** or delete the search text to
+remove the pins. The magnifying-glass button inside the search bar runs the search. Buyable items and reagents appear when
+Questie links them to vendors. If there is no matching location on the shown map, the map can offer the closest known vendor
+on your continent by map distance with a **Waypoint** button. Ctrl-right-click the map to search that map only. The map
+search needs a recent QuestieDB item list; only items with a known vendor link appear, so craft-only and gather-only
+searches do not invent a vendor. Results use one map view; there is no separate location-list view.
 
 **Quest acceptance and turn-ins.** Under `/qs settings` > **Accept & turn in**, enable **Accept quest offers automatically** to
 accept a quest when an NPC or party member presents it. Enable **Turn in completed quests automatically** to continue a ready
@@ -459,7 +459,7 @@ required payment stay open for you. Both options are independent and off by defa
 **Questing levels on the world map.** Open the map normally with `M`: continent maps display level badges
 over outdoor zones, and a small **Questing levels** panel shows the range for the zone you view or hover.
 Choose a continent/zone from the world overview to see its details. This is **off by default**; enable
-**Show zone questing level ranges** in Map & sellers to display it. Labels do not intercept map clicks and
+**Show zone questing level ranges** in Map & search to display it. Labels do not intercept map clicks and
 follow map resizing/zoom.
 When upgrading from v0.4.11, the option is switched off once; your subsequent choice stays saved across reloads.
 
@@ -619,7 +619,7 @@ If an unloaded AtlasLoot module cannot load during combat, it is retried after c
 Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check.
 
 ## Install
-**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.16), unzip `QuestSharing-<version>.zip` and drop the
+**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.17), unzip `QuestSharing-<version>.zip` and drop the
 `QuestSharing` folder into `Interface\AddOns`. Or:
 1. Copy the folder `QuestSharing` (the one containing `QuestSharing.toc`, not this README's folder) into
    the game's `Interface\AddOns` folder, so you have `...\AddOns\QuestSharing\QuestSharing.toc`.
@@ -635,7 +635,8 @@ Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check
    whether it is loaded (with its version) or why not (not installed, switched off in the AddOns list, marked out of
    date, a folder with another name such as `Questie-master`), what to do about it, how the data is read, the language
    of its names, and looks up a few quests of your quest log.
-4. In game type `/qs probe`. It tells you what your game client supports. **If something looks wrong,
+4. Optional: install [Shortest Path Forever](https://www.curseforge.com/wow/addons/shortest-path-forever) for walkable guidance from the quest planner. Quest Sharing still works without it.
+5. In game type `/qs probe`. It tells you what your game client supports. **If something looks wrong,
    open an issue at https://github.com/YodaGitMaster/QuestSharing/issues and paste that output.**
 
 ## Commands (`/qs` or `/questsharing`)
@@ -790,8 +791,9 @@ python tests/test_stats.py            # 20 tests: combined stat minimums, native
 python tests/test_spell_ranks.py      # 48 tests: learned rank upgrades, normal pages, cursor/combat guards and client APIs
 python tests/test_zone_levels.py      # 50 tests: native/fallback ranges, full-map missing data, hover, geometry, lifecycle and opt-in overlays
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
+python tests/test_quest_planner_path.py # 10 tests: SPF API detection, walk costs, async cancellation, outing ordering and fallbacks
 ```
-Expected: every line ends in `passed` with all tests green (1291 in total).
+Expected: every line ends in `passed` with all tests green (1324 in total).
 
 ## Files
 | File | Purpose |

@@ -77,6 +77,7 @@ local function newObject()
     function o:IsVisible() return self.shown end
     function o:SetText(t) self.text = t; self.sets = (self.sets or 0) + 1 end
     function o:GetText() return self.text end
+    function o:SetEnabled(v) self.enabled = v end
     function o:CreateFontString() return newObject() end
     function o:CreateTexture() return newObject() end
     function o:SetTexture(path) self.texture = path end

@@ -1,5 +1,10 @@
 # Insights
 
+## 2026-11-16 — SPF can provide walk costs as well as map guidance
+- Current public Shortest Path Forever API v2.3 adds `EstimateWalks`: asynchronous walk-yard costs from one position to up to 256 targets on the same walking map, with cancellation and explicit loading/no-data/unreachable results. `Navigate`/`NavigateRoute` hand off guidance and SPF draws its own route; `Guidance()` exposes current-leg bends.
+- Implemented as optional explicit click-to-follow plus walk-cost promotion of the first eligible outing; full outing optimization needs more cost queries. Cave heights and strict dry-land routing remain constraints.
+- Evidence and compatibility details: `context/quest-planner-routing-and-validation-plan.md`; official API docs: https://github.com/cjber/shortest-path-forever/blob/main/docs/api.md.
+
 ## 2026-11-15 — Missing creature badge was blocked by game nameplates
 - User-provided `/qs doctor` output from Quest Sharing 0.4.13 reports quest creature icons `[OK]` but explicitly says enemy nameplates are off and recommends `/qs highlight cvars on`. With no enemy nameplates, the addon has no creature plate to overlay; `markMobs` being on alone cannot display the badge.
 - The same report's 30 secret-string errors name `Friends.lua`, `Share.lua`, and `Diagnostics.lua`, not the marker path; treat these as a separate issue.
@@ -208,4 +213,29 @@
 - Questie readiness combines requirements beyond prerequisites; only current actionable and explicitly prerequisite-blocked candidates should enter this local plan. Unknown state is not guessed.
 - Quest Sharing can provide a useful route list and waypoints from Questie points, but map geometry is not pathfinding. Keep cave/floor routing and drop-weighted travel-time optimization as explicit future work.
 
+## 2026-11-16 — Quest planner scan completion and zone scope
+- A Lua local function declared below `scan()` does not bind references compiled earlier; the final timer batch resolved `render` globally and errored after progress reached 5160/5233. Forward-declare the local before both functions.
+- Questie adapter exposes all quest IDs via `GetAllIds`, not a zone-indexed quest list; batch catalogue traversal but retain only quests with starter points in the current mapped outdoor zone.
+- Recheck map type/city status during async work and before map actions so entering town stops the scan and old route stops cannot create waypoints.
+
+## 2026-11-16 — Quest route panel near the tracker
+- The plan is more useful as a persistent, readable stop list than as a centered long-form dialog: keep it near the right-side objective tracker, make stops scrollable, and put waypoint action on each row.
+- Avoid embedding custom blocks into Blizzard's tracker internals; position a separate addon frame beside its tracker frame and retain a fallback position when that frame is unavailable.
+
+## 2026-11-16 — Quest plan should begin at zone arrival
+- User story: arrive in a zone, reconcile active/completed quests, find locally available quests filtered by character eligibility, group giver errands, then group shared work and turn-ins into outings measured from the player's current position.
+- The pickup→objective→turn-in chain must contribute to route cost. Nearest-stop-only ordering can recommend a long giver detour for one quest without comparing its full outing to the nearby alternatives.
+- Keep all confirmed eligible quests discoverable; label distant isolated giver groups as long detours instead of silently omitting them. Replan on zone and meaningful quest-log changes while preserving the selected useful stop.
+- Implemented: enablement opens/builds the panel; login/zone entry and quest-list changes schedule debounced replanning; objective counts update stop text without traversing all Questie IDs again.
+- Outing scoring joins giver/work/turn-in chains plus shared/prerequisite stops, estimates the full trip from the player, and favors groups that serve more quests. It remains a map-distance estimate, not walkable routing or farming-time optimization.
+
 - Published v0.4.16 on 2026-11-16: commit `7c3cc2c1f821aa71204c1ce7dc1b99f0fb9e740b`, tag `v0.4.16`, release https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.16. The uploaded 36-file ZIP matches the local build byte for byte (SHA256 `4f709ffd200182bb90432de74e7d171d514fc75f4d8d0fe0541ee71c91161fb7`). README now documents planner behavior and limitations and links to this release. Tests were not run; native game behavior remains unverified.
+
+
+## 2026-11-16 — Vendor map search clear state
+- The search edit box redraws on `OnTextChanged`; clearing text must hide every pooled pin before returning from the empty-query branch, and clear any saved pin result/closest waypoint state.
+- The old item flow switched to a Sellers tab and list while other query types stayed on the map. Keep one map result view and show autocomplete near the input instead.
+# 2026-11-16 — Quest planner robustness findings
+- Questie source identity is not a reliable geographic cluster key: the same NPC/object can spawn at multiple distant camps.
+- Existing repository tests are self-running scripts with an in-file `Game` harness; pytest collection is not supported and yields missing `style` fixture errors.
+- Route lifecycle review found no additional confirmed issue in debounce, generation cancellation, town/map gating, or progress-only rebuild paths; native client calls still need in-game validation.

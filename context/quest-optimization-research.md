@@ -68,6 +68,41 @@ flowchart TD
 - `context/walkable-routing-research.md` and `context/shortest-path-source-study.md` cover terrain routes, floors and the external Shortest Path Forever code. Quest ordering and walkable route geometry are separate problems that can be combined behind a route-cost interface.
 - First prototype should be zone-local, only use already accepted/available quests and immediately unlockable prerequisite chains, group verified shared targets, then use geographic distance as fallback. Add global XP/time simulation only if a later need justifies its complexity.
 
+## Refined user journey: arrive in a new zone
+
+The intended plan is a small zone itinerary that starts from the player's actual position and answers both “what can I do?” and “where should I go first?”:
+
+```mermaid
+flowchart TD
+    A[Enter a new zone] --> B[Read active and completed quest state]
+    B --> C[Find local quest givers]
+    C --> D[Filter by Questie eligibility: level, race, class and known gates]
+    D --> E[Group pickup stops by giver/place]
+    E --> F[Group shared objectives by source and camp]
+    F --> G[Connect pickups to work and turn-ins]
+    G --> H[Estimate trips from current player position]
+    H --> I[Show next stop and the rest of the route]
+    I --> J[Click a stop to mark it on the map]
+    J --> K[Refresh after quest accepted, completed or turned in]
+```
+
+- Report a concise count first, e.g. **2 active quests · 5 quests you can pick up here**. Active quests are always considered; only Questie-confirmed ready quests are described as available. `nil`/unknown eligibility stays “not confirmed,” not silently promoted to available.
+- A quest is a small chain: **pickup location → objective camp(s) → turn-in location**. Existing active quests skip pickup. Completed prerequisites satisfy gates. Future candidates appear only when their prerequisite chain is representable; keep any/all prerequisite semantics intact.
+- Merge pickup errands for the same giver/source or same mapped place; merge work when objective source IDs match, then cautiously group nearby camps. Keep the quest names and actions visible so the player knows why stops share a trip.
+- Start route costing at the player's current position. Include the distance to the giver, from giver to objective areas, and to turn-in when known. Compare a far, isolated giver with nearby pickup/work clusters so the plan does not send the player on a long walk for one small errand while several good tasks are close.
+- Keep all confirmed available quests discoverable. Put far-out giver groups in a later/“long trip” section rather than silently dropping them. Show the estimated detour in simple terms when the data supports it.
+- Rebuild automatically after an outdoor zone change and meaningful quest-log changes. Preserve the selected stop when it still exists; if it is finished, advance to the next useful stop. Towns remain out of scope.
+- In the panel, emphasize **Next stop** with action, giver/camp name, quest names, and coordinates; list the upcoming grouped stops below. Clicking a row sets the current waypoint. An addon map overlay could show all pickup/objective clusters, but the native waypoint API represents one selected destination at a time.
+- The first route score can use straight map-coordinate distances. It should include pickup detours and grouping savings, but must label the result as an estimate; do not claim walking distance, XP/hour, or a globally shortest route without terrain/time data.
+
+### Current implementation after this refinement
+
+- Existing code has active-quest state, a Questie `IsDoable` hook (commented in the adapter as covering level, race, class, phase/event and other policy), known any/all prerequisites, local starter/objective/turn-in locations, a current-position origin, grouped stops and distance ordering.
+- When enabled, it now opens/builds on login and outdoor zone entry. Accept/remove/turn-in and level-up trigger full scans; changed objective counts rebuild existing stops without walking the full Questie catalogue again. The selected step is preserved if it still exists, otherwise the next route index is selected.
+- Outings connect a quest's pickup, objectives and turn-in. Shared stops and prerequisite edges combine outings. Each candidate outing is estimated from the player's position through its remaining stops using nearest-neighbour map distance; the estimate is normalized by the square root of its represented quest count. The chosen outing is handled as a group while individual stops still respect dependencies.
+- The panel summarizes active, ready and later quest counts; objective rows can include have/need progress. It still does not explain every excluded quest, overlay every route point on the map, or estimate terrain walking/time.
+- Questie ID discovery still traverses its enumerable catalogue because the adapter has no zone-indexed ID list; only current-zone candidates are planned. Availability completeness depends on Questie providing IDs, location records and eligibility results.
+
 ## Sources reviewed
 
 - [QuestieDB public API](https://github.com/Questie/QuestieDB/blob/master/docs/api.md) and [support-data guide](https://github.com/Questie/QuestieDB/blob/master/docs/support-data.md).

@@ -1,5 +1,11 @@
 # Decisions
 
+## 2026-11-16 — Optional Shortest Path Forever routing
+- Keep quest selection, prerequisites, outing groups and UI in Quest Sharing; use SPF only as an optional walk-cost/guidance provider through its published API.
+- Use explicit Follow with SPF / `/qs plan follow` for `Navigate`; use `EstimateWalks` (v2 minor 3+) to promote the first outing by reachable walking-yard cost. Keep current map-distance ordering and native waypoint without a supported provider.
+- Do not bundle SPF code or data. Don't assert strict no-swimming or correct cave floors when Questie gives only 2D coordinates. See `quest-planner-routing-and-validation-plan.md`.
+- Implemented locally; release waits for real-client checks.
+
 ## 2026-11-16 — Local quest planner first pass
 - Implement the user's graph idea as two connected views: prerequisite gates (`preQuestSingle` = any, `preQuestGroup` = all) determine which quest layers can unlock; a stop graph connects shared exact sources and nearby objective points.
 - Keep the planner in Quest Sharing as an opt-in Extra tools action and `/qs plan`; default `questPlanner=false`, no route data persisted and no automatic quest acceptance.
@@ -7,6 +13,24 @@
 - Build pickups, objectives and turn-ins as explicit stops. Schedule only dependency-ready stops, then use nearest straight map distance to choose among them. Keep drop-rate percentages informational; do not pretend this first score estimates farming time.
 - Do not add Shortest Path Forever or claim walkability in this pass. User-facing route says map-distance estimate; no cave/floor traversal. Follow up with in-game QA and terrain routing research before claiming a walkable route.
 - Scope preserves earlier user authorization to build the planner; published as Quest Sharing v0.4.16 after the user explicitly requested push/release. README includes the release link and full behavior/limits guide.
+
+## 2026-11-16 — Quest planner stays in the current outdoor zone
+- Require a mapped outdoor `Zone` and reject city maps before requesting Questie quest IDs. Recheck each async batch, selection and waypoint action; stop in towns and rebuild after outdoor zone changes.
+- Keep Questie ID enumeration batched because the current adapter has no zone-indexed ID method; filter plan candidates by starter location in the current zone.
+- Fix the frozen final progress state by forward-declaring `render` before `scan` closes over it; Lua otherwise binds the later local function name as a global at the earlier reference.
+- Local/unreleased; preserve the independent pending VendorMap edits. No in-game verification available.
+
+## 2026-11-16 — Put the quest plan beside the quest tracker
+- Replace the large center dialog and separate Previous/Next/Set waypoint controls with a compact scrollable panel docked beside the game's objective tracker.
+- Show each stop's kind, coordinates, action summary and related quest names in a clickable row. A click revalidates zone/map and immediately sets the waypoint; Refresh rebuilds the plan and close hides only the panel.
+- Keep the panel independent of Blizzard tracker internals; dock to the tracker frame when present, with a screen-corner fallback. The game tracker remains visible and unmodified.
+- Local/unreleased; actual frame placement, clipping and waypoint click behavior need in-game verification.
+
+## 2026-11-16 — Build and refresh zone plans automatically
+- When the optional planner is enabled, open/build after login or outdoor zone entry. Debounce quest events; compare active quest IDs, completion state and objective counts so partial progress updates route rows without rescanning every Questie ID.
+- Full catalogue scans follow zone changes, accept/remove/turn-in, and level-up changes. Preserve the selected stop if it remains; if it disappears, keep the next useful route index.
+- Connect each quest's giver, work sites and turn-in; merge outings sharing a stop or prerequisite edge. Estimate a nearest-neighbour map-distance trip from the player, then normalize by square root of represented quest count; schedule an outing together while respecting stop dependencies.
+- This heuristic does not account for terrain, kill time or XP value and does not promise a global optimum. Local/unreleased.
 
 ## 2026-11-15 — Optional quest dialog automation (published)
 - Add independent `autoAcceptQuests=false` and `autoCompleteQuests=false` controls under Tracker; a player can enable either action without enabling the other.
@@ -199,3 +223,13 @@
 - Keep optional role-play editor under Extra tools and `/qs adventure`; no saved settings/default changes. Reuse draft preservation, duplicate detection, byte limits and unfinished-quest checks rather than duplicate chat-routing logic.
 - Runtime scope: Adventure.lua, Menu.lua and Panel.lua tooltip; tests and user/continuity docs updated. No release requested.
 - Verification: Adventure 44/44, menu 60/60; full 34-file run plus updated tooltip-suite rerun passes all 1,314 checks. Bug report: `context/BUGS/2026-11-16-quest-recruitment-extra-editor.md`; native client unavailable.
+
+
+## 2026-11-16 — One map search view and immediate clear
+- User finds Map and Sellers views confusing and wants one map-only search, a bottom-right search box with an icon inside, a Clear button, and pins removed when the query becomes empty.
+- Keep item/vendor matching, suggestions, all matching map pins, Ctrl-right-click current-map search, and nearest mapped waypoint. Remove tab switching and the separate location list.
+- Root cause: the empty-query early return in `VendorMap.draw()` changed the status but returned before hiding old pooled pins. Clear and manual deletion both need to enter the same empty-query path.
+# 2026-11-16 — Quest planner route safety review
+- Objective-stop merging is constrained by map-coordinate distance even when Questie source IDs match; a source can have separate camps around a zone.
+- `/qs plan next` pins only when the requested stop selection succeeds, avoiding stale/empty-route waypoint attempts.
+- Review verification uses each `tests/test_*.py` script directly, matching the repository's documented runner; plain pytest expects fixtures these files do not define.

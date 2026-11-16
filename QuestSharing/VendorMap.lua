@@ -7,7 +7,6 @@ ns.vendorMap = V
 local items, vendors, ready, loading = {}, {}, false, false
 local generation, currentQuery, currentOnly = 0, "", false
 local mapUI, hookedScroll, pins, lastRender, lastRenderAt = nil, nil, {}, nil, 0
-local activeView = "map"
 local function call(fn, ...) return U.call(fn, ...) end
 local function trim(s) return (string.gsub(string.gsub(tostring(s or ""), "^%s+", ""), "%s+$", "")) end
 local function lower(s) return string.lower(type(s) == "string" and s or "") end
@@ -178,47 +177,45 @@ end
 local function ensureUI(wm)
     if mapUI then return mapUI end
     local panel = CreateFrame("Frame", nil, wm, "BackdropTemplate")
-    panel:SetWidth(420); panel:SetHeight(78); panel:SetPoint("TOPLEFT", wm, "TOPLEFT", 12, -54)
+    panel:SetWidth(400); panel:SetHeight(78); panel:SetPoint("BOTTOMRIGHT", wm, "BOTTOMRIGHT", -20, 24)
     S.fill(panel, "BACKGROUND", 0.025, 0.04, 0.065, 0.94):SetAllPoints(panel)
-    U.text(panel, "Find items sold on this map", 8, 6, 252)
-    local mapTab = S.button(panel, "Map", 56, function() V.setView("map") end)
-    mapTab:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -94, -2)
-    local sellersTab = S.button(panel, "Sellers", 80, function() V.setView("sellers") end)
-    sellersTab:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -8, -2)
+    U.text(panel, "Search items or vendor types", 8, 5, 300)
     local edit = CreateFrame("EditBox", nil, panel)
-    edit:SetWidth(284); edit:SetHeight(22); edit:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -23)
+    edit:SetWidth(316); edit:SetHeight(22); edit:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -22)
     if ChatFontNormal then edit:SetFontObject(ChatFontNormal) end
     edit:SetAutoFocus(false); edit:SetMaxLetters(70)
-    if edit.SetTextInsets then edit:SetTextInsets(5, 5, 0, 0) end
+    if edit.SetTextInsets then edit:SetTextInsets(5, 28, 0, 0) end
     S.fill(edit, "BACKGROUND", 0, 0, 0, 0.8):SetAllPoints(edit)
     edit:SetScript("OnEnterPressed", function(self) self:ClearFocus(); V.search(self:GetText(), false) end)
     edit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    local go = S.button(panel, "Search", 104, function() edit:ClearFocus(); V.search(edit:GetText(), false) end)
-    go:SetPoint("TOPLEFT", panel, "TOPLEFT", 300, -22)
-    local status = U.text(panel, "", 8, 47, 314)
+    local searchIcon = CreateFrame("Button", nil, edit)
+    searchIcon:SetWidth(22); searchIcon:SetHeight(22); searchIcon:SetPoint("RIGHT", edit, "RIGHT", -2, 0)
+    searchIcon.icon = searchIcon:CreateTexture(nil, "OVERLAY")
+    searchIcon.icon:SetAllPoints(searchIcon)
+    searchIcon.icon:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
+    searchIcon:SetScript("OnClick", function() edit:ClearFocus(); V.search(edit:GetText(), false) end)
+    local clearButton = S.button(panel, "Clear", 54, function()
+        edit:ClearFocus()
+        V.search("", false)
+    end)
+    clearButton:SetPoint("TOPLEFT", panel, "TOPLEFT", 336, -22)
+    local status = U.text(panel, "", 8, 51, 298)
     local waypoint = S.button(panel, "Waypoint", 78, function()
         local r = mapUI and mapUI.closest
         if r and not ns.compat.setWaypoint(r.spawn.map, r.spawn.x / 100, r.spawn.y / 100) then
             ns.print("the game could not set a waypoint for this vendor")
         end
     end)
-    waypoint:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -6, -42)
+    waypoint:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -6, 4)
     waypoint:Hide()
     local suggestionBox = CreateFrame("Frame", nil, wm, "BackdropTemplate")
-    suggestionBox:SetWidth(284); suggestionBox:SetHeight(124)
-    suggestionBox:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -2)
+    suggestionBox:SetWidth(316); suggestionBox:SetHeight(124)
+    suggestionBox:SetPoint("BOTTOMLEFT", panel, "TOPLEFT", 8, 2)
     S.fill(suggestionBox, "BACKGROUND", 0.025, 0.04, 0.065, 0.98):SetAllPoints(suggestionBox)
     suggestionBox:Hide()
-    local listFrame = CreateFrame("Frame", nil, wm, "BackdropTemplate")
-    listFrame:SetWidth(380); listFrame:SetHeight(320)
-    listFrame:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 0, -2)
-    S.fill(listFrame, "BACKGROUND", 0.025, 0.04, 0.065, 0.96):SetAllPoints(listFrame)
-    U.text(listFrame, "Seller locations on this map", 8, 8, 364)
-    local _, setList = U.scrollText(listFrame, 8, 30, 364, 280)
-    listFrame:Hide()
     mapUI = { frame = panel, edit = edit, status = status, waypoint = waypoint,
-        suggestionBox = suggestionBox, suggestionRows = {}, suggestions = {}, settingText = false,
-        mapTab = mapTab, sellersTab = sellersTab, listFrame = listFrame, setList = setList }
+        searchIcon = searchIcon, clearButton = clearButton,
+        suggestionBox = suggestionBox, suggestionRows = {}, suggestions = {}, settingText = false }
 
     local function refreshSuggestions(text)
         local state = mapUI
@@ -280,7 +277,7 @@ local function ensureUI(wm)
                     if suggestion then
                         state.settingText = true; state.edit:SetText(suggestion.value); state.settingText = false
                         state.suggestionBox:Hide()
-                        V.search(suggestion.value, false, suggestion.kind == "item" and "sellers" or "map")
+                        V.search(suggestion.value, false)
                     end
                 end)
                 state.suggestionRows[i] = row
@@ -308,32 +305,15 @@ local function ensureUI(wm)
         if suggestion then
             mapUI.settingText = true; edit:SetText(suggestion.value); mapUI.settingText = false
             mapUI.suggestionBox:Hide()
-            V.search(suggestion.value, false, suggestion.kind == "item" and "sellers" or "map")
+            V.search(suggestion.value, false)
         end
     end)
     return mapUI
 end
 
-function V.setView(view)
-    if view ~= "map" and view ~= "sellers" then return end
-    activeView = view
-    lastRender = nil
-    V.draw()
-end
-
-local function exactItem(query)
-    local needle = lower(trim(query))
-    if needle == "" then return false end
-    for _, item in ipairs(items) do
-        if item.key == needle then return true end
-    end
-    return false
-end
-
-function V.search(query, mapOnly, view)
+function V.search(query, mapOnly)
     currentQuery, currentOnly = trim(query), mapOnly == true
     if not mapUI then return end
-    activeView = view or (exactItem(currentQuery) and "sellers" or "map")
     lastRender = nil
     mapUI.suggestionBox:Hide()
     mapUI.settingText = true
@@ -352,35 +332,32 @@ function V.draw()
     local canvas = scroll and scroll.Child
     local on = ns.db.enabled and ns.db.vendorSearch and not ns.isBlocked("vendormap")
     if not (on and wm and canvas and call(wm.IsShown, wm)) then
-        if mapUI then mapUI.frame:Hide(); mapUI.suggestionBox:Hide(); mapUI.listFrame:Hide() end
+        if mapUI then mapUI.frame:Hide(); mapUI.suggestionBox:Hide() end
         for _, p in ipairs(pins) do p:Hide() end
         lastRender = nil
         return
     end
     local ui = ensureUI(wm); ui.frame:Show()
-    ui.mapTab:SetLabel(activeView == "map" and "[Map]" or "Map")
-    ui.sellersTab:SetLabel(activeView == "sellers" and "[Sellers]" or "Sellers")
     if scroll ~= hookedScroll and scroll.HookScript then
         scroll:HookScript("OnMouseDown", function(_, button)
             if button == "RightButton" and IsControlKeyDown and IsControlKeyDown()
                 and ns.db.enabled and ns.db.vendorSearch then
                 ui.edit:SetFocus()
-                V.search(ui.edit:GetText(), true, "map")
+                V.search(ui.edit:GetText(), true)
             end
         end)
         hookedScroll = scroll
     end
     if query == "" then
-        ui.closest = nil; ui.waypoint:Hide(); ui.listFrame:Hide()
+        ui.closest = nil; ui.waypoint:Hide(); ui.suggestionBox:Hide()
+        for _, p in ipairs(pins) do p.result = nil; p:Hide() end
+        lastRender = nil
         ui.status:SetText("Search an item or vendor type, like General Goods.")
-        ui.setList("Search to see seller locations.")
         return
     end
     if not ready then
         ui.closest = nil; ui.waypoint:Hide()
-        if activeView == "sellers" then ui.listFrame:Show() else ui.listFrame:Hide() end
         ui.status:SetText(loading and "Loading vendor data…" or "Loading Questie vendor data…")
-        ui.setList("Loading vendor data…")
         buildIndex(); return
     end
 
@@ -389,11 +366,11 @@ function V.draw()
     local scale = call(canvas.GetScale, canvas) or 1
     local now = GetTime and GetTime() or 0
     if lastRender and lastRender.canvas == canvas and lastRender.query == query and lastRender.map == map
-        and lastRender.only == currentOnly and lastRender.view == activeView
+        and lastRender.only == currentOnly
         and lastRender.width == width and lastRender.height == height
         and lastRender.scale == scale and lastRender.ready == ready and now - lastRenderAt < 3 then return end
     lastRender = { canvas = canvas, query = query, map = map, only = currentOnly, width = width, height = height,
-        view = activeView, scale = scale, ready = ready }
+        scale = scale, ready = ready }
     lastRenderAt = now
     ui.closest = nil; ui.waypoint:Hide()
     local results, selectedIDs = {}, {}
@@ -427,39 +404,24 @@ function V.draw()
         p:Show()
     end
     for i = n + 1, #pins do pins[i]:Hide() end
-    if activeView == "sellers" then ui.listFrame:Show() else ui.listFrame:Hide() end
-    local lines = {}
     if n > 0 then
-        ui.status:SetText(n .. " seller location" .. (n == 1 and "" or "s") .. " on this map")
-        lines[#lines + 1] = n .. " matching seller location" .. (n == 1 and "" or "s") .. ":"
-        lines[#lines + 1] = ""
-        for i, result in ipairs(localResults) do
-            lines[#lines + 1] = string.format("%d. %s — %s (%.1f, %.1f)", i, category(result.vendor),
-                zoneName(result.spawn.area), result.spawn.x, result.spawn.y)
-        end
+        ui.status:SetText(n .. " matching location" .. (n == 1 and "" or "s") .. " on this map")
     elseif next(selected) == nil then
-        ui.status:SetText("No known vendor sells an item or type matching that search.")
-        lines[#lines + 1] = "No known vendor sells an item or type matching that search."
+        ui.status:SetText("No known vendor or item matches that search.")
     elseif currentOnly then
-        ui.status:SetText("No matching vendor is on this map.")
-        lines[#lines + 1] = "No matching seller locations are on this map."
+        ui.status:SetText("No matching location is on this map.")
     else
         local nearest = nearestVendor(selected)
         if not nearest then
-            ui.status:SetText("No matching vendor is on this map; no nearby seller location is known.")
-            lines[#lines + 1] = "No matching seller is on this map; no nearby mapped seller is known."
+            ui.status:SetText("No matching location is on this map or nearby.")
         else
             local s, v = nearest.spawn, nearest.vendor
             ui.closest = nearest
             ui.waypoint:Show()
             local label = category(v) .. " · " .. zoneName(s.area) .. string.format(" (%.1f, %.1f)", s.x, s.y)
-            ui.status:SetText("Closest: " .. label)
-            lines[#lines + 1] = "No matching seller is on this map."
-            lines[#lines + 1] = "Closest by map distance: " .. label
-            lines[#lines + 1] = "Use the Waypoint button to mark this location."
+            ui.status:SetText("Closest by map distance: " .. label)
         end
     end
-    ui.setList(table.concat(lines, "\n"))
 end
 
 local function tick()
