@@ -2,8 +2,8 @@
 Last updated: 2026-11-16
 
 ## Active task
-- Latest release is v0.4.16. Unreleased local work includes VendorMap one-view/clear-button/search-panel changes and QuestPlanner fixes/UI plus auto zone/quest refresh and grouped outing scoring. Preserve local changes; do not publish unless asked.
-- 2026-11-16: implemented optional SPF assistance for QuestPlanner locally. `QuestPlannerPath.lua` detects SPF API v1/v2, enables explicit Follow with SPF and `/qs plan follow`, and for v2 minor 3+ estimates first-stop walk costs in cancellable <=256-target batches to promote the nearest reachable outing without breaking dependencies. No SPF source/data bundled; regular waypoints and map-distance fallback remain. Added 10 focused adapter/integration checks; all 35 suites / 1,324 checks pass, changed Lua files parse and diff check is clean. Live client validation and release remain pending.
+- Latest release is v0.4.17, published on 2026-11-16. Commit `b0cb28b058f3b856721388e4436b965ec646e93c`, annotated tag `v0.4.17`, GitHub lists it as Latest. All current local work is committed and pushed; live WoW validation remains pending.
+- v0.4.17 includes optional SPF assistance for QuestPlanner. `QuestPlannerPath.lua` detects SPF API v1/v2, enables explicit Follow with SPF and `/qs plan follow`, and for v2 minor 3+ estimates first-stop walk costs in cancellable <=256-target batches to promote the nearest reachable outing without breaking dependencies. No SPF source/data is bundled; regular waypoints and map-distance fallback remain.
 
 - 2026-11-16: direct quest-group questions complete locally: right-click quest > Ask in chat to do this quest fills `Anyone need [quest]? Wanna group up?` in current chat without opening the role-play editor; Enter sends. Select World first to use it. Current-chat assumption stated after optional destination question received no reply. All 1,314 checks pass across full run plus affected-tooltip-suite rerun. Role-play editor remains in Extra tools and `/qs adventure`; no release requested.
 
@@ -24,6 +24,7 @@ Last updated: 2026-11-16
 - Standing preference: Extra tools additions stay optional and default off unless explicitly requested otherwise.
 
 ## Last completed
+- 2026-11-16: published Quest Sharing v0.4.17. All 35 scripted suites / 1,324 checks pass; changed runtime Lua syntax and `git diff --check` pass. Built 37-file ZIP; uploaded asset downloaded and byte-matches local build, SHA256 `c590b8c563d11fc8010537044bff5a2011016084e0e37f5b0028a2b45aad0325`. Live client validation remains pending.
 - 2026-11-16: integrated optional SPF walk routes and first-outing cost promotion. A new end-to-end test exposed two pre-existing QuestPlanner scan errors: route builder read `q.data` though candidate fields are direct, and missing Questie level fields passed zero arguments to `tonumber`; fixed both and added the test harness's missing `SetEnabled` mock. Focused suite 10/10, full 35 suites / 1,324 checks, syntax and diff checks pass. See `context/BUGS/2026-11-16-quest-planner-empty-level-and-candidate-shape.md`; native client validation pending.
 - 2026-11-16: robustness review of QuestPlanner refresh, routing, map guards and panel interactions. Fixed same-source objectives merging across geographically distant camps and `/qs plan next` pinning after failed selection. All 34 documented Python/Lua harness suites pass (1,314 checks); planner/settings `luac -p` and `git diff --check` pass. Plain pytest is not this repo's runner (it reports missing `style` fixtures); native in-game map, Questie data and protected waypoint APIs remain unverified. See `context/BUGS/2026-11-16-quest-planner-distant-spawns-and-next-command.md`.
 - 2026-11-16: planner now opens/builds on enable/login/zone entry, rescans after quest-list/level changes, updates objective progress and route rows after progress-only changes, and schedules connected giver/objective/turn-in outings from the player's position using a full nearest-neighbour map-distance estimate normalized for grouped quest count. Rows include trip numbers and known giver names. Documentation updated. Planner/Settings syntax and diff whitespace checks pass; `Core.lua` has an unrelated pre-existing Lua 5.1 syntax construct rejected by host Lua 5.5; no tests or in-game behavior checked.
@@ -124,6 +125,8 @@ Last updated: 2026-11-16
 - Never open/redraw Blizzard's protected world map from addon code; print directions instead.
 
 ## Published release
+- v0.4.17: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.17 (Latest)
+- Commit/tag target `b0cb28b058f3b856721388e4436b965ec646e93c`; ZIP: 37 addon files, 186,768 bytes; SHA256 `c590b8c563d11fc8010537044bff5a2011016084e0e37f5b0028a2b45aad0325`.
 - v0.4.15: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.15
 - Tag target `5a15985ac9b5fcd2fe7990ed6ced28609d6ee72c`; ZIP: 33 addon files, 161 KB; SHA256 `78c5d1436ef4d4615673067c3d0407f611b237dabc0d425e8b80d810d23e4848`.
 - v0.4.14: https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.14
