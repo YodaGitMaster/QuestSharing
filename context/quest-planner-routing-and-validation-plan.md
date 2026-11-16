@@ -84,4 +84,4 @@ flowchart LR
 - QuestPlanner now filters by WoW's green/yellow quest difficulty colors, explains an all-gray zone, and shows local pickups line by line by giver, including when no matching quest is active.
 - Pickup/route rows set a waypoint on left-click and also mark the location on right-click. The player opens the World Map normally; the addon does not call protected map-opening/navigation APIs.
 - The planner can be dragged without later docking resets. Wrapped rows and the scroll child size to measured text. A source-shape mismatch in starter discovery was fixed with `nearestSource()`.
-- The 6-case planner UI workflow and 10-case SPF path suite pass. The full suite is pending in this release block; actual map/window rendering and WoW API behavior remain unverified until live client checks.
+- The 6-case planner UI workflow and 10-case SPF path suite pass; the full suite passed 36 files / 1,330 checks. Published as v0.4.18 from commit `30b3118`; release asset SHA256 `b28424148cbf7370d553bab55dbed2e9cf0a8774ae7b979cf58c4bc8a65afd93`. Actual map/window rendering and WoW API behavior remain unverified until live client checks.
