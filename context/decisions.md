@@ -1,5 +1,18 @@
 # Decisions
 
+## 2026-11-17 — Foreground budget for the Dungeon quests scan (user choice)
+- User chose "Faster + keep progress" over "keep progress only" and "stream results".
+- `DataWork.start(owner, run, valid, finished, budget)`: optional per-job budget in ms; jobs without one keep the shared 2 ms / 80-step slice even when a foreground job runs. Only DungeonQuests uses it (8 ms), and only while its page is visible (valid() pauses otherwise).
+- Hide pauses (keeps partial coroutine/tables in memory); master disable and Refresh data cancel. Rewards hover scan keeps cancel-on-hide.
+- Rejected for now: streaming partial results (bigger change); per-quest instead of per-read yields (little gain under the time-based profiler budget).
+
+## 2026-11-17 — Quest planner: zone membership and objective camps (user choices)
+- **Scope = this zone's quests.** Membership comes from Questie `zoneOrSort` -> `uiMapOf()`, accepting the current map or a descendant of it. A spawn that happens to be here does not make a quest belong here. Negative sorts (class, profession, event) and other zones are left out even with a local giver or mob; reasons go to `coverage.external` for `/qs plan why`.
+- **Exception:** an active quest from another zone appears only for its local hand-in, once it is ready (log `complete`, or a breadcrumb with no objectives in the log or in Questie).
+- **Fallback:** `zoneOrSort` missing, 0, or not mapped (e.g. old Questie without ZoneDB) -> keep the pre-change location rules, so quests don't silently vanish.
+- **Objective place = nearest real camp.** Group the target's spawns per map into camps: the densest unassigned spawn seeds a camp of the spawns within `CLUSTER_DISTANCE` (0.065); the camp's point is the member nearest its centroid. A camp is real when its size >= min(3, the target's largest camp on any map). Choose the real local camp nearest the player. The chosen camp depends on the player only through "which camp is nearest", so a step switches only when another camp gets closer.
+- Rejected: biggest camp (stable, but can send you far past a nearby camp); nearest single spawn (old behaviour: step 1 lands on the player and follows them).
+
 ## 2026-11-17 — WoW-style search journal
 - User requests a more beautiful WoW feel across existing searches. Scope all3shared explorer tabs; keep data/filters/actions/layout destinations and avoid globally changing Settings/profession/map tools.
 - EquipmentUI owns themed button/list-button/field/text/surface helpers; Rewards/Loot/DungeonQuests switch their UI creation to those. Use existing-client dialog/QuestBG/Quickslot2/native red-button art, Friz/locale fonts, warm opaque panels, gold states and dark parchment ink. Retain button scripts/disabled states, larger popup layering and existing outer dialog/scaling; no new runtime assets/providers/timers.

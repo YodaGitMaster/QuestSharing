@@ -1,5 +1,11 @@
 # Insights
 
+## 2026-11-17 — Quest planner: "where" and "which" are different questions
+- QuestieDB spawn lists hold every individual spawn; common mobs have lone spawns across the whole zone. Any "nearest spawn to the player" choice therefore lands at the player's feet and follows them (3 s movement re-plan). Choose among camps (grouped spawns), never single spawns.
+- "Has a point on this map" is not "belongs to this map". Membership comes from Questie `zoneOrSort` (positive = zone area, negative = class/profession/event category). Location rules only decide whether the work can be done here.
+- Removing a guard that no longer changes the *plan* can still change the *report*: the log-quest association guard also keeps unrelated log quests out of `/qs plan why` (`test_planner_facts.py` caught it).
+- No fixture before this set `zoneOrSort`; a quest without one is "unknown" and must keep the old location rules, or older Questie builds without ZoneDB would lose every quest.
+
 ## 2026-11-17 — Search appearance belongs in the shared explorer
 - Native red buttons, Quickslot2 item surrounds, dialog grain and QuestBG parchment provide client-owned WoW styling without shipped art or global UI changes. Keep selected-row/text-state semantics; use explicit dark ink for parchment (yellow quest links need conversion).
 - Shared skin can stay inside EquipmentUI and its3consumers; untouched data scans, item comparisons, filters and menus already have meaningful integration coverage. Larger13px row/detail text still fits existing48px item/102px quest rows.
@@ -414,3 +420,14 @@
 - Tiny exhaustive enumeration independently matches the optimizer's all, selected, XP and time-budget goals on a six-action fixture. An artificial one-check budget still returns the seeded eight-quest route and reports exhaustion.
 - Eight-quest harness result remains 420.95 seconds with eight hand-ins; beam uses 4,013 checks and does not exhaust. Host Lua harness averages ~19.7ms per all-mode solve across 100 runs; the actual game work is cooperatively sliced and must be profiled in WoW.
 - Two simultaneous different item objectives at one NPC can overlap, but marginal drop rates alone cannot give their joint completion time. The additive count stays an estimate with `uncertain=true`; two streams also expose a plausible camp range from the maximum versus sum of their separate expectations.
+
+## 2026-11-17 — Map suggestions vs DataWork budget
+- Harness tests run DataWork without `debugprofilestop` (80 steps/pump, no time limit) and small catalogues, so they cannot reveal in-game latency. Model client cost by defining `debugprofilestop` and advancing it per provider read; use Classic Era counts 10,122 NPCs / 14,899 items / 4,257 quests / 6,666 objects.
+- At 2 ms/100 ms, a one-NPC-per-yield scan of the Era NPC catalogue takes about 4 s of wall time; adding the item catalogue and worldwide seller spawns takes about 12 s for `vendor`. Interactive UI must not wait on whole-catalogue jobs.
+- Real QuestieDB (v1.1.2, contract 4) publishes `_G.<Type>DB` = `LibQuestieDB.<Type>` with `Get/GetAllIds/Exists` standalone; table reads return fresh copies, scalar reads are cached after the first.
+
+## 2026-11-17 — QuestOptimizer vs planner input (analysis, no code change)
+- `QuestOptimizer.optimize` only **orders** fixed stops; it never chooses *where* an action happens. `QuestPlanner.questActions()` fixes every point first, all relative to the player: pickup/turn-in = `nearestSource()`, objective = `targetLocation()` nearest real camp. So a camp near the turn-in, or one shared with another quest, cannot be picked by the optimizer.
+- Search = greedy nearest-legal-action baseline + seeded re-runs (previous plan, road insertion, any-of gate branches, up to 10 shared-camp seeds, up to 12 goal seeds when <=220 atoms) + beam search (width 20) **only when <=40 atoms** (~13 quests). Real zones are usually above 40, so the result is best-of-seeded-greedy; no 2-opt/local-search pass (QuestRoute and Factoruide both have one).
+- Shared kill credit needs an identical `campKey(point, npc)`. Camps are clustered per target from that target's own sources, so two quests on the same mob can land on different marks and lose the sharing bonus.
+- Travel: walking-path cost only for the first leg (`QuestPlannerPath`), every later leg straight-line * map size / run speed. Fixed 10 s per kill and 3 s per interaction; drop rates only where Questie has them.

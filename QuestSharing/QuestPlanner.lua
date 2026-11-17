@@ -179,15 +179,55 @@ local function statusFor(id, log)
     return "unknown"
 end
 
-local function newCandidate(id, starter, log, data)
+-- Questie files each quest under one zone (positive area ID) or a category (negative: class, profession,
+-- event). That filing decides membership; a spawn that happens to be here does not. An unresolved filing
+-- (no ZoneDB, unmapped area) is "unknown" and keeps the location rules.
+local function zoneMembership(id, cache)
+    local area = tonumber((questie().get("quest", id, "zoneOrSort")))
+    if not area or area == 0 then return "unknown" end
+    if area < 0 then return "other", "Class, profession or event quest" end
+    local map = questie().uiMapOf(area)
+    if not map then return "unknown" end
+    local known = cache and cache[map]
+    if known then return known[1], known[2] end
+    local result, reason, step = "other", nil, map
+    for _ = 1, 12 do
+        if step == frameMap then result = "here"; break end
+        local info = U.call(C_Map and C_Map.GetMapInfo, step)
+        step = info and info.parentMapID
+        if not step or step == 0 then break end
+    end
+    if result == "other" then
+        local info = U.call(C_Map and C_Map.GetMapInfo, map)
+        reason = "Belongs to " .. (info and info.name or ("another zone (map " .. tostring(map) .. ")"))
+    end
+    if cache then cache[map] = { result, reason } end
+    return result, reason
+end
+
+-- The game flags a finished quest complete; one with no objectives at all (a breadcrumb or delivery)
+-- is ready as soon as it is in the log.
+local function readyToHandIn(entry, data)
+    if not entry then return false end
+    if entry.complete then return true end
+    return #(data.targets or {}) == 0 and #ns.compat.objectives(entry) == 0
+end
+
+local function newCandidate(id, starter, log, data, membership, zoneReason)
     local turnPoint = nearestSource(data.turnIns)
+    local ready = readyToHandIn(log[id], data)
     if log[id] and not turnPoint and not nearestSource(data.starters) then
-        local area = tonumber((questie().get("quest", id, "zoneOrSort")))
-        local associated = area and area > 0 and questie().uiMapOf(area) == frameMap
+        -- A log quest with nothing on this map stays out of this zone's report.
+        local associated = membership == "here"
         for _, target in ipairs(data.targets) do
             if not associated and nearestPoint(target.points) then associated = true; break end
         end
         if not associated then return end
+    end
+    if membership == "other" and not (log[id] and ready and turnPoint) then
+        coverage.external[id] = (zoneReason or "Belongs to another zone")
+            .. (log[id] and "; only its hand-in here, once ready, is planned" or "")
+        return
     end
     local status, detail = statusFor(id, log)
     local level = U.call(UnitLevel,"player")
@@ -240,7 +280,7 @@ local function newCandidate(id, starter, log, data)
             else
                 allWorkLocal = false
                 if nearestPoint(target.points) then
-                    coverage.blocked[id] = "No local source with a possible drop: " .. (target.name or target.kind)
+                    coverage.blocked[id] = "No real local camp (only stray or zero-drop spawns): " .. (target.name or target.kind)
                 elseif #target.points > 0 then coverage.external[id] = "Objective outside this zone: " .. (target.name or target.kind)
                 else coverage.unknown[id] = "Objective location unknown: " .. (target.name or target.kind) end
             end
@@ -256,7 +296,7 @@ local function newCandidate(id, starter, log, data)
     end
     data.canFinishHere = allWorkLocal and turnPoint ~= nil
     if data.entry then
-        if not (data.entry.complete and turnPoint) and not localWork then return end
+        if not (ready and turnPoint) and not localWork then return end
     elseif not allWorkLocal or (#data.turnIns > 0 and not turnPoint) then
         return
     end
@@ -293,7 +333,7 @@ local function scan(rediscover)
     local inZone, index = {}, 1
     if rediscover then zoneQuestIDs[zoneMap] = nil end
     local discovered = zoneQuestIDs[zoneMap]
-    local discoveredIDs, sourceCache = {}, {}
+    local discoveredIDs, sourceCache, zoneCache = {}, {}, {}
     local levelStats = { localCount = 0, below = 0, above = 0, eligible = 0, unknown = 0 }
     lastLevelStats = levelStats
     loading, catalog, route, selected, plannedMap = true, {}, {}, 1, zoneMap
@@ -319,17 +359,17 @@ local function scan(rediscover)
             end
             local id = ids[index]; index = index + 1
             local active = log[id] ~= nil
+            local membership, zoneReason = zoneMembership(id, zoneCache)
             local starters, startPoint, zoneAssociated
             if not discovered or not active then
                 starters = q.plannerStarters(id, sourceCache)
                 startPoint = nearestSource(starters)
-                if not startPoint then
-                    local area = tonumber((q.get("quest", id, "zoneOrSort")))
-                    zoneAssociated = area and area > 0 and q.uiMapOf(area) == zoneMap
-                end
+                if not startPoint then zoneAssociated = membership == "here" end
                 if not discovered and (startPoint or zoneAssociated) then discoveredIDs[#discoveredIDs + 1] = id end
             end
-            if active or startPoint then
+            if startPoint and not active and membership == "other" then
+                coverage.external[id] = zoneReason
+            elseif active or startPoint then
                 local data = q.plannerQuest(id, sourceCache)
                 local band = data and questLevelBand(data.level) or "unknown"
                 if not active then
@@ -344,7 +384,7 @@ local function scan(rediscover)
                     coverage.filtered[id] = "Outside the green/yellow level filter"
                 else
                     data.band = band
-                    local candidate = newCandidate(id, starters or {}, log, data)
+                    local candidate = newCandidate(id, starters or {}, log, data, membership, zoneReason)
                     if candidate then inZone[id] = candidate end
                 end
             elseif zoneAssociated then
@@ -579,19 +619,107 @@ local function targetSummary(target, source, probability)
     return text
 end
 
+-- QuestieDB lists every spawn separately, and common mobs have lone spawns all over a zone. Spawns group into
+-- camps: the densest spawn not yet taken seeds a camp of the free spawns within CLUSTER_DISTANCE, and the
+-- member nearest the camp's centre marks it. Camps never depend on where the player stands.
+local REAL_CAMP = 3
+local function groupCamps(list)
+    local r2, cells = CLUSTER_DISTANCE * CLUSTER_DISTANCE, {}
+    for i, s in ipairs(list) do
+        s.cx, s.cy = math.floor(s.x / CLUSTER_DISTANCE), math.floor(s.y / CLUSTER_DISTANCE)
+        local key = s.cx .. ":" .. s.cy
+        cells[key] = cells[key] or {}
+        table.insert(cells[key], i)
+    end
+    local function around(s)
+        local found = {}
+        for cx = s.cx - 1, s.cx + 1 do
+            for cy = s.cy - 1, s.cy + 1 do
+                for _, j in ipairs(cells[cx .. ":" .. cy] or {}) do
+                    local dx, dy = list[j].x - s.x, list[j].y - s.y
+                    if dx * dx + dy * dy <= r2 then found[#found + 1] = j end
+                end
+            end
+        end
+        return found
+    end
+    local order = {}
+    for i, s in ipairs(list) do
+        s.density, order[i] = #around(s), i
+        if i % 16 == 0 then Work.checkpoint() end
+    end
+    table.sort(order, function(a, b)
+        if list[a].density ~= list[b].density then return list[a].density > list[b].density end
+        return a < b
+    end)
+    local taken, camps = {}, {}
+    for n, i in ipairs(order) do
+        if not taken[i] then
+            local members, sx, sy = {}, 0, 0
+            for _, j in ipairs(around(list[i])) do
+                if not taken[j] then
+                    taken[j], members[#members + 1] = true, list[j]
+                    sx, sy = sx + list[j].x, sy + list[j].y
+                end
+            end
+            local cx, cy, mark, best = sx / #members, sy / #members, nil, nil
+            for _, m in ipairs(members) do
+                local d = (m.x - cx) * (m.x - cx) + (m.y - cy) * (m.y - cy)
+                if not best or d < best then mark, best = m, d end
+            end
+            camps[#camps + 1] = { mark = mark, members = members }
+        end
+        if n % 16 == 0 then Work.checkpoint() end
+    end
+    return camps
+end
+
+-- An objective goes to the nearest real local camp. A camp is real when it has REAL_CAMP spawns, or as many
+-- as the target's biggest camp on any map when the mob never gathers that many, so a lone stray never
+-- outranks a camp. The step switches only when another real camp becomes nearer.
 targetLocation = function(target)
-    local best, chosen, score
-    for _, source in ipairs(target.sources or {}) do
-        local probability = target.dropRates and target.dropRates[source.id]
-        if source.kind ~= "npc" or target.kind ~= "loot" or probability ~= 0 then
-            local point = nearestPoint(source.spawns)
-            if point then
-                local d = distance(playerPoint, point)
-                if not best or d < score then best, chosen, score = point, source, d end
+    if #(target.sources or {}) == 0 then return nearestPoint(target.points) end
+    if not target.camps then
+        local byMap = {}
+        for _, source in ipairs(target.sources) do
+            local probability = target.dropRates and target.dropRates[source.id]
+            if source.kind ~= "npc" or target.kind ~= "loot" or probability ~= 0 then
+                for _, spawn in ipairs(source.spawns or {}) do
+                    if not spawn.dungeon and finite(spawn.x) and finite(spawn.y) then
+                        local point = pointForSpawn(spawn)
+                        -- Spawns elsewhere only size the biggest camp; local camps are the destinations.
+                        local key = point and "here" or (spawn.map and ("m" .. spawn.map) or ("a" .. tostring(spawn.area)))
+                        byMap[key] = byMap[key] or {}
+                        table.insert(byMap[key], { point = point, source = source,
+                            x = point and point.x or spawn.x / 100, y = point and point.y or spawn.y / 100 })
+                    end
+                end
+            end
+        end
+        local largest, here = 0, {}
+        for key, list in pairs(byMap) do
+            for _, camp in ipairs(groupCamps(list)) do
+                largest = math.max(largest, #camp.members)
+                if key == "here" then here[#here + 1] = camp end
+            end
+        end
+        target.camps = {}
+        for _, camp in ipairs(here) do
+            if #camp.members >= math.min(REAL_CAMP, largest) then
+                local count, source, most = {}, nil, 0
+                for _, member in ipairs(camp.members) do
+                    count[member.source] = (count[member.source] or 0) + 1
+                    if count[member.source] > most then source, most = member.source, count[member.source] end
+                end
+                target.camps[#target.camps + 1] = { point = camp.mark.point, source = source }
             end
         end
     end
-    if not chosen and #(target.sources or {}) == 0 then return nearestPoint(target.points) end
+    local best, chosen, score
+    for _, camp in ipairs(target.camps) do
+        local d = distance(playerPoint, camp.point)
+        if not best or d < score then best, chosen, score = camp.point, camp.source, d end
+    end
     return best, chosen
 end
 

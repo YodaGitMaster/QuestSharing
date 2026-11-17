@@ -219,6 +219,103 @@ def test_accepting_and_completing_quest_advances_from_pickup_to_work_to_handin(s
     assert "Kill Harvest Watcher" not in text(g)
 
 
+CAMP = r'''
+QUESTIE_QUESTS[9000],QUESTIE_QUESTS[9001],QUESTIE_QUESTS[9002]=nil,nil,nil
+QUESTIE_NPCS[610]={name="Harvest Watcher",spawns={[40]={
+ {50.4,50.3},{70.3,70.2},
+ {30,30},{31,32},{29,31},{32,29},{30.5,28.5},{28.5,30.5},
+}}}
+QUESTIE_QUESTS[9100]={name="Harvest Patrol",questLevel=8,zoneOrSort=40,startedBy={{600}},objectives={{{610}}},finishedBy={{600}}}
+QUESTS={{id=9100,title="Harvest Patrol",level=8,objectives={{text="Harvest Watcher slain: 0/8",type="monster",have=0,need=8}}}}
+'''
+
+
+def objective_waypoint(g):
+    row = next(r for r in rows(g) if "Complete these quests here" in r.detail.text)
+    row.scripts.OnClick(row, "LeftButton")
+    return g.eval("WAYPOINT.x"), g.eval("WAYPOINT.y")
+
+
+def near(point, x, y):
+    return abs(point[0] - x) < 0.02 and abs(point[1] - y) < 0.02
+
+
+def test_objective_goes_to_a_real_camp_not_a_lone_spawn_by_the_player(style):
+    g = game(style, CAMP)
+    point = objective_waypoint(g)
+    assert near(point, 0.30, 0.30), point
+    g.run("POS.x, POS.y = 0.70, 0.70")
+    g.advance(8)
+    point = objective_waypoint(g)
+    assert near(point, 0.30, 0.30), point
+
+
+def test_objective_switches_camp_only_when_another_real_camp_is_nearer(style):
+    g = game(style, CAMP + '''
+for _, p in ipairs({{80,80},{81,79},{79,81}}) do table.insert(QUESTIE_NPCS[610].spawns[40], p) end
+''')
+    assert near(objective_waypoint(g), 0.30, 0.30)
+    g.run("POS.x, POS.y = 0.52, 0.52")
+    g.advance(8)
+    assert near(objective_waypoint(g), 0.30, 0.30)
+    g.run("POS.x, POS.y = 0.75, 0.75")
+    g.advance(8)
+    assert near(objective_waypoint(g), 0.80, 0.80)
+
+
+FOREIGN_STRAY = r'''
+QUESTIE_QUESTS[9000],QUESTIE_QUESTS[9001],QUESTIE_QUESTS[9002]=nil,nil,nil
+QUESTIE_NPCS[702]={name="Prowler",spawns={[12]={{40,40},{41,42},{43,41}},[40]={{52,49}}}}
+QUESTIE_QUESTS[9200]={name="Elwynn Prowlers",questLevel=8,zoneOrSort=12,startedBy={{700}},objectives={{{702}}},finishedBy={{700}}}
+QUESTS={{id=9200,title="Elwynn Prowlers",level=8,objectives={{text="Prowler slain: 0/6",type="monster",have=0,need=6}}}}
+'''
+
+
+def test_lone_local_spawn_cannot_pull_a_foreign_active_quest_into_the_plan(style):
+    g = game(style, FOREIGN_STRAY)
+    assert "Elwynn Prowlers" not in text(g)
+    assert "Other Zone" in str(g.eval("NS.questPlanner.coverage().external[9200]"))
+    # Even without a zone filing, one stray is not a real camp while the mob's camp is elsewhere.
+    g = game(style, FOREIGN_STRAY + "QUESTIE_QUESTS[9200].zoneOrSort=nil")
+    assert "Elwynn Prowlers" not in text(g)
+
+
+def test_only_quests_filed_under_this_zone_are_planned_even_with_a_local_giver(style):
+    g = game(style, '''
+QUESTIE_QUESTS[9000].zoneOrSort=40
+QUESTIE_QUESTS[9010]={name="Class Trial",questLevel=8,zoneOrSort=-81,startedBy={{600}},objectives={{{601}}},finishedBy={{600}}}
+QUESTIE_QUESTS[9011]={name="Elwynn Errand",questLevel=8,zoneOrSort=12,startedBy={{600}},objectives={{{601}}},finishedBy={{600}}}
+QUESTIE_QUESTS[9012]={name="Sentinel Hill Duty",questLevel=8,zoneOrSort=999,startedBy={{600}},objectives={{{601}}},finishedBy={{600}}}
+QUESTIE_QUESTS[9013]={name="Unmapped Area Task",questLevel=8,zoneOrSort=5555,startedBy={{600}},objectives={{{601}}},finishedBy={{600}}}
+''')
+    output = text(g)
+    assert "Local Harvest" in output
+    assert "Sentinel Hill Duty" in output      # filed under a sub-zone map of Westfall
+    assert "Unmapped Area Task" in output      # an unresolved filing keeps the location rule
+    assert "Class Trial" not in output
+    assert "Elwynn Errand" not in output
+    external = g.eval("NS.questPlanner.coverage().external")
+    assert "Class" in str(external[9010])
+    assert "Other Zone" in str(external[9011])
+
+
+def test_quest_from_another_zone_appears_only_for_its_ready_local_handin(style):
+    base = '''
+QUESTIE_QUESTS[9002].zoneOrSort=12
+QUESTIE_QUESTS[9002].finishedBy={{600}}
+'''
+    assert "Foreign Active Quest" not in text(game(style, base))
+    g = game(style, base + "QUESTS[1].complete=true")
+    assert "Turn in Foreign Active Quest" in text(g)
+    assert "Faraway Creature" not in text(g)
+    # A breadcrumb has nothing to do but hand in, so it is ready as soon as it is in the log.
+    g = game(style, '''
+QUESTIE_QUESTS[9014]={name="Report to Sentinel Hill",questLevel=8,zoneOrSort=12,startedBy={{700}},finishedBy={{600}}}
+QUESTS={{id=9014,title="Report to Sentinel Hill",level=8,objectives={}}}
+''')
+    assert "Turn in Report to Sentinel Hill" in text(g)
+
+
 if __name__ == "__main__":
     failed = total = 0
     for name, test in sorted(list(globals().items())):

@@ -2,7 +2,7 @@
 
 A World of Warcraft addon for playing quests together.
 
-[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.20)
+[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.21)
 
 ## Your first party, in four steps
 1. **Install it** (see [Install](#install)) and log in. A short welcome in chat tells you it is ready. Everything is
@@ -428,7 +428,7 @@ Each tool has a card with its purpose, data requirements and a named Open action
 
 **Quest planner.** Open **Extra tools > Quest planner** or type `/qs plan`. It is off by default. Open it when you need it; saving the enabled switch does not open it or scan the database on login. While the guide is visible, it updates when you enter a different zone or your quest log changes. Closing it stops database work until you open it again. Use it outdoors in a zone: it will not scan in towns, cities, dungeons, or continent maps, and it clears or rebuilds the plan if you enter a town or change zones. Questie and a recent QuestieDB are needed for its quest catalogue, prerequisites and locations.
 
-The planner discovers local starters, active local work and known quests associated with the zone. It checks real acceptance restrictions and follows locally attainable chains without a fixed depth limit. The default goal is to complete the zone's compatible, non-repeatable quests. The **Plan** button chooses **Complete zone**, **Quest XP/hour**, **Selected quests** by quest ID, or a time budget in minutes. Goals and level scope last for the session. **Level range** switches the optional green/yellow filter. Quests requiring a future level, work elsewhere or missing facts appear in the plan report.
+The planner plans the zone's own quests: the ones Questie files under the current zone or one of its sub-zone maps. Class, profession, event and other-zone quests stay out even when their giver or a mob is here; a quest from another zone appears only for its hand-in here once it is ready. Each kill or collect step goes to the nearest real camp, a group of at least three spawns (or the mob's biggest group, if it never gathers that many), so lone stray spawns are ignored, the step stays put while you walk, and it switches only when another camp becomes nearer. Your position is only where the route starts. It checks real acceptance restrictions and follows locally attainable chains without a fixed depth limit. The default goal is to complete the zone's compatible, non-repeatable quests. The **Plan** button chooses **Complete zone**, **Quest XP/hour**, **Selected quests** by quest ID, or a time budget in minutes. Goals and level scope last for the session. **Level range** switches the optional green/yellow filter. Quests requiring a future level, work elsewhere or missing facts appear in the plan report.
 
 The planner compares nearest-ready instructions with alternative pickup, unlock and farming orders. It prices travel, estimated work and known waits, and gives time credit when the same verified creature action can progress accepted quests together. One item drop stream can share kills with kill quotas. An unaccepted follow-up receives no earlier kill credit. Independent objectives at the same camp share travel. Unknown quantities/rates use labelled work estimates. The guide explains measured differences between the schedules it compares.
 
@@ -706,7 +706,7 @@ If an unloaded AtlasLoot module cannot load during combat, it is retried after c
 Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check.
 
 ## Install
-**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.20), unzip `QuestSharing-<version>.zip` and drop the
+**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.21), unzip `QuestSharing-<version>.zip` and drop the
 `QuestSharing` folder into `Interface\AddOns`. Or:
 1. Copy the folder `QuestSharing` (the one containing `QuestSharing.toc`, not this README's folder) into
    the game's `Interface\AddOns` folder, so you have `...\AddOns\QuestSharing\QuestSharing.toc`.

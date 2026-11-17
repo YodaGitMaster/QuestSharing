@@ -115,6 +115,28 @@ end
     assert g.eval("WORK_DONE[1]") == 999
 
 
+def test_foreground_budget_speeds_only_its_job_and_keeps_background_at_shared_slice():
+    g = game(WESTFALL)
+    g.run(r'''
+PROFILE=0; debugprofilestop=function() return PROFILE end
+FG,BG=0,0
+NS.dataWork.start("background",function() for i=1,200 do PROFILE=PROFILE+0.4;BG=BG+1;NS.dataWork.yield() end end)
+NS.dataWork.start("foreground",function() for i=1,200 do PROFILE=PROFILE+0.4;FG=FG+1;NS.dataWork.yield() end end,nil,nil,8)
+''')
+    before = 0
+    for _ in range(5):
+        g.advance(0.1)
+        now = g.eval("PROFILE")
+        assert now - before <= 8.401, now - before  # whole slice never exceeds the largest requested budget
+        before = now
+    fg, bg = g.eval("FG"), g.eval("BG")
+    assert bg <= 5 * 3 and fg >= 3 * bg, (fg, bg)  # background keeps ~2 ms per slice; foreground gets ~4x
+    g.run("debugprofilestop=nil")
+    fg0, bg0 = g.eval("FG"), g.eval("BG")
+    g.advance(0.1)
+    assert g.eval("BG") - bg0 <= 80 and g.eval("FG") - fg0 > 80  # no profiler: step caps scale the same way
+
+
 def test_shared_work_pause_and_cancel_do_not_keep_idle_jobs_running():
     g = game(WESTFALL)
     g.run('''WORK_COUNT=0

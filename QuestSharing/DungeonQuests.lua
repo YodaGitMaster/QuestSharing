@@ -8,6 +8,7 @@ local selected, message, generation = nil, "Open to read dungeon quests.", 0
 local filterError
 local refreshPending=false
 local PAGE, OWNER, REWARDS_OWNER = 5, "dungeonQuests", "dungeonQuestRewards"
+local FOREGROUND_MS = 8 -- the player is waiting on this visible list; it reads ~18 fields per quest
 local rewardIndex, rewardsReady, rewardsLoading = {}, false, false
 local hovered, showHover
 local paint
@@ -235,7 +236,7 @@ function D.scan()
     end,shown,function(ok,err)
         if token~=generation then return end
         if not ok then loading=false;message="Could not read dungeon quests: "..tostring(err);paint() end
-    end)
+    end,FOREGROUND_MS)
     paint();return true
 end
 
@@ -577,14 +578,18 @@ local function build()
     window.next=E.button(f,"Next",100,function() D.go(1) end);window.next:SetPoint("TOPLEFT",f,"TOPLEFT",110,-705)
     window.reload=E.button(f,"Refresh data",120,D.scan);window.reload:SetPoint("TOPLEFT",f,"TOPLEFT",530,-705)
     E.navigation(window.search,window.rows,D.go)
+    -- Hiding (close, Esc, other tab) pauses the catalogue scan so reopening continues it instead of restarting.
     f.suspend=function()
-        generation=generation+1;ns.dataWork.cancel(OWNER);ns.closeQuestMenu()
+        ns.dataWork.pause(OWNER);ns.closeQuestMenu()
         hovered=nil;U.hideTip();ns.dataWork.cancel(REWARDS_OWNER)
         if rewardsLoading then rewardsLoading,rewardsReady=false,false;rewardIndex={} end
-        if loading then loading,ready=false,false end
     end
     f:SetScript("OnHide",f.suspend)
     return true
+end
+local function stop()
+    generation=generation+1;ns.dataWork.cancel(OWNER)
+    if loading then loading,ready=false,false end
 end
 function D.open(text)
     if not ns.db.enabled then ns.print("switch Quest Sharing on first (/qs on)");return end
@@ -594,9 +599,12 @@ function D.open(text)
     if text and text~="" then filters.text=text;window.search:SetText(text);window.search.cancel() end
     D.updateControls()
     for _,box in ipairs({window.level,window.search}) do if box.dirty then box.flush() end end
-    if ready then D.refresh() elseif not loading then D.scan() end
+    if ready then D.refresh()
+    elseif loading and ns.dataWork.busy(OWNER) then ns.dataWork.resume(OWNER);paint()
+    else D.scan() end
 end
-function D.close() if window then E.close(OWNER) end end
+-- Master disable: discard the scan entirely.
+function D.close() if window then E.close(OWNER);stop() end end
 function D._window() return window end
 function D._results() return results end
 function D._state() return ready,loading,progress end

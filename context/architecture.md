@@ -13,7 +13,7 @@ QuestSharing/  # Repository root
 │   ├── Compat.lua  # one place that knows the differences between the classic and the modern quest APIs
 │   ├── Core.lua  # settings, timers, events, chat helpers, master-tool lifecycle and /qs commands
 │   ├── CookingReference.lua  # Pinned MIT Forever Cooking facts: spells, ingredients and acquisition hints
-│   ├── DataWork.lua  # Shared cooperative database queue, 2ms slices, pause/resume and combat suspension
+│   ├── DataWork.lua  # Shared cooperative database queue, 2ms slices (optional larger per-job foreground budget), pause/resume and combat suspension
 │   ├── Diagnostics.lua  # Readable issue overview and full snapshot; Copy all includes all retained technical records
 │   ├── Friends.lua  # add the people you group with to your friends list
 │   ├── DungeonQuests.lua  # Dungeon catalogue, separate chain/task labels, locations, hover XP/rewards and quest actions
@@ -339,7 +339,7 @@ sequenceDiagram
     participant Menu as Menu.lua
     participant Game as Compat.lua waypoint
     User->>D: Open Dungeon quests / qs dungeons
-    D->>Work: Start visible-only cooperative scan
+    D->>Work: Start visible-only cooperative scan (8ms foreground budget per 100ms)
     Work->>Q: Quest categories, restrictions and source locations
     Q-->>Work: Records, prerequisites and explicit follow-ups
     Work->>D: Associate dungeons, outdoor chains and bidirectional chain links; ready catalogue
@@ -356,7 +356,7 @@ sequenceDiagram
     Menu->>D: Resolve mapped pickup source
     D->>Game: Native waypoint when coordinates supported
     D-->>User: Pickup coordinates; open map manually with M
-    Note over Work: Combat pauses; close/tab/master disable cancels unfinished work
+    Note over Work: Combat and close/Esc/tab switch pause the scan (reopen resumes); master disable and Refresh data cancel it
 ```
 
 ```mermaid
@@ -694,6 +694,8 @@ sequenceDiagram
             else Changed outdoor zone
                 Planner->>Planner: Cancel old scan and restart for new zone
             else Same outdoor zone
+                Planner->>Questie: zoneMembership(): zoneOrSort -> uiMapOf() is this map or a descendant
+                Note over Planner,Questie: Other zones/categories: only a ready local hand-in; unmapped filing keeps location rules
                 Planner->>Questie: Keep locally completable pickups and local active work/hand-ins
             end
         end
@@ -701,6 +703,7 @@ sequenceDiagram
         Planner->>Questie: Read readiness, prerequisites, starters, targets and turn-ins
         Planner->>Planner: Use all acceptance levels by default; optional green/yellow filter
         Planner->>Planner: Validate source-map ancestry and coordinates before planning any action
+        Planner->>Planner: targetLocation(): groupCamps() per map; nearest real camp (>= min(3, biggest group)), never a lone stray
         Planner->>Planner: Keep AND/OR gates and atomic giver/work/turn-in actions
         Planner->>Planner: Keep different prerequisite depths in separate stops at the same giver/camp
         Planner->>Planner: Compare feasible schedules and shared kill/drop work
@@ -1054,6 +1057,7 @@ classDiagram
         valid
         paused
         finished
+        budget
     }
     class ZoneQuestCache {
         mapID

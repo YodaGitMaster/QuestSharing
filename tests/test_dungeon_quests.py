@@ -183,8 +183,9 @@ def test_no_login_scan_close_combat_and_master_disable_cancel_work(style):
     assert g.eval("QUEST_ENUMS")==0
     g.run("InCombatLockdown=function()return false end");g.fire("PLAYER_REGEN_ENABLED");g.advance(.1)
     g.eval("NS.equipmentUI.close")();g.advance(10)
-    assert not g.eval("NS.dataWork.busy")("dungeonQuests")
-    g.slash("dungeons");g.advance(90);assert ids(g)
+    # Closing keeps the partial scan paused (no work while hidden); reopening resumes it without re-enumerating.
+    assert g.eval("NS.dungeonQuests._state()")[1] and g.eval("QUEST_ENUMS")==1
+    g.slash("dungeons");g.advance(90);assert ids(g) and g.eval("QUEST_ENUMS")==1
     g.slash("off")
     assert not g.eval("NS.equipmentUI._window()")[0].shown
     assert not g.eval("NS.dataWork.busy")("dungeonQuests")
@@ -397,6 +398,27 @@ def test_chain_status_visible_in_all_dungeons_and_no_linear_step_numbers_in_bran
     row=hover(g,1)
     assert "Chain quest" in row['from'].text and "step 1/" not in tooltip(g)
     assert "A dungeon job (2)" in tooltip(g) and "Class mission (4)" in tooltip(g)
+
+
+def test_partial_scan_survives_close_and_tab_switch_without_working_while_hidden(style):
+    g=game(style,"QUEST_READS=0 local get=QuestDB.Get QuestDB.Get=function(id,key) QUEST_READS=QUEST_READS+1 return get(id,key) end",False)
+    g.slash("dungeons");g.advance(.1)
+    reads=g.eval("QUEST_READS");assert reads>0 and not g.eval("NS.dungeonQuests._state()")[0]
+    g.eval("NS.equipmentUI.close")();g.advance(5)
+    assert g.eval("QUEST_READS")==reads, "no database work while the journal is closed"
+    g.eval("NS.loot.open")();g.advance(1)  # switching tab also pauses
+    paused=g.eval("QUEST_READS")
+    g.slash("dungeons");g.advance(30)
+    assert g.eval("NS.dungeonQuests._state()")[0] and ids(g)
+    assert g.eval("QUEST_ENUMS")==1 and g.eval("QUEST_READS")>=paused
+
+
+def test_open_scan_uses_foreground_slice_but_background_jobs_keep_shared_budget(style):
+    g=game(style,"",False)
+    g.run('''STARTS={} local start=NS.dataWork.start
+NS.dataWork.start=function(owner,run,valid,finished,budget) STARTS[owner]=budget or 0 return start(owner,run,valid,finished,budget) end''')
+    g.slash("dungeons");g.advance(30)
+    assert g.eval("STARTS.dungeonQuests")>=8
 
 
 if __name__=="__main__":

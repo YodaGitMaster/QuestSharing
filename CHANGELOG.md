@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.21
+- Fixed the quest guide's first step landing on your own character and following you as you walked. Kill and collect steps now go to the nearest real camp (a group of at least three spawns, or the mob's biggest group) instead of the single spawn nearest to you, and switch only when another camp becomes nearer.
+- The quest guide now plans only the zone's own quests, the ones Questie files under the current zone or its sub-zone maps. Class, profession, event and other-zone quests stay out even when their giver or one stray mob spawn is here; a quest from another zone appears only for its hand-in here once it is ready, including breadcrumb quests with no objectives. `/qs plan why` lists the quests left out and why.
+- Made **Dungeon quests** usable sooner on first open: the visible list now reads the quest catalogue in larger time slices than background work, and closing the window, pressing Esc or switching tabs pauses the scan so reopening continues it instead of restarting. Disabling Quest Sharing or **Refresh data** still discards it.
+
 ## 0.4.20
 - Added predictive zone planning with complete-zone, quest-XP/hour, selected-quest and time-budget goals, local chains, OR prerequisite choices, reputation and known skill gates, carried-item and one-level XP state, shared single-loot-stream/kill estimates, two-drop uncertainty bounds, and bounded route search. The Plan menu shows estimates, data gaps, external requirements and a temporary camp-wait action; movement and visible progress trigger replanning through the shared worker. All acceptance levels are the default, with an explicit green/yellow option. Corrected sub-one-percent DropDB handling and preserved objective evidence. Flight routes, adaptive timing, larger-zone beam search and native game calibration remain open.
 

@@ -40,9 +40,11 @@ function W.checkpoint()
     if running and coroutine.running() == running then coroutine.yield() end
 end
 
-function W.start(owner, run, valid, finished)
+-- budget (ms, optional): a larger slice for a visible window the player is waiting on. Background jobs keep BUDGET_MS.
+function W.start(owner, run, valid, finished, budget)
     W.cancel(owner)
-    local job = { owner = owner, thread = coroutine.create(run), valid = valid, finished = finished }
+    local job = { owner = owner, thread = coroutine.create(run), valid = valid, finished = finished,
+        budget = type(budget) == "number" and budget > BUDGET_MS and budget or nil }
     jobs[owner] = job
     queue[#queue + 1] = job
     wake()
@@ -56,12 +58,16 @@ pump = function()
     timer = nil
     if fighting() then return end -- PLAYER_REGEN_ENABLED wakes work; no combat polling timer.
     local started, steps = clock(), 0
-    local limit = started and 2000 or MAX_STEPS
-    while #queue > 0 and steps < limit do
-        local now = started and clock()
-        if now and now - started >= BUDGET_MS then break end
+    local deferred = {}
+    while #queue > 0 do
         local job = table.remove(queue, 1)
-        if jobs[job.owner] == job then
+        -- Each job may run only while the slice is within its own budget; a job past it waits for the next slice.
+        local scale = (job.budget or BUDGET_MS) / BUDGET_MS
+        local within = started and (steps < 2000 * scale and clock() - started < BUDGET_MS * scale)
+            or (not started and steps < MAX_STEPS * scale)
+        if not within then
+            deferred[#deferred + 1] = job
+        elseif jobs[job.owner] == job then
             if job.valid and not job.valid() then
                 job.paused = true
             else
@@ -81,6 +87,7 @@ pump = function()
             end
         end
     end
+    for _, job in ipairs(deferred) do queue[#queue + 1] = job end
     wake()
 end
 
