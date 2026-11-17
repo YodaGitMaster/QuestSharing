@@ -432,3 +432,4 @@
 ## 2026-11-17 — Publish the full tested preview as 0.4.20
 - User explicitly requested push and release after receiving the predictive preview. That ZIP contains the entire current addon, including the other locally completed journal, diagnostics, profession, settings, dungeon and map changes. Publish this source-matched full build together as v0.4.20 rather than release a planner-only archive that would differ from what was tested.
 - Keep native WoW and remaining optimizer model limits explicit in the release notes. Do not call the eight-batch algorithm fully complete.
+- Publication verified: `cb45f17fae12ebf175c56322ec896727ae6ae3c8` is origin/main and annotated `v0.4.20` target; GitHub latest stable release is v0.4.20; downloaded 46-file asset matches both the local tested ZIP and every tagged source byte.
