@@ -5,6 +5,7 @@
 - Follow existing main/annotated-tag/GitHub Release workflow; retain all earlier immutable tags/assets. GitHub connector lacks release creation and binary upload, so use git/gh.
 - Promote Unreleased notes, bump TOC and README links to 0.4.19, run all self-running test scripts and Lua 5.1 compilation, source/CRC-verify package, then verify remote tag/main and downloaded asset bytes.
 - Include continuity/research/testing/tools in source control; install ZIP includes only runtime Lua/TOC/XML, preserving embedded MIT attribution. Native game behavior remains unverified and is stated in release notes.
+- Completed: release commit/tag target `d0b859820f9b8fdb0a100e2bdc69b5363574a605`, atomic main/tag push; https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.19 is latest stable. All 44 suites / 1,617 checks, 42 Lua compilations and diff checks pass. Downloaded 44-file ZIP byte-matches source/local build and passes CRC; 231,769 bytes, SHA256 `f1a6e29d91fddeef01408f44132b703ff0a18ad3a055ac4170feb6ed094ab46e`; published notes match.
 
 ## 2026-11-17 — Cooking and static profession-upgrade companion
 - User authorizes recipe discovery/farming hints and a both-faction/all-profession upgrade reference; confirms "crafting menu" means the game's native profession window. Repository has only a water editor, so add native-window companion buttons and fishing-editor Cooking entry point.

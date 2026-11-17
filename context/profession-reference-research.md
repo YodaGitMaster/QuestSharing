@@ -4,7 +4,7 @@ Last updated: 2026-11-17
 ## User request and interpretation
 - Show unlearned Cooking recipes and acquisition sources, ingredient farm zones/levels/mobs/fishing skills, and a static all-profession upgrade tab covering both factions.
 - No existing crafting browser in this repository. User confirms the game's native profession window. Implement native profession-window companion buttons plus fishing-editor entry point; Cooking/Upgrades tabs live in the separate movable companion.
-- Local implementation and preview only; no publication/version bump requested.
+- Published with user-authorized v0.4.19 on 2026-11-17; original research/implementation block was local-only. See state.md for verified release details.
 
 ## Sources
 - Recipe facts: https://github.com/ExcEssIv3/profit/tree/6e74500005e80750081b215a0b6dc82748f0ac9f

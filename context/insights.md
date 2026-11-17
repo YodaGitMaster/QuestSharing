@@ -1,6 +1,7 @@
 # Insights
 
 ## 2026-11-17 — v0.4.19 release verification
+- Published latest stable https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.19 at `d0b859820f9b8fdb0a100e2bdc69b5363574a605`; main/annotated tag verified remotely. Uploaded/downloaded ZIP equals local tested build and source bytes; published notes match exactly.
 - Current workspace passes all 44 self-running suites / 1,617 checks and compilation of all 42 runtime Lua modules with Lua 5.1; diff whitespace clean.
 - Install ZIP contains exactly 44 Lua/TOC/XML entries, all byte-identical to source; TOC lists every runtime Lua module and embedded Cooking MIT attribution is retained. CRC passes, 231,769 bytes, SHA256 `f1a6e29d91fddeef01408f44132b703ff0a18ad3a055ac4170feb6ed094ab46e`.
 - No game client available; native rendering, live providers, profession learned states and protected deletion remain pending. These limits are included in 0.4.19 release notes.
