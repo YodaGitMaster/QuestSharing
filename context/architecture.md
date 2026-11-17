@@ -38,7 +38,7 @@ QuestSharing/  # Repository root
 │   ├── QuestSharing.toc  # Addon metadata and module load order
 │   ├── Questie.lua  # if the Questie addon is installed, its quest database tells us where a quest starts and which quests
 │   ├── QuestGuidance.lua  # Selected-step direction/distance HUD and own numbered map-route overlay
-│   ├── QuestOptimizer.lua  # Seeded and bounded-beam schedule search, compatible kill/drop expectation and four goals
+│   ├── QuestOptimizer.lua  # Seeded + bounded-beam schedule search, per-visit site choice among alternative camps, or-opt/2-opt local search, kill/drop expectation, four goals
 │   ├── QuestPlanner.lua  # Zone facts/actions, plan controls/report, stable replanning, guide, waypoint and SPF actions
 │   ├── QuestPlannerPath.lua  # optional SPF API detection, walk-cost requests, cancellation and outing promotion
 │   ├── Quick.lua  # a quick-chat wheel
@@ -192,7 +192,7 @@ flowchart TD
     Compat --> Inventory[Carried bags and live level/XP snapshot]
     Compat --> CharacterAPI[C_Reputation / GetFactionInfoByID / C_SkillInfo: referenced factions and skills]
     Planner --> Levels[GetQuestDifficultyColor: optional explicit green-yellow filter]
-    Planner --> Optimizer[QuestOptimizer.lua: seeded route plus bounded beam over legal action orders]
+    Planner --> Optimizer[QuestOptimizer.lua: seeded route, bounded beam, site choice, or-opt/2-opt local search]
     Optimizer --> DataWork
     Planner --> MapAPI[C_Map ancestry-validated zone projection, known place names and user waypoint]
     Planner --> Style[Style.lua: opaque compact guide, current/upcoming rows, navigation and mini mode]
@@ -428,11 +428,14 @@ sequenceDiagram
     Planner->>Planner: Discover zone facts and atomic prerequisite actions
     Planner->>Planner: Preserve all OR prerequisite choices and required gate kinds
     Planner->>Planner: Snapshot referenced faction points and skill-line ranks via Compat
-    Planner->>Planner: Cooperatively compare schedules with QuestOptimizer
+    Planner->>Planner: questActions(): per-creature real camps; default = nearest, up to 3 more as stop.alternatives
+    Planner->>Planner: solve(0): cooperatively compare schedules with QuestOptimizer (no local search), render
     Planner->>Planner: Keep feasible incumbent if bounded beam exhausts search checks
+    Planner->>Planner: Work "quest-improve": solve(IMPROVE_STEPS) with or-opt/2-opt local search, swap route, keep selection
+    Note over Planner: Optimizer place() picks each visit's site (travel + incremental work), so shared camps win
     Note over Planner,Path: Optimizer applies known reputation rewards at turn-in before checking later pickups
     Planner->>Path: Estimate eligible first stops from player position
-    Path->>SPF: EstimateWalks (async, same map, <=256 per request)
+    Path->>SPF: EstimateWalks (async, same map, <=256 per request; defaults + alternative camps)
     SPF-->>Path: Yard costs or unreachable/loading/data reason
     Path-->>Planner: Queue cooperative recost with first-leg walking costs
     Planner->>Planner: Re-solve and group consecutive instructions
@@ -770,6 +773,8 @@ sequenceDiagram
 classDiagram
     class QuestOptimizer {
         optimize(catalog, atomicStops, options)
+        place(state, action) site
+        improve(incumbent) best
     }
     class AtomicQuestAction {
         id
@@ -804,6 +809,9 @@ classDiagram
         uncertainty
         searchChecks
         searchExhausted
+        improveMoves
+        improveSteps
+        improveExhausted
         lootBounds
     }
     QuestOptimizer --> AtomicQuestAction

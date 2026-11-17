@@ -7,7 +7,8 @@ local f = { category = "All equipment", subtype = "Any type", slot = "All slots"
 E.filters = f
 -- Scoped journal skin: other addon windows keep their own layout and controls.
 local function font(text,size,r,g,b)
-    if text.SetFont then text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",size) end
+    -- EditBox:SetFont requires flags in the client (FontString does not); nil aborts the whole window build.
+    if text.SetFont then text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",size,"") end
     if r and text.SetTextColor then text:SetTextColor(r,g,b) end
 end
 function E.text(parent,value,x,y,width)

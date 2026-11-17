@@ -98,6 +98,12 @@ local function newObject()
         return child
     end
     function o:SetTexture(path) self.texture = path end
+    -- Mirrors the client signatures: FontString flags are optional, EditBox flags are not (Nilable = false).
+    function o:SetFont(file, size, flags)
+        if self.kind == "EditBox" and flags == nil then error("Usage: EditBox:SetFont(fontFile, height, flags)") end
+        self.font = { file, size, flags }
+        return true
+    end
     function o:SetTexCoord(...) self.coords = { ... } end
     function o:GetWidth() return self.width or 100 end
     function o:GetRight() return self.right or 1500 end
@@ -143,9 +149,9 @@ local function newObject()
     return o
 end
 
-function CreateFrame(_, name, parent)
+function CreateFrame(kind, name, parent)
     local f = newObject()
-    f.name, f.parent = name, parent
+    f.name, f.parent, f.kind = name, parent, kind
     if parent then parent.children = parent.children or {}; parent.children[#parent.children + 1] = f end
     if name then _G[name] = f end
     FRAMES[#FRAMES + 1] = f

@@ -42,7 +42,7 @@ local function campKey(point, npc)
         string.format("%.7f", point.y), tostring(npc) }, "/")
 end
 
-local function farmAt(stop)
+local function farmAt(stop, point, npc)
     local rows = stop.objectives
     if stop.kind ~= "objective" or not rows or #rows ~= 1 then return end
     local row, target = rows[1], rows[1].target or {}
@@ -54,8 +54,7 @@ local function farmAt(stop)
     end
     if not finite(remaining) or remaining ~= math.floor(remaining) then return { unknown = true } end
     if remaining == 0 then return { kills = 0, items = 0 } end
-    local npc = row.sourceID
-    local key = row.shareable == true and campKey(stop.point, npc) or nil
+    local key = row.shareable == true and campKey(point, npc) or nil
     if target.kind == "kill" then return { key = key, kills = remaining, items = 0 } end
     local p = npc and target.dropRates and target.dropRates[npc]
     if p == nil then
@@ -65,6 +64,27 @@ local function farmAt(stop)
     if p == 0 then return { unavailable = true } end
     if not finite(p) or p > 1 then return { unknown = true } end
     return { key = key, kills = 0, items = remaining, p = p }
+end
+
+-- A stop can offer alternative places for the same work (other camps of the objective's creatures).
+-- The search picks one per visit from its current position; the first site is the planner's default.
+local MAX_SITES = 6
+local function sitesFor(stop)
+    local row = stop.objectives and stop.objectives[1]
+    local sites, usable = { { point = stop.point, sourceID = row and row.sourceID } }, {}
+    for _, alt in ipairs(stop.alternatives or {}) do
+        local p = alt.point
+        if #sites >= MAX_SITES then break end
+        if type(p) == "table" and finite(p.x) and finite(p.y) and not (stop.point and p.map == stop.point.map and p.x == stop.point.x and p.y == stop.point.y) then
+            sites[#sites + 1] = { point = p, sourceID = alt.sourceID, tasks = alt.tasks, questTasks = alt.questTasks,
+                destination = alt.destination }
+        end
+    end
+    for _, site in ipairs(sites) do
+        site.farm = farmAt(stop, site.point, site.sourceID)
+        if not (site.farm and site.farm.unavailable) then usable[#usable + 1] = site end
+    end
+    return #usable > 0 and usable or { sites[1] }
 end
 
 local function compile(quests, stops, options)
@@ -82,14 +102,19 @@ local function compile(quests, stops, options)
     for i, stop in ipairs(stops) do
         local qid = next(stop.quests or {}) or stop.questID
         if not qid or not quests[qid] or not stop.id or m.byID[stop.id] then return end
-        local d = { s = stop, id = stop.id, qid = qid, order = i, parents = {}, children = {}, farm = farmAt(stop) }
+        local d = { s = stop, id = stop.id, qid = qid, order = i, parents = {}, children = {}, sites = sitesFor(stop) }
+        d.farm = d.sites[1].farm
         m.list[i], m.byID[d.id] = d, d
         local qs = m.byQuest[qid] or {}; m.byQuest[qid] = qs; qs[#qs + 1] = d
-        if d.farm and d.farm.key then
-            local key = d.farm.key
-            local camp = m.camps[key]
-            if not camp then camp = { stops = {} }; m.groups[#m.groups + 1] = camp; m.camps[key] = camp end
-            camp.stops[#camp.stops + 1] = d
+        local seen = {}
+        for _, site in ipairs(d.sites) do
+            local key = site.farm and site.farm.key
+            if key and not seen[key] then
+                seen[key] = true
+                local camp = m.camps[key]
+                if not camp then camp = { stops = {} }; m.groups[#m.groups + 1] = camp; m.camps[key] = camp end
+                camp.stops[#camp.stops + 1] = d
+            end
         end
         m.checkpoint()
     end
@@ -149,8 +174,8 @@ local function travel(m, a, b)
     return math.sqrt(x * x + y * y) * 600, true
 end
 
-local function service(m, d, s)
-    local opts, f = m.options, d.farm
+local function service(m, d, s, site)
+    local opts, f = m.options, (site or d.sites[1]).farm
     if not f or f.unknown then
         local rows = d.s.objectives
         local explicit = number(d.s.serviceSeconds, rows and rows[1] and rows[1].seconds)
@@ -191,6 +216,26 @@ local function service(m, d, s)
         combined and math.max(0, alone - incremental) or 0,
         jointUnknown and "Separate quest drops may overlap; their joint rate is unknown."
             or (capped and "Large drop counts use a conservative estimate." or nil), bounds
+end
+
+-- Where this visit happens: the site with the least travel plus incremental work from here,
+-- so a camp already being farmed for another quest wins when its shared kills save time.
+local function place(m, s, d)
+    local sites = d.sites
+    if #sites == 1 then
+        local t, approx = travel(m, s.at, sites[1].point)
+        return sites[1], t, approx
+    end
+    local best, bestTravel, bestApprox, bestCost
+    for _, site in ipairs(sites) do
+        local t, approx = travel(m, s.at, site.point)
+        if t < math.huge then
+            local cost = t + service(m, d, s, site)
+            if not bestCost or cost < bestCost - 0.000001 then best, bestTravel, bestApprox, bestCost = site, t, approx, cost end
+        end
+    end
+    if not best then return sites[1], math.huge end
+    return best, bestTravel, bestApprox
 end
 
 local function newState(m)
@@ -281,8 +326,9 @@ local function eligible(m, s, d)
     return true
 end
 
-local function advance(m, s, d, travelTime, approx, detail)
-    local effort, kills, run, unknown, saved, uncertaintyReason, bounds = service(m, d, s)
+local function advance(m, s, d, travelTime, approx, detail, site)
+    site = site or d.sites[1]
+    local effort, kills, run, unknown, saved, uncertaintyReason, bounds = service(m, d, s, site)
     local waitUntil = m.options.availableAfter and m.options.availableAfter[d.id]
     local waitTime = math.max(0, number(waitUntil, 0) - s.time - travelTime)
     s.time = s.time + travelTime + effort + waitTime
@@ -297,7 +343,7 @@ local function advance(m, s, d, travelTime, approx, detail)
             if owned == 0 and s.freeSlots then s.freeSlots = s.freeSlots - 1 end
         end
     end
-    s.at, s.done[d.id] = d.s.point, #s.order + 1
+    s.at, s.done[d.id] = site.point, #s.order + 1
     s.order[#s.order + 1] = d
     if m.selected[d.qid] then s.targetWork = s.targetWork + 1 end
     if d.s.kind == "pickup" then
@@ -378,7 +424,7 @@ local function attempt(m, seed, baseline)
     if seed.prep then for _ in pairs(seed.prep) do remainingPrep = remainingPrep + 1 end end
     local previousRank = seed.previous
     while #s.ready > 0 do
-        local bestAt, firstPriority, bestCost, bestOrder, bestTravel, approximate
+        local bestAt, firstPriority, bestCost, bestOrder, bestTravel, approximate, bestSite
         for i, d in ipairs(s.ready) do
             if i % 16 == 1 then m.checkpoint() end
             if not baseline then
@@ -386,10 +432,10 @@ local function attempt(m, seed, baseline)
                 if m.alternativeChecks > m.limit then return nil end
             end
             if eligible(m, s, d) then
-                local t, approx = travel(m, s.at, d.s.point)
+                local site, t, approx = place(m, s, d)
                 local possible = t < math.huge
                 if possible and mode == "budget" and not seed.fixed then
-                    local effort = service(m, d, s)
+                    local effort = service(m, d, s, site)
                     local opens = m.options.availableAfter and m.options.availableAfter[d.id]
                     possible = math.max(s.time + t, number(opens, 0)) + effort <= m.options.budgetSeconds
                 end
@@ -406,7 +452,7 @@ local function attempt(m, seed, baseline)
                         elseif seed.group[d.id] then priority = remainingPrep == 0 and 1 or 4 end
                     end
                     if rankLess(priority, cost, d.order, firstPriority, bestCost, bestOrder) then
-                        bestAt, firstPriority, bestCost, bestOrder, bestTravel, approximate = i, priority, cost, d.order, t, approx
+                        bestAt, firstPriority, bestCost, bestOrder, bestTravel, approximate, bestSite = i, priority, cost, d.order, t, approx, site
                     end
                 end
             end
@@ -415,20 +461,20 @@ local function attempt(m, seed, baseline)
         -- A low-cost pickup, delivery or interaction physically on the chosen leg can
         -- avoid a later return. Farming is deliberately left to the full camp comparison.
         if seed.road and bestTravel > 0 then
-            local destination, insertDistance, insertOrder = s.ready[bestAt].s.point, bestTravel, bestOrder
+            local destination, insertDistance, insertOrder = bestSite.point, bestTravel, bestOrder
             for i, d in ipairs(s.ready) do
                 if i % 16 == 1 then m.checkpoint() end
                 m.alternativeChecks = m.alternativeChecks + 1
                 if m.alternativeChecks > m.limit then return end
                 if i ~= bestAt and not d.farm and eligible(m, s, d) then
-                    local there, approx = travel(m, s.at, d.s.point)
+                    local site, there, approx = place(m, s, d)
                     if there < bestTravel and (there < insertDistance or (there == insertDistance and d.order < insertOrder)) then
-                        local through = travel(m, d.s.point, destination)
+                        local through = travel(m, site.point, destination)
                         local opens = m.options.availableAfter and m.options.availableAfter[d.id]
                         local delay = math.max(0, number(opens, 0) - s.time - there)
-                        local withinBudget = mode ~= "budget" or s.time + there + delay + service(m, d, s) <= m.options.budgetSeconds
+                        local withinBudget = mode ~= "budget" or s.time + there + delay + service(m, d, s, site) <= m.options.budgetSeconds
                         if withinBudget and delay == 0 and there + through <= bestTravel + 0.001 then
-                            bestAt, insertDistance, insertOrder, approximate = i, there, d.order, approx
+                            bestAt, insertDistance, insertOrder, approximate, bestSite = i, there, d.order, approx, site
                         end
                     end
                 end
@@ -437,7 +483,7 @@ local function attempt(m, seed, baseline)
         end
         local d = s.ready[bestAt]
         s.ready[bestAt] = s.ready[#s.ready]; s.ready[#s.ready] = nil
-        advance(m, s, d, bestTravel, approximate)
+        advance(m, s, d, bestTravel, approximate, nil, bestSite)
         if seed.prep and seed.prep[d.id] then remainingPrep = remainingPrep - 1 end
         if flexible and d.s.kind == "turnin" then
             local current = snapshot(s, mode)
@@ -476,15 +522,15 @@ local function beamSearch(m, incumbent)
                 m.alternativeChecks = m.alternativeChecks + 1
                 if m.alternativeChecks > m.limit then exhausted = true; break end
                 if eligible(m, s, d) then
-                    local t, approx = travel(m, s.at, d.s.point)
-                    local effort = t < math.huge and service(m, d, s) or math.huge
+                    local site, t, approx = place(m, s, d)
+                    local effort = t < math.huge and service(m, d, s, site) or math.huge
                     local opens = m.options.availableAfter and m.options.availableAfter[d.id]
                     local arrival = math.max(s.time + t, number(opens, 0)) + effort
                     if t < math.huge and (mode ~= "budget" or arrival <= m.options.budgetSeconds) then
                         local child = cloneState(s)
                         child.ready[i] = child.ready[#child.ready]
                         child.ready[#child.ready] = nil
-                        advance(m, child, d, t, approx)
+                        advance(m, child, d, t, approx, nil, site)
                         nextStates[#nextStates + 1] = child
                         if d.s.kind == "turnin" then
                             local current = snapshot(child, mode)
@@ -514,6 +560,135 @@ local function beamSearch(m, incumbent)
         m.checkpoint()
     end
     return best, exhausted
+end
+
+-- Replay one fixed action order; nil when it breaks a dependency, eligibility, reachability or budget.
+-- `saved` holds states of the incumbent every STRIDE actions, so a candidate that differs from position
+-- `from` onward resumes there. In "all" mode every feasible permutation hands in the same quests, so a
+-- candidate already slower than `bound` cannot win and stops early (exact pruning).
+local STRIDE = 8
+local function evaluate(m, path, from, saved, bound, record)
+    local mode = m.options.mode
+    local flexible = mode == "budget" or mode == "xp" or mode == "selected"
+    local s, best, first
+    local k = saved and math.floor(((from or 1) - 1) / STRIDE) * STRIDE or 0
+    if k > 0 and saved[k] then
+        s, best, first = cloneState(saved[k].state), saved[k].best, k + 1
+    else
+        s, first = newState(m), 1
+        best = flexible and snapshot(s, mode) or nil
+    end
+    for index = first, #path do
+        local d = path[index]
+        if s.todo[d.id] ~= 0 or s.done[d.id] or d.missingParent or not eligible(m, s, d) then return nil end
+        local site, t, approx = place(m, s, d)
+        if not (t < math.huge) then return nil end
+        if mode == "budget" then
+            local opens = m.options.availableAfter and m.options.availableAfter[d.id]
+            if math.max(s.time + t, number(opens, 0)) + service(m, d, s, site) > m.options.budgetSeconds then return nil end
+        end
+        advance(m, s, d, t, approx, nil, site)
+        m.evalSteps = (m.evalSteps or 0) + 1
+        if bound and not flexible and s.time > bound + 0.0000001 then return nil end
+        if flexible and d.s.kind == "turnin" then
+            local current = snapshot(s, mode)
+            if better(current, best) then best = current end
+        end
+        if record and index % STRIDE == 0 then record[index] = { state = cloneState(s), best = best } end
+    end
+    local result = {}
+    for key, value in pairs(best or snapshot(s, mode)) do result[key] = value end
+    result.path = {}
+    for i = 1, result.length do result.path[i] = s.order[i] end
+    return result
+end
+
+local function moved(path, i, len, j)
+    local out, last = {}, i + len - 1
+    if j == 0 then for k = i, last do out[#out + 1] = path[k] end end
+    for k = 1, #path do
+        if k < i or k > last then
+            out[#out + 1] = path[k]
+            if k == j then for q = i, last do out[#out + 1] = path[q] end end
+        end
+    end
+    return out
+end
+
+local function reversed(path, i, j)
+    local out = {}
+    for k = 1, #path do out[k] = (k >= i and k <= j) and path[i + j - k] or path[k] end
+    return out
+end
+
+-- Local search over the best schedule found so far, any zone size: move runs of up to three actions
+-- (or-opt) and reverse short segments (2-opt) within a window, keeping the first strict improvement.
+-- Every candidate is fully re-simulated, so prerequisites, slots, budgets and shared camps stay exact.
+-- Bounded by simulated action steps; the incumbent always survives.
+local function improve(m, incumbent)
+    local budget = number(m.options.maxImproveSteps, 250000)
+    local window = math.max(1, math.floor(number(m.options.improveWindow, 10)))
+    local best, used, moves, saved = incumbent, 0, 0, nil
+    if #incumbent.path < 3 or budget <= 0 then return best, moves, false, 0 end
+    local function remember()
+        saved = {}
+        local replay = evaluate(m, best.path, 1, nil, nil, saved)
+        if replay then best = replay else saved = nil end
+    end
+    remember()
+    local function try(candidate, from)
+        local before = m.evalSteps or 0
+        m.checkpoint()
+        local plan = evaluate(m, candidate, from, saved, best.time)
+        used = used + math.max(1, (m.evalSteps or 0) - before)
+        if plan and better(plan, best) then best, moves = plan, moves + 1; remember(); return true end
+        return false
+    end
+    -- All moves that start at action i; true after the first strict improvement.
+    local function movesAt(i)
+        local path = best.path
+        local n = #path
+        for len = 1, 3 do
+            if i + len - 1 > n then break end
+            for j = math.max(0, i - 1 - window), math.min(n, i + len - 1 + window) do
+                if used >= budget then return false end
+                if (j < i - 1 or j > i + len - 1) and try(moved(path, i, len, j), math.min(i, j + 1)) then return true end
+            end
+        end
+        for j = i + 2, math.min(n, i + window) do
+            if used >= budget then return false end
+            if try(reversed(path, i, j), i) then return true end
+        end
+        return false
+    end
+    -- Cycle through positions and stop after one full lap without any improvement.
+    local i, quiet = 1, 0
+    while used < budget and quiet < #best.path do
+        if i > #best.path then i = 1 end
+        if movesAt(i) then quiet = 0 else quiet, i = quiet + 1, i + 1 end
+    end
+    return best, moves, used >= budget, used
+end
+
+-- The returned stop carries the chosen site; the caller's stop tables are never modified.
+local function located(stop, site)
+    if not site or site.point == stop.point then return stop end
+    local copy = {}
+    for key, value in pairs(stop) do copy[key] = value end
+    copy.point, copy.site = site.point, site
+    if stop.objectives then
+        copy.objectives = {}
+        for i, row in ipairs(stop.objectives) do
+            local clone = {}
+            for key, value in pairs(row) do clone[key] = value end
+            copy.objectives[i] = clone
+        end
+        if copy.objectives[1] then copy.objectives[1].sourceID = site.sourceID end
+    end
+    if site.tasks then copy.tasks = site.tasks end
+    if site.questTasks then copy.questTasks = site.questTasks end
+    if site.destination then copy.destination = site.destination end
+    return copy
 end
 
 function O.optimize(quests, stops, options)
@@ -593,6 +768,8 @@ function O.optimize(quests, stops, options)
     end
     local searchExhausted
     best, searchExhausted = beamSearch(m, best)
+    local improveMoves, improveExhausted, improveSteps
+    best, improveMoves, improveExhausted, improveSteps = improve(m, best)
     if preferred and best ~= preferred and preferred[1] == best[1] and preferred[2] == best[2]
         and preferred.time - best.time <= number(options.stabilitySeconds, 0) then best = preferred end
     -- A mode can choose a different subset than nearest-first. Reprice that exact set
@@ -615,16 +792,17 @@ function O.optimize(quests, stops, options)
         expectedKills = best.kills, baselineKills = comparable.kills, baselineTravelSeconds = comparable.travel,
         travelSeconds = best.travel, workSeconds = best.work, waitSeconds = best.wait, expectedXP = best.xp,
         uncertain = best.uncertain, iterations = iterations, searchChecks = m.alternativeChecks,
-        searchExhausted = searchExhausted, coverage = best.count, baselineCoverage = comparable.count,
+        searchExhausted = searchExhausted, improveMoves = improveMoves, improveExhausted = improveExhausted, improveSteps = improveSteps,
+        coverage = best.count, baselineCoverage = comparable.count,
         baselineComparable = matched, nearestCoverage = baseline.count, nearestSeconds = baseline.time,
         plannedIDs = {}, completedIDs = {}, missingIDs = {}, reasons = {}, lootBounds = {}, baselineRoute = {} }
     local ordered, replay = {}, newState(m)
     for i, d in ipairs(best.path) do
-        ordered[i] = d.s
+        local site, t, approx = place(m, replay, d)
+        ordered[i] = located(d.s, site)
         report.plannedIDs[d.qid] = true
         if d.s.kind == "turnin" then report.completedIDs[d.qid] = true end
-        local t, approx = travel(m, replay.at, d.s.point)
-        advance(m, replay, d, t, approx, report)
+        advance(m, replay, d, t, approx, report, site)
         m.checkpoint()
     end
     for i, d in ipairs(comparable.path) do report.baselineRoute[i] = d.s end

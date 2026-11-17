@@ -565,6 +565,7 @@ end
 
 function P.cancelEstimate()
     Work.cancel("quest-costs")
+    Work.cancel("quest-improve")
     if Path then Path.cancelWalkEstimates() end
     report = nil
 end
@@ -623,6 +624,8 @@ end
 -- camps: the densest spawn not yet taken seeds a camp of the free spawns within CLUSTER_DISTANCE, and the
 -- member nearest the camp's centre marks it. Camps never depend on where the player stands.
 local REAL_CAMP = 3
+local MAX_CAMP_CHOICES = 4
+local IMPROVE_STEPS = 250000 -- local-search budget in simulated actions (background, after the first route shows)
 local function groupCamps(list)
     local r2, cells = CLUSTER_DISTANCE * CLUSTER_DISTANCE, {}
     for i, s in ipairs(list) do
@@ -674,53 +677,55 @@ local function groupCamps(list)
     return camps
 end
 
--- An objective goes to the nearest real local camp. A camp is real when it has REAL_CAMP spawns, or as many
--- as the target's biggest camp on any map when the mob never gathers that many, so a lone stray never
--- outranks a camp. The step switches only when another real camp becomes nearer.
+-- An objective's default place is the nearest real local camp; the other real camps are returned as
+-- alternatives the optimizer may pick from its route position. A camp is real when it has REAL_CAMP spawns,
+-- or as many as the target's biggest camp on any map when the mob never gathers that many, so a lone stray
+-- never outranks a camp. Camps are clustered per creature, so every quest on the same creature sees the
+-- very same camp points and the optimizer can share their kills.
 targetLocation = function(target)
     if #(target.sources or {}) == 0 then return nearestPoint(target.points) end
     if not target.camps then
-        local byMap = {}
+        local largest, here = 0, {}
         for _, source in ipairs(target.sources) do
             local probability = target.dropRates and target.dropRates[source.id]
             if source.kind ~= "npc" or target.kind ~= "loot" or probability ~= 0 then
+                local byMap = {}
                 for _, spawn in ipairs(source.spawns or {}) do
                     if not spawn.dungeon and finite(spawn.x) and finite(spawn.y) then
                         local point = pointForSpawn(spawn)
                         -- Spawns elsewhere only size the biggest camp; local camps are the destinations.
                         local key = point and "here" or (spawn.map and ("m" .. spawn.map) or ("a" .. tostring(spawn.area)))
                         byMap[key] = byMap[key] or {}
-                        table.insert(byMap[key], { point = point, source = source,
+                        table.insert(byMap[key], { point = point,
                             x = point and point.x or spawn.x / 100, y = point and point.y or spawn.y / 100 })
+                    end
+                end
+                for key, list in pairs(byMap) do
+                    for _, camp in ipairs(groupCamps(list)) do
+                        largest = math.max(largest, #camp.members)
+                        if key == "here" then here[#here + 1] = { camp = camp, source = source } end
                     end
                 end
             end
         end
-        local largest, here = 0, {}
-        for key, list in pairs(byMap) do
-            for _, camp in ipairs(groupCamps(list)) do
-                largest = math.max(largest, #camp.members)
-                if key == "here" then here[#here + 1] = camp end
-            end
-        end
         target.camps = {}
-        for _, camp in ipairs(here) do
-            if #camp.members >= math.min(REAL_CAMP, largest) then
-                local count, source, most = {}, nil, 0
-                for _, member in ipairs(camp.members) do
-                    count[member.source] = (count[member.source] or 0) + 1
-                    if count[member.source] > most then source, most = member.source, count[member.source] end
-                end
-                target.camps[#target.camps + 1] = { point = camp.mark.point, source = source }
+        for _, row in ipairs(here) do
+            if #row.camp.members >= math.min(REAL_CAMP, largest) then
+                target.camps[#target.camps + 1] = { point = row.camp.mark.point, source = row.source }
             end
         end
     end
-    local best, chosen, score
+    local ranked = {}
     for _, camp in ipairs(target.camps) do
-        local d = distance(playerPoint, camp.point)
-        if not best or d < score then best, chosen, score = camp.point, camp.source, d end
+        ranked[#ranked + 1] = { point = camp.point, source = camp.source, d = distance(playerPoint, camp.point) }
     end
-    return best, chosen
+    table.sort(ranked, function(a, b)
+        if a.d ~= b.d then return a.d < b.d end
+        if a.point.x ~= b.point.x then return a.point.x < b.point.x end
+        return a.point.y < b.point.y
+    end)
+    if not ranked[1] then return nil end
+    return ranked[1].point, ranked[1].source, ranked
 end
 
 local function questActions()
@@ -742,16 +747,26 @@ local function questActions()
         for i, target in ipairs(q.targets or {}) do
             local done, progress, have, need = objectiveIsDone(q.entry, target)
             if not done then
-                local point, source = targetLocation(target)
+                local point, source, camps = targetLocation(target)
                 if point then
-                    local npc = source and source.kind == "npc" and source.id or nil
-                    local probability = npc and target.dropRates and target.dropRates[npc]
                     local required = need or target.required
-                    local text = targetSummary(target, source, probability)
-                    if progress then text = text .. " (" .. progress .. ")"
-                    elseif required then text = text .. " ×" .. required end
+                    local function describe(src)
+                        local id = src and src.kind == "npc" and src.id or nil
+                        local text = targetSummary(target, src, id and target.dropRates and target.dropRates[id])
+                        if progress then text = text .. " (" .. progress .. ")"
+                        elseif required then text = text .. " ×" .. required end
+                        return text, id
+                    end
+                    local text, npc = describe(source)
                     local stop = atom(stops, "objective", point, q, text,
                         target.name and ("the " .. target.name .. " area"), i)
+                    -- Other real camps of the same work; the optimizer may choose one that suits the route.
+                    for n = 2, math.min(#(camps or {}), MAX_CAMP_CHOICES) do
+                        local altText, altNPC = describe(camps[n].source)
+                        stop.alternatives = stop.alternatives or {}
+                        stop.alternatives[#stop.alternatives + 1] = { point = camps[n].point, sourceID = altNPC,
+                            tasks = { altText }, questTasks = { [q.id] = { altText } } }
+                    end
                     local sharing = npc and target.shareable ~= false and
                         ((target.kind == "kill" and target.creditID) or (target.kind == "loot" and target.itemID))
                     stop.objectives = { { questID = id, target = target, remaining = required and math.max(0, required - (have or 0)),
@@ -888,7 +903,8 @@ buildRoute = function()
     if not origin then route = {}; return end
     local opts, firstLeg, estimatedScale, speed = planOptions(stops, origin)
     local token = generation
-    local function solve()
+    local function solve(improveSteps)
+        opts.maxImproveSteps = improveSteps or 0
         local ordered, result = ns.questOptimizer.optimize(catalog, stops, opts)
         if generation ~= token then return end
         report = result or {}
@@ -899,28 +915,40 @@ buildRoute = function()
         lastOrigin, plannedSpeed = origin, speed
         route = visibleStops(ordered or {}, report.reasons)
     end
-    solve()
+    -- The fast schedule shows at once; local search refines it in the background and swaps it in.
+    local function refine(owner)
+        Work.start(owner, function()
+            local key = selectionLocked and route[selected] and stopIdentity(route[selected])
+            solve(IMPROVE_STEPS)
+            if token ~= generation then return end
+            selected = 1
+            if key then
+                for i, stop in ipairs(route) do if stopIdentity(stop) == key then selected = i; break end end
+            end
+            render()
+        end, function() return generation == token and sessionActive and not panelDismissed and ns.db.enabled end)
+    end
+    solve(0)
+    refine("quest-improve")
     if Path and Path.available() then
         local targets, seen = {}, {}
         for _, stop in ipairs(stops) do
-            local key = campKey(stop.point)
-            if not next(stop.deps) and not seen[key] then
-                targets[#targets + 1], seen[key] = stop.point, true
+            if not next(stop.deps) then
+                -- Alternative camps need walking costs too, or a straight-line guess would undercut the default.
+                local points = { stop.point }
+                for _, alt in ipairs(stop.alternatives or {}) do points[#points + 1] = alt.point end
+                for _, point in ipairs(points) do
+                    local key = campKey(point)
+                    if not seen[key] then targets[#targets + 1], seen[key] = point, true end
+                end
             end
         end
         Path.estimateWalks(origin, targets, function(costs)
             if not costs or generation ~= token or not sessionActive then return end
             for i, point in ipairs(targets) do firstLeg[campKey(point)] = costs[i] end
-            Work.start("quest-costs", function()
-                local key = selectionLocked and route[selected] and stopIdentity(route[selected])
-                solve()
-                if token ~= generation then return end
-                selected = 1
-                if key then
-                    for i, stop in ipairs(route) do if stopIdentity(stop) == key then selected = i; break end end
-                end
-                render()
-            end, function() return generation == token and sessionActive and not panelDismissed and ns.db.enabled end)
+            -- Walking costs change every first leg; the refinement restarts with them.
+            Work.cancel("quest-improve")
+            refine("quest-costs")
         end)
     end
 end

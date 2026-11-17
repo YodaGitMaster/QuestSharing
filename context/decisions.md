@@ -446,3 +446,14 @@
 - User explicitly requested push and release after receiving the predictive preview. That ZIP contains the entire current addon, including the other locally completed journal, diagnostics, profession, settings, dungeon and map changes. Publish this source-matched full build together as v0.4.20 rather than release a planner-only archive that would differ from what was tested.
 - Keep native WoW and remaining optimizer model limits explicit in the release notes. Do not call the eight-batch algorithm fully complete.
 - Publication verified: `cb45f17fae12ebf175c56322ec896727ae6ae3c8` is origin/main and annotated `v0.4.20` target; GitHub latest stable release is v0.4.20; downloaded 46-file asset matches both the local tested ZIP and every tagged source byte.
+
+## 2026-11-17 — Closing QuestOptimizer gaps (site choice, shared camps, local search)
+- **Site choice inside the optimizer**: planner sends the nearest real camp as default plus up to 3 more as `stop.alternatives`; optimizer `place()` picks per visit by travel + incremental work from the simulated position. Greedy per visit (not a joint site search) — cheap, and local search then reorders around it. Rejected: picking camps in the planner from the player (the old way; ignores route and sharing).
+- **Per-creature camp clustering**: camps grouped per source NPC instead of mixing all of a target's sources, so every quest on the same creature gets identical camp points and the exact `campKey(point,npc)` sharing matches. Trade-off: a loot target dropping from two mixed mobs now gets one camp per mob.
+- **Local search = or-opt (runs of 1-3) + 2-opt (segments ≤ window 10)**, first-improvement, cyclic scan, full re-simulation of each candidate from a checkpoint every 8 actions; exact pruning in `all` mode (same quests handed in, so slower total = reject). Budget counts simulated actions (default 250k ≈ 0.7 s CPU in lupa Lua 5.1).
+- **Background refinement**: DataWork gives 2 ms per 0.1 s, so 0.7 s CPU ≈ 35 s wall. First route uses `solve(0)` and shows at once; Work job `quest-improve` re-solves with local search and swaps the route keeping selection. The Path walking-cost job (`quest-costs`) cancels and replaces `quest-improve`.
+- **Not done**: pairwise walking costs (gap 5). SPF `EstimateWalks` is one origin → many targets, async; all pairs would mean n requests per replan. Later legs stay straight-line.
+- Beam search threshold (≤40 actions) left as is: local search covers large zones; raising it only burns the 36k check budget.
+
+## 2026-11-17 — Client-accurate SetFont in test harness
+- `tests/harness.py` `CreateFrame` records the widget kind; `SetFont` errors for EditBox without flags (client Nilable=false), FontString flags optional. Chosen over a lenient mock so `if x.SetFont` guards cannot hide native-only failures. Addon code always passes `""` flags.

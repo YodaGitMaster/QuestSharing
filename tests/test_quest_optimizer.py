@@ -392,6 +392,84 @@ r,rep=NS.questOptimizer.optimize(q,s,{mode="selected",selectedIDs={[3]=true},
     route=[stop.id for stop in g.eval("r").values()]
     assert route.index(6)<route.index(7)
 
+SITES = r"""
+function siteFixture()
+ local q={[1]={id=1,name="Wolves",status="active",xp=100},[2]={id=2,name="Pelts",status="active",xp=100}}
+ local function kill(id,qid,x,need,alts)
+  return {id=id,kind="objective",point={map=1436,x=x,y=.5},quests={[qid]=q[qid].name},deps={},alternatives=alts,
+   objectives={{questID=qid,target={kind="kill",creditID=601,required=need},sourceID=601,remaining=need,shareable=true}}}
+ end
+ local s={
+  kill(1,1,.1,10),
+  kill(2,2,.9,6,{{point={map=1436,x=.1,y=.5},sourceID=601,tasks={"Wolves at the west camp"},questTasks={[2]={"Wolves at the west camp"}}}}),
+  {id=3,kind="turnin",point={map=1436,x=.5,y=.5},quests={[1]="Wolves"},deps={[1]=true}},
+  {id=4,kind="turnin",point={map=1436,x=.5,y=.5},quests={[2]="Pelts"},deps={[2]=true}},
+ }
+ return q,s
+end
+"""
+
+def test_alternative_site_joins_the_camp_already_farmed(style):
+    g=Game(style,WESTFALL+FIXTURE+SITES,fresh=True)
+    g.run('''
+q,s=siteFixture()
+r,rep=NS.questOptimizer.optimize(q,s,{mode="all",origin={map=1436,x=.5,y=.5},
+ travelSeconds=function(a,b)return math.abs(a.x-b.x)*100 end,killSeconds=10,interactionSeconds=3})
+''')
+    # Both quests farm the same west camp: ten shared kills cover the six as well.
+    assert abs(g.eval("rep.expectedKills")-10)<1e-9
+    route=list(g.eval("r").values())
+    pelts=[stop for stop in route if stop.id==2][0]
+    assert abs(pelts.point.x-.1)<1e-9 and pelts.tasks[1]=="Wolves at the west camp"
+    # The caller's stop keeps the planner's default place.
+    assert abs(g.eval("s[2].point.x")-.9)<1e-9
+
+def test_local_search_repairs_a_nearest_first_detour(style):
+    g=Game(style,WESTFALL+FIXTURE,fresh=True)
+    g.run('''
+q={[1]={id=1,name="A",status="active"},[2]={id=2,name="B",status="active"},[3]={id=3,name="C",status="active"}}
+local function hand(id,x) return {id=id,kind="turnin",point={map=1436,x=x,y=.5},quests={[id]=q[id].name},deps={}} end
+s={hand(1,.6),hand(2,.35),hand(3,1)}
+r,rep=NS.questOptimizer.optimize(q,s,{mode="all",origin={map=1436,x=.5,y=.5},maxSearchChecks=1,
+ travelSeconds=function(a,b)return math.abs(a.x-b.x)*100 end,interactionSeconds=0})
+''')
+    # Nearest-first walks .6, .35, 1 (100 s); 2-opt/or-opt finds .35, .6, 1 (80 s).
+    assert abs(g.eval("rep.nearestSeconds")-100)<1e-6
+    assert abs(g.eval("rep.expectedSeconds")-80)<1e-6
+    assert g.eval("rep.improveMoves")>=1
+    assert [stop.id for stop in g.eval("r").values()]==[2,1,3]
+
+def test_same_creature_camps_share_kills_across_quests_in_the_planner(style):
+    setup=r"""
+QUESTS={{id=9000,title="Local Harvest",level=8,objectives={{text="Harvest Watcher slain: 0/10",type="monster",have=0,need=10}}}}
+QUESTIE_NPCS[601].spawns={[40]={{30,30},{31,31},{32,30}}}
+QUESTIE_NPCS[602]={name="Harvest Reaper",spawns={[40]={{34,31},{35,32},{36,31}}}}
+QUESTIE_QUESTS[9000].objectivesText={"Kill 10 Harvest Watchers."}
+QUESTIE_QUESTS[9010]={name="Harvest Cores",questLevel=8,startedBy={{600}},finishedBy={{600}},
+ objectives={nil,nil,{{50}}},objectivesText={"Collect 5 Harvest Cores."}}
+QUESTIE_ITEMS[50]={name="Harvest Core",npcDrops={601,602}}
+ItemDB.Get=function(id,key)local t=QUESTIE_ITEMS[id];return t and t[key]end
+local old=QuestieLoader.ImportModule
+QuestieLoader.ImportModule=function(self,name)
+ if name=="DropDB" then return {GetItemDroprate=function()return {25,"fixture"}end} end
+ return old(self,name)
+end
+"""
+    g=Game(style,WESTFALL+setup,fresh=True);g.start();g.slash("plan");g.advance(12)
+    r=g.eval("NS.questPlanner.report")()
+    # The cores drop from both creatures; the Reaper camp is nearer, but the Watcher camp is the very
+    # same point as the kill quest's, so ten kills there also yield the cores (joint expectation).
+    assert r.coverage==2 and abs(r.expectedKills-20.094718933105)<1e-6, r.expectedKills
+
+def test_planner_shows_fast_route_then_refines_it_in_the_background(style):
+    g=Game(style,WESTFALL,fresh=True);g.start();g.slash("plan");g.advance(12)
+    r=g.eval("NS.questPlanner.report")()
+    # The background refinement re-solves with local search after the first route is shown.
+    assert r.improveSteps and r.improveSteps>0, r.improveSteps
+    assert not g.eval('NS.dataWork.busy("quest-improve")')
+    g.slash("plan hide");g.advance(2)
+    assert not g.eval('NS.dataWork.busy("quest-improve")')
+
 if __name__=="__main__":
     failed=total=0
     for name,test in sorted(list(globals().items())):

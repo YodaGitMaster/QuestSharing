@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+- The quest guide now chooses *where* to do each kill or collect step, not only the order: it considers up to four real camps per step and picks the one that suits the route, so it prefers a camp next to the hand-in or one you are already farming for another quest. Camps are now grouped per creature, so two quests on the same mob point to the same camp and share their kills.
+- The quest guide now improves its route after showing it: a background local search (moving short runs of steps and reversing short segments, each change fully re-checked for prerequisites, log slots and budgets) removes detours the nearest-first route leaves, in zones of any size, and swaps the better route in while keeping your selected step. Walking estimates from Shortest Path Forever now also cover the alternative camps.
+- Kill and collect steps no longer always switch to whichever camp is nearest to you; the route decides among the real camps.
+- Fixed the Adventurer's Journal tabs (Dungeon quests, Quest rewards, Instance drops) opening as an almost empty black page with only the top dropdowns and the Character level box: the restyled text boxes set their font in a way the game client rejects, which stopped the window from building its list, buttons and details. Dropdown option lists open again too.
+
 ## 0.4.21
 - Fixed the quest guide's first step landing on your own character and following you as you walked. Kill and collect steps now go to the nearest real camp (a group of at least three spawns, or the mob's biggest group) instead of the single spawn nearest to you, and switch only when another camp becomes nearer.
 - The quest guide now plans only the zone's own quests, the ones Questie files under the current zone or its sub-zone maps. Class, profession, event and other-zone quests stay out even when their giver or one stray mob spawn is here; a quest from another zone appears only for its hand-in here once it is ready, including breadcrumb quests with no objectives. `/qs plan why` lists the quests left out and why.

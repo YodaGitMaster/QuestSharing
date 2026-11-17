@@ -421,6 +421,17 @@ NS.dataWork.start=function(owner,run,valid,finished,budget) STARTS[owner]=budget
     assert g.eval("STARTS.dungeonQuests")>=8
 
 
+
+def test_journal_text_boxes_pass_font_flags_so_the_whole_window_builds(style):
+    # Regression: EditBox:SetFont without flags errored in the client and left a black page with only the top dropdowns.
+    g=game(style);w=g.eval("NS.dungeonQuests._window()")
+    for key in ("level","search","levelMode","mine","reset","status","detailFrame","pickup","prev","next","reload"):
+        assert w[key] is not None, key
+    assert w.level.font and w.level.font[3]=="" and w.search.font[3]==""
+    assert len(list(w.rows.values()))==5 and w.rows[1].frame.shown
+    host,c,p,t=g.eval("NS.equipmentUI._window()")
+    assert c.min.font[3]=="" and c.stats[3].stat is not None
+
 if __name__=="__main__":
     failed=total=0
     for name,fn in sorted(list(globals().items())):
