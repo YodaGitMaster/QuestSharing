@@ -56,3 +56,15 @@
 - Check `C_Map.GetMapInfo`, `C_Map.IsCityMap`, player position and current map type if a town scan starts or a zone switch leaves stale stops.
 
 ---
+## Addendum 2026-11-17 — Worldwide quests leak into Westfall
+- What happened: user on v0.4.17 reports a Westfall plan containing quests all around the world and requests actionable Go/Take/Complete/Hand-in steps.
+- Why previous zone guard was insufficient: `project()` accepted `GetMapRectOnMap(source,currentZone)` for any source without verifying ancestry or rectangle bounds. Unrelated zero rectangles produced apparently local (0,0) points; plausible unrelated rectangles also leaked. Active quests were admitted before checking local actions.
+- Reproduction: real Lua planner plus Westfall and foreign starter/objective/turn-in records, with zero/plausible rectangles. Before patch, foreign quest names and active work appear at (0,0). New initial zone/instruction suite 0/14 passes.
+- Method: prove map ancestry independently of returned geometry, validate finite coordinates and positive bounded child transforms; new candidates require local pending work and known hand-ins, active candidates only local actions. `canFinishHere` gates turn-ins and prerequisite lookahead. Clear old steps before zone debounce, cancel prior SPF estimates at scan start, and rescan on completion flags so newly ready local hand-ins appear.
+- Presentation: numbered Go-to steps using known native place names or giver/objective fallback, per-plan quest numbers, and every per-quest task shown. No new protected map operations.
+- Verification: final zone/step suite 28/28 (modern/classic), planner UI 6/6, SPF 10/10; full 38 suites / 1,434 checks, Lua syntax and diff checks pass. Native game and exact live provider records unavailable. User subsequently requests reference-led guide UI/emulation; preserve these scope rules during that continuation.
+- Result / status: solved locally; not published/installed. A preview archive was built but must be rebuilt after the newly requested guide presentation changes.
+
+### UI continuation verified 2026-11-17
+- Reference-led compact native guide and actual-planner-output browser emulation now complete. Same zone/dependency fixtures remain green; full 39 suites / 1,444 checks pass, including 10 new guide-control checks. Browser interactions inspected; native game still pending.
+- Final rebuilt preview: `dist/QuestSharing-preview-2026-11-17.zip`, 37 source-matching files, SHA256 `65c94ab8fa1d8cc2a38eb83cdafb721de25269e15788d9be48f5988ba98be1b4`. Unpublished preview retains TOC version 0.4.18 and includes prior authorized vendor fixes.

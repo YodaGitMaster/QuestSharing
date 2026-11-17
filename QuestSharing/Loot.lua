@@ -195,6 +195,7 @@ local dungeonIDs = { [389]=true,[43]=true,[36]=true,[33]=true,[48]=true,[34]=tru
     [189]=true,[129]=true,[70]=true,[209]=true,[349]=true,[109]=true,[230]=true,[229]=true,[429]=true,[289]=true,[329]=true,[3065]=true,[2999]=true,[2998]=true,[2959]=true,[3002]=true }
 local dungeonAreas = { [2437]=true,[718]=true,[1581]=true,[209]=true,[719]=true,[717]=true,[721]=true,[491]=true,
     [796]=true,[722]=true,[1337]=true,[1176]=true,[2100]=true,[1477]=true,[1584]=true,[1583]=true,[2557]=true,[2057]=true,[2017]=true,[16611]=true,[16732]=true,[16560]=true,[3002]=true }
+function L.isDungeonArea(area) return dungeonAreas[tonumber(area)] == true end
 local function standardDungeon(content, module, owner)
     if content.IsRaid or (tonumber(content.MaxPlayers) or 0) > 10 then return false end
     local types = U.call(module.GetContentTypes, module)

@@ -91,7 +91,7 @@ function C.doneByMe(e) return e and e.complete == true end
 
 function C.link(e)
     local l
-    if GetQuestLink then l = GetQuestLink(C.modern and e.questID or e.index) end
+    if GetQuestLink and not e.catalogue then l = GetQuestLink(C.modern and e.questID or e.index) end
     return l or string.format("|cffffff00|Hquest:%d:%d|h[%s]|h|r", e.questID or 0, e.level or 0, e.title or "?")
 end
 

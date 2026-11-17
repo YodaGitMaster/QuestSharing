@@ -32,6 +32,7 @@ ns.defaults = {
     nearPause = 10,     -- seconds the tracker and the pin leave your choice alone after you change the tracker yourself
     nearMode = "auto",  -- "auto" (distance if the client can measure it, else zone), "distance" or "zone"
     fishingMap = false, -- optional fishing notes on the world map
+    professionGuide = true, -- explicitly requested cooking catalogue and static profession upgrades
     rewardBrowser = false, -- optional quest reward catalogue
     autoSpellRanks = false, -- opt-in: highest learned ranks on existing player spell buttons
     zoneLevels = false, -- opt-in: questing level ranges on the world map
@@ -370,14 +371,17 @@ function ns.setSetting(key, value)
         d[key] = value
         if key == "debug" and value and ns.logSession then ns.logSession("debug log on") end
         if (key == "fishingMap" or key == "enabled") and ns.fishing then ns.fishing.refresh() end
+        if (key == "professionGuide" or key == "enabled") and ns.professions then ns.professions.settingChanged() end
         if (key == "rewardBrowser" or key == "enabled") and ns.rewards then ns.rewards.settingChanged() end
         if (key == "autoSpellRanks" or key == "enabled") and ns.spellRanks then ns.spellRanks.settingChanged() end
         if (key == "zoneLevels" or key == "enabled") and ns.zoneLevels then ns.zoneLevels.refresh() end
         if (key == "itemSources" or key == "enabled") and ns.itemSources then ns.itemSources.refresh() end
         if (key == "vendorSearch" or key == "enabled") and ns.vendorMap then ns.vendorMap.refresh() end
         if key == "questPlanner" and ns.questPlanner then ns.questPlanner.settingChanged(value) end
+        if key == "enabled" and ns.questPlanner then ns.questPlanner.masterChanged(value) end
         if key == "enabled" and not value and ns.adventure then ns.adventure.close() end
         if key == "enabled" and not value and ns.loot then ns.loot.close() end
+        if key == "enabled" and not value and ns.dungeonQuests then ns.dungeonQuests.close() end
         if (key == "bagMarks" or key == "enabled") and ns.refreshBagMarks then ns.refreshBagMarks() end
         if (key == "hideTracker" or key == "enabled") and ns.applyTrackerHidden then ns.applyTrackerHidden() end
         if key == "quickSend" and value then               -- you ask for it again: refused channels get another try
@@ -430,8 +434,11 @@ end
 
 local help = {
     "/qs loot [search]    search instance drops and the boss or creature that drops each item",
+    "/qs dungeons [search]  browse dungeon quests, pickup locations and prerequisites",
     "/qs adventure [quest ID or title]  prepare a role-play invitation in any chat channel",
     "/qs fishing [on|off]  fishing waters on the big map; no argument opens the water editor",
+    "/qs cooking          recipes, acquisition sources and ingredient farming hints",
+    "/qs professions [on|off]  rank upgrades for all professions and both factions; on/off toggles integration",
     "/qs rewards [on|off]  browse quest reward equipment for your class, level and faction",
     "/qs plan [refresh|next|on|off]  plan nearby quests and set a waypoint for a stop",
     "/qs settings         open the settings window (click a line to switch it on or off)",
@@ -458,6 +465,7 @@ local help = {
     "/qs pingkey <KEY>    the key that pings the nearest quest creature (Attack) or quest object (look here); none removes it",
     "/qs itemkey <KEY>    the key that uses the item of your nearest quest (a torch, a flare...); none removes it",
     "/qs items on|off     item icons next to the quests in the tracker, and the quest item button",
+    "/qs cleanup         review leftover quest items in your bags and delete confirmed stacks",
     "/qs questie          does Quest Sharing read Questie's quest database? (with a real lookup from your quest log)",
     "/qs ping             checks every step of the ping key (and says where it stops); /qs ping on|off switches it",
     "/qs mappins on|off   party members running Quest Sharing on my world map (and my position to them)",
@@ -488,9 +496,15 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     local d = ns.db
     if cmd == "share" then ns.shareClick()
     elseif cmd == "loot" then ns.loot.open(arg)
+    elseif cmd == "dungeons" or cmd == "dungeonquests" then ns.dungeonQuests.open(arg)
     elseif cmd == "plan" then ns.questPlanner.command(arg)
+    elseif cmd == "cleanup" then ns.questCleanup.open()
     elseif cmd == "questmap" then ns.print("quest symbols on the world map and minimap have been removed")
     elseif cmd == "adventure" then ns.adventure.command(arg)
+    elseif cmd == "cooking" then ns.professions.open("cooking")
+    elseif cmd == "professions" then
+        if arg == "on" or arg == "off" then ns.setSetting("professionGuide",arg=="on")
+        else ns.professions.open("upgrades") end
     elseif cmd == "fishing" or cmd == "rewards" then
         local key = cmd == "fishing" and "fishingMap" or "rewardBrowser"
         if arg == "on" or arg == "off" then ns.setSetting(key, arg == "on")

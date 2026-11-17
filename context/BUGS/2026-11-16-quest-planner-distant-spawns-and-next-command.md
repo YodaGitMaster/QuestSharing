@@ -40,3 +40,8 @@
 - Inspect callers of `selectStop` to ensure failure does not proceed to waypoint placement.
 
 ---
+## Addendum 2026-11-17 — Shared giver merges future pickups too early
+- What happened: while verifying the user's ordered local instructions, a follow-up at the same giver/camp merged with the parent's pickup/objective/turn-in stops.
+- Why distance-only grouping failed: shared geography does not imply simultaneous availability. Merging across prerequisite depths created a pickup -> objective -> hand-in -> shared pickup cycle, triggering the route's incomplete-data fallback and listing a follow-up too early.
+- Method: fixture parent and blocked follow-up use the same giver, objective NPC and hand-in; assert follow-up pickup appears only after parent's hand-in. Before patch this fails on both APIs. Add prerequisite depth as stop `phase`; require kind, phase and distance to match when merging, and include phase in stop identity.
+- Verification: same-giver chain workflow passes in new `tests/test_quest_planner_zone_steps.py`; zone suite 28/28, full 38 suites / 1,434 checks. Native game validation pending; local/unpublished.

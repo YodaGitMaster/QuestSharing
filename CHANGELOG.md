@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 0.4.19
+- Added a Cooking companion from the fishing panel, `/qs cooking`, and the native Cooking window: 133 Forever reference records, live Known/Missing/Unconfirmed states, acquisition sources and ingredient farming tooltips with Questie mob levels/locations, zone levels and available fishing skills. Added an **Upgrades** tab and `/qs professions` for static Alliance/Horde Apprentice-to-Artisan requirements, trainers, books and quests across all 12 professions; dated sources/unknowns, native guide buttons, refresh and an integration off switch. No native recipe-filter changes or login catalogue scans.
+- Fixed guide positioning on submaps, automatic recovery when map measurements arrive late, and selected-stop labels/positions in grouped map markers; missing measurements retry at most once per second while the guide is active.
+- Dungeon quest rows now show pickup and turn-in givers/locations; hovering shows base XP, all known item rewards and full locations. Reward links load only on first hover in cancellable background slices; six taller rows keep the new lines readable.
+- Added **Dungeon quests** in the shared explorer and `/qs dungeons`: select a dungeon to list its quests inside/outside, outdoor preparation chains and explicit follow-ups, with faction/class/level/completion filters. Includes pickup/chain/objective details, the usual right-click menu and pickup map waypoints; scans only on demand with combat/close cancellation, independently of equipment filters.
+- Added **Extra tools > Review quest items left in my bags** and `/qs cleanup`: Questie-backed carried-bag review, active quest/starter protection, individual whole-stack confirmation, fresh bag/quest/cursor checks, and client-refusal fallback; no background or bank scans.
+- Added selected-step direction guidance above the guide: action/destination, facing-relative green arrow, direct yards and an arrival message without completing or skipping quests.
+- Added own numbered world-map stops with readable straight connections and selected-stop highlight; click to select and waypoint, or cycle colocated steps. Cached drawing adds no database scans, hides map interactions in combat and stops on guide close; SPF remains optional for terrain-aware paths.
+- Removed automatic guide/map catalogue scans on login and ordinary closed-tool events. Guide and map search share small time-budgeted work slices, suspend scans in combat, and stop work when hidden.
+- Made map search debounced and lazy: reuse role metadata, load item links only when needed, decode only matching NPC locations and release locations after query changes. The guide reuses discovered IDs for its last two zones and caches repeated source reads during a scan; explicit Refresh rediscovers data.
+- Restyled the planner as a compact dark quest guide with one gold/red highlighted current step, up to five muted upcoming steps, previous/next arrows, current-step counter, session position lock and mini/expanded modes. Added a Westfall UI emulation generated from actual Lua planner output.
+- Fixed worldwide quests leaking into a zone plan through unrelated/zero map rectangles. Plans now require verified local locations, exclude remote-only new quests, clear stale steps immediately after zone changes, and prevent premature hand-ins/follow-up pickups.
+- Replaced planner trip labels with numbered **Go to… → Take these quests → Complete these quests here → Hand in these quests** instructions, known place/giver names, consistent quest numbers and every grouped task shown.
+- Made map role searches flexible: profession aliases such as **skinner → Skinning**, plurals, punctuation and word order; small spelling errors fall back to nearby role names with exact local matches taking priority. Suggestions use the same matching and item selections remain exact.
+- Made map-search suggestions easier to read with an opaque dark background and border above map content, larger white text and wider, taller rows.
+- `vendor` / `all vendors` now highlights all known sellers on the displayed map; `general vendor` narrows to local general sellers. Added provider vendor-flag support for sellers without titles, with trainers excluded from generic vendor results unless they also sell items.
+- Map seller search now includes matching NPC titles without item links, scopes suggestions to the displayed map, keeps selected vendor types separate from item matches, and shows the map, query and location count. Off-map nearest searches require clicking **Elsewhere**; missing item seller data is explained.
+- Validation: 44 automated suites / 1,617 checks and Lua 5.1 syntax checks pass. Native game rendering, live provider coverage, profession learned-state APIs and protected item deletion still require in-game validation.
+
 ## 0.4.18
 - Made the quest planner movable; after you drag it, it stays where you placed it for the rest of the session.
 - Fixed long quest names and wrapped details overlapping while scrolling; rows now grow to fit their text.

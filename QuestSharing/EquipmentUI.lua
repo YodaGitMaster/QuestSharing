@@ -1,4 +1,4 @@
--- One equipment explorer shared by quest rewards and dungeon drops.
+-- One explorer shared by quest rewards, dungeon drops and dungeon quests.
 local ADDON, ns = ...
 local E, U, S = {}, ns.optionalUI, ns.style
 ns.equipmentUI = E
@@ -324,6 +324,7 @@ function E.pageButtons(prev,next,total,page,count)
 end
 function E._menu() return menu end
 local controls
+local tabNames = {quests="Quest rewards",dungeons="Instance drops",dungeonQuests="Dungeon quests"}
 local function labels()
     if not controls then return end
     for _,key in ipairs({"category","subtype","slot","mode","sort"}) do controls[key].refresh() end
@@ -394,22 +395,22 @@ function E.close(key)
 end
 local function build()
     if host then return true end
-    host = U.window("QuestSharingEquipment", 1080, 828, "Equipment explorer")
+    host = U.window("QuestSharingEquipment", 1080, 828, "Quest and equipment explorer")
     if not host then return false end
     local scale = math.min(1, (UIParent:GetWidth() - 40) / 1080, (UIParent:GetHeight() - 40) / 828)
     host:SetScale(math.max(0.5, scale))
     S.fill(host, "BACKGROUND", 0.035, 0.055, 0.09, 1):SetAllPoints(host)
-    for i, key in ipairs({ "quests", "dungeons" }) do
-        tabs[key] = S.button(host, key == "quests" and "Quest rewards" or "Instance drops", 184, function()
-            if key == "quests" then ns.rewards.open() else ns.loot.open() end
+    for i, key in ipairs({ "quests", "dungeons", "dungeonQuests" }) do
+        tabs[key] = S.button(host, tabNames[key], 184, function()
+            if key == "quests" then ns.rewards.open() elseif key == "dungeons" then ns.loot.open() else ns.dungeonQuests.open() end
         end)
         tabs[key]:SetPoint("TOPLEFT", host, "TOPLEFT", 24 + (i-1)*194, -40)
     end
-    U.text(host, "Blue+ only • hover to compare", 440, 43, 370)
+    local hint=U.text(host, "Blue+ only • hover to compare", 620, 43, 200)
     local bar = CreateFrame("Frame", nil, host)
     bar:SetPoint("TOPLEFT", host, "TOPLEFT", 16, -73); bar:SetWidth(1048); bar:SetHeight(137)
     S.fill(bar, "BACKGROUND", 0.09, 0.12, 0.18, 1):SetAllPoints(bar)
-    controls = {}
+    controls = {bar=bar,hint=hint}
     local function choice(key,label,x,width,values)
         U.text(bar,label,x,5,width)
         controls[key]=E.dropdown(bar,nil,x,24,width,values,function() return f[key] end,function(value)
@@ -456,7 +457,7 @@ function E.page(key)
     if not build() then return end
     if not pages[key] then
         local p = CreateFrame("Frame", nil, host)
-        p:SetPoint("TOPLEFT", host, "TOPLEFT", 24, -220); p:SetWidth(1032); p:SetHeight(580); p:Hide()
+        p:SetPoint("TOPLEFT", host, "TOPLEFT", 24, key=="dungeonQuests" and -85 or -220); p:SetWidth(1032); p:SetHeight(key=="dungeonQuests" and 715 or 580); p:Hide()
         pages[key] = p
     end
     return pages[key]
@@ -467,9 +468,13 @@ function E.show(key)
     if active and active ~= key then hidePage(active) end
     active = key
     host:Show(); pages[key]:Show()
-    for _,b in ipairs({controls.min,controls.max}) do if b.dirty then b.flush() end end
-    for _,row in ipairs(controls.stats) do if row.min.dirty then row.min.flush() end end
-    for k,b in pairs(tabs) do b:SetLabel((k == key and S.GOLD or S.GREY) .. (k == "quests" and "Quest rewards" or "Instance drops") .. "|r") end
+    if key=="dungeonQuests" then controls.bar:Hide();controls.sort:Hide();controls.hint:Hide()
+    else
+        controls.bar:Show();controls.sort:Show();controls.hint:Show()
+        for _,b in ipairs({controls.min,controls.max}) do if b.dirty then b.flush() end end
+        for _,row in ipairs(controls.stats) do if row.min.dirty then row.min.flush() end end
+    end
+    for k,b in pairs(tabs) do b:SetLabel((k == key and S.GOLD or S.GREY) .. tabNames[k] .. "|r") end
     return true
 end
 function E.details(parent, x, width, title)

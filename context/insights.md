@@ -1,5 +1,98 @@
 # Insights
 
+## 2026-11-17 — v0.4.19 release verification
+- Current workspace passes all 44 self-running suites / 1,617 checks and compilation of all 42 runtime Lua modules with Lua 5.1; diff whitespace clean.
+- Install ZIP contains exactly 44 Lua/TOC/XML entries, all byte-identical to source; TOC lists every runtime Lua module and embedded Cooking MIT attribution is retained. CRC passes, 231,769 bytes, SHA256 `f1a6e29d91fddeef01408f44132b703ff0a18ad3a055ac4170feb6ed094ab46e`.
+- No game client available; native rendering, live providers, profession learned states and protected deletion remain pending. These limits are included in 0.4.19 release notes.
+
+## 2026-11-17 — Forever Cooking reference and rank upgrades
+- Forever's Camelot `Professions.GenerateCraftingDataProvider` resets unlearned filtering false; a separate catalogue avoids filter loops. `GetRecipeInfo(spellID).learned` is useful only for explicit available answers from the player's own Cooking source; absence is unknown, not missing.
+- Recipe counts differ by source: Profit pinned build1.60.1.70888 has133 Cooking records, WoWFDB lists123. Display as dated reference records with unconfirmed entries, not an asserted obtainable-recipe count.
+- Item food drops in installed Questie use `npcDrops`; NPC `minLevel`/`maxLevel` plus `spawns` answer mob/zone questions without enumerating the item database. Real raw data resolves Chunk of Boar Meat -> Stonetusk Boar5-6 in Elwynn, with alternate NPCs.
+- Guides support practical fish routes more often than exact minimum/no-getaway thresholds; keep these separate and preserve AnglerAtlas provisional/zone-estimate labels.
+
+## 2026-11-17 — Guidance follow-up validation
+- U.call returns only three values; never route GetMapRectOnMap's four bounds through it. Preserve local API arity instead of weakening coordinate validation or changing a shared wrapper.
+- Missing-on-first-open measurements require throttled repair; active-frame retry can recover a target without re-opening or adding a timer. Tests must measure increments after opening because Game.advance now executes active frame updates.
+- Summary truncation needs selected-entry coverage, and grouped marker position must follow the selected point. Color-only highlight misses the wrong-number/wrong-point defect.
+- Package only known runtime entries: the workspace gained an unrelated, unlisted CookingReference.lua draft during validation. Verified baseline ZIP + QuestGuidance overlay includes the completed runtime and excludes draft files; all entries match current source.
+
+## 2026-11-17 — Hover rewards and compact quest locations
+- XP belongs to active-flavor `Support.Get("QuestXP").db[id]` as `{questLevel,baseXP}`, not the quest entity. Legacy QuestieLoader QuestXP.db is a safe fallback. Label base XP; keep missing distinct from zero and avoid unrelated selected-log reward APIs.
+- Item rewards are reverse Item.questRewards links, including non-equipment; they do not distinguish fixed/choice, amounts or cash. Build once only after first hover through shared DataWork, then reuse. Late worker/item-cache events must check currently hovered visible row; leaving/closing cannot reopen tooltip.
+- Cache pickup/all NPC-object turn-in projections; first giver plus alternate count stays in four-line 84px row, all givers/locations in tooltip/detail. Six rows at 88px spacing fit existing 530px list without overlap.
+- Actual raw Classic quest 166 smoke: 2,600 base XP; reward IDs 2041 Tunic of Westfall, 2042 Staff of Westfall, 6087 Chausses of Westfall. Provider row smoke omits runtime corrections and native rendering remains unverified.
+- Validation: 48/48 focused and full 43 suites / 1,573 checks, Lua 5.1 syntax and diff checks; preview rebuilt with 41 byte-matched files / 212,263 bytes, SHA256 `b1e11d89fa922b92ef919742af741481210aa83aa28aec67d5b738be16be7efe`.
+
+## 2026-11-17 — Dungeon quest identity versus shared item drops
+- User means all associated quests for one dungeon, including outdoor pickups/preparation/follow-ups; this is independent of reward equipment and current quest-log membership.
+- Upstream raw Classic data smoke: 4,244 quest IDs, 580 associated quest records after chain expansion; Deadmines includes Defias preparation, Red Silk Bandanas, Collecting Memories, Oh Brother, Underground Assault, The Unsent Letter and Test of Righteousness. No runtime corrections loaded in this smoke.
+- Any-dungeon-drop inference incorrectly brought ordinary wool/leather/food/crafted turn-ins into every dungeon where materials drop. Require objective-item sources to be exclusively known dungeon areas unless the quest has another direct dungeon association; include explicit dungeon categories and actual NPC/object objectives independently. Permanent mixed NPC/object source regression checks cover this boundary.
+- Synthetic absent-log entries need a catalogue flag: Classic quest links/objectives/share APIs take log indices, so calling them for an unaccepted quest can target the wrong selection or fail. Reuse actual entries when accepted; catalogue entries keep where/how/chain/pickup actions and explain unavailable log-only actions.
+- Validation: 32 new checks across both API styles; full current workspace 43 suites / 1,557 checks, Lua 5.1 syntax and diff checks pass. No native WoW rendering/FPS claim. Separate source/CRC-verified 41-file preview at `dist/QuestSharing-dungeon-quests-preview-2026-11-17.zip` (211,093 bytes; SHA256 `4708720803b38d3002bd4ac539034950f499c6bc09388889246172358b71d927`).
+
+## 2026-11-17 — Review leftover quest items conservatively
+- `Item.startQuest` and positive native bag questID protect unaccepted quest starters; `Item.relatedQuests` complements active quest objective/source/special-item requirements, with native IsOnQuest covering hidden reverse matches.
+- Keep completed quests in the item requirement snapshot until removed from the log: readiness to hand in does not make their items leftovers. Quest class/native flags provide positive quest-item evidence; ordinary reagents should not become cleanup candidates merely because they lack active matches.
+- Pickup may invoke synchronous callbacks: recheck quest/combat/master state after pickup and cursor identity immediately before destructive calls. Refused native deletion returns cursor item via ClearCursor; never retry deletion on a timer.
+- New cleanup stays entirely on demand: visible bag/quest/combat events invalidate review without reading bags or catalogues. 34 focused checks and 43-suite / 1,557-check full run pass; native WoW still required to verify protected APIs and appearance.
+
+## 2026-11-17 — Direction and route overlay boundaries
+- World coordinates from C_Map run north/west, while zone fractions run east/south. Use metric world deltas or native width/height; normalized map fractions alone distort bearing and cannot give yards.
+- A hidden arrow frame receives no native OnUpdate; temporary position loss must retain an active retry path rather than hide itself permanently. Explicit guide close removes updates entirely.
+- Own map layers avoid pin providers and host-map writes. Plain markers use hover plus global mouse down/up; Core prepends event name, so handlers accept (_,button). Group colocated/nearby steps and cycle rather than stacking inaccessible buttons.
+- Cache geometry by route revision/displayed map/size/scale; spatial buckets avoid pairwise grouping across every stop. Reuse line/marker pools, make background labels opaque, and retain exact quest selection on arrival.
+
+## 2026-11-17 — Optional database cost and lifecycle
+- Provider caching does not make broad enumeration free; first reads decode/cache data. Eager map index warmed every vendor spawn and item name even on a closed map; saved planner setting triggered world quest discovery on login and same-zone events repeated it.
+- Gate work on visible user demand before calling GetAllIds; queue discovery and route work through one cooperative timer, with per-field yields outside pcall. A record/native call may still exceed a soft budget.
+- Reuse scalar NPC roles, only current-query locations, last-two-zone quest IDs and a per-scan 256-source cache. Do not treat quest zoneOrSort as an exclusive geographic index.
+- Mock 1,000-NPC trainer search reads one matching NPC spawn and zero item IDs; login/blank-map and hidden guide events enumerate no catalogues. Native FPS and provider-independent startup cost remain unmeasured.
+- Coroutine replacement must be guarded by job identity at completion; pausing after resolving a query must still resume rendering when map reopens. New-query debounce must discard stale Tab suggestions immediately.
+- 2026-11-17: user reports `vendor` produces no results in the Barrens while using a previous version. Actual v0.4.17/v0.4.18 VendorMap both return 0 pins for generic `vendor` on the existing seller fixture; current module returns 5 on both API styles. Focused suite 76/76 passes; preview ZIP contains identical fixed module. Release/version gap reproduced independently of zone; actual Barrens records/native rendering remain unverified.
+
+## 2026-11-17 — Compact guide and real-output emulation
+- User supplied Zygor screenshots to clarify presentation. Reproduce interaction hierarchy and dark compact guide style with own branding/assets: one emphasized current step, muted future steps, header navigation/counter, position lock and mini mode.
+- `P.navigate` reviews/waypoints only; guide navigation must never masquerade as quest completion. Auto quest events still rebuild eligibility/progress. Lock must gate drag handlers as well as SetMovable.
+- Emulate from actual Lua route/row output rather than a separate hand-invented route. Generator walks eight sample steps via P.navigate and exports actual strings/coordinates. Sample names/locations are explicitly illustrative, not the player's live quest log.
+- Browser inspection: one active + five upcoming rows, no root horizontal overflow; next changes 1/8 to 2/8, mini leaves one row, lock toggles, close/reopen works. Native tests cover same controls. First clipped screenshot API returned empty background; full getScreenshot capture succeeded, then cropped surrounding whitespace only.
+- Visualize bundled renderer missing assets/visualize.css; self-contained inspection wrapper works. Native WoW fonts/compositing remain unverified. Full 39 suites / 1,444 checks, Lua/JS syntax and whitespace pass.
+
+## 2026-11-17 — Flexible role matching
+- Explicitly requested after `skinner trainer` failed literal lookup. Role aliases cover common English profession worker/training names; plurals/punctuation and query order normalize consistently for both hints and pins.
+- Avoid unrestricted fuzzy matching: at most one spelling edit across role tokens, minimum five ASCII letters; include insertion/deletion/replacement/adjacent swaps and canonical worker alias forms. Non-ASCII/short tokens do not receive typo matching.
+- Cache normalized NPC title words, preserve raw localized labels. Prioritize literal/alias role or item pins on displayed map; remote exact hits must not suppress a local approximate role. Rank approximate suggestions after literal role and item suggestions.
+- Item names remain literal and selected items exact. No provider records/spawns invented. Generic vendor typos still request seller-only results.
+- Baseline first new workflows 56/64; final focused 76/76, all 37 suites / 1,406 checks, syntax/diff clean. Earlier no-synonym finding is now superseded in local code; installed user build remains v0.4.17.
+
+## 2026-11-17 — Skinner vs Skinning search wording
+- Current `matchesWords` requires each literal query token within a title/item. In both API harnesses, Skinning Trainer matches `skinning trainer` and `skin trainer`, not `skinner trainer`; no synonym alias exists. Keep this limitation explicit rather than promise natural-language profession understanding.
+
+## 2026-11-17 — Map popup readability and confirmed installed version
+- Solid-looking color values alone do not guarantee visible popup backgrounds: map content can compete with sibling-frame draw order. Existing popup had 0.98 alpha and no explicit strata/level. Raised only own popup using existing EquipmentUI dropdown pattern; background and border now fully opaque, rows wider/taller, text larger/white.
+- Instrumented real frame creation on modern/classic confirms opacity, explicit layer above map, text format, bounds and click dismissal; native compositing remains unverified. Focused 52/52 and syntax/diff checks pass; no added permanent tests for this visual-only change.
+- User confirms Stormwind capital and installed v0.4.17. Actual v0.4.17 module reproduces linked Druid Trainer/unlinked Paladin Trainer asymmetry; local module finds both. Prior fixes have not been installed/published.
+
+## 2026-11-17 — Trainer release/local comparison
+- Published v0.4.18 still indexes only Item.vendors. A Druid Trainer linked by an item and an unlinked Paladin Trainer reproduce asymmetric discovery; current local NPC-title index finds both with identical map/data.
+- Search contains no Druid/Paladin-specific branch. Do not infer class discrimination from an item-derived coverage gap.
+- Exact full title is deliberately omitted from autocomplete (`key == lower(query)`), while matching pins remain. Ask whether missing means suggestions, pins or both before changing matching.
+- Added six trainer workflows; focused suite 52/52 passes. No runtime edits in this follow-up; actual user map/version/data remain unverified.
+
+## 2026-11-17 — Vendor means seller category, not a literal title word
+- User clarifies `vendor` -> all sellers and `general vendor` -> general seller roles, strictly on displayed map. Earlier fix retained literal title matching; new failing workflows reproduce this omission (30/40 baseline pass).
+- Normalize seller nouns once for matching and suggestions; preserve seller-only suggestion kind so choosing `General` does not include General Commander or unrelated item names.
+- A nonempty NPC title is not seller evidence. Use explicit item links, guarded active-flavor vendor flags, or known merchant-title words; index untitled flagged sellers too. No fixed flag bit: provider flavors differ; RequireContract(4) guards enum use.
+- Verification: focused 46/46, full 37 suites / 1,376 checks, Lua syntax and whitespace checks pass. Native rendering/installed data completeness remain unverified.
+
+## 2026-11-16 — Vendor search omissions and scope
+- An Item.vendors-derived NPC index cannot support complete title search: known General Goods NPCs with no reverse item links disappear. Enumerate NPC subName independently while preserving explicit item links for item queries.
+- Suggestions must use the same valid-coordinate projection as pins; globally correct suggestions can still feel broken when the current zone has no matching points.
+- Keep suggestion kind through submission: category text can also occur in an unrelated item name; selected items should use exact names.
+- Style.button uses a custom visible label; dynamic text must use SetLabel. Native SetText can pass a mock field check without changing the visible label.
+- A cancelled generation's callback must not clear shared loading for its replacement; exercise overlapping timer batches rather than only end-state cancellation.
+- Verified: baseline 4/18; final focused 30/30; full 37 suites / 1,360 checks. Native map/installed Questie behavior remains unverified.
+
 ## 2026-11-16 — SPF can provide walk costs as well as map guidance
 - Current public Shortest Path Forever API v2.3 adds `EstimateWalks`: asynchronous walk-yard costs from one position to up to 256 targets on the same walking map, with cancellation and explicit loading/no-data/unreachable results. `Navigate`/`NavigateRoute` hand off guidance and SPF draws its own route; `Guidance()` exposes current-leg bends.
 - Implemented as optional explicit click-to-follow plus walk-cost promotion of the first eligible outing; full outing optimization needs more cost queries. Cave heights and strict dry-land routing remain constraints.
@@ -239,3 +332,21 @@
 - Questie source identity is not a reliable geographic cluster key: the same NPC/object can spawn at multiple distant camps.
 - Existing repository tests are self-running scripts with an in-file `Game` harness; pytest collection is not supported and yields missing `style` fixture errors.
 - Route lifecycle review found no additional confirmed issue in debounce, generation cancellation, town/map gating, or progress-only rebuild paths; native client calls still need in-game validation.
+
+## 2026-11-16 — Local quest voice acting
+- ForeverVO already demonstrates local Chatterbox generation + talking-head queue; its capture/generate/restart pipeline avoids promising live file discovery.
+- Qwen3-TTS documents VoiceDesign then reusable Base clone prompts; instruction control varies by checkpoint, so voice consistency and acting control must be evaluated together.
+- Native Forever speech APIs plus third-party Windows model voices suggest a live path, but actual voice enumeration/control remains unverified.
+- Chatterbox current README says retired research since August 2026; Fish official requirements list 24 GB S2-Pro / 48 GB Drama 3 GPU paths. GPU unknown; do not promise local real-time acting or game FPS.
+- Existing QuestSharing auto-accept can close the offer immediately; separate narration must capture before acceptance or reliably retrieve text afterward.
+
+## 2026-11-16 — Quest planner arrival, level filter and panel layout
+- Questie starter records are sources (`id`, `name`, `spawns[]`); `nearestPoint()` accepts flat points. Passing the wrong shape silently removes giver candidates. Use `nearestSource()` and cover the empty-active-log route.
+- On the user's WoW Forever/API 16001 client, use the game's `GetQuestDifficultyColor` result against `QuestDifficultyColors`; quest difficulty is relative to player level and cannot be replaced with a fixed quest-level bracket.
+- Variable wrapped text needs variable row height, cumulative vertical offsets, and matching scroll-child height. A fixed wheel step can remain a small navigation increment.
+- Quest Sharing's protected-map safety rule forbids opening or navigating Blizzard's map from code. Use the supported native waypoint for right-click and let the player open the map normally.
+
+## 2026-11-17 — Quest narration interface boundary
+- Native SpeakText exposes voice/text/rate/volume/overlap, not arbitrary acting directions or NPC metadata; local speech adapter must own configured model profiles and any extra controls.
+- Windows adapter can call localhost model server; Lua cannot directly use that HTTP endpoint. Model audio returns through speech engine, not as a Lua WAV buffer.
+- Stop/replay sentence and exact pause/resume are different capabilities; native timing/ownership/queue behavior needs client testing. Offline sound manifest remains a separate viable integration path.

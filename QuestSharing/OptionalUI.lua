@@ -44,7 +44,7 @@ function U.scrollText(parent, x, y, width, height)
         text:SetText(value)
         local size = text.GetStringHeight and text:GetStringHeight() or math.ceil(#value / 32) * 14
         content:SetHeight(math.max(height, size + 4))
-    end
+    end, scroll
 end
 
 function U.window(name, width, height, title)

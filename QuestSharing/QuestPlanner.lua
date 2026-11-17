@@ -2,14 +2,19 @@
 local ADDON, ns = ...
 local P, U, S = {}, ns.optionalUI, ns.style
 local Path = ns.questPlannerPath
+local Work = ns.dataWork
+local Guidance = ns.questGuidance
 ns.questPlanner = P
 
-local MAX_FUTURE_LAYERS, SCAN_BATCH = 4, 120
+local MAX_FUTURE_LAYERS = 4
 local CLUSTER_DISTANCE, TAKEIN_DISTANCE = 0.065, 0.045
 local catalog, route, selected, frameMap, playerPoint, plannedMap, loading, generation = {}, {}, 1, nil, nil, nil, false, 0
 local selectionLocked = false
 local panel, message, planScroll, planRows, planContent, emptyText, followButton
-local buildGraph, buildRoute, render, selectStop, showPlanRows, stopIdentity
+local previousButton, nextButton, stepCounter, modeButton, lockButton, waypointButton, guidePosition
+local guideExpanded, guideLocked = true, false
+local sessionActive, zoneQuestIDs, zoneOrder = false, {}, {}
+local buildGraph, buildRoute, render, selectStop, showPlanRows, stopIdentity, objectiveIsDone
 local nextStopID = 0
 local PLAN_ROW_HEIGHT, PLAN_LIST_HEIGHT, PLAN_WIDTH = 56, 280, 320
 local panelDismissed, refreshQueued, refreshForce, refreshZoneEntry = false, false, false, false
@@ -41,6 +46,9 @@ end
 local function isInLevelRange(band)
     return band == "green" or band == "yellow"
 end
+local function finite(n)
+    return type(n) == "number" and n == n and n > -math.huge and n < math.huge
+end
 local function distance(a, b)
     if not (a and b and a.x and a.y and b.x and b.y and a.map == b.map) then return math.huge end
     local dx, dy = a.x - b.x, a.y - b.y
@@ -48,19 +56,36 @@ local function distance(a, b)
 end
 
 local function project(map, x, y)
-    if not (map and x and y and frameMap) then return nil end
+    if not (map and frameMap and finite(x) and finite(y)) or x < 0 or x > 1 or y < 0 or y > 1 then return nil end
     if map == frameMap then return { map = frameMap, x = x, y = y } end
-    if C_Map and C_Map.GetMapRectOnMap then
-        local ok, left, right, top, bottom = pcall(C_Map.GetMapRectOnMap, map, frameMap)
-        if ok and left and right and top and bottom then
-            return { map = frameMap, x = left + (right - left) * x, y = top + (bottom - top) * y }
-        end
+    -- A rectangle alone does not prove membership: unrelated maps can return zero or plausible rectangles.
+    local chain, seen, id = {}, {}, map
+    for _ = 1, 12 do
+        if seen[id] then return nil end
+        seen[id] = true
+        local info = U.call(C_Map and C_Map.GetMapInfo, id)
+        local parent = info and info.parentMapID
+        if not parent or parent == 0 then return nil end
+        chain[#chain + 1] = { id, parent }
+        id = parent
+        if id == frameMap then break end
     end
+    if id ~= frameMap then return nil end
+    for _, edge in ipairs(chain) do
+        local ok, left, right, top, bottom
+        if C_Map and type(C_Map.GetMapRectOnMap) == "function" then
+            ok, left, right, top, bottom = pcall(C_Map.GetMapRectOnMap, edge[1], edge[2])
+        end
+        if not (ok and finite(left) and finite(right) and finite(top) and finite(bottom))
+            or right <= left or bottom <= top or left < 0 or right > 1 or top < 0 or bottom > 1 then return nil end
+        x, y = left + (right - left) * x, top + (bottom - top) * y
+    end
+    return { map = frameMap, x = x, y = y }
 end
 
 local function pointForSpawn(spawn)
-    if not spawn or spawn.dungeon or not spawn.map then return nil end
-    return project(spawn.map, (spawn.x or 0) / 100, (spawn.y or 0) / 100)
+    if not spawn or spawn.dungeon or not spawn.map or not finite(spawn.x) or not finite(spawn.y) then return nil end
+    return project(spawn.map, spawn.x / 100, spawn.y / 100)
 end
 
 local function nearestPoint(points)
@@ -107,11 +132,13 @@ local function currentZone()
 end
 
 local function clearPlan(reason)
+    Guidance.clear()
+    Work.cancel("quest-plan")
     if Path then Path.cancelWalkEstimates() end
     loading, catalog, route, selected, plannedMap = false, {}, {}, 1, nil
     lastLevelStats = { localCount = 0, below = 0, above = 0, eligible = 0, unknown = 0 }
     selectionLocked = false
-    if message then message:SetText(reason) end
+    if message then message:SetText("Quest guide") end
     if emptyText then emptyText:SetText(reason) end
     if planContent then planScroll:SetVerticalScroll(0); showPlanRows() end
 end
@@ -159,23 +186,34 @@ local function newCandidate(id, starter, log, data)
     data.starterPoint = nearestSource(starter)
     data.starterRows = starter or {}
     data.entry = log[id]
+    local localWork, allWorkLocal = false, true
+    for _, target in ipairs(data.targets or {}) do
+        if not objectiveIsDone(data.entry, target) then
+            if nearestPoint(target.points) then localWork = true else allWorkLocal = false end
+        end
+    end
+    local turnPoint = nearestSource(data.turnIns)
+    data.canFinishHere = allWorkLocal and turnPoint ~= nil
+    if data.entry then
+        if not (data.entry.complete and turnPoint) and not localWork then return nil end
+    elseif not allWorkLocal or (#(data.turnIns or {}) > 0 and not turnPoint) then
+        return nil
+    end
     data.depth = 0
     data.prereqIDs = {}
     return data
 end
 
-local function scan()
+local function scan(rediscover)
+    Guidance.clear()
     generation = generation + 1
+    Work.cancel("quest-plan")
+    if Path then Path.cancelWalkEstimates() end
     local thisGeneration = generation
     local q = questie()
     local zone, locationError, zoneMap = currentZone()
     if not zone then
         clearPlan(locationError)
-        return
-    end
-    local ids = q.ids("quest")
-    if type(ids) ~= "table" then
-        clearPlan("Questie needs a recent QuestieDB with quest IDs.")
         return
     end
     local log = ns.compat.entryMap()
@@ -184,38 +222,47 @@ local function scan()
     local oldSelected = selected
     local oldSelectedKey = keepSelection and route[selected] and stopIdentity(route[selected]) or nil
     local inZone, index = {}, 1
+    if rediscover then zoneQuestIDs[zoneMap] = nil end
+    local discovered = zoneQuestIDs[zoneMap]
+    local discoveredIDs, sourceCache = {}, {}
     local levelStats = { localCount = 0, below = 0, above = 0, eligible = 0, unknown = 0 }
     lastLevelStats = levelStats
     loading, catalog, route, selected, plannedMap = true, {}, {}, 1, zoneMap
-    if message then message:SetText("Looking through Questie quests for this area…") end
+    if message then message:SetText(zone) end
     if emptyText then emptyText:SetText("Checking quest locations…") end
     if planContent then planScroll:SetVerticalScroll(0); showPlanRows() end
 
-    local function batch()
-        if thisGeneration ~= generation or not loading then return end
-        local currentName, locationError, currentMap = currentZone()
-        if not currentName then
-            clearPlan(locationError)
-            return
+    Work.start("quest-plan", function()
+        local ids
+        if discovered then
+            ids = {}; local seen = {}
+            for _, id in ipairs(discovered) do ids[#ids + 1] = id; seen[id] = true end
+            for id in pairs(log) do if not seen[id] then ids[#ids + 1] = id end end
+        else
+            ids = q.ids("quest")
         end
-        if currentMap ~= zoneMap then
-            scan()
-            return
-        end
-        local stopAt = math.min(#ids, index + SCAN_BATCH - 1)
-        while index <= stopAt do
+        if type(ids) ~= "table" then clearPlan("Questie needs a recent QuestieDB with quest IDs."); return end
+        while index <= #ids do
+            if index % 20 == 1 then
+                local currentName, locationError, currentMap = currentZone()
+                if not currentName then clearPlan(locationError); return end
+                if currentMap ~= zoneMap then scan(); return end
+            end
             local id = ids[index]; index = index + 1
             local active = log[id] ~= nil
             local starters, startPoint, candidate, data, band
+            if not discovered or not active then
+                starters = q.plannerStarters(id, sourceCache)
+                startPoint = nearestSource(starters)
+                if not discovered and startPoint then discoveredIDs[#discoveredIDs + 1] = id end
+            end
             if active then
-                data = q.plannerQuest(id)
+                data = q.plannerQuest(id, sourceCache)
                 band = data and questLevelBand(data.level) or "unknown"
                 if data and isInLevelRange(band) then candidate = newCandidate(id, {}, log, data) end
             else
-                starters = q.plannerStarters(id)
-                startPoint = nearestSource(starters)
                 if startPoint then
-                    data = q.plannerQuest(id)
+                    data = q.plannerQuest(id, sourceCache)
                     band = data and questLevelBand(data.level) or "unknown"
                     levelStats.localCount = levelStats.localCount + 1
                     if band == "below" then levelStats.below = levelStats.below + 1
@@ -230,11 +277,13 @@ local function scan()
             if candidate and (active or candidate.status == "ready" or candidate.status == "any" or candidate.status == "all") then
                 inZone[id] = candidate
             end
+            Work.yield()
         end
-        if index <= #ids then
-            if message then message:SetText(string.format("Checking %s quest data… %d / %d", zone, math.min(index - 1, #ids), #ids)) end
-            ns.after(0.02, batch)
-            return
+        if not discovered then
+            zoneQuestIDs[zoneMap] = discoveredIDs
+            for i = #zoneOrder, 1, -1 do if zoneOrder[i] == zoneMap then table.remove(zoneOrder, i) end end
+            zoneOrder[#zoneOrder + 1] = zoneMap
+            while #zoneOrder > 2 do zoneQuestIDs[table.remove(zoneOrder, 1)] = nil end
         end
         if thisGeneration ~= generation then return end
         catalog = inZone
@@ -251,8 +300,12 @@ local function scan()
         end
         loading = false
         render(zone)
-    end
-    ns.after(0.01, batch)
+    end, function()
+        return thisGeneration == generation and loading and ns.db.enabled and ns.db.questPlanner
+            and sessionActive and not panelDismissed and panel and panel:IsShown()
+    end, function(ok)
+        if not ok and thisGeneration == generation then clearPlan("Quest data could not be read; try Refresh.") end
+    end)
 end
 
 buildGraph = function(log)
@@ -273,7 +326,7 @@ buildGraph = function(log)
                     local bestDepth, bestParent
                     for _, parentID in ipairs(anyReq) do
                         local parent = nodes[parentID]
-                        if activeOrReady[parentID] and (parent.depth or 0) < layer then
+                        if activeOrReady[parentID] and parent.canFinishHere and (parent.depth or 0) < layer then
                             local candidateDepth = (parent.depth or 0) + 1
                             if not bestDepth or candidateDepth < bestDepth then bestDepth, bestParent = candidateDepth, parentID end
                         elseif questie().questComplete(parentID) == true then
@@ -289,7 +342,7 @@ buildGraph = function(log)
                 end
                 for _, parentID in ipairs(allReq) do
                     local parent = nodes[parentID]
-                    if activeOrReady[parentID] and (parent.depth or 0) < layer then
+                    if activeOrReady[parentID] and parent.canFinishHere and (parent.depth or 0) < layer then
                         parents[#parents + 1] = parentID
                         depth = math.max(depth, (parent.depth or 0) + 1)
                     elseif questie().questComplete(parentID) ~= true then
@@ -301,6 +354,7 @@ buildGraph = function(log)
                     additions[#additions + 1] = { quest = child, id = id, depth = depth, parents = parents }
                 end
             end
+            Work.checkpoint()
         end
         if #additions == 0 then break end
         for _, a in ipairs(additions) do
@@ -321,24 +375,33 @@ local function addDep(stop, dep)
     if dep and stop and dep ~= stop then stop.deps[dep.id] = true end
 end
 
-local function newStop(kind, p)
+local function newStop(kind, p, phase)
     nextStopID = nextStopID + 1
-    return { id = nextStopID, kind = kind, point = p, quests = {}, tasks = {}, deps = {}, done = false }
+    return { id = nextStopID, kind = kind, phase = phase, point = p, quests = {}, tasks = {}, questTasks = {}, deps = {}, done = false }
 end
 
-local function findOrAddStop(stops, kind, p, threshold)
+local function addTask(stop, quest, text, destination)
+    stop.tasks[#stop.tasks + 1] = text
+    stop.quests[quest.id] = quest.name
+    stop.questTasks[quest.id] = stop.questTasks[quest.id] or {}
+    table.insert(stop.questTasks[quest.id], text)
+    stop.destination = stop.destination or destination
+end
+
+local function findOrAddStop(stops, kind, p, threshold, phase)
     for _, s in ipairs(stops) do
         -- A source ID can have spawn points on opposite sides of a zone; merge by camp distance only.
-        if s.kind == kind and distance(s.point, p) <= threshold then
+        -- A follow-up at the same giver/camp must remain after its parent's hand-in.
+        if s.kind == kind and s.phase == phase and distance(s.point, p) <= threshold then
             return s
         end
     end
-    local s = newStop(kind, p)
+    local s = newStop(kind, p, phase)
     stops[#stops + 1] = s
     return s
 end
 
-local function objectiveIsDone(entry, target)
+objectiveIsDone = function(entry, target)
     if not entry then return false end
     if entry.complete then return true end
     local objectives = ns.compat.objectives(entry)
@@ -392,9 +455,8 @@ buildRoute = function()
             local point, giver = nearestSource(data.starters or q.starterRows)
             point = point or q.starterPoint
             if point then
-                pickup = findOrAddStop(stops, "pickup", point, TAKEIN_DISTANCE)
-                pickup.tasks[#pickup.tasks + 1] = "Pick up " .. q.name .. (giver and giver.name and (" from " .. giver.name) or "")
-                pickup.quests[q.id] = q.name
+                pickup = findOrAddStop(stops, "pickup", point, TAKEIN_DISTANCE, q.depth)
+                addTask(pickup, q, "Pick up " .. q.name .. (giver and giver.name and (" from " .. giver.name) or ""), giver and giver.name)
             end
         end
         local complete = entry and entry.complete
@@ -404,19 +466,18 @@ buildRoute = function()
                 if not done then
                     local point = nearestPoint(target.points)
                     if point then
-                        local stop = findOrAddStop(stops, "objective", point, CLUSTER_DISTANCE)
-                        stop.tasks[#stop.tasks + 1] = targetSummary(target) .. (progress and (" (" .. progress .. ")") or "")
-                        stop.quests[q.id] = q.name
+                        local stop = findOrAddStop(stops, "objective", point, CLUSTER_DISTANCE, q.depth)
+                        addTask(stop, q, targetSummary(target) .. (progress and (" (" .. progress .. ")") or ""),
+                            target.name and ("the " .. target.name .. " area"))
                         objectives[#objectives + 1] = stop
                     end
                 end
             end
         end
         local turnPoint, turner = nearestSource(data.turnIns)
-        if turnPoint then
-            turnin = findOrAddStop(stops, "turnin", turnPoint, TAKEIN_DISTANCE)
-            turnin.tasks[#turnin.tasks + 1] = "Turn in " .. q.name .. (turner and turner.name and (" to " .. turner.name) or "")
-            turnin.quests[q.id] = q.name
+        if turnPoint and (complete or q.canFinishHere) then
+            turnin = findOrAddStop(stops, "turnin", turnPoint, TAKEIN_DISTANCE, q.depth)
+            addTask(turnin, q, "Turn in " .. q.name .. (turner and turner.name and (" to " .. turner.name) or ""), turner and turner.name)
         end
         questStops[q.id] = { pickup = pickup, objectives = objectives, turnin = turnin }
         for _, stop in ipairs(objectives) do addDep(stop, pickup) end
@@ -424,6 +485,7 @@ buildRoute = function()
             if #objectives > 0 then for _, stop in ipairs(objectives) do addDep(turnin, stop) end
             else addDep(turnin, pickup) end
         end
+        Work.checkpoint()
     end
 
     for _, q in ipairs(quests) do
@@ -511,6 +573,7 @@ buildRoute = function()
             local nextStop = table.remove(unvisited, bestIndex)
             total = total + (bestDistance == math.huge and 0 or bestDistance)
             at = nextStop.point
+            Work.checkpoint()
         end
         local count = 0; for _ in pairs(outing.quests) do count = count + 1 end
         return total / math.sqrt(math.max(1, count))
@@ -559,6 +622,7 @@ buildRoute = function()
         remainingSet[stop], doneIDs[stop.id] = nil, true
         route[#route + 1] = stop
         if stop.point then pos = stop.point end
+        Work.checkpoint()
     end
 
     if Path and playerPoint then
@@ -585,7 +649,7 @@ end
 
 stopIdentity = function(stop)
     local p = stop.point or {}
-    return table.concat({ stop.kind, tostring(p.map), string.format("%.4f", p.x or 0), string.format("%.4f", p.y or 0),
+    return table.concat({ stop.kind, tostring(stop.phase), tostring(p.map), string.format("%.4f", p.x or 0), string.format("%.4f", p.y or 0),
         stopLabel(stop) }, "\31")
 end
 
@@ -611,12 +675,49 @@ local function ensurePanel()
     if not (CreateFrame and UIParent) then return false end
     panel = S.window("QuestSharingPlannerPanel", PLAN_WIDTH, 380, "Quest plan", "hud")
     if not panel then return false end
-    panel.title:SetText("Quest plan — drag to move")
+    S.fill(panel, "BACKGROUND", 0.035, 0.032, 0.027, 1):SetAllPoints(panel)
+    panel.title:ClearAllPoints()
+    panel.title:SetPoint("TOP", panel, "TOP", 0, -8)
+    panel.title:SetText(S.GOLD .. "QUEST SHARING|r")
     panel.onMoved = function() panelMoved = true end
+    panel:SetScript("OnDragStart", function(self) if not guideLocked then self:StartMoving() end end)
+    panel:SetScript("OnDragStop", function(self)
+        if not guideLocked then self:StopMovingOrSizing(); panelMoved = true end
+    end)
     panel:EnableMouse(true)
-    message = U.text(panel, "", 12, 34, PLAN_WIDTH - 24)
+    local function smallButton(label, width, x, y, action, tip)
+        local b = S.button(panel, label, width, action, tip)
+        b:SetPoint("TOPLEFT", panel, "TOPLEFT", x, -y)
+        b.bg:Hide(); b.edge:Hide()
+        return b
+    end
+    smallButton("...", 20, 7, 6, function() ns.toggleSettings(true, "optional") end, "Quest Sharing settings")
+    smallButton("?", 20, 30, 6, function(self)
+        U.tip(self, "Quest guide", { "Follow the highlighted step, then use the arrows to review the next step.",
+            "Quest progress updates the guide automatically. Click a step to mark its location.",
+            "Lock keeps the guide in place. Minus shows only the current step." })
+    end, "How to use the quest guide")
+    lockButton = smallButton("Lock", 46, PLAN_WIDTH - 80, 6, function(self)
+        guideLocked = not guideLocked
+        panel:SetMovable(not guideLocked)
+        self:SetLabel(guideLocked and "Unlock" or "Lock")
+    end, "Lock or unlock the guide position")
+    local headerLine = S.fill(panel, "ARTWORK", 0.56, 0.39, 0.14, 1)
+    headerLine:SetPoint("TOPLEFT", panel, "TOPLEFT", 7, -29)
+    headerLine:SetWidth(PLAN_WIDTH - 14); headerLine:SetHeight(1)
+    previousButton = smallButton("<", 20, 8, 34, function() P.navigate(-1) end, "Previous step")
+    stepCounter = U.text(panel, "0/0", 32, 38, 40)
+    nextButton = smallButton(">", 20, 74, 34, function() P.navigate(1) end, "Next step")
+    message = U.text(panel, "", 100, 38, PLAN_WIDTH - 138)
+    message:SetWordWrap(false)
+    modeButton = smallButton("-", 22, PLAN_WIDTH - 32, 34, function(self)
+        guideExpanded = not guideExpanded
+        self:SetLabel(guideExpanded and "-" or "+")
+        if planScroll then planScroll:SetVerticalScroll(0) end
+        showPlanRows()
+    end, "Show upcoming steps or only the current step")
     planScroll = CreateFrame("ScrollFrame", nil, panel)
-    planScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -56)
+    planScroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -60)
     planScroll:SetWidth(PLAN_WIDTH - 20)
     planScroll:SetHeight(PLAN_LIST_HEIGHT)
     planScroll:EnableMouseWheel(true)
@@ -631,7 +732,9 @@ local function ensurePanel()
         self:SetVerticalScroll(math.max(0, math.min(self:GetVerticalScrollRange(), pos)))
     end)
     planRows = {}
-    S.button(panel, "Refresh", 72, function() scan() end):SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 12, 12)
+    S.button(panel, "Refresh", 72, function() scan(true) end):SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 12, 12)
+    waypointButton = S.button(panel, "Waypoint", 90, function() P.pin() end)
+    waypointButton:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -12, 12)
     followButton = S.button(panel, "Follow with SPF", 126, function() P.follow() end)
     followButton:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 94, 12)
     followButton:SetScript("OnEnter", function(self)
@@ -640,9 +743,18 @@ local function ensurePanel()
     end)
     followButton:SetScript("OnLeave", function() U.hideTip() end)
     followButton:Hide()
-    S.closeButton(panel, function() panelDismissed = true; panel:Hide() end)
+    local track = S.fill(panel, "BACKGROUND", 0.11, 0.1, 0.08, 1)
+    track:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 8, 4)
+    track:SetWidth(PLAN_WIDTH - 16); track:SetHeight(3)
+    guidePosition = S.fill(panel, "ARTWORK", 0.86, 0.64, 0.24, 1)
+    guidePosition:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 8, 4)
+    guidePosition:SetHeight(3); guidePosition:SetWidth(1)
+    S.closeButton(panel, function() panelDismissed = true; panel:Hide() end, -2, -2)
     panel:SetScript("OnHide", function()
+        Guidance.clear()
         panelDismissed = true
+        sessionActive = false
+        Work.cancel("quest-plan")
         generation = generation + 1
         loading = false
     end)
@@ -658,16 +770,35 @@ local function rowTaskText(stop)
     return table.concat(tasks, " • ")
 end
 
-local function rowDetailsText(stop)
-    local tasks = {}
-    local limit = stop.kind == "pickup" and #stop.tasks or math.min(#stop.tasks, 4)
-    for i = 1, limit do tasks[#tasks + 1] = stop.tasks[i] end
-    if #stop.tasks > limit then tasks[#tasks + 1] = string.format("+%d more tasks", #stop.tasks - limit) end
-    if stop.kind ~= "pickup" then
-        local quests = stopLabel(stop)
-        if quests ~= "" then tasks[#tasks + 1] = "Quests: " .. quests end
+local function sortedQuestIDs(stop)
+    local ids = {}
+    for id in pairs(stop.quests) do ids[#ids + 1] = id end
+    table.sort(ids)
+    return ids
+end
+
+local function rowDetailsText(stop, numbers)
+    local tasks = { stop.kind == "pickup" and "Take these quests:" or stop.kind == "turnin"
+        and "Hand in these quests:" or "Complete these quests here:" }
+    for _, id in ipairs(sortedQuestIDs(stop)) do
+        local questTasks = stop.questTasks[id] or {}
+        if stop.kind == "objective" or #questTasks == 0 then
+            tasks[#tasks + 1] = string.format("[%d] %s", numbers[id], stop.quests[id])
+            for _, task in ipairs(questTasks) do tasks[#tasks + 1] = "  " .. task end
+        else
+            for _, task in ipairs(questTasks) do tasks[#tasks + 1] = string.format("[%d] %s", numbers[id], task) end
+        end
     end
     return table.concat(tasks, "\n")
+end
+
+local function destinationName(stop)
+    local p = stop.point
+    local info = p and U.call(C_Map and C_Map.GetMapInfoAtPosition, p.map, p.x, p.y)
+    local zone = p and U.call(C_Map and C_Map.GetMapInfo, p.map)
+    if type(info) == "table" and type(info.name) == "string" and info.name ~= ""
+        and (not zone or info.name ~= zone.name) then return info.name end
+    return stop.destination or "the marked location"
 end
 
 local function showStopOnMap(index)
@@ -686,15 +817,23 @@ showPlanRows = function()
     if not planContent then return end
     if emptyText then if #route == 0 then emptyText:Show() else emptyText:Hide() end end
     for _, row in ipairs(planRows) do row:Hide() end
+    local numbers, count = {}, 0
+    for _, stop in ipairs(route) do
+        for _, id in ipairs(sortedQuestIDs(stop)) do
+            if not numbers[id] then count = count + 1; numbers[id] = count end
+        end
+    end
     local contentY = 0
-    for i, stop in ipairs(route) do
+    local lastVisible = math.min(#route, selected + (guideExpanded and 5 or 0))
+    for i = selected, lastVisible do
+        local stop = route[i]
         local row = planRows[i]
         if not row then
             row = CreateFrame("Button", nil, planContent)
             row:SetHeight(PLAN_ROW_HEIGHT - 3)
-            row.bg = S.fill(row, "BACKGROUND", 0.08, 0.1, 0.14, 0.96)
+            row.bg = S.fill(row, "BACKGROUND", 1, 1, 1, 1)
             row.bg:SetAllPoints(row)
-            row.edge = S.fill(row, "BORDER", 0.33, 0.8, 1, 0.4)
+            row.edge = S.fill(row, "BORDER", 1, 1, 1, 1)
             row.edge:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
             row.edge:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
             row.edge:SetHeight(1)
@@ -713,16 +852,23 @@ showPlanRows = function()
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", planContent, "TOPLEFT", 0, -contentY)
         row:SetWidth(PLAN_WIDTH - 20)
-        local kind = stop.kind == "pickup" and "PICK UP" or stop.kind == "turnin" and "TURN IN" or "OBJECTIVES"
+        row.stepIndex, row.current = i, i == selected
         local pointText = stop.point and string.format("%.1f, %.1f", stop.point.x * 100, stop.point.y * 100) or "location unknown"
-        row.title:SetText(string.format("%02d  TRIP %d  ·  %s  ·  %s", i, stop.outingID or 1, kind, pointText))
-        row.detail:SetText(rowDetailsText(stop))
+        row.title:SetText((row.current and S.GOLD or "|cffb6ad9d") ..
+            string.format("Step %d: Go to %s\n%s", i, destinationName(stop), pointText) .. "|r")
+        row.detail:SetText((row.current and S.WHITE or "|cffa9a69f") .. rowDetailsText(stop, numbers) .. "|r")
         local titleHeight = row.title.GetStringHeight and row.title:GetStringHeight() or 12
         local detailHeight = row.detail.GetStringHeight and row.detail:GetStringHeight() or 12
         local rowHeight = math.max(PLAN_ROW_HEIGHT - 3, titleHeight + detailHeight + 16)
         row:SetHeight(rowHeight)
         contentY = contentY + rowHeight + 3
-        row.bg:SetVertexColor(i == selected and 1.35 or 1, i == selected and 1.05 or 1, i == selected and 0.55 or 1)
+        if row.current then
+            row.bg:SetVertexColor(0.23, 0.075, 0.045, 1)
+            row.edge:SetVertexColor(0.82, 0.54, 0.18, 1)
+        else
+            row.bg:SetVertexColor(0.065, 0.06, 0.052, 1)
+            row.edge:SetVertexColor(0.18, 0.16, 0.12, 1)
+        end
         local rowIndex = i
         row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         row:SetScript("OnClick", function(_, button)
@@ -736,11 +882,30 @@ showPlanRows = function()
         row:SetEnabled(stop.point ~= nil)
         row:Show()
     end
-    planContent:SetHeight(math.max(PLAN_LIST_HEIGHT, contentY))
+    local viewport = guideExpanded and PLAN_LIST_HEIGHT or math.max(70, math.min(PLAN_LIST_HEIGHT, contentY + 3))
+    planScroll:SetHeight(viewport)
+    panel:SetHeight(60 + viewport + 40)
+    planContent:SetHeight(math.max(viewport, contentY))
+    if stepCounter then stepCounter:SetText(string.format("%d/%d", #route > 0 and selected or 0, #route)) end
+    if previousButton then previousButton:SetEnabled(#route > 0 and selected > 1) end
+    if nextButton then nextButton:SetEnabled(selected < #route) end
+    if guidePosition then guidePosition:SetWidth(math.max(1, (PLAN_WIDTH - 16) * (#route > 0 and selected / #route or 0))) end
+    if waypointButton then
+        if #route > 0 and not (Path and Path.available()) then waypointButton:Show() else waypointButton:Hide() end
+    end
+    local stop = route[selected]
+    if stop and not loading then
+        local action = stop.kind == "pickup" and "Accept quests at " or stop.kind == "turnin" and "Hand in quests at "
+            or "Complete objectives at "
+        Guidance.set(route, selected, panel, function(index) if selectStop(index) then P.pin() end end,
+            action .. destinationName(stop))
+    else Guidance.clear() end
 end
 
 render = function(zone)
     if not planScroll then return end
+    local info = plannedMap and U.call(C_Map and C_Map.GetMapInfo, plannedMap)
+    zone = zone or (info and info.name)
     if followButton then
         if Path and Path.available() and #route > 0 then followButton:Show() else followButton:Hide() end
     end
@@ -752,8 +917,7 @@ render = function(zone)
     end
     if #route == 0 then
         if message then
-            message:SetText(zone and string.format("%s • %d active • %d ready • %d later", zone, active, ready, future)
-                or "Open this panel outdoors in a zone.")
+            message:SetText(zone or "Quest guide")
         end
         if emptyText then
             local stats = lastLevelStats or {}
@@ -779,14 +943,13 @@ render = function(zone)
     end
     selected = math.min(selected, #route)
     if message then
-        message:SetText(string.format("%s • %d active • %d ready • %d later • %d stops",
-            zone or "Current zone", active, ready, future, #route))
+        message:SetText(zone or "Current zone")
     end
     showPlanRows()
 end
 
 selectStop = function(index)
-    if #route == 0 then return false end
+    if loading or #route == 0 then return false end
     local zone, reason, map = currentZone()
     if not zone then clearPlan(reason); return false end
     if map ~= plannedMap then scan(); return false end
@@ -796,7 +959,17 @@ selectStop = function(index)
     return true
 end
 
+function P.navigate(direction)
+    local index = selected + direction
+    if index < 1 or index > #route then return false end
+    if not selectStop(index) then return false end
+    if planScroll then planScroll:SetVerticalScroll(0) end
+    P.pin()
+    return true
+end
+
 function P.pin()
+    if loading then return ns.print("the quest guide is updating") end
     if not plannedMap and #route == 0 then return ns.print("there is no quest plan yet; use /qs plan") end
     local zone, reason, map = currentZone()
     if not zone then clearPlan(reason); return end
@@ -810,6 +983,7 @@ function P.pin()
 end
 
 function P.follow()
+    if loading then return ns.print("the quest guide is updating") end
     local stop = route[selected]
     if not stop or not stop.point then return ns.print("this stop has no map location") end
     local zone, reason, map = currentZone()
@@ -829,12 +1003,15 @@ end
 
 function P.refresh()
     if not ns.db.questPlanner then return ns.print("turn on Quest planner in Extra tools first") end
-    scan()
+    if not panel or not panel:IsShown() then return P.open() end
+    sessionActive = true
+    scan(true)
 end
 
 function P.open()
     if not ns.db.questPlanner then ns.setSetting("questPlanner", true); return end
     panelDismissed = false
+    sessionActive = true
     if not ensurePanel() then return ns.print("this client cannot open the quest plan panel") end
     dockPanel()
     panel:Show()
@@ -847,6 +1024,8 @@ function P.settingChanged(enabled)
         P.open()
     else
         panelDismissed = true
+        sessionActive = false
+        zoneQuestIDs, zoneOrder = {}, {}
         generation = generation + 1
         loading = false
         clearPlan("Quest planner is off.")
@@ -854,21 +1033,51 @@ function P.settingChanged(enabled)
     end
 end
 
+function P.masterChanged(enabled)
+    if enabled then return end
+    Guidance.clear()
+    sessionActive = false
+    generation = generation + 1
+    Work.cancel("quest-plan")
+    if Path then Path.cancelWalkEstimates() end
+    loading = false
+    if panel then panel:Hide() end
+end
+
 local function rebuildProgress(log, zone)
+    Guidance.clear()
     local oldIndex, oldKey = selected, route[selected] and stopIdentity(route[selected])
-    for id, quest in pairs(catalog) do quest.entry = log[id] end
-    buildRoute()
-    selected = math.max(1, math.min(oldIndex, #route))
-    if oldKey then
-        for i, stop in ipairs(route) do
-            if stopIdentity(stop) == oldKey then selected = i; break end
+    generation = generation + 1
+    local token = generation
+    if Path then Path.cancelWalkEstimates() end
+    loading = true
+    Work.start("quest-plan", function()
+        for id, quest in pairs(catalog) do quest.entry = log[id] end
+        buildRoute()
+        selected = math.max(1, math.min(oldIndex, #route))
+        if oldKey then
+            for i, stop in ipairs(route) do
+                if stopIdentity(stop) == oldKey then selected = i; break end
+            end
         end
-    end
-    render(zone)
+        loading = false
+        render(zone)
+    end, function()
+        return token == generation and ns.db.enabled and ns.db.questPlanner and sessionActive
+            and not panelDismissed and panel and panel:IsShown()
+    end, function(ok) if not ok and token == generation then clearPlan("Refresh the quest guide to try again.") end end)
 end
 
 local function scheduleRefresh(force, zoneEntry)
-    if not (ns.db and ns.db.questPlanner) then return end
+    if not (ns.db and ns.db.enabled and ns.db.questPlanner and sessionActive)
+        or panelDismissed or not (panel and panel:IsShown()) then return end
+    if zoneEntry and plannedMap then
+        local zone, reason, map = currentZone()
+        if map ~= plannedMap then
+            generation = generation + 1
+            clearPlan(zone and ("Building a new plan for " .. zone .. "…") or reason)
+        end
+    end
     refreshForce = refreshForce or force
     refreshZoneEntry = refreshZoneEntry or zoneEntry
     if refreshQueued then return end
@@ -877,7 +1086,8 @@ local function scheduleRefresh(force, zoneEntry)
         refreshQueued = false
         local mustRefresh, enteredZone = refreshForce, refreshZoneEntry
         refreshForce, refreshZoneEntry = false, false
-        if not (ns.db and ns.db.questPlanner) then return end
+        if not (ns.db and ns.db.enabled and ns.db.questPlanner and sessionActive)
+            or panelDismissed or not (panel and panel:IsShown()) then return end
 
         if enteredZone and not panelDismissed and ensurePanel() then
             dockPanel()
@@ -890,19 +1100,19 @@ local function scheduleRefresh(force, zoneEntry)
         end
         local log = ns.compat.entryMap()
         local members, structure, progress = questLogState(log)
-        if mustRefresh or map ~= plannedMap or members ~= lastLogMembers
-            or (loading and (structure ~= lastLogStructure or progress ~= lastLogProgress)) then
+        if mustRefresh or map ~= plannedMap or members ~= lastLogMembers or structure ~= lastLogStructure
+            or (loading and progress ~= lastLogProgress) then
             scan()
-        elseif structure ~= lastLogStructure or progress ~= lastLogProgress then
+        elseif progress ~= lastLogProgress then
             lastLogMembers, lastLogStructure, lastLogProgress = members, structure, progress
             rebuildProgress(log, zone)
         end
     end)
 end
 
-ns.on("PLAYER_ENTERING_WORLD", function() scheduleRefresh(true, true) end)
-ns.on("ZONE_CHANGED_NEW_AREA", function() scheduleRefresh(true, true) end)
-ns.on("ZONE_CHANGED", function() scheduleRefresh(true, true) end)
+ns.on("PLAYER_ENTERING_WORLD", function() scheduleRefresh(false, true) end)
+ns.on("ZONE_CHANGED_NEW_AREA", function() scheduleRefresh(false, true) end)
+ns.on("ZONE_CHANGED", function() scheduleRefresh(false, true) end)
 ns.on("QUEST_ACCEPTED", function() scheduleRefresh(true, false) end)
 ns.on("QUEST_REMOVED", function() scheduleRefresh(true, false) end)
 ns.on("QUEST_TURNED_IN", function() scheduleRefresh(true, false) end)
@@ -914,7 +1124,7 @@ ns.on("UNIT_QUEST_LOG_CHANGED", function() scheduleRefresh(false, false) end)
 function P.command(arg)
     arg = string.lower(arg or "")
     if arg == "off" then ns.setSetting("questPlanner", false)
-    elseif arg == "hide" or arg == "close" then panelDismissed = true; if panel then panel:Hide() end
+    elseif arg == "hide" or arg == "close" then Guidance.clear(); panelDismissed = true; if panel then panel:Hide() end
     elseif arg == "on" then ns.setSetting("questPlanner", true); ns.print("quest planner is on")
     elseif arg == "next" then if selectStop(selected + 1) then P.pin() end
     elseif arg == "follow" then P.follow()

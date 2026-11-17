@@ -385,11 +385,29 @@ end
 
 -- Quest planner reads a complete, uncapped projection. Q.targets() is intentionally a short chat/display summary;
 -- using it for optimization would silently lose alternate mobs and item sources.
-local function appendSources(out, kind, ids)
+local function plannerField(kind, id, key, cache)
+    local value = field(kind, id, key)
+    if cache and ns.dataWork then ns.dataWork.checkpoint() end
+    return value
+end
+
+local function appendSources(out, kind, ids, cache)
     if type(ids) ~= "table" then return end
     for _, id in ipairs(ids) do
         if type(id) == "number" then
-            out[#out + 1] = { kind = kind, id = id, name = field(kind, id, "name"), spawns = spawnList(kind, id) }
+            local key = kind .. ":" .. tostring(id)
+            local source = cache and cache[key]
+            if not source then
+                source = { kind = kind, id = id, name = plannerField(kind, id, "name", cache), spawns = spawnList(kind, id) }
+                if cache then
+                    cache._keys = cache._keys or {}
+                    cache._slot = (cache._slot or 0) % 256 + 1
+                    local old = cache._keys[cache._slot]
+                    if old then cache[old] = nil end
+                    cache._keys[cache._slot], cache[key] = key, source
+                end
+            end
+            out[#out + 1] = source
         end
     end
 end
@@ -402,52 +420,52 @@ local function objectiveIds(rows, fieldIndex)
     return ids
 end
 
-local function itemSources(itemID)
+local function itemSources(itemID, cache)
     local out = {}
-    appendSources(out, "npc", field("item", itemID, "npcDrops"))
-    appendSources(out, "object", field("item", itemID, "objectDrops"))
+    appendSources(out, "npc", plannerField("item", itemID, "npcDrops", cache), cache)
+    appendSources(out, "object", plannerField("item", itemID, "objectDrops", cache), cache)
     return out
 end
 
-local function allStarters(questID)
-    local out, by = {}, field("quest", questID, "startedBy")
+local function allStarters(questID, cache)
+    local out, by = {}, plannerField("quest", questID, "startedBy", cache)
     if type(by) ~= "table" then return out end
-    appendSources(out, "npc", by[1])
-    appendSources(out, "object", by[2])
+    appendSources(out, "npc", by[1], cache)
+    appendSources(out, "object", by[2], cache)
     for _, itemID in ipairs(type(by[3]) == "table" and by[3] or {}) do
-        for _, source in ipairs(itemSources(itemID)) do
-            source.startsFrom = { id = itemID, name = field("item", itemID, "name") }
-            out[#out + 1] = source
+        for _, source in ipairs(itemSources(itemID, cache)) do
+            out[#out + 1] = { kind = source.kind, id = source.id, name = source.name, spawns = source.spawns,
+                startsFrom = { id = itemID, name = plannerField("item", itemID, "name", cache) } }
         end
     end
     return out
 end
-function Q.plannerStarters(questID) return allStarters(questID) end
+function Q.plannerStarters(questID, cache) return allStarters(questID, cache) end
 
-local function plannerTargets(questID)
-    local out, objs = {}, field("quest", questID, "objectives")
+local function plannerTargets(questID, cache)
+    local out, objs = {}, plannerField("quest", questID, "objectives", cache)
     if type(objs) == "table" then
         for _, id in ipairs(objectiveIds(objs[1], 1)) do
-            local sources = {}; appendSources(sources, "npc", { id })
-            out[#out + 1] = { kind = "kill", name = field("npc", id, "name"), sources = sources }
+            local sources = {}; appendSources(sources, "npc", { id }, cache)
+            out[#out + 1] = { kind = "kill", name = plannerField("npc", id, "name", cache), sources = sources }
         end
         for _, row in ipairs(type(objs[5]) == "table" and objs[5] or {}) do
             local ids = type(row) == "table" and type(row[1]) == "table" and row[1] or nil
-            local sources = {}; appendSources(sources, "npc", ids)
+            local sources = {}; appendSources(sources, "npc", ids, cache)
             if #sources > 0 then
                 local names = {}; for _, s in ipairs(sources) do if s.name then names[#names + 1] = s.name end end
                 out[#out + 1] = { kind = "kill", name = table.concat(names, " or "), sources = sources }
             end
         end
         for _, id in ipairs(objectiveIds(objs[2], 1)) do
-            local sources = {}; appendSources(sources, "object", { id })
-            out[#out + 1] = { kind = "object", name = field("object", id, "name"), sources = sources }
+            local sources = {}; appendSources(sources, "object", { id }, cache)
+            out[#out + 1] = { kind = "object", name = plannerField("object", id, "name", cache), sources = sources }
         end
         for _, itemID in ipairs(objectiveIds(objs[3], 1)) do
-            out[#out + 1] = { kind = "loot", name = field("item", itemID, "name"), itemID = itemID, sources = itemSources(itemID) }
+            out[#out + 1] = { kind = "loot", name = plannerField("item", itemID, "name", cache), itemID = itemID, sources = itemSources(itemID, cache) }
         end
     end
-    local trigger = field("quest", questID, "triggerEnd")
+    local trigger = plannerField("quest", questID, "triggerEnd", cache)
     if type(trigger) == "table" and type(trigger[2]) == "table" then
         local points = {}
         for area, locations in pairs(trigger[2]) do
@@ -468,22 +486,22 @@ local function plannerTargets(questID)
     return out
 end
 
-function Q.plannerQuest(questID)
-    local name = field("quest", questID, "name")
+function Q.plannerQuest(questID, cache)
+    local name = plannerField("quest", questID, "name", cache)
     if not name then return nil end
-    local single, group = field("quest", questID, "preQuestSingle"), field("quest", questID, "preQuestGroup")
-    local finish = field("quest", questID, "finishedBy")
+    local single, group = plannerField("quest", questID, "preQuestSingle", cache), plannerField("quest", questID, "preQuestGroup", cache)
+    local finish = plannerField("quest", questID, "finishedBy", cache)
     local turnIns = {}
     if type(finish) == "table" then
-        appendSources(turnIns, "npc", finish[1])
-        appendSources(turnIns, "object", finish[2])
+        appendSources(turnIns, "npc", finish[1], cache)
+        appendSources(turnIns, "object", finish[2], cache)
     end
     return {
-        id = questID, name = name, level = tonumber(field("quest", questID, "questLevel") or 0) or 0,
-        requiredLevel = tonumber(field("quest", questID, "requiredLevel") or 0) or 0,
+        id = questID, name = name, level = tonumber(plannerField("quest", questID, "questLevel", cache) or 0) or 0,
+        requiredLevel = tonumber(plannerField("quest", questID, "requiredLevel", cache) or 0) or 0,
         beforeAny = type(single) == "table" and single or {},
         beforeAll = type(group) == "table" and group or {},
-        starters = allStarters(questID), targets = plannerTargets(questID), turnIns = turnIns,
+        starters = allStarters(questID, cache), targets = plannerTargets(questID, cache), turnIns = turnIns,
     }
 end
 

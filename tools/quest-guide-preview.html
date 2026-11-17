@@ -1,0 +1,284 @@
+<div id="qs-guide-emulation" class="viz-dotted-background">
+  <div class="qs-example-label">WESTFALL <span>Example guide · illustrative positions and distances</span></div>
+  <div class="qs-stage">
+    <section class="qs-route-view" aria-label="Quest stop position diagram">
+      <div class="qs-route-heading">QUEST ROUTE <span>Position diagram · zone coordinates</span></div>
+      <div class="qs-route-plot">
+        <svg class="qs-route-lines" role="img" aria-label="Straight connections between the ordered quest stops"></svg>
+        <div class="qs-route-marks"></div>
+        <div class="qs-player-mark" aria-label="Example player position"><span>You</span></div>
+      </div>
+      <div class="qs-route-caption">Numbered stops · direct connections</div>
+    </section>
+    <div class="qs-guide-stack">
+    <div class="qs-direction" aria-label="Selected step direction">
+      <div class="qs-direction-icon"><i data-lucide="arrow-up" aria-hidden="true"></i><span aria-hidden="true">↑</span></div>
+      <div class="qs-direction-label"></div>
+      <div class="qs-direction-distance"></div>
+    </div>
+    <section class="qs-window" aria-label="Quest Sharing guide emulation">
+      <header class="qs-titlebar">
+        <div class="qs-tools">
+          <button type="button" class="qs-icon cursor-interaction" aria-label="Guide options" data-tooltip="Guide options" data-action="options">⚙</button>
+          <button type="button" class="qs-icon cursor-interaction" aria-label="Guide help" data-tooltip="Guide help" data-action="help">?</button>
+        </div>
+        <div class="qs-brand">QUEST <span>SHARING</span><b></b></div>
+        <div class="qs-tools">
+          <button type="button" class="qs-icon cursor-interaction" aria-label="Lock guide" aria-pressed="false" data-tooltip="Lock guide position" data-action="lock"><i data-lucide="lock-open" aria-hidden="true"></i><span class="qs-fallback">◇</span></button>
+          <button type="button" class="qs-icon cursor-interaction" aria-label="Close guide" data-tooltip="Close guide" data-action="close">×</button>
+        </div>
+      </header>
+      <nav class="qs-navigation" aria-label="Guide step navigation">
+        <button type="button" class="qs-icon cursor-interaction" aria-label="Previous step" data-action="previous">‹</button>
+        <output class="qs-step-count" aria-label="Current step">1/8</output>
+        <button type="button" class="qs-icon cursor-interaction" aria-label="Next step" data-action="next">›</button>
+        <span class="qs-zone">Westfall</span>
+        <button type="button" class="qs-mode cursor-interaction" aria-label="Collapse upcoming steps" aria-expanded="true" data-tooltip="Current step / upcoming steps" data-action="mode">−</button>
+      </nav>
+      <div class="qs-step-list" aria-label="Quest route steps"></div>
+      <footer class="qs-footer">
+        <button type="button" class="qs-text-button cursor-interaction" data-action="refresh">Refresh</button>
+        <span class="qs-footer-label">THIS ZONE ONLY</span>
+        <button type="button" class="qs-text-button cursor-interaction" data-action="waypoint">Waypoint</button>
+      </footer>
+      <div class="qs-track" role="progressbar" aria-label="Step position" aria-valuemin="1" aria-valuemax="8" aria-valuenow="1"><span></span></div>
+      <div class="qs-popover" hidden role="dialog" aria-label="Guide options">
+        <button type="button" class="qs-popover-close cursor-interaction" aria-label="Close guide options" data-action="dismiss">×</button>
+        <div class="qs-popover-content"></div>
+      </div>
+    </section>
+    <button type="button" class="qs-reopen cursor-interaction" data-action="reopen" hidden>Open quest guide</button>
+    </div>
+  </div>
+  <output class="qs-status" aria-live="polite"></output>
+</div>
+<style>
+  #qs-guide-emulation{font-family:Arial,Helvetica,sans-serif;color:#ece7dd;width:100%;background-color:transparent;--qs-gold:#e5b664;--qs-outline:#65503a;--qs-red:#491d17;--qs-window:#11110f;--qs-text:#ece7dd}
+  #qs-guide-emulation *{box-sizing:border-box}
+  #qs-guide-emulation [hidden]{display:none!important}
+  #qs-guide-emulation button{font:inherit}
+  #qs-guide-emulation .qs-example-label{font-size:11px;letter-spacing:1.3px;color:#a18d6d;padding:14px 16px 8px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  #qs-guide-emulation .qs-example-label span{letter-spacing:0;color:#908b82}
+  #qs-guide-emulation .qs-stage{padding:18px 8px 24px;position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,320px);gap:20px;align-items:start;max-width:736px;margin:auto}
+  #qs-guide-emulation .qs-guide-stack{min-width:0;display:flex;flex-direction:column;align-items:center;gap:7px}
+  #qs-guide-emulation .qs-direction{text-align:center;width:100%;max-width:300px;padding:0 0 7px;color:#f0eadb}
+  #qs-guide-emulation .qs-direction-icon{height:45px;color:#85ee61;font-size:42px;line-height:1;display:grid;place-items:center;filter:drop-shadow(0 2px 2px #0009)}
+  #qs-guide-emulation .qs-direction-icon svg{width:40px;height:40px;stroke-width:3}
+  #qs-guide-emulation .qs-direction-icon:has(svg) span{display:none}
+  #qs-guide-emulation .qs-direction-label{padding:5px 8px 3px;background:#181711;line-height:1.3;font-size:13px}
+  #qs-guide-emulation .qs-direction-distance{padding:0 8px 6px;background:#181711;color:#e5b664;font-size:12px;font-variant-numeric:tabular-nums}
+  #qs-guide-emulation .qs-route-view{margin-top:83px;min-width:0;color:#d7c9ae;background:#181711;border:1px solid #65503a}
+  #qs-guide-emulation .qs-route-heading{padding:10px;font-size:12px;letter-spacing:1px;color:#e5b664}
+  #qs-guide-emulation .qs-route-heading span{display:block;letter-spacing:0;font-size:11px;color:#b1a58d;margin-top:4px}
+  #qs-guide-emulation .qs-route-plot{height:290px;position:relative;margin:8px 12px 8px 24px;background:repeating-linear-gradient(to right,transparent 0,transparent calc(20% - 1px),#c6ab7430 calc(20% - 1px),#c6ab7430 20%),repeating-linear-gradient(to bottom,transparent 0,transparent calc(20% - 1px),#c6ab7430 calc(20% - 1px),#c6ab7430 20%);border-left:1px solid #a58e5a55;border-top:1px solid #a58e5a55}
+  #qs-guide-emulation .qs-route-lines,#qs-guide-emulation .qs-route-marks{position:absolute;inset:0;width:100%;height:100%}
+  #qs-guide-emulation .qs-route-lines{overflow:visible;pointer-events:none}
+  #qs-guide-emulation .qs-route-stop{position:absolute;transform:translate(-50%,-50%);background:#15313d;color:#e8e3d6;border:1px solid #7296a1;min-width:26px;height:25px;padding:0 5px;font-size:12px;line-height:23px;white-space:nowrap;z-index:1}
+  #qs-guide-emulation .qs-route-stop[aria-current="step"]{background:#493008;border:2px solid #edc377;color:#ffe4a7;line-height:21px;z-index:2}
+  #qs-guide-emulation .qs-player-mark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:11px;color:#83d9f1;background:#83d9f1;border:1px solid #74bed5;border-radius:100%;width:8px;height:8px;z-index:3;pointer-events:none}
+  #qs-guide-emulation .qs-player-mark span{position:absolute;top:13px;left:-6px;background:#181711;padding:0 2px}
+  #qs-guide-emulation .qs-route-caption{font-size:11px;padding:8px 10px 10px;color:#baad92}
+  #qs-guide-emulation .qs-axis-label{font-size:11px;fill:#ac9e83}
+  #qs-guide-emulation .qs-window{width:320px;max-width:100%;background:#11110f;border:1px solid #65503a;box-shadow:0 5px 22px #0008;font-size:12px;position:relative;flex-shrink:0}
+  #qs-guide-emulation .qs-titlebar{height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 5px;background:linear-gradient(#262522,#151513);border-bottom:1px solid #6c5030;user-select:none;touch-action:none}
+  #qs-guide-emulation .qs-titlebar:not(.qs-locked){cursor:move}
+  #qs-guide-emulation .qs-tools{display:flex;align-items:center;gap:1px;z-index:1}
+  #qs-guide-emulation .qs-brand{font-size:14px;letter-spacing:0.6px;font-weight:700;color:#efeadf;position:relative;white-space:nowrap}
+  #qs-guide-emulation .qs-brand span{color:#e5b664}
+  #qs-guide-emulation .qs-brand b{height:2px;background:#d69b45;position:absolute;bottom:-5px;left:0;right:0}
+  #qs-guide-emulation .qs-icon{display:grid;place-items:center;background:none;border:0;color:#d7d5d0;width:23px;height:24px;padding:0;font-size:18px;border-radius:2px}
+  #qs-guide-emulation .qs-icon svg{width:13px;height:13px;stroke-width:2}
+  #qs-guide-emulation .qs-icon:has(svg) .qs-fallback{display:none}
+  #qs-guide-emulation .qs-icon:hover{color:#f0c67f;background:#ffffff0b}
+  #qs-guide-emulation .qs-icon:disabled{color:#625e55}
+  #qs-guide-emulation .qs-navigation{display:flex;align-items:center;height:27px;padding:0 6px;background:#1c1c18;border-bottom:1px solid #38352e;gap:1px}
+  #qs-guide-emulation .qs-step-count{font-variant-numeric:tabular-nums;color:#e2d4b9;min-width:34px;text-align:center;font-size:11px}
+  #qs-guide-emulation .qs-zone{padding-left:8px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#d6d0c3}
+  #qs-guide-emulation .qs-mode{background:#c78e3b;border:1px solid #e8bd72;color:#18150f;border-radius:1px;width:19px;height:18px;display:grid;place-items:center;font-size:15px;padding:0}
+  #qs-guide-emulation .qs-step-list{height:280px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#62513a #161612;padding:0 6px;background:#141411}
+  #qs-guide-emulation .qs-window.qs-mini .qs-step-list{height:auto;max-height:280px;min-height:70px}
+  #qs-guide-emulation .qs-step{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #383126;background:#1b1a16;color:#aaa69d;padding:7px 7px 8px;margin:0 0 3px;font-size:12px;line-height:1.4}
+  #qs-guide-emulation .qs-step.qs-current{background:#3b130b;color:#ece7dd;border-bottom-color:#bd8138}
+  #qs-guide-emulation .qs-step:hover{background:#25231c}
+  #qs-guide-emulation .qs-step.qs-current:hover{background:#46180f}
+  #qs-guide-emulation .qs-step-title{display:block;color:#b6ad9d;font-size:12px;font-weight:500}
+  #qs-guide-emulation .qs-current .qs-step-title{color:#e5b664}
+  #qs-guide-emulation .qs-coordinates{display:block;font-variant-numeric:tabular-nums;font-size:11px;color:#928777;margin:1px 0 5px 15px}
+  #qs-guide-emulation .qs-current .qs-coordinates{color:#d9c39a}
+  #qs-guide-emulation .qs-lines{display:block}
+  #qs-guide-emulation .qs-line{display:block}
+  #qs-guide-emulation .qs-line.qs-instruction{font-size:11px;color:#a7a091;margin-bottom:3px}
+  #qs-guide-emulation .qs-current .qs-line.qs-instruction{color:#d1b68b}
+  #qs-guide-emulation .qs-line.qs-quest{padding-left:13px;position:relative}
+  #qs-guide-emulation .qs-line.qs-quest::before{content:'!';position:absolute;left:1px;color:#978873}
+  #qs-guide-emulation .qs-current .qs-line.qs-quest{color:#f2e4c9}
+  #qs-guide-emulation .qs-current .qs-line.qs-quest::before{color:#e7b450}
+  #qs-guide-emulation .qs-line.qs-task{padding-left:15px;color:inherit}
+  #qs-guide-emulation .qs-footer{display:flex;justify-content:space-between;align-items:center;padding:7px 8px 9px;background:#161512;gap:5px}
+  #qs-guide-emulation .qs-footer-label{font-size:11px;color:#a39881;letter-spacing:0.4px;white-space:nowrap}
+  #qs-guide-emulation .qs-text-button{font-size:11px;background:#25221a;border:1px solid #4c402b;border-radius:2px;color:#dcc69c;padding:3px 7px}
+  #qs-guide-emulation .qs-text-button:hover{background:#342b1d;color:#f2d39c}
+  #qs-guide-emulation .qs-track{height:3px;margin:0 7px 5px;background:#2d291f}
+  #qs-guide-emulation .qs-track span{display:block;height:100%;width:12.5%;background:#d8a745}
+  #qs-guide-emulation .qs-status{display:block;min-height:28px;padding:0 16px 10px;font-size:12px;color:#9e927c;text-align:center}
+  #qs-guide-emulation .qs-popover{position:absolute;top:32px;left:7px;right:7px;background:#222017;border:1px solid #8a6c3c;padding:14px;color:#e0d2b8;font-size:12px;line-height:1.5;box-shadow:0 4px 16px #000b;z-index:5}
+  #qs-guide-emulation .qs-popover-close{position:absolute;top:3px;right:4px;background:none;border:0;color:#d8c09b;font-size:18px}
+  #qs-guide-emulation .qs-popover-content{padding-right:10px}
+  #qs-guide-emulation .qs-popover-content label{display:flex;gap:7px;align-items:center;margin:4px 0}
+  #qs-guide-emulation .qs-reopen{background:#1a1813;border:1px solid #8d703c;border-radius:2px;padding:9px 14px;color:#e4c38a;font-size:13px}
+  @media(max-width:620px){#qs-guide-emulation .qs-stage{grid-template-columns:minmax(0,1fr);justify-items:center}#qs-guide-emulation .qs-guide-stack{grid-row:1;width:100%}#qs-guide-emulation .qs-route-view{grid-row:2;margin-top:0;width:100%;max-width:400px}}
+  @media(max-width:360px){#qs-guide-emulation .qs-stage{padding-left:5px;padding-right:5px}#qs-guide-emulation .qs-brand{font-size:12px}#qs-guide-emulation .qs-footer-label{letter-spacing:0}}
+  @media(pointer:coarse){#qs-guide-emulation .qs-icon{min-height:36px;width:29px}#qs-guide-emulation .qs-titlebar{height:42px}#qs-guide-emulation .qs-navigation{height:40px}#qs-guide-emulation .qs-mode{height:30px;width:26px}#qs-guide-emulation .qs-text-button{padding:8px}#qs-guide-emulation .qs-popover{top:43px}}
+</style>
+<script>
+(() => {
+  const root = document.getElementById('qs-guide-emulation');
+  const data = __QUEST_GUIDE_DATA__;
+  const windowEl = root.querySelector('.qs-window');
+  const list = root.querySelector('.qs-step-list');
+  const counter = root.querySelector('.qs-step-count');
+  const status = root.querySelector('.qs-status');
+  const popover = root.querySelector('.qs-popover');
+  const content = root.querySelector('.qs-popover-content');
+  const state = {index:0, expanded:true, locked:false, closed:false, x:0, y:0};
+  const button = name => root.querySelector('[data-action="'+name+'"]');
+  function apply(saved) {
+    const value = saved?.privateContent?.guide;
+    if (!value) return;
+    if (Number.isInteger(value.index)) state.index = Math.max(0, Math.min(data.steps.length-1,value.index));
+    for (const key of ['expanded','locked','closed']) if (typeof value[key]==='boolean') state[key]=value[key];
+    for (const key of ['x','y']) if (Number.isFinite(value[key])) state[key]=Math.max(-60,Math.min(60,value[key]));
+  }
+  function save() {
+    if (!window.openai?.setWidgetState) return;
+    window.openai.setWidgetState({modelContent:{zone:data.zone,step:state.index+1,guideMode:state.expanded?'expanded':'mini'},privateContent:{guide:{...state}}}).catch(()=>{});
+  }
+  function renderPositions() {
+    const view=root.querySelector('.qs-route-view');view.hidden=state.closed;
+    const plot=root.querySelector('.qs-route-plot');
+    const svg=root.querySelector('.qs-route-lines');
+    const marks=root.querySelector('.qs-route-marks');
+    const width=plot.clientWidth||300,height=plot.clientHeight||290;
+    svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.replaceChildren();marks.replaceChildren();
+    const svgNS='http://www.w3.org/2000/svg';
+    for(let i=1;i<data.steps.length;i++) {
+      const a=data.steps[i-1].point,b=data.steps[i].point;
+      const line=document.createElementNS(svgNS,'line');
+      line.setAttribute('x1',a.x*width);line.setAttribute('y1',a.y*height);
+      line.setAttribute('x2',b.x*width);line.setAttribute('y2',b.y*height);
+      line.setAttribute('stroke',i===state.index?'#e5b664':'#938c76');
+      line.setAttribute('stroke-width',i===state.index?'2':'1');svg.append(line);
+    }
+    [20,40,60,80,100].forEach(value=>{
+      const x=document.createElementNS(svgNS,'text');x.setAttribute('x',width*value/100);x.setAttribute('y',-7);x.setAttribute('text-anchor','middle');x.setAttribute('class','qs-axis-label');x.textContent=value+'%';svg.append(x);
+      const y=document.createElementNS(svgNS,'text');y.setAttribute('x',-5);y.setAttribute('y',height*value/100+3);y.setAttribute('text-anchor','end');y.setAttribute('class','qs-axis-label');y.textContent=value;svg.append(y);
+    });
+    const groups=[];
+    data.steps.forEach(step=>{
+      let group=groups.find(g=>Math.abs(g.point.x-step.point.x)<0.0001&&Math.abs(g.point.y-step.point.y)<0.0001);
+      if(!group){group={point:step.point,steps:[]};groups.push(group);}group.steps.push(step);
+    });
+    groups.forEach(group=>{
+      const node=document.createElement('button');node.type='button';node.className='qs-route-stop cursor-interaction';
+      node.textContent=group.steps.map(s=>s.step).join('/');
+      node.style.left=group.point.x*100+'%';node.style.top=group.point.y*100+'%';
+      node.setAttribute('aria-label','Select route stop '+group.steps.map(s=>s.step).join(', '));
+      node.setAttribute('aria-current',group.steps.some(s=>s.step===state.index+1)?'step':'false');
+      node.addEventListener('click',()=>{const at=group.steps.findIndex(s=>s.step===state.index+1);state.index=group.steps[(at+1)%group.steps.length].step-1;render();pin();save();});
+      marks.append(node);
+    });
+  }
+  function render() {
+    const current = data.steps[state.index];
+    root.querySelector('.qs-direction').hidden=state.closed;
+    root.querySelector('.qs-direction-label').textContent=current.guidance.title;
+    root.querySelector('.qs-direction-distance').textContent=current.guidance.distance;
+    root.querySelector('.qs-direction-icon').style.transform='rotate('+(-current.guidance.angle)+'rad)';
+    list.replaceChildren();
+    data.steps.slice(state.index, state.index+(state.expanded?6:1)).forEach((step, offset)=>{
+      const row = document.createElement('button');
+      row.type='button'; row.className='qs-step cursor-interaction'+(offset===0?' qs-current':'');
+      row.setAttribute('aria-current',offset===0?'step':'false');
+      row.dataset.step=String(step.step);
+      const title=document.createElement('span');title.className='qs-step-title';title.textContent='Step '+step.step+': '+step.heading;
+      const coordinates=document.createElement('span');coordinates.className='qs-coordinates';coordinates.textContent=step.coordinates;
+      const lines=document.createElement('span');lines.className='qs-lines';
+      step.lines.forEach((line,i)=>{
+        const text=document.createElement('span');
+        text.className='qs-line '+(i===0?'qs-instruction':line.startsWith('[')?'qs-quest':'qs-task');
+        text.textContent=line.trim(); lines.append(text);
+      });
+      row.append(title,coordinates,lines);
+      row.addEventListener('click',()=>{state.index=step.step-1;render();pin();save();});
+      list.append(row);
+    });
+    counter.textContent=(state.index+1)+'/'+data.steps.length;
+    button('previous').disabled=state.index===0;
+    button('next').disabled=state.index===data.steps.length-1;
+    button('mode').textContent=state.expanded?'−':'+';
+    button('mode').setAttribute('aria-expanded',String(state.expanded));
+    button('mode').setAttribute('aria-label',state.expanded?'Collapse upcoming steps':'Expand upcoming steps');
+    button('lock').setAttribute('aria-pressed',String(state.locked));
+    button('lock').setAttribute('aria-label',state.locked?'Unlock guide':'Lock guide');
+    button('lock').querySelector('i,svg')?.setAttribute('data-lucide',state.locked?'lock':'lock-open');
+    button('lock').querySelector('.qs-fallback').textContent=state.locked?'◆':'◇';
+    root.querySelector('.qs-titlebar').classList.toggle('qs-locked',state.locked);
+    root.querySelector('.qs-track').setAttribute('aria-valuenow',String(state.index+1));
+    root.querySelector('.qs-track span').style.width=((state.index+1)/data.steps.length*100)+'%';
+    windowEl.classList.toggle('qs-mini',!state.expanded);
+    windowEl.hidden=state.closed;button('reopen').hidden=!state.closed;
+    windowEl.style.transform='translate('+state.x+'px,'+state.y+'px)';
+    list.scrollTop=0;
+    renderPositions();
+    if (globalThis.lucide) lucide.createIcons({attrs:{width:13,height:13}});
+  }
+  function pin() {
+    const current=data.steps[state.index];
+    status.textContent='Waypoint preview · '+current.heading.replace(/^Go to /,'')+' · '+current.coordinates;
+  }
+  function move(delta) {
+    state.index=Math.max(0,Math.min(data.steps.length-1,state.index+delta));
+    render();pin();save();
+  }
+  button('previous').addEventListener('click',()=>move(-1));
+  button('next').addEventListener('click',()=>move(1));
+  button('mode').addEventListener('click',()=>{state.expanded=!state.expanded;render();save();});
+  button('lock').addEventListener('click',()=>{state.locked=!state.locked;render();save();});
+  button('close').addEventListener('click',()=>{state.closed=true;popover.hidden=true;render();save();});
+  button('reopen').addEventListener('click',()=>{state.closed=false;render();save();});
+  button('waypoint').addEventListener('click',pin);
+  button('refresh').addEventListener('click',()=>{render();status.textContent='Westfall guide refreshed';});
+  button('dismiss').addEventListener('click',()=>{popover.hidden=true;});
+  button('help').addEventListener('click',()=>{
+    popover.setAttribute('aria-label','Guide help');
+    content.textContent='Follow the highlighted step. Use the arrows to review the next or previous step. Click a step or Waypoint to mark its destination. Minus shows only the current step; Lock keeps the guide in place.';
+    popover.hidden=false;
+  });
+  button('options').addEventListener('click',()=>{
+    popover.setAttribute('aria-label','Guide options');content.replaceChildren();
+    [['expanded','Show upcoming steps'],['locked','Lock guide position']].forEach(([key,label])=>{
+      const field=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.checked=state[key];
+      input.addEventListener('change',()=>{state[key]=input.checked;render();save();});field.append(input,document.createTextNode(label));content.append(field);
+    });popover.hidden=false;
+  });
+  let drag=null;
+  const bar=root.querySelector('.qs-titlebar');
+  bar.addEventListener('pointerdown',event=>{
+    if(state.locked||event.target.closest('button'))return;
+    drag={x:event.clientX,y:event.clientY,ox:state.x,oy:state.y};bar.setPointerCapture(event.pointerId);
+  });
+  bar.addEventListener('pointermove',event=>{
+    if(!drag)return;
+    const room=Math.max(0,Math.min(50,(root.querySelector('.qs-stage').clientWidth-windowEl.offsetWidth)/2-5));
+    state.x=Math.max(-room,Math.min(room,drag.ox+event.clientX-drag.x));
+    state.y=Math.max(0,Math.min(20,drag.oy+event.clientY-drag.y));
+    windowEl.style.transform='translate('+state.x+'px,'+state.y+'px)';
+    root.querySelector('.qs-direction').style.transform=windowEl.style.transform;
+  });
+  bar.addEventListener('pointerup',()=>{if(drag){drag=null;save();}});
+  root.addEventListener('keydown',event=>{if(event.key==='Escape')popover.hidden=true;});
+  apply(window.openai?.widgetState);render();
+  if(globalThis.ResizeObserver)new ResizeObserver(renderPositions).observe(root.querySelector('.qs-route-plot'));
+  window.addEventListener('openai:set_globals',event=>{apply(event.detail?.globals?.widgetState);render();});
+})();
+</script>

@@ -2,7 +2,7 @@
 
 A World of Warcraft addon for playing quests together.
 
-[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.18)
+[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.19)
 
 ## Your first party, in four steps
 1. **Install it** (see [Install](#install)) and log in. A short welcome in chat tells you it is ready. Everything is
@@ -422,11 +422,19 @@ party member running Quest Sharing finishes one you share. Never during combat.
 Open `/qs settings` > **Map & search** for item sources, map search, and zone levels; use **Accept & turn in** for quest automation and **Extra tools** for the remaining tools.
 Extra tools are opt-in: enable their switches or open a tool explicitly when you need it.
 
-**Quest planner.** Open **Extra tools > Plan my quests** or type `/qs plan`. It is off by default. When enabled, it opens a route panel on login and rebuilds the plan when you enter a zone or your quest log changes. Use it outdoors in a zone: it will not scan in towns, cities, dungeons, or continent maps, and it clears or rebuilds the plan if you enter a town or change zones. Questie and a recent QuestieDB are needed for its quest catalogue, prerequisites and locations.
+**Leftover quest items.** Open **Extra tools > Review quest items left in my bags** or type `/qs cleanup`. Questie is required. The tool checks carried bags against every quest in your log, including completed quests awaiting hand-in and quests in other zones. It keeps known active objective/source/special items and items that start quests; unknown and locked items are skipped. Review each possible leftover, then confirm **Delete stack** to permanently remove that whole stack. These are candidates, and may still have a use in a future quest. Each confirmation rechecks current quests and the exact bag slot/item/count before deletion. Bag or quest changes cancel the review; click **Refresh bags**. Cleanup waits during combat, never scans the bank, and runs only when opened/refreshed or after a confirmed deletion. If the client refuses deletion, it returns the picked-up item and explains how to delete it manually.
 
-The planner uses Questie's quest-ID catalogue to find quests with start points in your current zone, then plans from those local quests and your current quest log. QuestieDB does not expose a zone-only ID list through this addon, so it checks the catalogue in small batches; the plan itself stays in your current zone. It uses Questie's eligibility check when available and only includes quests whose difficulty is **green or yellow** for your current level. When you arrive with no active quests, it still lists available pickups by giver, with each quest on its own line. It can also look ahead by up to four prerequisite layers when Questie marks a quest as blocked only by known prerequisites and those earlier quests are available or can be planned here. It respects both prerequisite rules: **any one** quest in a single-prerequisite list is enough, while **every** quest in a group-prerequisite list is required. A quest with unknown eligibility, level color or location is not guessed into the plan.
+**Quest planner.** Open **Extra tools > Plan my quests** or type `/qs plan`. It is off by default. Open it when you need it; saving the enabled switch does not open it or scan the database on login. While the guide is visible, it updates when you enter a different zone or your quest log changes. Closing it stops database work until you open it again. Use it outdoors in a zone: it will not scan in towns, cities, dungeons, or continent maps, and it clears or rebuilds the plan if you enter a town or change zones. Questie and a recent QuestieDB are needed for its quest catalogue, prerequisites and locations.
 
-Each route is a sequence of useful stops:
+The planner uses Questie's quest-ID catalogue to find quests with start points in your current zone, then plans from locally completable pickups and local actions in your current quest log. It verifies that each location belongs to the zone or one of its submaps; a rectangle from an unrelated map never makes that location local. New quests requiring work or a known hand-in elsewhere are excluded. Active quests can still contribute work here or a ready local hand-in, but unfinished work elsewhere never unlocks a premature local hand-in or follow-up. QuestieDB does not expose a zone-only ID list through this addon, so the first open in a zone checks the catalogue in small work slices; the displayed steps stay in your current zone. The last two zones keep only their discovered quest IDs for reuse, with fresh eligibility and progress checks. Explicit Refresh rediscovers the catalogue. It uses Questie's eligibility check when available and only includes quests whose difficulty is **green or yellow** for your current level. When you arrive with no active quests, it still lists available pickups by giver, with each quest on its own line. It can also look ahead by up to four prerequisite layers when Questie marks a quest as blocked only by known prerequisites and those earlier quests can finish here. It respects both prerequisite rules: **any one** quest in a single-prerequisite list is enough, while **every** quest in a group-prerequisite list is required. A quest with unknown eligibility, level color or location is not guessed into the plan.
+
+Each route gives numbered instructions, for example:
+
+1. **Go to Sentinel Hill** — take quests **[1]**, **[2]**, **[3]** from the listed givers.
+2. **Go to the objective area** — complete quests **[1]**, **[2]**, **[3]** here, with the required kills, items and progress listed under each quest.
+3. **Return to the giver** — hand in the listed quests; follow-up pickups appear after their prerequisite hand-ins.
+
+Place names come from known map data; if no town/camp name is available, the step names the giver or objective area and shows coordinates. Quest numbers stay consistent across steps in the displayed plan. Every grouped task is shown rather than hidden behind a “more tasks” count. Routes contain these actions:
 
 - **Pickups:** where to accept quests you can take, plus prerequisite quests that open a later step.
 - **Objectives:** kill creatures, collect items, use objects, or visit places. If the same known creature or object advances multiple quests, the planner combines those tasks at one stop. It also combines close objective locations into a nearby camp when they are on the same map.
@@ -434,7 +442,11 @@ Each route is a sequence of useful stops:
 
 The order always follows known prerequisite and pickup/objective/turn-in dependencies. It groups each quest's giver, work sites and turn-in into an outing, combines outings that share a giver, objective camp or prerequisite chain, then estimates the full trip from where you are. Larger groups get credit for sharing the outing. If Shortest Path Forever is installed, its walking-distance API can choose the reachable first outing; later trip ordering still uses map-distance estimates. Without it, all ordering uses map distance. Neither method estimates kill time or guarantees the globally shortest full-zone plan. If Questie has a drop percentage for a collect-item target, the panel shows progress and the best known drop percentage; the percentage does not affect stop order or estimate time-to-farm.
 
-The route appears in a compact, movable panel beside the game's quest tracker; drag it to place it where you want. Its header shows active, ready and later quests. Stops show their outing number, action, coordinates and known giver/camp names; pickup quests are listed line by line and objective rows show progress when available. Left-click a stop to set its waypoint; right-click to mark that location too. Open the map with `M` to see the pin. If every mapped quest in the zone is below green, the planner says **This zone is too low level for you.** Long rows grow to fit their text while scrolling. With Shortest Path Forever installed, **Follow with SPF** hands the selected stop to SPF to draw and guide the walk on both maps. This is an explicit action and replaces the route currently being followed. You can also use `/qs plan follow`. It updates after quest progress, and **Refresh** is available if needed. `/qs plan next` selects the next stop and sets its regular waypoint; `/qs plan refresh` rebuilds the list; `/qs plan hide` closes the panel; `/qs plan on` enables the tool; `/qs plan off` disables it and closes the panel. Following a stop does not move your character or accept/complete quests for you.
+The route appears in an opaque dark guide beside the game's quest tracker; drag its header to place it where you want, then use **Lock** to keep it there for the session. The header shows the zone and current/total step. The current step is highlighted in gold on dark red; up to five upcoming steps are muted beneath it. **< / >** reviews previous/next steps and marks the destination; this does not complete quests. **− / +** switches between expanded and current-step-only views. Each step says where to go and which quests to take, complete or hand in. Left-click a step to set its waypoint; right-click to mark that location too, or use **Waypoint**. Open the map with `M` to see the pin. Changing zones immediately clears old steps before building the new zone's plan. If every mapped quest in the zone is below green, the planner says **This zone is too low level for you.** Long rows grow to fit their text while scrolling. With Shortest Path Forever installed, **Follow with SPF** hands the selected stop to SPF to draw and guide the walk on both maps. This is an explicit action and replaces the route currently being followed. You can also use `/qs plan follow`. It updates after quest progress, and **Refresh** is available if needed. Completing an objective or quest rescans eligibility; progress-only count changes rebuild the current steps. `/qs plan next` selects the next step and sets its regular waypoint; `/qs plan refresh` rediscovers the zone list; `/qs plan hide` closes the panel; `/qs plan on` enables the tool; `/qs plan off` disables it and closes the panel. Following a step does not move your character or accept/complete quests for you.
+
+**Direction arrow and map route.** While the guide is open, a green arrow above it points toward the selected stop relative to your facing. The caption names the action and destination; the distance is in direct yards, with a compass direction. At the destination it says to follow the quest step; arrival does not accept, finish or skip a quest. Missing position/distance/facing data is labelled rather than guessed; delayed measurements recover automatically while the guide is open. The arrow follows the guide when you move it and disappears when you close it.
+
+Open the world map normally to see numbered quest stops and connecting lines; the selected stop is highlighted. Click a number to select that step and set its waypoint. Stops at the same spot share numbers, and repeated clicks cycle through them; the selected number remains visible and its marker uses its exact position. The connections show stop order, not a path around terrain; **Follow with SPF** remains the way to request terrain-aware guidance. Map interactions hide during combat while the read-only arrow keeps updating. The overlay uses addon-owned drawings, and it reads no extra quest database data. Stationary map geometry is reused and all guidance updates stop when the guide closes.
 
 **Travel limits:** SPF is optional. Its walk estimates follow SPF's data and water-walking settings; no strict no-swimming promise is made. Later stops still use map-distance estimates, and SPF may combine travel modes when guiding. Questie points often have no height, so cave entrances, stacked floors, elevators and underground connections need in-game checking; an unknown floor is not guaranteed correct. Without SPF, the game's waypoint marks the stop but does not draw a path. The planner may miss quests whose Questie points cannot be mapped to your current area.
 
@@ -442,14 +454,35 @@ The route appears in a compact, movable panel beside the game's quest tracker; d
 **General Goods** to bag and recipe item tooltips. Known mining nodes are labelled **Mining**. Questie stores vendor links
 and object names, but does not mark every gathering profession or craft recipe, so unrecognized source types are not guessed.
 Turn on **Search items and vendors on the map**, open the map with `M`, and type an item name or vendor type such as
-`General Goods`. The search panel sits in the map's bottom-right corner. Suggestions appear as you type; click one or press
-Tab to complete it. Partial titles also match, so `tail` finds **Tailor**, **Senior Tailor** or **Senior Master Tailor**.
-Matching locations appear as pins on the map; click a pin to set a waypoint. Click **Clear** or delete the search text to
+`General Goods`. Type `vendor` (or `all vendors`) to highlight all known sellers on the displayed map; type
+`general vendor` to highlight only its general sellers. These searches never add pins from another map; browsing a new
+map updates the results. Sellers are recognized from Questie item links, vendor flags (including NPCs without titles),
+or known merchant titles; unrelated titled NPCs such as trainers are excluded from `vendor` results without seller evidence.
+The search panel sits in the map's bottom-right corner. Suggestions appear above it in a solid dark panel with a border
+and larger white text; click one or press
+Tab to complete it. Suggestions only include roles and buyable items with known locations on the displayed map;
+changing maps updates both suggestions and pins. Partial titles also match, so `tail` finds local **Tailor**,
+**Senior Tailor** or **Senior Master Tailor** roles. Choosing **General Goods** searches matching NPC titles even when
+Questie has no item-to-seller links for that NPC. Choosing an item searches sellers of that exact item.
+Class trainers such as `Druid Trainer` and `Paladin Trainer` are also searched by their NPC titles; they do not need
+an item seller link. Discovering these unlinked trainers requires Questie's enumerable NPC list.
+Role search accepts common English profession names and variants: `skinner trainer` finds **Skinning Trainer**,
+`miner trainer` finds **Mining Trainer**, and `leatherworker trainer` finds **Leatherworking Trainer**. Plurals,
+punctuation and word order are flexible. A small typo such as `paladin tranier` is also tolerated; exact or partial
+matches on the displayed map take priority, and suggestions show the actual role title. Typo correction is limited to
+one spelling error in role words of at least five ASCII letters; short/localized words retain literal matching.
+Item searches keep their existing literal matching, and choosing an item still searches that exact item name.
+The panel names the map and reports the search text and number of known locations. Hover a pin to see the matching role,
+query and coordinates; click it to set a waypoint. Click **Clear** or delete the search text to
 remove the pins. The magnifying-glass button inside the search bar runs the search. Buyable items and reagents appear when
-Questie links them to vendors. If there is no matching location on the shown map, the map can offer the closest known vendor
-on your continent by map distance with a **Waypoint** button. Ctrl-right-click the map to search that map only. The map
-search needs a recent QuestieDB item list; only items with a known vendor link appear, so craft-only and gather-only
-searches do not invent a vendor. Results use one map view; there is no separate location-list view.
+Questie links them to vendors. Searches stay on the displayed map by default. If there are no local pins but known matches
+exist, click **Elsewhere** to explicitly look for the closest known match on your continent by map distance, then
+**Waypoint** to mark it. Changing the query or displayed map restores local search. Ctrl-right-click also searches only
+the displayed map. Search needs a recent QuestieDB NPC or item list; older providers with only item enumeration have
+partial role coverage. Missing item seller links are explained; drops, gathering and crafting are not searched.
+Results use one map view; there is no separate location-list view.
+
+**Lightweight data loading.** Login, a closed map and an empty search do not build these catalogues. Typing waits briefly before searching, then builds reusable NPC role metadata; a matching role query does not load the item catalogue. Item fallback and broad seller queries read item seller links when needed, reading names only for buyable items. Locations are decoded only for the current query's candidates, including spelling alternatives, and released when the query changes or clears. Disabling map search releases its indexes. The guide and map search share a soft 2 ms work budget per 100 ms slice and suspend database work in combat; a single provider call can exceed that budget. Hiding a tool stops its scans. Questie and QuestieDB manage their own loading and caches independently. Quest reward and dungeon catalogues also start only when you open their browsers.
 
 **Quest acceptance and turn-ins.** Under `/qs settings` > **Accept & turn in**, enable **Accept quest offers automatically** to
 accept a quest when an NPC or party member presents it. Enable **Turn in completed quests automatically** to continue a ready
@@ -521,8 +554,34 @@ Forever data remain labelled. **There is no built-in verified catalogue of every
 their specific fish/skill values are entered by you, and zone summaries are not copied onto individual waters.
 The fishing layer works alongside Questie.
 
-**One equipment window.** `/qs rewards` and `/qs loot` open the same **Equipment explorer**. Switch between
-**Quest rewards** and **Instance drops** with its tabs. Item rows have icons, quality colors, item/required levels
+**Cooking and profession upgrades.** The fishing editor has a **Cooking / recipes** button; `/qs cooking`
+opens the same companion. Opening your own Cooking in the game's profession window also opens it. Browse
+133 Forever reference records, search recipes/ingredients/sources, and cycle **All / Missing / Known**.
+Missing means the live Cooking API explicitly reports the recipe as unlearned; unsupported or unavailable
+records remain **Unconfirmed** under All. This does not change the game's recipe filters.
+
+Select a recipe for vendor, quest, drop or trainer information and recipe-item names, then hover its
+ingredient buttons for farming sources. Ingredient item tooltips also receive these hints. Installed Questie
+supplies mob names, mob levels, coordinates and sellers; the existing zone-level guide supplies zone brackets.
+Seven example fish waters include verified guide-route details; AnglerAtlas can add zone catch estimates.
+Exact fishing minimums and no-getaway skills are shown only when available, otherwise **unknown**; effective
+skill includes pole/lure bonuses. Unknown sources are explicit, and seasonal/time/location catches can differ.
+
+The companion's **Upgrades** tab, `/qs professions`, and **QS Upgrades** beside the native profession
+window show all 12 professions, both factions, Apprentice through Artisan caps/requirements, and the
+trainer, book or quest needed to advance. Choose a profession and cycle **Both / Alliance / Horde**.
+This is a static reference checked on **2026-11-17**, partly based on guides' beta-derived higher-rank data.
+Cooking facts come from the MIT-licensed [Profit Forever dataset](https://github.com/ExcEssIv3/profit)
+and [Forever profession guides](https://www.wow-professions.com/forever); unavailable client records can
+appear as unconfirmed. Use **Refresh** after learning a recipe or when a provider finishes loading.
+
+The explicitly requested integration is on by default; **Extra tools > Cooking recipes, farming hints and
+profession upgrades** or `/qs professions off` disables automatic opening, native guide buttons and item
+farming hints. Manual `/qs cooking` or `/qs professions` enables it again. No login catalogue scans, external
+downloads, auto-crafting or map navigation are performed; learned-state reads pause in combat and cancel on close.
+
+**One search window.** `/qs rewards`, `/qs loot` and `/qs dungeons` open the same **Quest and equipment explorer**. Switch between
+**Quest rewards**, **Instance drops** and **Dungeon quests** with its tabs. Item rows have icons, quality colors, item/required levels
 and a source line; hover for the game's comparison tooltip. Click a row to update the route or drop-source pane
 on the right. Selecting more items never opens additional route/source windows.
 Each equipment name appears **once**, with every matching mob or quest listed together in its details.
@@ -582,6 +641,27 @@ and stops if disabled or its tab/window is closed. Uncached item details update 
 Map controls give directions: open the map yourself with `M`, avoiding this client's protected-map restrictions.
 Both tools are covered by Lua mock tests; their rendering and item tooltips still need verification in the game.
 
+**All quests for a dungeon, inside and outside.** `/qs dungeons` (or **Extra tools → Find quests by dungeon**)
+opens the **Dungeon quests** tab. Choose a dungeon to see its known quests, including pickups outside the entrance,
+outdoor preparation chains and explicit follow-ups. This lists quests regardless of their rewards; equipment quality,
+slot and stat filters apply only to the equipment tabs. Start with all factions, classes, levels and completed quests;
+select **Alliance/Horde**, a **class**, or enter your **character level** to narrow the list. **My character** applies
+your current faction/class/level; **All quests** broadens these filters while keeping the selected dungeon.
+Search by quest name, ID or dungeon; scroll or use Previous/Next. Preparation and follow-up entries are labelled.
+Each row shows **Pickup** and **Turn-in** giver/location lines; six taller rows fit each page.
+Hover for **base XP**, all known item rewards (including non-equipment), and full pickup/turn-in locations.
+XP is before character-level/bonus adjustments; listed items can be reward choices. Missing data stays labelled unknown.
+Item rewards load on the first hover, in small background slices, and refresh the tooltip when ready.
+Click a quest for its pickup giver/item, coordinates, requirements, chain and objective/turn-in directions.
+Right-click for the usual Quest Sharing menu plus **Where to pick it up** and **Show pickup on map (open M)**.
+Pickup actions mark a native waypoint when supported and print directions; open the map yourself with `M`.
+Quest-log actions explain when you must accept the quest first; unknown dungeon coordinates are never pinned at `-1,-1`.
+Needs an enumerable recent QuestieDB. Association uses dungeon categories and known quest-source/objective locations;
+common materials also dropped outdoors do not associate unrelated quests with a dungeon. The list depends on installed
+data, and filters do not check every reputation, profession, event or acceptance condition. Scans run only on explicit
+open/refresh (reward links on first hover), share the small data-work budget, pause in combat and cancel when the tab closes;
+no login scan or new saved setting.
+
 **Instance drops and who drops them.** Opening the browser inside a recognized dungeon selects that dungeon
 and brings its navigation row into view. This also works after the catalogue finishes loading. Old item/dungeon
 searches and encounter choices are cleared; an explicit `/qs loot [search]` keeps that query inside your current
@@ -619,7 +699,7 @@ If an unloaded AtlasLoot module cannot load during combat, it is retried after c
 Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check.
 
 ## Install
-**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.18), unzip `QuestSharing-<version>.zip` and drop the
+**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.19), unzip `QuestSharing-<version>.zip` and drop the
 `QuestSharing` folder into `Interface\AddOns`. Or:
 1. Copy the folder `QuestSharing` (the one containing `QuestSharing.toc`, not this README's folder) into
    the game's `Interface\AddOns` folder, so you have `...\AddOns\QuestSharing\QuestSharing.toc`.
@@ -672,8 +752,11 @@ Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check
 | `/qs doctor` | a report of what works on this client, in a window you can copy from |
 | `/qs errors [clear]` | errors this addon has caused; the window adds where each came from (line, what was running, stack) |
 | `/qs bagmarks on\|off` | quest items marked in your bags: gold for quests of this zone, blue for quests elsewhere (default on) |
+| `/qs cleanup` | review leftover quest item stacks in carried bags and confirm individual deletions; requires Questie |
 | `/qs hidetracker on\|off` | hide the game's quest tracker, outside fights (default off) |
 | `/qs fishing [on\|off]` | open the fishing water editor; on/off switches its world-map layer |
+| `/qs cooking` | Cooking recipe catalogue, acquisition sources and ingredient farming hints |
+| `/qs professions [on\|off]` | static profession upgrades for both factions; on/off toggles the companion integration |
 | `/qs rewards [on\|off]` | open quest reward equipment for your class, level and faction; on/off enables/disables the browser |
 | `/qs loot [search]` | search instance drops by item/name/ID, boss or instance and inspect who drops each item |
 | `/qs debug on\|off` | the debug log: every action and its outcome, saved to the addon's file on `/reload` or logout (default off) |
@@ -775,14 +858,17 @@ python tests/test_done.py             # 20 tests: a quest you finished is never 
 python tests/test_box.py              # 46 tests: messages into the chat box, refused calls written down (line, stack), sharing on your clicks
 python tests/test_ping.py             # 27 tests: the ping key, nearest quest creature, anti-spam, the ring's ping slot
 python tests/test_usability.py        # 30 tests: direct choices, live searches, sorting, scrolling, selection and recovery
+python tests/test_vendor_map.py       # 76 tests: flexible roles, local sellers/trainers, scope, flags, feedback and loading
 python tests/test_zone.py             # 10 tests: only the quests of where you are (Teldrassil vs Stormwind)
 python tests/test_items.py            # 24 tests: quest item icons in the tracker, the item key and button
 python tests/test_emotes.py           # 34 tests: the emote rings behind the mouse wheel, editing them, only the ones that work
 python tests/test_bags.py             # 16 tests: quest items marked in the bags, hiding the game's quest tracker
+python tests/test_quest_cleanup.py    # 34 checks: cleanup candidates, active/starter protection, fresh confirmation and cursor safeguards
 python tests/test_questmap.py         # 15 tests: How to do it, and guards against the retired quest map symbols
 python tests/test_ringtest.py         # 14 tests: /qs quick test: every slot run, checked against what the game did
 python tests/test_log.py              # 35 tests: the debug log: every action and its outcome, kept small, the log window
 python tests/test_optional.py         # 42 tests: fishing water notes, map drawing, reward filters and item comparisons
+python tests/test_professions.py      # 34 tests: Cooking states/sources, farming hints, profession ranks, faction UI and lifecycle
 python tests/test_adventure.py        # 44 tests: direct quest questions, role-play invitations, channels and preserved drafts
 python tests/test_equipment.py        # 36 tests: one window, shared filters, rare+ quality, dungeon/raid identity and cancellation
 python tests/test_equipment_grouping.py # 28 tests: unique names, merged sources/routes, variants, filtering, counts and selection
@@ -793,8 +879,14 @@ python tests/test_zone_levels.py      # 50 tests: native/fallback ranges, full-m
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 python tests/test_quest_planner_path.py # 10 tests: SPF API detection, walk costs, async cancellation, outing ordering and fallbacks
 python tests/test_quest_planner_ui.py   # 6 tests: movable panel, wrapped rows, level filter, pickup list and map actions
+python tests/test_quest_planner_zone_steps.py # 28 tests: zone isolation, grouped travel/actions, prerequisites and refresh
+python tests/test_quest_planner_guide.py # 10 tests: current/upcoming states, arrows, mini mode and position lock
 ```
-Expected: every line ends in `passed` with all tests green (1330 in total).
+Expected: every line ends in `passed` with all tests green.
+
+For a local guide emulation, run `python tools/preview_quest_planner.py OUTPUT.html` using the same Lua test environment.
+The fragment contains eight illustrative Westfall steps exported from the actual planner, with working step navigation,
+mini mode, lock and waypoint preview; it is not the live game or the character's real quest log.
 
 ## Files
 | File | Purpose |
@@ -814,10 +906,14 @@ Expected: every line ends in `passed` with all tests green (1330 in total).
 | `QuestSharing/Friends.lua` | (beta) adds party members to your friends list, with safeguards |
 | `QuestSharing/QuestItems.lua` | usable quest items: icons next to the quests in the tracker, the item key and button |
 | `QuestSharing/Bags.lua` | quest items marked in the bags: gold for quests of this zone, blue for quests elsewhere |
+| `QuestSharing/QuestCleanup.lua` | on-demand leftover quest item review and confirmed per-stack bag deletion |
 | `QuestSharing/Ping.lua` | the ping key: Attack ping on the nearest quest creature, "look here" on quest objects, anti-spam |
 | `QuestSharing/Menu.lua` | the right-click menu of the Party quests window |
 | `QuestSharing/Questie.lua` | reads Questie's quest database (when installed): where a quest starts, which quests come first, where objectives are done and quests turned in |
 | `QuestSharing/Fishing.lua` | optional world-map water markers, saved water editor and AnglerAtlas zone summaries |
+| `QuestSharing/Professions.lua` | Cooking/Upgrades companion, learned-state reads, recipe sources and ingredient farming tooltips |
+| `QuestSharing/CookingReference.lua` | pinned MIT Forever Cooking snapshot with recipe spells, ingredients and acquisition hints |
+| `QuestSharing/ProfessionReference.lua` | dated faction/rank reference, guide-backed starter recipe sources and example fish waters |
 | `QuestSharing/Rewards.lua` | optional QuestieDB equipment rewards, filters, item comparisons and quest routes |
 | `QuestSharing/EquipmentUI.lua` | one equipment window, shared item type/slot/level/stat filters, item cards and inline details |
 | `QuestSharing/SpellRanks.lua` | opt-in highest learned spell ranks on existing normal action-bar buttons |

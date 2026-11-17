@@ -77,7 +77,7 @@ function ns.howMessage(e)
     local q = ns.questie
     if not (q and q.available() and q.howText) then return nil end
     local finished = {}
-    for _, o in ipairs(C.objectives(e)) do
+    for _, o in ipairs(not e.catalogue and C.objectives(e) or {}) do
         if o.finished and o.text then finished[#finished + 1] = string.lower(o.text) end
     end
     local function done(name)
@@ -143,11 +143,12 @@ function ns.questMenuItems(e)
     local missing = lacking(e)
     local items = {}
     local function add(text, run, why) items[#items + 1] = { text = text, run = run, why = why } end
-    add("Tell the party how I am doing", function() ns.askParty(e) end, (not inParty) and "you are not in a party" or nil)
+    local notInLog=e.catalogue and "this quest is not in your quest log" or nil
+    add("Tell the party how I am doing", function() ns.askParty(e) end, notInLog or (not inParty) and "you are not in a party" or nil)
     add("Ask in chat to do this quest", function() ns.adventure.ask(e) end,
-        C.doneByMe(e) and "you have finished this quest" or nil)
+        notInLog or C.doneByMe(e) and "you have finished this quest" or nil)
     add("Offer it to the party", function() ns.offerQuest(e) end,
-        (not inParty and "you are not in a party") or (raid and "not in a raid") or (not C.pushable(e) and "the game does not let this quest be shared")
+        notInLog or (not inParty and "you are not in a party") or (raid and "not in a raid") or (not C.pushable(e) and "the game does not let this quest be shared")
         or (#missing == 0 and "everybody has it") or nil)
     local qOk = ns.questie and ns.questie.available()
     add("Tell them where to get it", function() ns.tellWhere(e) end,
@@ -157,8 +158,8 @@ function ns.questMenuItems(e)
         (not qOk and ns.questie.whyMissing()) or (not ns.howMessage(e) and "Questie does not know this quest") or nil)
     add("Trace back the chain", function() ns.traceBack(e) end,
         (not qOk and ns.questie.whyMissing()) or (not ns.chainMessage(e) and "Questie does not know this quest") or nil)
-    add("Focus it on my map", function() ns.focusQuest(e) end, (not (ns.canPin and ns.canPin())) and "not on this client" or nil)
-    add(ns.mapQuestLog() and "Select it in the quest log" or "Open it in the quest log", function() ns.openInLog(e) end, nil)
+    add("Focus it on my map", function() ns.focusQuest(e) end, notInLog or (not (ns.canPin and ns.canPin())) and "not on this client" or nil)
+    add(ns.mapQuestLog() and "Select it in the quest log" or "Open it in the quest log", function() ns.openInLog(e) end, notInLog)
     return items
 end
 
@@ -191,11 +192,17 @@ local function build()
     return f
 end
 
-function ns.openQuestMenu(e)
+function ns.openQuestMenu(e, items)
     if not e then return end
     local f = build()
     if not f then return end
-    f.entry, f.items = e, ns.questMenuItems(e)
+    f.entry, f.items = e, items or ns.questMenuItems(e)
+    for i=#lines+1,#f.items do
+        local index=i
+        local b=S.button(f,"",WIDTH-16,function() ns.questMenuPick(index) end)
+        b:SetPoint("TOPLEFT",f,"TOPLEFT",8,-26-(i-1)*(LINE_H+2))
+        lines[i]=b
+    end
     f.title:SetText(S.GOLD .. e.title .. "|r")
     for i, b in ipairs(lines) do
         local it = f.items[i]

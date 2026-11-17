@@ -113,6 +113,16 @@ local function newObject()
     function o:HookScript(n, fn) self.posthooks = self.posthooks or {}; self.posthooks[n] = self.posthooks[n] or {}; table.insert(self.posthooks[n], fn) end
     function o:SetScale(v) self.scale = v end
     function o:GetScale() return self.scale or 1 end
+    function o:SetParent(parent) self.parent = parent end
+    function o:SetRotation(radians) self.rotation = radians end
+    function o:CreateLine()
+        local child = newObject(); child.parent, child.isLine = self, true
+        self.children = self.children or {}; self.children[#self.children + 1] = child
+        function child:SetThickness(n) self.thickness = n end
+        function child:SetStartPoint(...) self.startPoint = { ... } end
+        function child:SetEndPoint(...) self.endPoint = { ... } end
+        return child
+    end
     function o:EnableKeyboard(v) self.keyboard = v end
     function o:SetNormalTexture(t) self.normal = t end
     -- scroll frames: one child, a position and a range (tests set scrollRange)
