@@ -1,5 +1,51 @@
 # Decisions
 
+## 2026-11-17 — WoW-style search journal
+- User requests a more beautiful WoW feel across existing searches. Scope all3shared explorer tabs; keep data/filters/actions/layout destinations and avoid globally changing Settings/profession/map tools.
+- EquipmentUI owns themed button/list-button/field/text/surface helpers; Rewards/Loot/DungeonQuests switch their UI creation to those. Use existing-client dialog/QuestBG/Quickslot2/native red-button art, Friz/locale fonts, warm opaque panels, gold states and dark parchment ink. Retain button scripts/disabled states, larger popup layering and existing outer dialog/scaling; no new runtime assets/providers/timers.
+- Darken only gold/yellow quest-link codes inside parchment detail output so they remain readable; source text/IDs/hyperlinks and other features remain intact. Dungeon detail scroll uses690px panel height; old equipment panels default550.
+- Verify release-based isolated snapshot because current workspace has concurrent diagnostics/profession/optimizer changes.44suites/1,627checks pass,42Lua modules compile and CRC/source package pass. First snapshot Extras failure was missing copied root build_release.py, not runtime; copied release root fixture and35/35rerun pass. Current workspace full run had3diagnostic-related assertions outside scope; do not claim that mixed run passed or overwrite others' work.
+- Browser layout emulation exports real Lua row/details (27raw Deadmines quests;2reward/4loot fixtures) and approximates native art. All3tabs/rowselection visually inspected; native WoW validation remains pending. Source tools are not shipped.
+- Provide4file UI overlay for existing v0.4.19+ installation so user retains other previews/updates; also keep full stable-baseline preview separately. No new release requested. Preview screenshot: `/Users/francesco/.codex/visualizations/2026/11/17/01a1e8ac-7734-78d1-bcb9-43551860a2d8/search-journal-preview.png`; emulation `search-journal.html`, browser tab1 on localhost8792, server exec43787.
+
+## 2026-11-17 — Readable troubleshooting overview with complete copying
+- User says combined diagnostics remain messy and asks for friendly issue reading plus copying everything; continuation authorizes completing the redesign.
+- Keep one window, but open a plain-language overview with numbered newest-first issues, timestamps/repeat counts, friendly paused-feature names and separate client/setup notes. Do not label client limitations as additional addon errors or guess root causes.
+- One frozen snapshot has overviewText/fullText/showingDetails. Full report contains every retained message/stack/log, section headings and one labelled setting per line. Copy all always switches to/selects fullText; Ctrl+C/Cmd+C is the user's native clipboard action. Toggling views never refreshes or drops records.
+- Larger14px text/4px spacing, no initial selection/focus, explicit full/overview toggle and Refresh. Opening log/errors/doctor no longer dumps technical text to chat. Preserve existing slash clear semantics, bounded storage, logging defaults and unrelated local work. Native game rendering remains unverified; no publication requested.
+- Verification: diagnostic47/47; frozen HEAD baseline plus Core/Diagnostics, scoped General settings rows and affected tests passes44 suites /1,629 checks,42 Lua5.1 compilations. Snapshot path recorded in state.md. Shared-workspace test transiently encountered concurrent settings/optimizer work; latest broad run44 existing suites pass, new planner-facts0/8 remains unrelated in-progress work. No unrelated fix/reset performed.
+
+## 2026-11-17 — Replace rejected companion with an embedded native profession GUI
+- User approves the redesigned preview with "yes like this"; this is the accepted GUI direction. Preserve its structure in subsequent changes; native game testing remains pending.
+- User rejects the separate small-text companion and explicitly requests a full rethink inside the same game panel. This supersedes the earlier companion-window decision; existing authorization covers the redesign, with no new approval checkpoint or publication implied.
+- Reproduce native-parent mismatch/six-row paging before edits. Split model/lifecycle in Professions.lua from ProfessionUI.lua; render own child list/source/Upgrades panes inside ProfessionsFrame, retaining native shell/close/position and native learned-recipe crafting.
+- One scrollable catalogue, 44px rows, separate Recipe/Skill/source fields, grey clickable unlearned recipes. Main source pane uses measured 14px text, 18px heading and structured requirement/source/ingredient sections; keep provenance in reference docs rather than repeat it in every visible dish.
+- Reject native filter loops and synthetic recipeInfo injection. Only pass live learned info to `CraftingPage:SelectRecipe(info,true)`; unlearned selection clears native transaction/selection and validates controls. Visible row remains authoritative when Blizzard rebuilds/auto-selects from its hidden filtered list.
+- Upgrades is a ProfessionsFrame child accessible from any profession and overview; direct faction buttons. If native UI isn't available, instruct K/choose profession; never recreate the rejected standalone fallback.
+- Native recipe IDs supplement the static reference with positively matched live Cooking records. No Questie catalogue scan; guard own/linked/changing sources, 12-read slices, combat/close cancellation. Current faction gets preferred vendor locality in short labels.
+- Package on released c2f5a06 plus only task-owned profession runtime and scoped Settings copy because concurrent unrelated local changes are in flight; preserve them in the workspace. Tested snapshot `/tmp/questsharing-profession-native-verify-20261117`; final counts/hash in state.md.
+- Visualize skill used for an actual-model-data preview with explicitly illustrative learned states; browser inspection isn't native WoW verification. Reload its full skill before editing the preview in a later session.
+
+## 2026-11-17 — Separate dungeon chain status from task type
+- User confirms dungeon selector works, then requests clarity between chain quests and NPC conversation steps. Initial-only All dungeons reproduced while catalogue loads, but user resolved it; no speculative dropdown fix.
+- Chain membership and task are independent: a prerequisite can be Talk only, item delivery or an escort. Build reciprocal previous/next mappings once from known prerequisite/next links, expose role within selected dungeon and show linked names/IDs in hover/detail. No invented linear numbers on branching chains.
+- Lazy cached task classifier uses structured objectives, exploration, extra/required-source work, event specialFlags and provided/starter items; native active objectives are a conservative fallback. NPC hand-in with no work -> Talk only; object/unknown explicit. Invalidate cached task labels on visible debounced log changes. Text plus color communicates purpose; no extra login catalogue scan or filters.
+- Five102px rows at106px spacing keep independent task and existing pickup/turn-in lines inside530px. Other explorer tabs unchanged.
+- Validate/package against isolated v0.4.19 runtime snapshot plus current DungeonQuests.lua, since profession redesign is active concurrently. Seven affected suites301checks (58 dungeon); all42 Lua modules compile; raw Classic quest smoke65Talk Wiley,155escort,166collection; source/CRC verification pass. New44-file clarity preview; existing stable release/assets unchanged, no new push/release requested. Native rendering remains pending.
+
+## 2026-11-17 — Map-search dependency feedback
+- User reports empty map searches and uncertainty about Questie requirement. Reproduced absent-data state on modern/classic harness: misleading instructions/no-known-seller with zero pins. README installation section also incorrectly promised every other feature worked without Questie.
+- Require enumerable NPC **or** item database through global/LibQuestieDB providers; full Questie/quest DB is not required. Check method presence only before blank/query render, preserving no-catalogue-work startup and partial-provider support.
+- Explain missing data versus non-enumerable installed data; show QuestieDB-only support and `/qs questie`, update/enable/reload guidance. Reuse existing disable reset for provider loss; preserve query for late retry. No bundled data, matching changes or new dependency.
+- 88 map checks + 129 related checks pass; local/unpublished. Exact installed version, query/map and provider state requested asynchronously; no reply yet. Native in-game cause/rendering unverified; other concurrent profession/diagnostic/dungeon changes preserved.
+
+## 2026-11-17 — Default diagnostics and one copyable report
+- User requests logging/errors/troubleshooting on by default and one window to copy everything at once.
+- `debug=true`; once-only `diagnosticsDefaultMigrated` enables existing saved false settings, then preserves subsequent explicit off. Error capture stays independent of debug.
+- All three existing entry commands and one General action share a fixed combined snapshot. Include doctor checks, sorted defaults-backed settings, blocked features, full retained errors/stacks and full retained debug buffer; keep bounded storage, remove narrower display caps.
+- Refresh is explicit so new events cannot overwrite selected text during copying. Combined clear empties both lists; existing slash clear arguments retain their respective-list behavior. No release requested; preserve concurrent profession/dungeon work.
+- Verified diagnostic suite41/41, complete current workspace44 suites /1,661 checks, 43 Lua5.1 compilations and diff checks; native game layout remains unverified.
+
 ## 2026-11-17 — Publish current workspace as v0.4.19
 - User explicitly requests "push and release", authorizing commit/push/publication of the completed local guide, map search, data-loading, dungeon quest, cleanup and profession work; supersedes earlier local-only packaging decisions.
 - Follow existing main/annotated-tag/GitHub Release workflow; retain all earlier immutable tags/assets. GitHub connector lacks release creation and binary upload, so use git/gh.
@@ -352,3 +398,37 @@
 - Keep default tracker docking until the user drags the panel; then preserve the moved position for the session. Measure wrapped title/detail heights and derive each row offset and scroll-child height from the content.
 - The first local quest list was hidden by a data-shape mismatch: `plannerStarters()` returns source records with `spawns`, not flat points. Use `nearestSource()` for these records.
 - Published as Quest Sharing v0.4.18; see README and changelog. Native-client behavior remains to be checked.
+
+## 2026-11-17 — Extra tools and Browser DB
+- User requests clearer Extra tools and a separate Browser DB tab for all database searches. Keep five everyday utility cards in optional; move equipment/dungeon/profession lookups and item/vendor/source controls to browser. Map contains only zone levels/party positions.
+- Reuse existing row kinds, saved setting keys and feature handlers. Bool cards merge their launch action into one card; explicit checkbox changes persistence, separate primary button opens the feature. No catalogue probing during settings rendering.
+- Short titles, purpose, dependency note, measured wrapped text and spacing replace duplicate switch/action rows; read-only card bodies prevent accidental toggles.
+- Verification: Settings59/59, layout42/42; full44 suites /1,677 checks, all43 Lua5.1 compilations and whitespace checks pass. Browser preview checks Extra tools, Browser DB top/bottom and final source controls; native font/texture/rendering remains an in-game check.
+
+## 2026-11-17 — Predictive zone scheduling
+- Latest user instruction authorizes implementation of the pasted design. Implement locally through the existing guide and scheduler.
+- Use bounded constructive schedule search with a legal nearest-ready incumbent, waiting-aware order, shared-camp preparation, terminal alternatives and prior order. A complete graph replaces the four-layer cap.
+- Keep actions per quest through simulation and combine only consecutive instructions for display. Enforce log slots and acceptance/expiry/exclusion gates.
+- Default all acceptance levels and all compatible non-repeatable local quests. Explicit session-only alternatives select quest XP/hour, selected IDs or expected-time budget; optional green/yellow filter is user-visible.
+- Use exact single-loot-stream plus kill expectation and conservative separate loot estimates. Unknown work uses 60 seconds, kills 10 seconds and interactions 3 seconds, all labelled estimates. Missing dimensions use an explicit illustrative scale.
+- Defer unsupported future-level, inventory-consumption/capacity, flight/transport, reputation and custom event models with report reasons. They require verified live facts. Native game unavailable.
+- Added implementation design and executed eight-quest simulation in predictive-quest-optimizer.md. No publication/version bump requested.
+
+## 2026-11-17 — Planner resource-state implementation
+- The current coding-plan work adds a carried-bag snapshot on explicit guide planning only. Only relevant item IDs are counted; bank data is excluded. Missing bag APIs or slot counts remain unknown.
+- The optimizer simulates known quest-item gains, explicit consumed-item costs and a single observed XP threshold. It never infers consumed items from every loot objective. More levels and item costs without provider evidence remain unresolved.
+- For complete-zone scoring, equal hand-in coverage is ordered by estimated elapsed time. The previous action-count tie break could prefer longer work for no quest-completion gain.
+
+## 2026-11-17 — Conditional prerequisite and character gates
+- Keep every QuestieDB prerequisite choice on the candidate while using one parent only to discover graph reachability; check the full AND/OR gates in the simulator at pickup. Selected routes may include either parent and stop at their selected hand-in.
+- Read reputation as absolute faction points from native APIs for only local referenced IDs. Apply signed QuestieDB `reputationReward` at simulated hand-in. Missing values stay unknown; an unverified future pickup is excluded. QuestieDB `requiredMaxRep` is an exclusive upper threshold.
+- Read profession rank by skill-line ID only where the client exposes that ID directly. No quest-driven skill gain is invented. Static rank requirements and OR rank alternatives can gate pickups; unsupported clients retain unknown eligibility.
+
+## 2026-11-17 — Small-plan bounded search and loot confidence
+- Keep the existing seeded route as a legal incumbent. For at most 40 atomic actions, branch within the shared 36,000-check budget and retain a 20-state beam; never replace the incumbent with a worse or infeasible branch. Report exhausted search explicitly. Larger zones keep seeded scheduling until a measured safe large-zone search exists.
+- A separate item drop stream at an already-active shared camp has unknown joint probability. Preserve the conservative additive work estimate and set uncertainty with an explicit reason. Do not invent independence or correlated drops from separate marginal rates.
+- The SPF first-stop test now gives both candidate quests a turn-in. A nearest-leg-only expectation for an unfinishable quest contradicts complete-zone scoring.
+
+## 2026-11-17 — Publish the full tested preview as 0.4.20
+- User explicitly requested push and release after receiving the predictive preview. That ZIP contains the entire current addon, including the other locally completed journal, diagnostics, profession, settings, dungeon and map changes. Publish this source-matched full build together as v0.4.20 rather than release a planner-only archive that would differ from what was tested.
+- Keep native WoW and remaining optimizer model limits explicit in the release notes. Do not call the eight-batch algorithm fully complete.

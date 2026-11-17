@@ -276,14 +276,14 @@ def test_the_new_rows_and_defaults():
 def test_doctor_reports_the_highlight_features():
     g = game()
     g.slash("doctor")
-    text = g.eval("NS._reportWindow()")[1].text
+    text = g.eval("NS._reportWindow()")[0].fullText
     assert "[OK] quest icons above creatures that are part of your quests" in text
     assert "[OK] pin the nearest quest in the world" in text
     g.run('CVARS.nameplateShowEnemies = "0"')
     assert "BUT enemy nameplates are off: /qs highlight cvars on" in "\n".join(g.eval("NS.doctorLines()").values())
     c = game("classic")
     c.slash("doctor")
-    ctext = c.eval("NS._reportWindow()")[1].text
+    ctext = c.eval("NS._reportWindow()")[0].fullText
     assert "[--] quest icons above creatures" in ctext and "[--] pin the nearest quest" in ctext
 
 

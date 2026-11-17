@@ -259,7 +259,7 @@ def test_every_setting_is_on_exactly_one_tab(style):
     n = int(g.eval("#NS.settingRows"))
     tabs = [g.eval("NS.settingRows[%d].tab" % i) for i in range(1, n + 1)]
     ids = [g.eval("NS.settingTabs[%d].id" % i) for i in range(1, int(g.eval("#NS.settingTabs")) + 1)]
-    assert ids == ["general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "optional"]
+    assert ids == ["general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "browser", "optional"]
     assert all(t in ids for t in tabs)
     assert all(tabs.count(t) >= 1 for t in ids), "no empty tab"
     keys = [g.eval("NS.settingRows[%d].key" % i) for i in range(1, n + 1) if g.eval("NS.settingRows[%d].key" % i)]
@@ -385,8 +385,9 @@ def test_all_controls_have_visible_plain_language_help_and_correct_categories(st
     assert "nameplates" in by_key["markMobs"].desc
     assert by_key["near"].tab == "tracker"
     assert by_key["autoAcceptQuests"].tab == by_key["autoCompleteQuests"].tab == "dialogs"
-    assert by_key["vendorSearch"].tab == by_key["zoneLevels"].tab == "maps"
-    assert "Requires Questie" in by_key["vendorSearch"].desc
+    assert by_key["vendorSearch"].tab == by_key["itemSources"].tab == "browser"
+    assert by_key["zoneLevels"].tab == "maps"
+    assert "Requires QuestieDB" in by_key["vendorSearch"].note
     assert "Multiple rewards" in by_key["autoCompleteQuests"].desc
 
 
@@ -432,6 +433,55 @@ def test_quest_marker_checkbox_changes_the_visible_enemy_marker():
     g.eval("function(f) f.scripts.OnMouseUp(f, 'LeftButton') end")(r.frame)
     assert g.eval("NS.markerFor(PLATES.nameplate1).shown")
     assert "On" in r.value.text and r.tick.shown
+
+
+def test_tool_cards_keep_primary_action_separate_from_persistent_switch(style):
+    g = fresh(style)
+    g.slash("settings")
+    g.eval("NS.settingsTab")("browser")
+    W = window(g)
+    reward = visible_by_key(g, W, "rewardBrowser")
+    g.run("REWARD_OPENS=0; NS.rewards.open=function() REWARD_OPENS=REWARD_OPENS+1 end")
+    press(g, reward.button)
+    assert g.eval("REWARD_OPENS") == 1 and not g.eval("NS.db.rewardBrowser")
+    g.eval('function(r) r.toggle.scripts.OnMouseUp(r.toggle,"LeftButton") end')(reward)
+    assert g.eval("NS.db.rewardBrowser") and g.eval("REWARD_OPENS") == 1
+    assert reward.tick.shown and "On" in reward.toggleText.text
+    # The card body is informational, so clicking the description cannot toggle it.
+    g.eval('function(r) r.frame.scripts.OnMouseUp(r.frame,"LeftButton") end')(reward)
+    assert g.eval("NS.db.rewardBrowser")
+    g.eval("NS.settingsTab")("general")
+    assert all(not r.card.shown and not r.toggle.shown and not r.note.shown for r in visible_rows(W))
+
+
+def test_browser_db_contains_all_reference_launchers_and_extra_tools_stays_focused(style):
+    g = fresh(style)
+    g.slash("settings")
+    g.eval("NS.settingsTab")("browser")
+    W = window(g)
+    assert "Browser DB" in W.heading.text
+    cards = [r for r in W.rows.values() if r.index and r.frame.shown and r.card.shown]
+    assert len(cards) == 7
+    expected = {"Browse rewards", "Browse drops", "Dungeon quests", "Cooking recipes", "Upgrades"}
+    assert {r.button.text for r in cards if r.button.shown} == expected
+    assert all(r.desc.text and r.note.shown for r in cards)
+    # Exercise the actual shared button dispatcher for every reference launcher.
+    g.run("""OPENED_TOOLS={}; NS.rewards.open=function() table.insert(OPENED_TOOLS,'rewards') end
+       NS.loot.open=function() table.insert(OPENED_TOOLS,'loot') end
+       NS.dungeonQuests.open=function() table.insert(OPENED_TOOLS,'dungeons') end
+       NS.professions.open=function(view) table.insert(OPENED_TOOLS,view) end""")
+    for r in cards:
+        if r.button.shown:
+            press(g, r.button)
+    assert list(g.eval("OPENED_TOOLS").values()) == ["rewards", "loot", "dungeons", "cooking", "upgrades"]
+    g.eval("NS.settingsScroll")(100000)
+    assert W.rowScroll.vscroll == W.contentHeight - W.rowScroll.height
+    g.eval("NS.settingsTab")("optional")
+    assert W.rowScroll.vscroll == 0
+    cards = [r for r in W.rows.values() if r.index and r.frame.shown and r.card.shown]
+    assert len(cards) == 5
+    assert {r.button.text for r in cards} == {"Open plan", "Review items", "Write invite", "Update ranks", "Edit spots"}
+    assert all(r.button.shown for r in cards)
 
 if __name__ == "__main__":
     import inspect

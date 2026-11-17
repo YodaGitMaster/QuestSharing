@@ -1,0 +1,60 @@
+<meta charset="utf-8">
+<div id="qs-journal" aria-label="Quest Sharing search journal layout emulation">
+<style>
+#qs-journal{font:13px/1.45 Georgia,"Times New Roman",serif;color:#e8d6ab;--gold:#efc56a;--edge:#77603b;--red:#701e18;--paper:#d5bc85;max-width:1080px;margin:auto}
+#qs-journal *{box-sizing:border-box}
+#qs-journal .journal{border:5px ridge #7c7466;border-radius:7px;background:linear-gradient(105deg,#18120b,#21180f 45%,#120e09);box-shadow:0 10px 30px #0007,inset 0 0 0 2px #080603;padding:12px 18px 18px}
+#qs-journal h2{font-size:19px;font-weight:500;text-align:center;color:var(--gold);text-shadow:0 2px #000;margin:0 0 20px;letter-spacing:.3px}
+#qs-journal button,#qs-journal input,#qs-journal select{font:12px Georgia,serif}
+#qs-journal button{cursor:pointer;color:#f5d17c;background:linear-gradient(#9b3026,#50100e);border:2px ridge #987747;border-radius:3px;padding:6px 12px;text-shadow:0 1px #000}
+#qs-journal button:hover{filter:brightness(1.18)}
+#qs-journal button:focus-visible,#qs-journal select:focus-visible,#qs-journal input:focus-visible{outline:2px solid #ffe09b;outline-offset:2px}
+#qs-journal button:disabled{opacity:.45;cursor:default}
+#qs-journal .tabs{display:flex;gap:8px;border-bottom:1px solid #70542e;padding-bottom:12px;margin-bottom:16px;align-items:center}
+#qs-journal .tabs button{min-width:155px}
+#qs-journal .tabs button[aria-selected=true]{background:linear-gradient(#452116,#682319);border-color:#c09a4f;box-shadow:inset 0 -2px #d3aa52;color:#ffe3a0}
+#qs-journal .tabs small{margin-left:auto;color:#baab8c;font-size:11px}
+#qs-journal .columns{display:grid;grid-template-columns:minmax(0,1.85fr) minmax(280px,1fr);gap:24px}
+#qs-journal .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding-bottom:13px;border-bottom:1px solid #57401f}
+#qs-journal label{display:grid;gap:5px;color:#d3bc8b;font-size:12px;flex:1;min-width:95px}
+#qs-journal select,#qs-journal input{min-width:0;width:100%;height:30px;background:#110d08;color:#f1e3c6;border:1px solid #745832;border-radius:2px;padding:4px 8px}
+#qs-journal .searchline{display:flex;gap:12px;margin-top:12px;align-items:center}
+#qs-journal .searchline input{flex:1}
+#qs-journal .status{font-size:12px;color:#c0ad86;margin:15px 0 10px}
+#qs-journal .rows{display:grid;gap:6px;min-height:380px;align-content:start}
+#qs-journal .row{border:1px solid #554024;border-radius:0;color:#eadfca;background:linear-gradient(110deg,#21190f,#19130c);display:grid;grid-template-columns:42px minmax(0,1fr);gap:12px;text-align:left;padding:10px 11px;min-height:65px;text-shadow:none;width:100%}
+#qs-journal .row[aria-selected=true]{background:linear-gradient(110deg,#5c3e18,#2e2111);border-color:#ac7f34;box-shadow:inset 3px 0 #d8ab47}
+#qs-journal .slot{height:38px;width:38px;background:radial-gradient(#4e4025,#17130c);border:3px ridge #8d7954;border-radius:2px;color:var(--gold);display:grid;place-items:center;font-size:22px;box-shadow:0 1px 2px #000}
+#qs-journal .row strong{display:block;font-size:13px;line-height:18px;font-weight:500;color:#f1deac}
+#qs-journal .row.equipment strong{color:#7cb5ef}
+#qs-journal .row small{display:block;font-size:12px;color:#bba989;margin-top:3px;overflow-wrap:anywhere}
+#qs-journal .row .task{color:#edcc7b;margin:7px 0 4px}
+#qs-journal .row .talk{color:#93c9d7}
+#qs-journal .locations{color:#d5c8ae;font-size:12px;line-height:18px}
+#qs-journal .paper{background:radial-gradient(ellipse at 30% 12%,#e3d1a8,transparent 70%),linear-gradient(100deg,#b39965,#dac18c 12%,#c5aa72);border:2px ridge #8c6e3c;color:#352211;min-width:0;display:flex;flex-direction:column}
+#qs-journal .paper h3{margin:0;font-size:14px;font-weight:500;padding:11px 14px;background:linear-gradient(#362315,#21150c);color:#edcd8b;border-bottom:2px solid #8c6e3c}
+#qs-journal .detail{font-size:13px;line-height:1.65;padding:18px 18px 12px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:520px;overflow-y:auto;scrollbar-color:#886b3d #d0b883;flex:1}
+#qs-journal .paper footer{padding:14px;text-align:center;border-top:1px solid #947848}
+#qs-journal .paper footer small{display:block;font-size:11px;margin-bottom:7px;color:#5b4224}
+#qs-journal .pager{display:flex;gap:8px;justify-content:space-between;margin-top:16px;align-items:center}
+#qs-journal .pager div{display:flex;gap:8px}
+#qs-journal .pager small{font-size:12px;color:#bba989}
+#qs-journal .note{text-align:center;font:11px/1.5 Arial,sans-serif;color:#aaa195;margin:10px 0}
+#qs-journal [hidden]{display:none!important}
+@media(max-width:750px){#qs-journal .columns{grid-template-columns:1fr}#qs-journal .tabs{flex-wrap:wrap}#qs-journal .tabs button{min-width:0;flex:1}#qs-journal .tabs small{width:100%;margin:0}#qs-journal .journal{padding:12px}#qs-journal .rows{min-height:0}#qs-journal .paper .detail{max-height:400px}}
+</style>
+<section class="journal">
+<h2>Quest Sharing — Adventurer’s Journal</h2>
+<nav class="tabs" aria-label="Search categories"><button data-tab="quests">Quest rewards</button><button data-tab="dungeons">Instance drops</button><button data-tab="dungeonQuests" aria-selected="true">Dungeon quests</button><small>Quest and equipment search</small></nav>
+<div class="columns"><section class="results" aria-label="Search results">
+<div class="filters"><label class="location-filter">Dungeon<select aria-label="Dungeon"><option>The Deadmines</option></select></label><label>Faction<select aria-label="Faction"><option>All factions</option><option>Alliance</option><option>Horde</option></select></label><label>Class<select aria-label="Class"><option>All classes</option><option>My character</option></select></label><label>Level<input aria-label="Level" value="All levels" readonly></label></div>
+<div class="searchline"><input type="search" placeholder="Search quests..." aria-label="Search results"><button class="clear">Clear</button></div>
+<div class="status" aria-live="polite"></div><div class="rows" role="listbox" aria-label="Quests or items"></div>
+<footer class="pager"><div><button class="prev">Previous</button><button class="next">Next</button></div><small class="page-count"></small></footer>
+</section><aside class="paper"><h3>Quest pickup and chain</h3><div class="detail" aria-live="polite"></div><footer><small>Open your map with M to see the marked location.</small><button class="map">Show pickup on map (open M)</button></footer></aside></div>
+</section><p class="note">Layout emulation using actual addon output and sample data · native game textures approximated · in-game rendering still to verify</p>
+<script type="application/json" id="journal-data">__JOURNAL_DATA__</script>
+<script>
+(()=>{const root=document.getElementById('qs-journal'),data=JSON.parse(root.querySelector('#journal-data').textContent);let tab='dungeonQuests',page=0,selected=null;const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const query=root.querySelector('input[type=search]');function render(){const all=data[tab].filter(r=>(r.name+' '+r.subtitle).toLowerCase().includes(query.value.toLowerCase())),size=tab==='dungeonQuests'?5:7;page=Math.max(0,Math.min(page,Math.max(0,Math.ceil(all.length/size)-1)));const rows=all.slice(page*size,(page+1)*size);if(!rows.includes(selected))selected=rows[0];const list=root.querySelector('.rows');list.replaceChildren();for(const r of rows){const b=document.createElement('button');b.className='row'+(tab==='dungeonQuests'?'':' equipment');b.setAttribute('role','option');b.setAttribute('aria-selected',r===selected);b.innerHTML='<span class="slot" aria-hidden="true">'+(tab==='dungeonQuests'?'!':'⚔')+'</span><span><strong>'+esc(r.name)+'</strong><small>'+esc(r.subtitle)+'</small>'+(r.task?'<div class="task '+(r.task.includes('Talk only')?'talk':'')+'">'+esc(r.task)+'</div>':'')+(r.pickup?'<div class="locations">'+esc(r.pickup)+'<br>'+esc(r.turnIn)+'</div>':'')+'</span>';b.onclick=()=>{selected=r;render()};list.appendChild(b)}root.querySelector('.detail').textContent=selected?.detail||'No matching results.';root.querySelector('.status').textContent=all.length?(page*size+1)+'–'+Math.min(all.length,(page+1)*size)+' of '+all.length+' '+(tab==='dungeonQuests'?'quests':'items'):'No matching results';root.querySelector('.prev').disabled=page===0;root.querySelector('.next').disabled=(page+1)*size>=all.length;root.querySelector('.page-count').textContent='Page '+(page+1)+' / '+Math.max(1,Math.ceil(all.length/size));root.querySelector('.paper h3').textContent=tab==='dungeons'?'Drop sources':'Quest pickup and chain';root.querySelector('.paper footer').hidden=tab==='dungeons';root.querySelector('.location-filter').hidden=tab==='quests';query.placeholder=tab==='dungeonQuests'?'Search quest, ID or dungeon...':'Search item, quest or source...';for(const b of root.querySelectorAll('[data-tab]'))b.setAttribute('aria-selected',b.dataset.tab===tab)}for(const b of root.querySelectorAll('[data-tab]'))b.onclick=()=>{tab=b.dataset.tab;page=0;selected=null;query.value='';render()};query.oninput=()=>{page=0;render()};root.querySelector('.clear').onclick=()=>{query.value='';page=0;render()};root.querySelector('.prev').onclick=()=>{page--;render()};root.querySelector('.next').onclick=()=>{page++;render()};root.querySelector('.map').onclick=()=>{root.querySelector('.paper footer small').textContent='Preview only — the addon sets the in-game waypoint.'};render()})();
+</script>
+</div>

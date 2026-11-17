@@ -1,5 +1,43 @@
 # Insights
 
+## 2026-11-17 — Search appearance belongs in the shared explorer
+- Native red buttons, Quickslot2 item surrounds, dialog grain and QuestBG parchment provide client-owned WoW styling without shipped art or global UI changes. Keep selected-row/text-state semantics; use explicit dark ink for parchment (yellow quest links need conversion).
+- Shared skin can stay inside EquipmentUI and its3consumers; untouched data scans, item comparisons, filters and menus already have meaningful integration coverage. Larger13px row/detail text still fits existing48px item/102px quest rows.
+- Isolated v0.4.19+4files passes44suites/1,627checks,42Lua parses and source/CRC checks. Browser3tab emulation inspected; native texture/font rendering cannot be claimed from browser approximation.
+- Recommend4file overlay over complete baseline package to avoid rolling back concurrently installed profession/diagnostic updates. Overlay34,536bytes/SHA256 `ec1462c387e53ccf39eb214b5abf012a1801b73cdaacde0675fe2980b3ed43fa`; complete baseline preview44files/233,999bytes/SHA256 `f11e760ae4377ff5a8276b7d364507d70aee0b2d306a126de9f48886a811439a`.
+
+## 2026-11-17 — Diagnostic readability follow-up
+- Concatenating raw doctor flags, stacks and logs solves capture but creates a wall of text; auto-selecting it also obscures reading. Open an unselected overview, keep raw detail optional, copy the complete snapshot regardless of view.
+- Keep capability/setup notes separate from actual recorded errors. Opening reports should not repeat the same details into chat or generate fresh log noise.
+
+## 2026-11-17 — Wetlands standalone vendor smoke
+- Latest-version user reports standalone QuestieDB, query `vendor`, outdoor Wetlands; loaded-data report still absent. Do not ask them to install full Questie as an assumed remedy.
+- Loaded existing `/tmp/questsharing-dungeon-{npc,item}db.lua` raw Classic source through schema-based adapters, then removed Questie/QuestieLoader and set ZoneDB area11->UI1437. Actual map module produced20 pins/6 suggestions/zero errors on both API styles. Includes Engineering Supplies at26.4,25.8 outside Menethil. Raw baseline is not the user's installed Forever dataset/native UI.
+- Checked primary upstream docs: https://github.com/Questie/QuestieDB/blob/master/docs/api.md entity globals/GetAllIds and standalone support ZoneDB, and QuestieDB.toc with no Questie dependency. Remaining fault boundary needs `/qs questie` output/panel status, not more synthetic matching changes.
+
+## 2026-11-17 — Readability requires the correct host and information hierarchy
+- User explicitly rejects the released companion despite 1,617 prior data/layout checks passing. Assert requested frame ownership, all-row navigation and text hierarchy; fixed bounds alone cannot establish visual usability.
+- Forever CraftingPage exposes RecipeList/SchematicForm and `SelectRecipe(info,true)`, allowing an embedded full list and native learned-recipe controls without fighting show-unlearned resets. Never pass static/synthetic unavailable recipeInfo into native schematic code.
+- A native hidden-list rebuild can auto-select a learned recipe behind an unlearned source overlay. Keep the visible selection authoritative and clear/validate native controls before showing the overlay; exercise this event ordering in tests.
+- Lua `return line:gsub(...)` returns replacement count too; shortSource must parenthesize it when exporting strings to tools or passing to strict UI functions.
+- Prefer same-faction vendor locality and hide repeated provenance/opposite-faction supplement lines from selected source copy; preserve the complete factual source reference separately.
+
+## 2026-11-17 — Chain relation and task are independent
+- Clear row labels need two dimensions: chain prerequisite/dungeon step/follow-up versus Talk only, item delivery/collection, combat, exploration, event or unknown. Do not replace chain identity with Talk only; many preparation steps have both.
+- Prerequisite reverse links identify a chain start even when it has no own preQuest; include known explicit next links and preserve IDs for identical titles. Branches need previous/next names, not fabricated step N/M.
+- An empty NPC/object objective list alone is insufficient for Talk only: check exploration, extra objectives, source items, event/escort bit and given/starter items. Actual raw Classic quest65Talk Wiley,132/141letterdelivery,155escort,166VanCleefheadcollection validate distinctions.
+- User confirmed selector works after initial complaint; only-All options reproduced before scan completion/missing provider, but no live defect established and no dropdown patch made.
+- Stable-package checks301/301 across7suites, focused58/58, all42Lua parses and raw4,244quest smoke pass. `dist/QuestSharing-dungeon-clarity-preview-2026-11-17.zip` contains only DungeonQuests.lua runtime delta over v0.4.19;44entries/232,804bytes/SHA256 `fde50fb793c24d64eec4e74c31da87813a8372ffc75968394826e38edb2438b0`. Native visuals unverified.
+
+## 2026-11-17 — Empty map search can hide a missing database
+- `VendorMap.indexRoles/indexItems` coerce absent `Q.ids` to `{}` and mark indexes ready, caching an empty result even if a database appears later. Detect enumeration capability before starting the worker; distinguish dependency failure from legitimate no-local-match feedback.
+- `Q.available()` checks **quest** records; it cannot gate NPC/item search because a valid standalone provider may expose only NPC/item tables. Use `Q.canEnumerate("npc") or Q.canEnumerate("item")` without executing GetAllIds.
+- Reproduced misleading no-seller state with all provider globals nil on modern/classic; tests verify absent, old, global/Lib-only, late and lost providers. A no-data fixture must restore ZoneDB mapping support alongside entity tables when verifying late pins.
+
+## 2026-11-17 — Diagnostic copying
+- Previous window switched between doctor/errors/log; display caps hid all but 10 errors and 1000 log lines despite storage retaining 30/~3000. Combined report must read full buffers, not concatenate already-truncated views.
+- Preserve a selected report as a snapshot; refresh explicitly. Native clipboard remains user-driven via Select all + Ctrl+C/Cmd+C.
+
 ## 2026-11-17 — v0.4.19 release verification
 - Published latest stable https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.19 at `d0b859820f9b8fdb0a100e2bdc69b5363574a605`; main/annotated tag verified remotely. Uploaded/downloaded ZIP equals local tested build and source bytes; published notes match exactly.
 - Current workspace passes all 44 self-running suites / 1,617 checks and compilation of all 42 runtime Lua modules with Lua 5.1; diff whitespace clean.
@@ -351,3 +389,28 @@
 - Native SpeakText exposes voice/text/rate/volume/overlap, not arbitrary acting directions or NPC metadata; local speech adapter must own configured model profiles and any extra controls.
 - Windows adapter can call localhost model server; Lua cannot directly use that HTTP endpoint. Model audio returns through speech engine, not as a Lua WAV buffer.
 - Stop/replay sentence and exact pause/resume are different capabilities; native timing/ownership/queue behavior needs client testing. Offline sound manifest remains a separate viable integration path.
+
+## 2026-11-17 — Green quests beside the planned route
+- User asks why a green quest on the way can be omitted. Verified QuestPlanner.scan/newCandidate/statusFor: green/yellow is only a level gate; new pickups also need a local starter, supported eligibility and locally mapped unfinished work/known hand-in. One remote or unmapped required target rejects a new quest even if its giver is beside the route. Active quests may still contribute local work/local ready hand-ins. Eligible ready local quests are not intentionally dropped for route proximity; no named quest/reproduction was supplied, so no specific omission diagnosed or runtime change made.
+
+## 2026-11-17 — Settings tool hierarchy
+- Extra tools mixed utility actions with equipment searches and profession references; database controls also lived under Map & search. Dedicated Browser DB plus one card per tool makes scope explicit.
+- Existing bool-row dispatch can be retained while adding an independent primary action: no setting migration or feature-module rewrite is needed.
+- Tool-card layout in the real harness: Extra tools667px /7 rows (five cards/two headers), Browser DB985px /10 rows (seven cards/three headers), both clipped to the existing484px scroll viewport. Browser preview confirms readable card grouping and final controls are reachable.
+
+## 2026-11-17 — Predictive timing versus omission
+- The user's roadside example concerns postponement as well as catalogue omission. Eligibility checks alone cannot explain the best timing.
+- Same source/camp is insufficient without acceptance and compatible credit. Sequential follow-ups cannot inherit earlier farming.
+- DropDB tuple values are percentages even below one, with source labels. Zero is evidence of an unusable source.
+- Eight-quest executed fixture predicts 99.23774719 seconds saved from bundling, with identical 160-second travel. A known unavailable pickup reverses the recommended start.
+- A dry streak under a fixed independent probability does not itself worsen the expected next-drop wait. Actual remaining counts drive replanning; statistical rate learning remains unsupported.
+
+## 2026-11-17 — Predictive prerequisite and character-state evidence
+- A graph can use one parent to establish reachability without forcing that parent in the route; retaining the full gate choices lets a selected quest choose the lower-cost branch. A selected objective must snapshot at its hand-in, or greedy continuation adds irrelevant quests.
+- QuestieDB quest fields `requiredMinRep`, `requiredMaxRep` and `requiredSkill` are pairs; `requiredRanks` is an OR list of pairs; `reputationReward` is a list of signed faction-point pairs. The local active-flavor provider must be read rather than importing raw base data. Native reputation `currentStanding`/legacy faction value uses the same absolute scale; Forever `C_SkillInfo.GetSkillLineInfoByID.rank` supplies an ID-based rank.
+- The full Lua harness passed 1,731 checks after this work, with both modern/classic adapter fixtures. Actual client behavior, travel availability and performance remain unmeasured.
+
+## 2026-11-17 — Search and uncertainty verification
+- Tiny exhaustive enumeration independently matches the optimizer's all, selected, XP and time-budget goals on a six-action fixture. An artificial one-check budget still returns the seeded eight-quest route and reports exhaustion.
+- Eight-quest harness result remains 420.95 seconds with eight hand-ins; beam uses 4,013 checks and does not exhaust. Host Lua harness averages ~19.7ms per all-mode solve across 100 runs; the actual game work is cooperatively sliced and must be profiled in WoW.
+- Two simultaneous different item objectives at one NPC can overlap, but marginal drop rates alone cannot give their joint completion time. The additive count stays an estimate with `uncertain=true`; two streams also expose a plausible camp range from the maximum versus sum of their separate expectations.

@@ -15,8 +15,9 @@ ns.settingTabs = {
     { id = "party", title = "Party window", intro = "Show who has each quest, choose what clicks do, and manage party friends." },
     { id = "actions", title = "Pings & quest items", intro = "Point out quest targets and use the items your quests need." },
     { id = "quick", title = "Quick chat", intro = "Send a saved message from a ring of choices. Set the key and edit messages below." },
-    { id = "maps", title = "Map & search", intro = "Search for items, see zone levels, and show party locations on the world map." },
-    { id = "optional", title = "Extra tools", intro = "Optional tools for quest planning, bag cleanup, spell ranks, fishing, equipment, and invites." },
+    { id = "maps", title = "Map", intro = "Show zone level guides and party locations on the world map." },
+    { id = "browser", title = "Browser DB", intro = "Find equipment, dungeon quests, recipes and item sources. Choose what you want to look up below." },
+    { id = "optional", title = "Extra tools", intro = "Plan your next quests, tidy your bags, update spells or save fishing spots. Open a tool below." },
 }
 
 -- Every setting explains the visible result; choices also explain the selected value.
@@ -40,14 +41,12 @@ ns.settingRows = {
     { tab = "general", kind = "action", label = "Show the ring", button = "Preview ring",
       desc = "Click to preview the quick chat ring. Edit its messages under Quick chat.", action = function() ns.quickOpen(true) end },
     { tab = "general", kind = "action", label = "Check my setup", button = "Run check",
-      desc = "Click for a report of working features, missing addons, and game settings that need attention.", action = function() ns.doctor() end },
+      desc = "Start with a readable issue overview. Copy all includes setup details, every recorded error and all retained log lines.", action = function() ns.doctor() end },
     { tab = "general", kind = "header", label = "Troubleshooting and reset" },
     { tab = "general", kind = "bool", key = "debug", label = "Record addon actions for troubleshooting",
-      desc = "Turn on to record what the addon tried and what happened. The record is saved when you reload or log out." },
-    { tab = "general", kind = "action", label = "Show the debug log", button = "View log",
-      desc = "Click to read or copy recent addon actions. Also available with /qs log.", action = function() ns.logCommand() end },
-    { tab = "general", kind = "action", label = "Show the errors", button = "View errors",
-      desc = "Click to read or copy recorded addon errors. Also available with /qs errors.", action = function() ns.errorsCommand(nil, true) end },
+      desc = "On by default: records what the addon tried and what happened, including errors. Saved when you reload or log out." },
+    { tab = "general", kind = "action", label = "Copy logs, errors and setup", button = "Open report",
+      desc = "Read the issue overview, then click Copy all and press Ctrl+C (Windows) or Cmd+C (Mac). Full technical details are included automatically.", action = function() ns.diagnostics() end },
     { tab = "general", kind = "action", label = "Reset everything to the defaults", button = "Reset settings",
       desc = "Click to restore default settings and quick chat messages. Your saved fishing notes are kept.", action = function() ns.resetSettings() end },
 
@@ -173,11 +172,6 @@ ns.settingRows = {
                party = "Party: only your current party receives the message.",
                whisper = "Whisper player: sends privately to the player you target or point at when opening the ring." } },
 
-    { tab = "maps", kind = "header", label = "Search items and vendors (requires Questie data)" },
-    { tab = "maps", kind = "bool", key = "itemSources", label = "Show where items come from when I hover over them",
-      desc = "Turn on for seller types and known Mining sources in bag and recipe tooltips. Requires Questie data." },
-    { tab = "maps", kind = "bool", key = "vendorSearch", label = "Search items and vendors on the map",
-      desc = "Show matching locations as map pins. Type an item or vendor type, like General Goods. Requires Questie data." },
     { tab = "maps", kind = "header", label = "Zone level guides" },
     { tab = "maps", kind = "bool", key = "zoneLevels", label = "Show zone questing level ranges",
       desc = "Turn on to display level ranges on the world map, such as 10-20. These are zone guides, not the level of every quest." },
@@ -187,53 +181,63 @@ ns.settingRows = {
     { tab = "maps", kind = "bool", key = "teamWaypoint", label = "Add a waypoint where a teammate found quest items",
       desc = "Turn on to mark a location a teammate shares for quest items you still need. Requires a client with waypoints." },
 
-    { tab = "optional", kind = "header", label = "Plan nearby quests" },
-    { tab = "optional", kind = "bool", key = "questPlanner", label = "Enable the quest planner",
-      desc = "Turn on to plan quests for your zone. Requires Questie. Shortest Path Forever can add walk routes and walking-distance ordering." },
-    { tab = "optional", kind = "action", label = "Plan my quests", button = "Open plan",
-      desc = "Open the route panel beside the quest tracker. Click a stop to mark it; use Follow with SPF for a walk route when installed.",
+    { tab = "optional", kind = "header", label = "Questing" },
+    { tab = "optional", kind = "bool", key = "questPlanner", label = "Quest planner", button = "Open plan",
+      desc = "Build a route through nearby quest pickups, objectives and turn-ins.",
+      note = "Requires QuestieDB. Optional: Shortest Path Forever for walking routes.", toggle = "Enable quest planner",
       action = function() ns.questPlanner.open() end },
-    { tab = "optional", kind = "header", label = "Leftover quest items" },
-    { tab = "optional", kind = "action", label = "Review quest items left in my bags", button = "Review items",
-      desc = "Find possible leftovers with no current quest match. Requires Questie. Review and confirm each stack before deleting it.",
+    { tab = "optional", kind = "action", label = "Review quest items left in my bags", title = "Bag cleanup", button = "Review items",
+      desc = "Review possible leftover quest items. You confirm each stack before it is deleted.",
+      note = "Requires QuestieDB. Active quest items and quest starters are protected.",
       action = function() ns.questCleanup.open() end },
-    { tab = "optional", kind = "header", label = "Spell ranks on my action bars" },
-    { tab = "optional", kind = "bool", key = "autoSpellRanks", label = "Auto-update spells to highest learned rank",
-      desc = "Turn on to replace old spell ranks on your action bars with the best rank you already learned. Waits during combat; leaves macros and pet bars alone." },
-    { tab = "optional", kind = "action", label = "Check spell ranks now", button = "Update ranks",
-      desc = "First turn on Auto-update spells above, then click to check your action bars now. Reports any update or reason it must wait.",
-      action = function() ns.spellRanks.update(true) end },
-    { tab = "optional", kind = "header", label = "Find equipment" },
-    { tab = "optional", kind = "bool", key = "rewardBrowser", label = "Enable the quest reward equipment browser",
-      desc = "Turn on to browse quest equipment for your class, level, and faction. Requires Questie data." },
-    { tab = "optional", kind = "action", label = "Find quest rewards", button = "Browse rewards",
-      desc = "Click to enable and open the reward browser. See quest gear and how to start each quest; hover over gear to compare it with yours.",
-      action = function() ns.rewards.open() end },
-    { tab = "optional", kind = "action", label = "Search instance loot and who drops it", button = "Browse drops",
-      desc = "Click to find dungeon equipment by item, boss, or dungeon. AtlasLoot provides fuller data; Questie results may be incomplete.",
-      action = function() ns.loot.open() end },
-    { tab = "optional", kind = "action", label = "Find quests by dungeon", button = "Dungeon quests",
-      desc = "Browse dungeon quests by faction, class and level, including pickups outside the dungeon. Right-click for quest actions and pickup map locations.",
-      action = function() ns.dungeonQuests.open() end },
-    { tab = "optional", kind = "header", label = "Saved fishing spots" },
-    { tab = "optional", kind = "bool", key = "professionGuide", label = "Cooking recipes, farming hints and profession upgrades",
-      desc = "Show the Cooking catalogue when you open Cooking, add guide buttons beside the profession window, and show ingredient farming tips. Static Forever sources can be incomplete." },
-    { tab = "optional", kind = "action", label = "Cooking recipes and sources", button = "Cooking recipes",
-      desc = "Browse known, missing and unconfirmed recipes. Select a recipe, then hover an ingredient for zones, mobs or fishing skill.",
-      action = function() ns.professions.open("cooking") end },
-    { tab = "optional", kind = "action", label = "Where to upgrade every profession", button = "Upgrades",
-      desc = "Static rank requirements and Alliance/Horde trainers, books and quests for all 12 professions.",
-      action = function() ns.professions.open("upgrades") end },
-    { tab = "optional", kind = "bool", key = "fishingMap", label = "Show fishing waters on the world map",
-      desc = "Turn on to display fishing spots you saved. AnglerAtlas can also provide zone fishing information." },
-    { tab = "optional", kind = "action", label = "Add or edit a fishing spot", button = "Edit spots",
-      desc = "Click to save a water's location, fishing skill, fish, and notes. You enter this information yourself.",
-      action = function() ns.fishing.open() end },
-    { tab = "optional", kind = "header", label = "Find people to quest with" },
-    { tab = "optional", kind = "action", label = "Seek fellow adventurers", button = "Write invite",
-      desc = "Click to draft an invitation for an unfinished quest. Choose a chat, review the text, and press Enter to send.",
+    { tab = "optional", kind = "action", label = "Seek fellow adventurers", title = "Quest invitation", button = "Write invite",
+      desc = "Draft an invitation for an unfinished quest. Choose a chat, review it and press Enter to send.",
       action = function() ns.adventure.open() end },
+    { tab = "optional", kind = "header", label = "Character & gathering" },
+    { tab = "optional", kind = "bool", key = "autoSpellRanks", label = "Auto-update spells to highest learned rank", title = "Spell ranks", button = "Update ranks",
+      desc = "Replace old spells on your action bars with the highest rank you already know.",
+      note = "Enable below before updating. Waits during combat; macros and pet bars stay unchanged.", toggle = "Automatically update spell ranks",
+      action = function() ns.spellRanks.update(true) end },
+    { tab = "optional", kind = "bool", key = "fishingMap", label = "Saved fishing spots", button = "Edit spots",
+      desc = "Save fishing locations with your own skill, fish and water notes.",
+      note = "Optional: AnglerAtlas adds zone fishing information.", toggle = "Show saved spots on the world map",
+      action = function() ns.fishing.open() end },
+
+    { tab = "browser", kind = "header", label = "Equipment & dungeon quests" },
+    { tab = "browser", kind = "bool", key = "rewardBrowser", label = "Quest rewards", button = "Browse rewards",
+      desc = "Find quest equipment for your class, level and faction, then see how to start each quest.",
+      note = "Requires QuestieDB. Hover over equipment to compare it with yours.", toggle = "Enable quest reward browser",
+      action = function() ns.rewards.open() end },
+    { tab = "browser", kind = "action", label = "Search instance loot and who drops it", title = "Dungeon loot", button = "Browse drops",
+      desc = "Search equipment by item, boss or dungeon and see who drops it.",
+      note = "AtlasLoot provides full encounter tables; QuestieDB is a partial fallback.",
+      action = function() ns.loot.open() end },
+    { tab = "browser", kind = "action", label = "Find quests by dungeon", title = "Dungeon quests", button = "Dungeon quests",
+      desc = "Find quests for a dungeon, including outside pickups, prerequisites and follow-ups.",
+      note = "Requires QuestieDB. Filter by faction, class and level.",
+      action = function() ns.dungeonQuests.open() end },
+    { tab = "browser", kind = "header", label = "Professions & recipes" },
+    { tab = "browser", kind = "bool", key = "professionGuide", label = "Cooking recipes and sources", title = "Cooking recipes", button = "Cooking recipes",
+      desc = "Browse learned and unlearned recipes, skill requirements, sources and ingredients in the game's profession window.",
+      note = "Recipe reference included. QuestieDB adds ingredient farming locations.", toggle = "Show recipe and upgrade guide in the profession window",
+      action = function() ns.professions.open("cooking") end },
+    { tab = "browser", kind = "action", label = "Where to upgrade every profession", title = "Profession upgrades", button = "Upgrades",
+      desc = "Look up rank requirements, trainers, books and quests for all 12 professions and both factions.",
+      note = "Reference included; no database addon needed.",
+      action = function() ns.professions.open("upgrades") end },
+    { tab = "browser", kind = "header", label = "Items & vendors" },
+    { tab = "browser", kind = "bool", key = "vendorSearch", label = "Search items and vendors on the map", title = "Item & vendor search",
+      desc = "Enable below, then open the world map and use its search box. Search an item, vendor type or trainer role.",
+      note = "Requires QuestieDB; Questie itself is optional. Check loaded data with /qs questie.", toggle = "Show the search box on the world map" },
+    { tab = "browser", kind = "bool", key = "itemSources", label = "Show where items come from when I hover over them", title = "Item source tooltips",
+      desc = "Show known seller types and Mining sources when you hover over bag items or recipe ingredients.",
+      note = "Requires QuestieDB.", toggle = "Show item sources in tooltips" },
+
 }
+
+for _, row in ipairs(ns.settingRows) do
+    row.card = (row.tab == "optional" or row.tab == "browser") and row.kind ~= "header"
+end
 
 local function limit(v) if type(v) == "function" then return v() end return v end
 
@@ -282,6 +286,12 @@ function ns.settingsClick(i, button)
     elseif row.kind == "key" then
         ns.captureKey(row.which)
     end
+    if ns.refreshSettings then ns.refreshSettings() end
+end
+
+function ns.settingsAction(i)
+    local row = ns.settingRows[i]
+    if row and row.action then row.action() end
     if ns.refreshSettings then ns.refreshSettings() end
 end
 
@@ -557,13 +567,53 @@ local function textHeight(font, text, width, size)
     return math.max(size, h or math.ceil(#text / math.max(1, math.floor(width / (size * 0.55)))) * size)
 end
 
+local function paintTool(r, row)
+    r.card:Show()
+    r.text:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 16, -12)
+    local labelH = textHeight(r.text, row.title or row.label, CONTENT - (row.action and 184 or 32), 14)
+    r.text:SetText(S.WHITE .. (row.title or row.label) .. "|r")
+    if row.action then
+        r.button:SetLabel(row.button or "Open")
+        r.button:ClearAllPoints(); r.button:SetPoint("TOPRIGHT", r.frame, "TOPRIGHT", -12, -10)
+        r.button:SetHeight(26); r.button:Show()
+    end
+    local y = math.max(44, labelH + 22)
+    r.desc:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 16, -y)
+    y = y + textHeight(r.desc, row.desc, CONTENT - 32, 13) + 8
+    r.desc:SetText("|cffd0d5df" .. row.desc .. "|r")
+    if row.note then
+        r.note:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 16, -y)
+        y = y + textHeight(r.note, row.note, CONTENT - 32, 12) + 8
+        r.note:SetText("|cff9daabd" .. row.note .. "|r")
+        r.note:Show()
+    end
+    if row.kind == "bool" then
+        local enabled = ns.db[row.key]
+        r.toggle:ClearAllPoints(); r.toggle:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 12, -y)
+        r.toggleText:ClearAllPoints(); r.toggleText:SetPoint("TOPLEFT", r.toggle, "TOPLEFT", 30, -4)
+        local toggleH = math.max(26, textHeight(r.toggleText, (row.toggle or row.label) .. (enabled and "  |cff55ff55On|r" or "  |cff9d9d9dOff|r"), CONTENT - 58, 13) + 8)
+        r.toggle:SetHeight(toggleH); r.toggle:Show(); r.toggleText:Show()
+        r.box:ClearAllPoints(); r.box:SetPoint("TOPLEFT", r.toggle, "TOPLEFT", 0, 0)
+        r.box:Show()
+        if enabled then r.tick:Show() end
+        y = y + toggleH + 4
+    end
+    return y + 8
+end
+
 local function paintRow(r, row)
     local d = ns.db
     r.box:Hide(); r.tick:Hide(); r.value:SetText(""); r.button:Hide(); r.line:Hide()
+    r.card:Hide(); r.note:Hide(); r.toggle:Hide(); r.toggleText:Hide()
+    r.note:ClearAllPoints()
     r.less:Hide(); r.more:Hide()
     for _, b in ipairs(r.choices) do b:Hide() end
     r.text:ClearAllPoints()
     r.desc:ClearAllPoints()
+    if row.card then return paintTool(r, row) end
+    r.box:ClearAllPoints(); r.box:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 0, 1)
+    r.button:ClearAllPoints(); r.button:SetPoint("TOPRIGHT", r.frame, "TOPRIGHT", -4, -1)
+    r.button:SetHeight(20)
     if row.kind == "header" then
         r.desc:SetText("")
         r.text:SetPoint("BOTTOMLEFT", r.frame, "BOTTOMLEFT", 0, 8)
@@ -643,7 +693,7 @@ function ns.refreshSettings()
             r.frame:SetPoint("TOPLEFT", W.rowBody, "TOPLEFT", 0, -y)
             r.frame:SetHeight(h)
             r.frame:Show()
-            y = y + h + 4
+            y = y + h + (ns.settingRows[idx].card and 12 or 4)
         else
             r.index = nil
             r.frame:Hide()
@@ -694,6 +744,8 @@ buildRow = function(f, n)
     local r = { choices = {} }
     local frame = clickable(f, CONTENT, ROW_H, nil)
     r.frame = frame
+    r.card = S.fill(frame, "BACKGROUND", 0.09, 0.11, 0.16, 0.98)
+    r.card:SetAllPoints(frame); r.card:Hide()
     r.hover = S.fill(frame, "BACKGROUND", 1, 1, 1, 0.06)
     r.hover:SetAllPoints(frame); r.hover:Hide()
     r.box, r.tick = S.checkBox(frame)
@@ -702,13 +754,24 @@ buildRow = function(f, n)
     r.text:SetJustifyH("LEFT"); r.text:SetWordWrap(true)
     r.desc = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     r.desc:SetJustifyH("LEFT"); r.desc:SetWordWrap(true)
+    r.note = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.note:SetJustifyH("LEFT"); r.note:SetWordWrap(true)
+    r.toggle = clickable(frame, CONTENT - 24, 26, function(_, button)
+        if r.index then ns.settingsClick(r.index, button) end
+    end)
+    r.toggleText = r.toggle:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.toggleText:SetJustifyH("LEFT"); r.toggleText:SetWordWrap(true)
     r.value = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     r.value:SetJustifyH("RIGHT")
     r.line = S.fill(frame, "ARTWORK", 1, 0.82, 0, 0.35)
     r.line:SetHeight(1)
     r.line:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 2)
     r.line:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 2)
-    r.button = S.button(frame, "", 140, function(_, which) if r.index then ns.settingsClick(r.index, which) end end)
+    r.button = S.button(frame, "", 140, function(_, which)
+        local row = r.index and ns.settingRows[r.index]
+        if row and row.card and row.action then ns.settingsAction(r.index)
+        elseif row then ns.settingsClick(r.index, which) end
+    end)
     r.button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -1)
     r.less = S.button(frame, "-", 32, function() if r.index then ns.settingsClick(r.index, "RightButton") end end)
     r.less:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -100, -1)
@@ -723,7 +786,7 @@ buildRow = function(f, n)
     end
     frame:SetScript("OnMouseUp", function(_, button)
         local row = r.index and ns.settingRows[r.index]
-        if row and row.kind == "bool" then ns.settingsClick(r.index, button) end
+        if row and row.kind == "bool" and not row.card then ns.settingsClick(r.index, button) end
     end)
     frame:SetScript("OnEnter", function(self)
         local row = r.index and ns.settingRows[r.index]

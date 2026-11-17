@@ -370,6 +370,13 @@ Q.get = field                                                   -- one field of 
 
 -- Enumerable IDs are available in current QuestieDB / LibQuestieDB builds. Older Questie versions can still
 -- answer direct item queries, but cannot build a whole-catalogue map search.
+-- Inspect capabilities without reading/enumerating the database on a blank map.
+function Q.canEnumerate(kind)
+    local db, lib = _G[NEW[kind]], libTable(kind)
+    return (type(db) == "table" and type(db.GetAllIds) == "function")
+        or (type(lib) == "table" and type(lib.GetAllIds) == "function")
+end
+
 function Q.ids(kind)
     local db = _G[NEW[kind]]
     if type(db) == "table" and type(db.GetAllIds) == "function" then
@@ -442,27 +449,92 @@ local function allStarters(questID, cache)
 end
 function Q.plannerStarters(questID, cache) return allStarters(questID, cache) end
 
+local function positiveInteger(value)
+    if type(value) == "number" and value > 0 and value < math.huge and value == math.floor(value) then return value end
+end
+
+-- The normal Questie row has ID, optional localized label, and icon. None of its positional fields
+-- is a quantity. The English descriptions sometimes give a quantity directly before the source name.
+local function describedQuantity(descriptions, name)
+    if not (type(descriptions) == "table" and type(name) == "string" and #name > 1) then return end
+    local needle, count = string.lower(name), nil
+    for _, line in ipairs(descriptions) do
+        if type(line) == "string" then
+            local lower, from = string.lower(line), 1
+            while true do
+                local first, last = string.find(lower, needle, from, true)
+                if not first then break end
+                local tail = string.sub(lower, last + 1)
+                if tail == "" or string.match(tail, "^%W") or string.match(tail.." ", "^s%W") then
+                    local before = string.sub(lower, 1, first - 1)
+                    local n = positiveInteger(tonumber(string.match(before, "%f[%d](%d+)%s+$")
+                        or string.match(before, "%f[%d](%d+)%s+pieces%s+of%s+$")))
+                    if n and count and n ~= count then return end
+                    count = n or count
+                end
+                from = last + 1
+            end
+        end
+    end
+    return count
+end
+
 local function plannerTargets(questID, cache)
     local out, objs = {}, plannerField("quest", questID, "objectives", cache)
+    local descriptions = plannerField("quest", questID, "objectivesText", cache)
+    local function add(kind, row, id, name, sources)
+        local target = {kind=kind, name=name, sources=sources, creditID=kind=="kill" and id or nil,
+            itemID=kind=="loot" and id or nil, objectiveText=type(row[2])=="string" and row[2] or nil}
+        target.required = positiveInteger(row.required)
+        if target.required then target.countSource = "provider"
+        elseif kind == "kill" or kind == "loot" then
+            target.required = describedQuantity(descriptions, name)
+            if target.required then target.countSource = "description" end
+        end
+        if kind == "loot" then
+            target.dropRates, target.rateSources = {}, {}
+            for _, source in ipairs(sources) do
+                if source.kind == "npc" then
+                    local percent, origin = Q.itemDropRate(id, source.id)
+                    if percent then target.dropRates[source.id], target.rateSources[source.id] = percent / 100, origin end
+                    if cache and ns.dataWork then ns.dataWork.checkpoint() end
+                end
+            end
+        end
+        out[#out + 1] = target
+    end
     if type(objs) == "table" then
-        for _, id in ipairs(objectiveIds(objs[1], 1)) do
-            local sources = {}; appendSources(sources, "npc", { id }, cache)
-            out[#out + 1] = { kind = "kill", name = plannerField("npc", id, "name", cache), sources = sources }
+        for _, row in ipairs(type(objs[1]) == "table" and objs[1] or {}) do
+            local id = type(row)=="table" and positiveInteger(row[1])
+            if id then
+                local sources = {}; appendSources(sources, "npc", {id}, cache)
+                local custom = type(row[2]) == "string" and row[2] ~= ""
+                add(custom and "interact" or "kill", row, id, sources[1] and sources[1].name, sources)
+            end
         end
         for _, row in ipairs(type(objs[5]) == "table" and objs[5] or {}) do
             local ids = type(row) == "table" and type(row[1]) == "table" and row[1] or nil
             local sources = {}; appendSources(sources, "npc", ids, cache)
             if #sources > 0 then
-                local names = {}; for _, s in ipairs(sources) do if s.name then names[#names + 1] = s.name end end
-                out[#out + 1] = { kind = "kill", name = table.concat(names, " or "), sources = sources }
+                local names = {}; for _, src in ipairs(sources) do if src.name then names[#names + 1] = src.name end end
+                add("kill", row, positiveInteger(row[2]), table.concat(names, " or "), sources)
             end
         end
-        for _, id in ipairs(objectiveIds(objs[2], 1)) do
-            local sources = {}; appendSources(sources, "object", { id }, cache)
-            out[#out + 1] = { kind = "object", name = plannerField("object", id, "name", cache), sources = sources }
+        for _, row in ipairs(type(objs[2])=="table" and objs[2] or {}) do
+            local id = type(row)=="table" and positiveInteger(row[1])
+            if id then
+                local sources = {}; appendSources(sources, "object", {id}, cache)
+                add("object", row, id, sources[1] and sources[1].name, sources)
+            end
         end
-        for _, itemID in ipairs(objectiveIds(objs[3], 1)) do
-            out[#out + 1] = { kind = "loot", name = plannerField("item", itemID, "name", cache), itemID = itemID, sources = itemSources(itemID, cache) }
+        for _, row in ipairs(type(objs[3])=="table" and objs[3] or {}) do
+            local id = type(row)=="table" and positiveInteger(row[1])
+            if id then add("loot", row, id, plannerField("item", id, "name", cache), itemSources(id, cache)) end
+        end
+        for _, slot in ipairs({4, 6}) do
+            if type(objs[slot])=="table" and next(objs[slot]) then
+                out[#out + 1] = {kind="unknown", name=slot==4 and "Reputation objective" or "Spell objective",sources={}}
+            end
         end
     end
     local trigger = plannerField("quest", questID, "triggerEnd", cache)
@@ -486,6 +558,21 @@ local function plannerTargets(questID, cache)
     return out
 end
 
+local function questBaseXP(id, cache)
+    local module = cache and cache._xp
+    if module == nil then
+        local support = type(LibQuestieDB)=="table" and LibQuestieDB.Support
+        module = support and call(support.Get, "QuestXP")
+        if type(module)~="table" or type(module.db)~="table" then
+            module = QuestieLoader and call(QuestieLoader.ImportModule, QuestieLoader, "QuestXP")
+        end
+        if cache then cache._xp = module or false end
+    end
+    local row = type(module)=="table" and type(module.db)=="table" and module.db[id]
+    local value = type(row)=="table" and row[2]
+    if type(value)=="number" and value>=0 and value<math.huge then return value end
+end
+
 function Q.plannerQuest(questID, cache)
     local name = plannerField("quest", questID, "name", cache)
     if not name then return nil end
@@ -496,12 +583,50 @@ function Q.plannerQuest(questID, cache)
         appendSources(turnIns, "npc", finish[1], cache)
         appendSources(turnIns, "object", finish[2], cache)
     end
+    local flags = tonumber(plannerField("quest", questID, "specialFlags", cache)) or 0
+    local exclusives = plannerField("quest", questID, "exclusiveTo", cache)
+    local targets = plannerTargets(questID, cache)
+    local function pair(key)
+        local value = plannerField("quest", questID, key, cache)
+        if type(value) == "table" and positiveInteger(value[1]) and type(value[2]) == "number"
+            and value[2] == value[2] and math.abs(value[2]) < math.huge then
+            return {value[1], value[2]}
+        end
+    end
+    local rewards = {}
+    local rewardRows = plannerField("quest", questID, "reputationReward", cache)
+    for _, row in ipairs(type(rewardRows) == "table" and rewardRows or {}) do
+        if type(row) == "table" and positiveInteger(row[1]) and type(row[2]) == "number"
+            and row[2] == row[2] and math.abs(row[2]) < math.huge then
+            rewards[row[1]] = (rewards[row[1]] or 0) + row[2]
+        end
+    end
+    local rankRows = plannerField("quest", questID, "requiredRanks", cache)
+    local requiredRanks = {}
+    for _, row in ipairs(type(rankRows) == "table" and rankRows or {}) do
+        if type(row) == "table" and positiveInteger(row[1]) and type(row[2]) == "number"
+            and row[2] >= 0 and row[2] < math.huge then
+            requiredRanks[#requiredRanks + 1] = {row[1], row[2]}
+        end
+    end
+    if flags % 4 >= 2 and #targets == 0 then
+        targets[1] = {kind="event", name="Quest event", sources={}, points={}}
+    end
     return {
+        repeatable = flags % 2 == 1, xp = questBaseXP(questID, cache),
+        requiredMinRep = pair("requiredMinRep"), requiredMaxRep = pair("requiredMaxRep"),
+        requiredSkill = pair("requiredSkill"), requiredRanks = requiredRanks,
+        reputationReward = rewards,
+        exclusiveTo = type(exclusives) == "table" and exclusives or {},
+        parentQuest = positiveInteger(plannerField("quest",questID,"parentQuest",cache)),
+        availableStartingWith = positiveInteger(plannerField("quest",questID,"availableStartingWith",cache)),
+        availableUntilCompleted = positiveInteger(plannerField("quest",questID,"availableUntilCompleted",cache)),
+        requiredMaxLevel = positiveInteger(plannerField("quest",questID,"requiredMaxLevel",cache)),
         id = questID, name = name, level = tonumber(plannerField("quest", questID, "questLevel", cache) or 0) or 0,
         requiredLevel = tonumber(plannerField("quest", questID, "requiredLevel", cache) or 0) or 0,
         beforeAny = type(single) == "table" and single or {},
         beforeAll = type(group) == "table" and group or {},
-        starters = allStarters(questID, cache), targets = plannerTargets(questID, cache), turnIns = turnIns,
+        starters = allStarters(questID, cache), targets = targets, turnIns = turnIns,
     }
 end
 
@@ -515,16 +640,100 @@ function Q.questDoable(questID)
     end
 end
 
+-- The provider's first failure can be a chain gate. Check other character restrictions
+-- before predicting that turning in the parent alone will make this quest attainable.
+function Q.futureCharacterGate(id, skipReputation)
+    local enums = type(LibQuestieDB)=="table" and LibQuestieDB.Enum or {}
+    local ui = ns.optionalUI
+    local _, token = ui.call(UnitClass, "player")
+    local _, _, raceID = ui.call(UnitRace, "player")
+    local masks = {requiredClasses = enums.classKeys and enums.classKeys[token],
+        requiredRaces = enums.raceMaskById and enums.raceMaskById[raceID]}
+    for _, key in ipairs({"requiredClasses", "requiredRaces"}) do
+        local required = tonumber((field("quest",id,key))) or 0
+        if required > 0 then
+            if not masks[key] then return "unknown", "Character restriction cannot be verified" end
+            if not ns.rewards.overlaps(required, masks[key]) then
+                return "blocked", key=="requiredClasses" and "Wrong class for this quest" or "Wrong race or faction for this quest"
+            end
+        end
+    end
+    for _, key in ipairs({"requiredMinRep","requiredMaxRep","requiredSpecialization"}) do
+        local requirement = field("quest",id,key)
+        if (not skipReputation or (key ~= "requiredMinRep" and key ~= "requiredMaxRep"))
+            and ((type(requirement)=="table" and next(requirement)) or (type(requirement)=="number" and requirement~=0)) then
+            return "unknown", "Future eligibility needs a profession or reputation check"
+        end
+    end
+    local spell = positiveInteger(field("quest", id, "requiredSpell"))
+    if spell then
+        local known = call(IsSpellKnown, spell)
+        if known == nil then return "unknown","Required spell cannot be verified" end
+        if not known then return "blocked","Requires spell " .. spell end
+    end
+    local skill, ranks = field("quest", id, "requiredSkill"), field("quest", id, "requiredRanks")
+    local skills = {}
+    if type(skill) == "table" and positiveInteger(skill[1]) then skills[skill[1]] = true end
+    for _, row in ipairs(type(ranks) == "table" and ranks or {}) do
+        if type(row) == "table" and positiveInteger(row[1]) then skills[row[1]] = true end
+    end
+    if next(skills) then
+        local values = ns.compat.plannerSkills(skills)
+        if type(skill) == "table" and positiveInteger(skill[1]) then
+            local current = values[skill[1]]
+            if current == nil then return "unknown", "Future eligibility needs a profession skill value" end
+            if current < (tonumber(skill[2]) or math.huge) then return "blocked", "Profession skill too low" end
+        end
+        if type(ranks) == "table" and #ranks > 0 then
+            local matched, unknown = false, false
+            for _, row in ipairs(ranks) do
+                if type(row) == "table" and positiveInteger(row[1]) then
+                    local current = values[row[1]]
+                    if current == nil then unknown = true
+                    elseif current >= (tonumber(row[2]) or math.huge) then matched = true end
+                end
+            end
+            if not matched then
+                if unknown then return "unknown", "Future eligibility needs a profession rank value" end
+                return "blocked", "Profession rank too low"
+            end
+        end
+    end
+    if skipReputation then
+        local factions = {}
+        for _, key in ipairs({"requiredMinRep", "requiredMaxRep"}) do
+            local rule = field("quest", id, key)
+            if type(rule) == "table" and positiveInteger(rule[1]) then factions[rule[1]] = true end
+        end
+        if next(factions) then
+            local values = ns.compat.plannerReputation(factions)
+            for faction in pairs(factions) do
+                if values[faction] == nil then return "unknown", "Future eligibility needs a reputation value" end
+            end
+        end
+    end
+end
+
 function Q.questBlockReason(questID)
     local mod = questieModule()
     if not (mod and type(mod.IsDoableVerbose) == "function") then return nil end
-    local ok, _, blocked, reason = pcall(mod.IsDoableVerbose, questID, false, true, true)
+    local ok, detail, blocked, reason = pcall(mod.IsDoableVerbose, questID, false, true, true)
     if not ok then return nil end
-    if blocked ~= true then return nil end
     local states = mod.DoableStates or {}
+    if blocked ~= true then
+        if reason ~= nil and (reason == states.AVAILABLE or reason == states.PARENT_ACTIVE) then return "ready" end
+        return nil
+    end
+    if reason == nil then return "unknown" end
     if reason == states.NO_PREQUESTSINGLE then return "any" end
     if reason == states.NO_PREQUESTGROUP then return "all" end
-    return "other"
+    if reason == states.PARENT_INACTIVE or reason == states.ENABLING_QUEST_MISSING then return "parent" end
+    if reason == states.LEVEL_TOO_LOW then return "level" end
+    if reason == states.LEVEL_TOO_HIGH then return "overlevel" end
+    if reason == states.MISSING_REPUTATION or reason == states.EXCEED_REPUTATION then return "reputation" end
+    if reason == states.WRONG_RACE or reason == states.WRONG_CLASS then return "character" end
+    if reason == states.EXCLUSIVE_COMPLETED or reason == states.EXCLUSIVE_IN_QUEST_LOG then return "exclusive" end
+    return "other", type(detail)=="string" and detail or nil
 end
 
 function Q.questComplete(questID)
@@ -537,25 +746,18 @@ function Q.questComplete(questID)
     if type(complete) == "table" then return complete[questID] == true end
 end
 
--- Questie keeps drop percentages in a separate DropDB. Normalize only an unambiguous numeric result;
--- an unfamiliar provider shape stays unknown rather than being guessed.
+-- DropDB.GetItemDroprate returns {percent, source}. Its units are 0..100, including
+-- sub-one-percent drops. Never reinterpret a smaller percentage as a fraction.
 function Q.itemDropRate(itemID, npcID)
     if not (QuestieLoader and QuestieLoader.ImportModule) then return nil end
-    local ok, drops = pcall(QuestieLoader.ImportModule, QuestieLoader, "DropDB")
-    local rate = ok and type(drops) == "table" and type(drops.GetItemDroprate) == "function"
-        and call(drops.GetItemDroprate, itemID, npcID)
-    if type(rate) == "number" and rate > 0 then return rate <= 1 and rate * 100 or rate end
-    if type(rate) == "string" then
-        local value = tonumber(string.match(rate, "([%d%.]+)"))
-        if value and value > 0 then return value end
-    elseif type(rate) == "table" then
-        for _, value in pairs(rate) do
-            if type(value) == "number" and value > 0 then return value <= 1 and value * 100 or value end
-            if type(value) == "string" then
-                local parsed = tonumber(string.match(value, "([%d%.]+)"))
-                if parsed and parsed > 0 then return parsed end
-            end
-        end
+    local drops = call(QuestieLoader.ImportModule, QuestieLoader, "DropDB")
+    local result = type(drops) == "table" and call(drops.GetItemDroprate, itemID, npcID)
+    local value, origin
+    if type(result) == "table" then value, origin = result[1], result[2]
+    elseif type(result) == "number" then value = result
+    elseif type(result) == "string" then value = tonumber((result:match("^%s*([%d%.]+)%%%s*$"))) end
+    if type(value) == "number" and value >= 0 and value <= 100 then
+        return value, type(origin) == "string" and origin or "Questie"
     end
 end
 

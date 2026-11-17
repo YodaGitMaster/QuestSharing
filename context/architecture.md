@@ -14,10 +14,10 @@ QuestSharing/  # Repository root
 │   ├── Core.lua  # settings, timers, events, chat helpers, master-tool lifecycle and /qs commands
 │   ├── CookingReference.lua  # Pinned MIT Forever Cooking facts: spells, ingredients and acquisition hints
 │   ├── DataWork.lua  # Shared cooperative database queue, 2ms slices, pause/resume and combat suspension
-│   ├── Diagnostics.lua  # an error log and a "doctor" report, so problems on a real game client are easy to report
+│   ├── Diagnostics.lua  # Readable issue overview and full snapshot; Copy all includes all retained technical records
 │   ├── Friends.lua  # add the people you group with to your friends list
-│   ├── DungeonQuests.lua  # Dungeon quest catalogue, cached pickup/turn-in rows, hover XP/rewards and quest actions
-│   ├── EquipmentUI.lua  # Shared three-tab quest/equipment explorer with scoped equipment controls
+│   ├── DungeonQuests.lua  # Dungeon catalogue, separate chain/task labels, locations, hover XP/rewards and quest actions
+│   ├── EquipmentUI.lua  # Three-tab WoW-style journal skin, native buttons/slots, parchment details and scoped filters
 │   ├── Fishing.lua  # Optional world-map water notes, editor and AnglerAtlas zone summaries
 │   ├── Highlight.lua  # make quest objectives easier to find
 │   ├── ItemSources.lua  # optional Questie source hints on bag and recipe item tooltips
@@ -30,18 +30,20 @@ QuestSharing/  # Repository root
 │   ├── Ping.lua  # one key (or a click on the ring) pings the nearest creature one of your quests needs with the game's
 │   ├── Progress.lua  # notices when the objectives of one of your quests are all done, tells the party
 │   ├── ProfessionReference.lua  # Static rank requirements, faction trainers/books/quests and example fish waters
-│   ├── Professions.lua  # Cooking catalogue, live learned states, item farming hints and native-window guide buttons
+│   ├── Professions.lua  # Recipe/farming model, own-Cooking learned-state reads and native-window lifecycle
+│   ├── ProfessionUI.lua  # Embedded scrolling recipe list, native known-recipe crafting and in-place source/Upgrades panes
 │   ├── QuestAutomation.lua  # opt-in quest offer acceptance and safe turn-ins
 │   ├── QuestCleanup.lua  # On-demand carried-bag leftovers review and freshly validated per-stack deletion
 │   ├── QuestItems.lua  # quest items you can USE (a torch to light, a flare to throw...)
 │   ├── QuestSharing.toc  # Addon metadata and module load order
 │   ├── Questie.lua  # if the Questie addon is installed, its quest database tells us where a quest starts and which quests
 │   ├── QuestGuidance.lua  # Selected-step direction/distance HUD and own numbered map-route overlay
-│   ├── QuestPlanner.lua  # zone-local quest route, tracker panel, native waypoint and optional SPF actions
+│   ├── QuestOptimizer.lua  # Seeded and bounded-beam schedule search, compatible kill/drop expectation and four goals
+│   ├── QuestPlanner.lua  # Zone facts/actions, plan controls/report, stable replanning, guide, waypoint and SPF actions
 │   ├── QuestPlannerPath.lua  # optional SPF API detection, walk-cost requests, cancellation and outing promotion
 │   ├── Quick.lua  # a quick-chat wheel
 │   ├── Rewards.lua  # On-demand QuestieDB reward catalogue, eligibility filters and item comparisons
-│   ├── Settings.lua  # Sidebar categories, plain explanations, direct choices, scrollable settings/editor and key capture
+│   ├── Settings.lua  # Sidebar settings; Extra tools / Browser DB cards, separate switches/actions, scrolling and key capture
 │   ├── Share.lua  # notice a new party, push the quests of the area one by one, read the game's replies
 │   ├── SpellRanks.lua  # Opt-in learned spell-rank upgrades across player action-bar pages
 │   ├── Status.lua  # what to say about a quest you click in the tracker, and the hooks that notice the click
@@ -49,16 +51,24 @@ QuestSharing/  # Repository root
 │   ├── Sync.lua  # party members who also run Quest Sharing tell each other exactly which quests they have
 │   ├── Team.lua  # "Picked up [Wolves Among Us] - Anna has it too. Want to do it together?"
 │   ├── Track.lua  # keeps the quest tracker (the list on the right) filled with the quests closest to you
-│   ├── VendorMap.lua  # optional item/vendor map search, autocomplete and own pins
+│   ├── VendorMap.lua  # optional item/vendor map search, database availability feedback, autocomplete and own pins
 │   └── ZoneLevels.lua  # Read-only map questing ranges, outdoor zone badges and hover panel
 ├── README.md  # User documentation
 ├── build_release.py  # Build install ZIP and release notes
 ├── tools/  # Local UI emulation utilities, never shipped in the addon
 │   ├── build_cooking_reference.py  # Rebuild pinned factual Cooking subset with upstream MIT attribution
+│   ├── preview_professions.py  # Export actual profession model into an illustrative native-window layout preview
+│   ├── profession-preview.html  # Embedded recipe-list/source/Upgrades visual template with sample learned states
+│   ├── preview_search_journal.py  # Export real Lua search rows/details to a local journal layout emulation
+│   ├── search-journal-preview.html  # Interactive three-tab journal layout emulation; native textures approximated
 │   ├── preview_quest_planner.py  # Run actual Lua planner and embed its rows in the Westfall emulation
 │   └── quest-guide-preview.html  # Interactive compact-guide fragment template with navigation, mini mode and lock
 ├── context/  # Session continuity and live architecture
 │   ├── BUGS/  # Verified bug methodology and regressions
+│   │   ├── 2026-11-17-planner-multiple-drop-confidence.md  # Label unverified overlap between separate loot streams
+│   │   ├── 2026-11-17-planner-or-parent-selection.md  # Preserve OR gate choices through routing and selected completion
+│   │   ├── 2026-11-17-profession-window-layout.md  # Standalone companion mismatch; embedded native list/detail and readable hierarchy
+│   │   ├── 2026-11-17-map-search-missing-database.md  # Missing-data feedback, standalone QuestieDB and late-provider retry
 │   │   ├── 2026-11-17-guidance-submap-rectangle.md  # Preserve four native bounds across submap projection
 │   │   ├── 2026-11-17-guidance-late-map-metrics.md  # Throttled recovery from absent initial measurements
 │   │   ├── 2026-11-17-guidance-selected-cluster-marker.md  # Keep selected number/position in grouped map markers
@@ -89,6 +99,7 @@ QuestSharing/  # Repository root
 │   ├── profession-reference-research.md  # Forever guide sources, pinned recipe-data provenance and live API boundaries
 │   ├── quest-narration-research.md  # Separate local voice-acting addon proposals and verified source limits
 │   ├── quest-optimization-research.md  # Prior art and proposed quest graph/route optimizer design
+│   ├── predictive-quest-optimizer.md  # Implemented algorithm, executed simulation and evidence limits
 │   ├── quest-planner-routing-and-validation-plan.md  # SPF integration behavior, automated coverage and pending in-game checks
 │   ├── schema.md  # Data structures and formats
 │   ├── shortest-path-source-study.md  # External router implementation trace; no runtime dependency
@@ -120,6 +131,8 @@ QuestSharing/  # Repository root
     ├── test_professions.py  # Cooking reference, live learned-state guards, recipe/farming sources, rank/faction UI and cancellation
     ├── test_ping.py  # Tests for ping
     ├── test_questmap.py  # How-to quest text and retired map-overlay guards
+    ├── test_planner_facts.py  # Provider units/counts, character restrictions and deep zone chains
+    ├── test_quest_optimizer.py  # Predictive simulation, four goals, constraints and public guide integration
     ├── test_quest_planner_path.py  # Optional SPF API, walk-cost ordering, cancellation and fallback
     ├── test_quest_guidance.py  # Arrow/world-size math, grouped route selection, own map lines, lifecycle, fallbacks and idle reads
     ├── test_quest_planner_guide.py  # Current/upcoming styling, previous/next, mini mode and session lock
@@ -146,19 +159,25 @@ QuestSharing/  # Repository root
 
 ```mermaid
 flowchart LR
-    Fishing[Fishing.lua: Cooking button] --> Professions[Professions.lua: catalogue / Upgrades tabs]
-    Native[Native profession frame and events] --> Professions
-    Cooking[CookingReference.lua: pinned MIT facts] --> Professions
-    Ranks[ProfessionReference.lua: Forever rank guide and example waters] --> Professions
-    Professions --> API[C_TradeSkillUI: read own Cooking learned states]
-    Professions --> Sources[Questie.lua: hovered ingredient / recipe source IDs]
-    Professions --> Levels[ZoneLevels.lua: zone ranges]
-    Atlas[Optional AnglerAtlas] --> Professions
+    Native[Existing ProfessionsFrame] --> UI[ProfessionUI.lua: embedded Recipes and Upgrades]
+    Fishing[Fishing.lua: Cooking action] --> Model[Professions.lua: source/state model]
+    UI --> Model
+    Model --> API[C_TradeSkillUI: own Cooking reads]
+    UI --> Craft[CraftingPage.SelectRecipe: learned recipes only]
+    Model --> Cooking[CookingReference.lua: pinned MIT recipe facts]
+    Model --> Ranks[ProfessionReference.lua: factions, ranks and water examples]
+    Model --> Sources[Questie.lua: requested item/NPC source records]
+    Model --> Levels[ZoneLevels.lua: zone ranges]
+    Atlas[Optional AnglerAtlas estimates] --> Model
 ```
 ```mermaid
 flowchart TD
     TOC[QuestSharing.toc] --> Compat[Compat.lua: ns.compat]
     TOC --> Core[Core.lua: events, settings, timers]
+    Core --> Diagnostics[Diagnostics.lua: log / errors / doctor combined snapshot]
+    Settings --> Diagnostics
+    Diagnostics --> DiagnosticStore[QuestSharingLog and QuestSharingDB.errors: bounded saved records]
+    Diagnostics --> Report[QuestSharingReport: issue overview, full details, Copy all, Refresh and Clear records]
     Core --> Share[Share.lua: quest offers]
     Core --> DataWork[DataWork.lua: shared optional database work budget]
     Core --> Sync[Sync.lua: party addon messages]
@@ -170,7 +189,11 @@ flowchart TD
     Planner --> DataWork
     Planner --> Q
     Planner --> Compat
-    Planner --> Levels[GetQuestDifficultyColor: allow green and yellow quests]
+    Compat --> Inventory[Carried bags and live level/XP snapshot]
+    Compat --> CharacterAPI[C_Reputation / GetFactionInfoByID / C_SkillInfo: referenced factions and skills]
+    Planner --> Levels[GetQuestDifficultyColor: optional explicit green-yellow filter]
+    Planner --> Optimizer[QuestOptimizer.lua: seeded route plus bounded beam over legal action orders]
+    Optimizer --> DataWork
     Planner --> MapAPI[C_Map ancestry-validated zone projection, known place names and user waypoint]
     Planner --> Style[Style.lua: opaque compact guide, current/upcoming rows, navigation and mini mode]
     Planner --> Preview[tools/preview_quest_planner.py: real Lua rows to browser emulation]
@@ -180,23 +203,27 @@ flowchart TD
     Path -. unsupported or missing .-> Planner
     Share --> API[WoW APIs via Compat.lua]
     Sync --> API
-    Settings[Settings.lua: sidebar categories] --> Fishing[Fishing.lua: water notes]
-    Settings --> Cleanup[QuestCleanup.lua: review leftovers on demand]
+    Settings[Settings.lua: sidebar categories] --> Tools[Extra tools: utility cards]
+    Settings --> Browser[Browser DB: lookup cards]
+    Tools --> Fishing[Fishing.lua: water notes]
+    Tools --> Cleanup[QuestCleanup.lua: review leftovers on demand]
     Core --> Cleanup
     Cleanup --> Q
     Cleanup --> Compat
     Cleanup --> BagAPI[Carried bags and explicit cursor item deletion]
-    Settings --> ItemSources[ItemSources.lua: item tooltip source hints]
-    Settings --> VendorMap[VendorMap.lua: item/vendor search and map pins]
-    Settings --> Rewards[Rewards.lua: reward browser]
-    OptionalUI[OptionalUI.lua] --> Equipment[EquipmentUI.lua: shared explorer; equipment tabs Rare+ only]
+    Browser --> ItemSources[ItemSources.lua: item tooltip source hints]
+    Browser --> VendorMap[VendorMap.lua: item/vendor search and map pins]
+    Browser --> Rewards[Rewards.lua: reward browser]
+    OptionalUI[OptionalUI.lua] --> Equipment[EquipmentUI.lua: shared WoW-style journal; equipment tabs Rare+ only]
+    Equipment --> NativeJournalArt[Built-in dialog, QuestBG, Quickslot2 and red button textures]
+    Equipment --> Parchment[Scoped dark-ink scrollable detail pages]
     Equipment --> Rewards
     Equipment --> Loot
     Rewards --> Group[EquipmentUI.groupItems: filter first, one row per name]
     Loot --> Group
     Group --> Inline[Single inline detail pane: every matching source and version]
     Equipment --> StatAPI[WoW GetItemStats: lazy link cache, invalidated on item events]
-    Settings --> Ranks[SpellRanks.lua: opt-in action-bar rank updates]
+    Tools --> Ranks[SpellRanks.lua: opt-in action-bar rank updates]
     Core --> Ranks
     Ranks --> SpellBook[WoW learned player spell book]
     Ranks --> ActionSlots[WoW normal action slots, out of combat and cursor clear]
@@ -219,8 +246,8 @@ flowchart TD
     VendorMap --> ExistingMap[WorldMapFrame and C_Map]
     VendorMap --> Waypoint[Compat.lua: user waypoint]
     Rewards --> Items[WoW item info and comparison tooltips]
-    Settings --> Loot[Loot.lua: instance drop search]
-    Settings --> DungeonQuests[DungeonQuests.lua: dungeon quest catalogue]
+    Browser --> Loot[Loot.lua: instance drop search]
+    Browser --> DungeonQuests[DungeonQuests.lua: dungeon quest catalogue]
     DungeonQuests --> Equipment
     DungeonQuests --> Q
     DungeonQuests --> Loot
@@ -242,25 +269,66 @@ flowchart TD
 ```
 
 ## Sequence diagrams
+```mermaid
+sequenceDiagram
+    participant Player
+    participant Settings as Settings.lua: Extra tools / Browser DB
+    participant Feature as Selected tool module
+    participant Core as Core.lua: ns.db
+    Player->>Settings: Choose a category
+    Settings-->>Player: Cards with purpose, requirements and controls
+    Player->>Settings: Click primary action
+    Settings->>Feature: settingsAction -> row.action (explicit open)
+    Player->>Settings: Click persistent checkbox
+    Settings->>Core: settingsClick -> setSetting(key, value)
+    Settings-->>Player: Refresh card state; preserve reading position
+```
+
+
+```mermaid
+sequenceDiagram
+    participant Core as Core.lua
+    participant Saved as QuestSharingDB / QuestSharingLog
+    participant Report as Diagnostics.lua
+    participant Player
+    Core->>Saved: Enable debug once via diagnosticsDefaultMigrated; preserve later off
+    Core->>Saved: Record bounded actions and errors
+    Player->>Report: /qs log, /qs errors, /qs doctor or settings
+    Report->>Saved: Read all retained logs and full errors
+    Report->>Report: Build diagnosticOverview and diagnosticLines from same checks
+    Report-->>Player: Readable overview, no selection or chat dump
+    Player->>Report: Show full report / Show overview
+    Report-->>Player: Switch stored views without refreshing
+    Player->>Report: Copy all
+    Report-->>Player: Select full snapshot including hidden technical details
+    Player->>Player: Ctrl+C / Cmd+C copies everything
+    Player->>Report: Refresh (explicit only)
+    Report->>Saved: Read fresh snapshot and preserve current view
+```
+
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Native as Game profession window
-    participant Guide as Professions.lua
+    participant Native as ProfessionsFrame.CraftingPage
+    participant UI as ProfessionUI.lua
+    participant Model as Professions.lua
     participant API as C_TradeSkillUI
-    participant Q as Questie.lua
-    User->>Native: Open own Cooking
-    Native->>Guide: TRADE_SKILL_SHOW or DATA_SOURCE_CHANGED
-    Guide->>API: Verify own Cooking and data-source readiness
-    Guide->>API: Read 12 reference spell learned states per timer slice
-    Note over Guide,API: No filter mutations or catalogue enumeration; combat pauses; close/disable cancels
-    Guide-->>User: All recipes with Known / Missing / Unconfirmed
-    User->>Guide: Select recipe; hover ingredient
-    Guide->>Q: Read this item's drops/vendors and bounded NPC locations
-    Guide-->>User: Source, mob levels, zone levels, fish skill or explicit unknown
-    User->>Guide: Upgrades tab, profession, faction
-    Guide-->>User: Static Apprentice to Artisan requirements, trainers/books/quests
+    User->>Native: Open Cooking
+    Native->>Model: TRADE_SKILL_SHOW / DATA_SOURCE_CHANGED
+    Model->>API: Verify own Cooking; read 12 spell states per timer slice
+    Model->>UI: Refresh embedded scrolling list
+    UI-->>User: Recipe, skill, short source; grey unlearned rows
+    User->>UI: Select learned recipe
+    UI->>Native: SelectRecipe(actualInfo,true)
+    Native-->>User: Existing schematic and Create controls
+    User->>UI: Select unlearned recipe
+    UI->>Native: Clear transaction; Init(nil); ValidateControls
+    UI->>Model: Acquisition/ingredient sources for selected record
+    UI-->>User: In-place requirements, source and ingredient pane
+    User->>UI: Upgrades tab; profession/faction buttons
+    UI-->>User: Static ranks inside the same native window
+    Note over UI,API: No standalone window, filter toggles or automatic crafting
 ```
 ```mermaid
 sequenceDiagram
@@ -274,9 +342,9 @@ sequenceDiagram
     D->>Work: Start visible-only cooperative scan
     Work->>Q: Quest categories, restrictions and source locations
     Q-->>Work: Records, prerequisites and explicit follow-ups
-    Work->>D: Associate dungeons and outdoor chains; ready catalogue
+    Work->>D: Associate dungeons, outdoor chains and bidirectional chain links; ready catalogue
     User->>D: Select dungeon, faction, class and level
-    D->>D: Filter unique quest IDs and show pickup details
+    D->>D: Show independent chain status, task type and pickup/turn-in lines
     User->>D: Hover quest
     D->>Q: Read QuestXP base row; cached pickup and turn-in sources
     D->>Work: First hover only: enumerate item reward links in small slices
@@ -357,11 +425,17 @@ sequenceDiagram
     participant SPF as Optional SPF API
     participant Maps as SPF map/minimap guidance
     Player->>Planner: Open plan in an outdoor zone
-    Planner->>Planner: Build prerequisite and outing route
+    Planner->>Planner: Discover zone facts and atomic prerequisite actions
+    Planner->>Planner: Preserve all OR prerequisite choices and required gate kinds
+    Planner->>Planner: Snapshot referenced faction points and skill-line ranks via Compat
+    Planner->>Planner: Cooperatively compare schedules with QuestOptimizer
+    Planner->>Planner: Keep feasible incumbent if bounded beam exhausts search checks
+    Note over Planner,Path: Optimizer applies known reputation rewards at turn-in before checking later pickups
     Planner->>Path: Estimate eligible first stops from player position
     Path->>SPF: EstimateWalks (async, same map, <=256 per request)
     SPF-->>Path: Yard costs or unreachable/loading/data reason
-    Path-->>Planner: Promote reachable outing; preserve dependencies
+    Path-->>Planner: Queue cooperative recost with first-leg walking costs
+    Planner->>Planner: Re-solve and group consecutive instructions
     Player->>Planner: Click Follow with SPF
     Planner->>Path: Navigate selected stop
     Path->>SPF: Start explicit QuestSharing-owned guidance
@@ -550,9 +624,18 @@ sequenceDiagram
     participant User
     participant Map as Existing world map
     participant Search as VendorMap.lua
+    participant Adapter as Questie.lua
     participant DB as QuestieDB
     participant Work as DataWork.lua
     Note over Search,DB: No catalogue reads on login or blank map
+    Search->>Adapter: canEnumerate(npc/item): inspect methods only
+    alt Missing or non-enumerable database
+        Search->>Search: Cancel/reset stale index, suggestions and pins
+        Search-->>User: Install/update QuestieDB, /reload, /qs questie
+        Note over Search,Adapter: Preserve query; retry when provider becomes available
+    else Enumerable NPC or item database
+        Search-->>User: Blank-map help names QuestieDB and search scope
+    end
     User->>Search: Type a query or select a result
     Search->>Work: Debounce then start/resume vendor-search
     Work->>DB: Index NPC titles/flags once; item links only when needed
@@ -616,11 +699,11 @@ sequenceDiagram
         end
         Planner->>Log: Read active quests and objective progress
         Planner->>Questie: Read readiness, prerequisites, starters, targets and turn-ins
-        Planner->>Planner: Keep only quests colored green or yellow for player level
+        Planner->>Planner: Use all acceptance levels by default; optional green/yellow filter
         Planner->>Planner: Validate source-map ancestry and coordinates before planning any action
-        Planner->>Planner: Build prerequisite layers and connected giver/work/turn-in outings
+        Planner->>Planner: Keep AND/OR gates and atomic giver/work/turn-in actions
         Planner->>Planner: Keep different prerequisite depths in separate stops at the same giver/camp
-        Planner->>Planner: Estimate full outing distance from player and favor shared groups
+        Planner->>Planner: Compare feasible schedules and shared kill/drop work
         Planner->>Map: Look up known place name at each local stop, otherwise use giver/objective name
         Planner->>Player: Show numbered Go/Take/Complete/Hand-in steps with stable quest numbers and every task
         Planner->>Player: Highlight current step and mute up to five upcoming steps
@@ -682,6 +765,71 @@ sequenceDiagram
 
 ```mermaid
 classDiagram
+    class QuestOptimizer {
+        optimize(catalog, atomicStops, options)
+    }
+    class AtomicQuestAction {
+        id
+        questID
+        kind
+        point
+        dependencyIDs
+        objectiveEvidence
+    }
+    class QuestCandidate {
+        gates
+        requiredMinRep
+        requiredMaxRep
+        reputationReward
+        requiredSkill
+        requiredRanks
+    }
+    class OptimizerState {
+        claimed
+        finishedQuests
+        inventory
+        reputation
+        skillRanks
+    }
+    class OptimizerReport {
+        mode
+        expectedSeconds
+        expectedKills
+        completedIDs
+        missingIDs
+        reasons
+        uncertainty
+        searchChecks
+        searchExhausted
+        lootBounds
+    }
+    QuestOptimizer --> AtomicQuestAction
+    QuestOptimizer --> QuestCandidate
+    QuestOptimizer --> OptimizerState
+    QuestOptimizer --> OptimizerReport
+```
+
+
+```mermaid
+classDiagram
+    class DiagnosticSnapshot {
+        fullText
+        overviewText
+        showingDetails
+        kind
+    }
+    class DiagnosticRecord {
+        at
+        source
+        msg
+        count
+        detail_lines
+    }
+    DiagnosticSnapshot --> DiagnosticRecord : overview summaries and all full records share a fixed snapshot
+```
+
+```mermaid
+classDiagram
     class CookingRecipeReference {
         id spellID
         name string
@@ -700,14 +848,24 @@ classDiagram
         Horde string
         method string
     }
-    class ProfessionCompanion {
+    class ProfessionModel {
         learned spellID_to_boolean_or_nil
         materialCache itemID_to_lines
         scanToken cancellation_generation
-        nativeEpoch pending_open_generation
+        eventToken pending_native_event_generation
     }
-    ProfessionCompanion --> CookingRecipeReference : reads static snapshot
-    ProfessionCompanion --> ProfessionRankReference : displays chosen profession and faction
+    class EmbeddedProfessionView {
+        host ProfessionsFrame
+        native CraftingPage
+        list RecipeList_child_overlay
+        selected CookingRecipeReference
+        rows pooled_44px_scroll_buttons
+        missing in_place_source_pane
+        upgrade ProfessionsFrame_child
+    }
+    ProfessionModel --> CookingRecipeReference : state and acquisition
+    EmbeddedProfessionView --> ProfessionModel : query sources and learned state
+    EmbeddedProfessionView --> ProfessionRankReference : selected profession and faction
 ```
 ```mermaid
 classDiagram
@@ -725,6 +883,10 @@ classDiagram
         dungeons
         dungeonText
         locations_pickups_and_turnIns
+        chainBefore_ID_to_name
+        chainAfter_ID_to_name
+        taskLabel
+        talkOnly
     }
     class DungeonQuestFilters {
         dungeon_areaID_or_zero
@@ -771,6 +933,11 @@ classDiagram
         questCleanup
     }
     class SettingRow {
+        card_optional
+        title_optional
+        note_optional
+        toggle_optional
+        action_optional
         tab
         kind
         key_optional
@@ -792,6 +959,8 @@ classDiagram
     }
     Namespace --> CleanupStack : questCleanup results and pending review, session only
     class Settings {
+        debug_default_true
+        diagnosticsDefaultMigrated
         dbVersion
         enabled
         bagMarks

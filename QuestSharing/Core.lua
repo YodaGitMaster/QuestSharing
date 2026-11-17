@@ -43,7 +43,7 @@ ns.defaults = {
     autoCompleteQuests = false, -- opt-in: finish safe quest turn-ins without a reward decision
     bagMarks = true,    -- quest items marked in the bags: gold = a quest of this zone, blue = a quest elsewhere
     hideTracker = false, -- hide the game's quest tracker (outside fights)
-    debug = false,      -- the debug log: every action and its outcome (QuestSharingLog, saved on /reload or logout)
+    debug = true,       -- diagnostic actions and outcomes, saved on /reload or logout
     shareByClick = false, -- share only on my clicks (set by itself when the game refuses an automatic share)
     pickup = false,     -- (off) say in party chat when I pick up a quest someone in the party has ("let's do it together?")
     mapPins = true,     -- show party members who run Quest Sharing on my world map, and send them where I am
@@ -70,7 +70,7 @@ for k, v in pairs(ns.defaults) do ns.db[k] = v end        -- until the saved var
 -- The debug log (Settings > General > Debug log, /qs debug on|off) -------------------------------------------------
 -- Every action and its outcome, errors or not, one line each: "12:34:56 ring: "Thanks!" -> WHISPER Lia (sent)".
 -- Kept in QuestSharingLog, which the game writes to WTF/Account/<account>/SavedVariables/QuestSharing.lua when you
--- /reload or log out. Off (the default): nothing is kept and nothing is spent. The same line again becomes one line
+-- /reload or log out. On by default; /qs debug off stops recording. The same line again becomes one line
 -- with a count ("(x5)"); the oldest lines go once there are more than LOG_MAX.
 local LOG_MAX = 3000
 ns.LOG_MAX = LOG_MAX
@@ -261,6 +261,10 @@ ns.on("ADDON_LOADED", function(_, name)
     ns.newInstall = (QuestSharingDB == nil) or (next(QuestSharingDB) == nil)
     QuestSharingDB = QuestSharingDB or {}
     local savedVersion = QuestSharingDB.dbVersion or 0            -- read before the defaults fill the gaps
+    if QuestSharingDB.diagnosticsDefaultMigrated ~= true then
+        QuestSharingDB.debug = true
+        QuestSharingDB.diagnosticsDefaultMigrated = true
+    end
     if QuestSharingDB.zoneLevelsOptInMigrated ~= true then
         -- 0.4.11 enabled this by default; require a fresh opt-in once, then preserve the choice.
         QuestSharingDB.zoneLevels = false
@@ -461,7 +465,7 @@ local help = {
     "/qs bagmarks on|off  mark quest items in your bags: gold for quests here, blue for quests elsewhere (the bank can keep them)",
     "/qs hidetracker on|off hide the game's quest tracker (outside fights)",
     "/qs debug on|off     the debug log: every action and its outcome, saved to the addon's file on /reload or logout",
-    "/qs log [clear]      show the debug log in a window you can copy from (clear empties it)",
+    "/qs log [clear]      all diagnostics in one copyable window (clear empties the debug log)",
     "/qs pingkey <KEY>    the key that pings the nearest quest creature (Attack) or quest object (look here); none removes it",
     "/qs itemkey <KEY>    the key that uses the item of your nearest quest (a torch, a flare...); none removes it",
     "/qs items on|off     item icons next to the quests in the tracker, and the quest item button",
@@ -478,8 +482,8 @@ local help = {
     "/qs quick            the quick chat wheel: list / add / edit / remove / move / reset the messages (see /qs quick help)",
     "/qs key [KEY]        bind the quick chat wheel to a key, e.g. /qs key V   (/qs key none removes it)",
     "/qs highlight        quest creature markers / pin the nearest quest / game settings helper (mobs|pin|cvars [on|off])",
-    "/qs doctor           a report of what works on this client (opens in a window you can copy from)",
-    "/qs errors [clear]   errors this addon has caused",
+    "/qs doctor           setup, errors and debug log in one copyable report",
+    "/qs errors [clear]   open all diagnostics (clear empties recorded errors)",
     "/qs minimap on|off   the minimap button",
     "/qs reset            put every setting back to its default (everything on)",
     "/qs probe            show what this game client supports (send this to the author if something fails)",

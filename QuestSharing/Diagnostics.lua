@@ -1,6 +1,4 @@
--- Diagnostics.lua: an error log and a "doctor" report, so problems on a real game client are easy to report.
---   /qs errors        show the errors this addon has caused (and open them in a window you can copy from)
---   /qs doctor        a report of what works on this client; opens in a window: Ctrl+A, Ctrl+C, paste it to the author
+-- Diagnostics.lua: /qs log, /qs errors and /qs doctor open one complete copyable diagnostic snapshot.
 local ADDON, ns = ...
 local C = ns.compat
 
@@ -147,9 +145,20 @@ ns.on("ADDON_ACTION_BLOCKED", blocked)
 -- A window with text you can select and copy ---------------------------------------------------------------------
 local win, box
 
--- kind: "log" or "errors" (shows Clear for that list), nil for other reports (the doctor)
+local function reportView(details)
+    win.showingDetails = details or win.overviewText == nil
+    box.reportText = win.showingDetails and win.fullText or win.overviewText
+    box:SetText(box.reportText)
+    box:ClearFocus()
+    if box.SetCursorPosition then box:SetCursorPosition(0) end
+    win.scroll:SetVerticalScroll(0)
+    win.details:SetText(win.showingDetails and "Show overview" or "Show full report")
+    win.hint:SetText("Copy all includes every issue, error stack, setting and log line. Then press Ctrl+C (Windows) or Cmd+C (Mac).")
+end
+
+-- kind: "diagnostics" shows Clear all; nil leaves other reports intact (the ring test).
 local W_WIDTH, W_HEIGHT = 720, 500
-function ns.reportWindow(title, lines, kind)
+function ns.reportWindow(title, lines, kind, overview, details)
     local text = table.concat(lines, "\n")
     if not win then
         if not (CreateFrame and UIParent) then return false end
@@ -175,11 +184,12 @@ function ns.reportWindow(title, lines, kind)
         f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -12)
         f.hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         f.hint:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -30)
-        f.hint:SetText("Scroll with the mouse wheel. Select all, then Cmd+C (Mac) or Ctrl+C to copy. Esc closes this window.")
+        f.hint:SetWidth(W_WIDTH - 28)
+        f.hint:SetJustifyH("LEFT")
         -- the text scrolls inside the window, however long it is
         local okS, scroll = pcall(CreateFrame, "ScrollFrame", "QuestSharingReportScroll", f, "UIPanelScrollFrameTemplate")
         if not (okS and scroll) then scroll = CreateFrame("ScrollFrame", "QuestSharingReportScroll", f) end
-        scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -48)
+        scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -64)
         scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -34, 42)
         scroll:EnableMouseWheel(true)
         scroll:SetScript("OnMouseWheel", function(self, delta)
@@ -190,9 +200,12 @@ function ns.reportWindow(title, lines, kind)
         f.scroll = scroll
         box = CreateFrame("EditBox", nil, scroll)
         box:SetMultiLine(true)
+        box:SetMaxLetters(0)
         box:SetWidth(W_WIDTH - 14 - 34 - 6)
         box:SetHeight(W_HEIGHT - 90)
         if ChatFontNormal then box:SetFontObject(ChatFontNormal) end
+        if box.SetFont then box:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 14, "") end
+        if box.SetSpacing then box:SetSpacing(4) end
         box:SetAutoFocus(false)
         box:SetScript("OnEscapePressed", function() f:Hide() end)
         box:SetScript("OnTextChanged", function(self, user) if user then self:SetText(self.reportText or "") end end)   -- read only
@@ -201,28 +214,33 @@ function ns.reportWindow(title, lines, kind)
             if ScrollingEdit_OnUpdate then box:SetScript("OnUpdate", function(self, dt) ScrollingEdit_OnUpdate(self, dt, scroll) end) end
         end
         scroll:SetScrollChild(box)
-        -- the buttons: Select all (then Cmd+C / Ctrl+C), switch between the debug log and the errors, Clear, Close
+        -- One snapshot stays selected until the player explicitly refreshes it.
         local S = ns.style
         local function button(label, w, fn, tip)
             local b = S.button(f, label, w, fn, tip)
             b:SetHeight(22)
             return b
         end
-        f.selectAll = button("Select all", 110, function()
+        f.selectAll = button("Copy all", 100, function()
+            reportView(true)
             box:SetFocus()
             box:HighlightText()
-            ns.print("all of it is selected: press Cmd+C (Mac) or Ctrl+C (Windows) to copy it")
+            win.hint:SetText("Entire report selected - press Ctrl+C (Windows) or Cmd+C (Mac), then paste it into your message.")
+            ns.print("entire report selected: press Cmd+C (Mac) or Ctrl+C (Windows) to copy it")
         end, "Selects everything in this window, so one Cmd+C / Ctrl+C copies it all (the game lets addons go no further)")
         f.selectAll:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 12)
-        f.showLog = button("Debug log", 96, function() ns.logCommand() end, "Every action and its outcome (/qs log)")
-        f.showLog:SetPoint("LEFT", f.selectAll, "RIGHT", 8, 0)
-        f.showErrors = button("Errors", 80, function() ns.errorsCommand(nil, true) end, "The errors only, with where they came from (/qs errors)")
-        f.showErrors:SetPoint("LEFT", f.showLog, "RIGHT", 8, 0)
-        f.clear = button("Clear", 70, function()
-            if win.kind == "log" then ns.logCommand("clear"); ns.logCommand()
-            elseif win.kind == "errors" then ns.errorsCommand("clear"); ns.errorsCommand(nil, true) end
-        end, "Empties the list shown")
-        f.clear:SetPoint("LEFT", f.showErrors, "RIGHT", 8, 0)
+        f.details = button("Show full report", 120, function() reportView(not win.showingDetails) end,
+            "Switch between the readable overview and full technical details; Copy all always includes everything")
+        f.details:SetPoint("LEFT", f.selectAll, "RIGHT", 8, 0)
+        f.refresh = button("Refresh", 80, function() ns.diagnostics(win.showingDetails) end,
+            "Refresh the setup check, all recorded errors and all saved debug lines together")
+        f.refresh:SetPoint("LEFT", f.details, "RIGHT", 8, 0)
+        f.clear = button("Clear records", 110, function()
+            QuestSharingLog, ns.db.errors = {}, {}
+            ns.logSession("logs and errors cleared")
+            ns.diagnostics()
+        end, "Empties both saved lists, then refreshes the combined report")
+        f.clear:SetPoint("LEFT", f.refresh, "RIGHT", 8, 0)
         f.test = button("Test the ring", 110, function() ns.quickTest() end,
             "Runs every slot of every ring and shows what the game really did (/qs quick test). Emotes are seen by " ..
             "players near you; messages are whispered to yourself.")
@@ -234,12 +252,12 @@ function ns.reportWindow(title, lines, kind)
     end
     win.title:SetText(title)
     win.kind = kind
+    win.fullText = text
+    win.overviewText = overview and table.concat(overview, "\n") or nil
     if kind then win.clear:Show() else win.clear:Hide() end
-    box.reportText = text
-    box:SetText(text)
+    if overview then win.details:Show() else win.details:Hide() end
+    reportView(details == true)
     win:Show()
-    box:HighlightText()
-    box:SetFocus()
     return true
 end
 
@@ -247,10 +265,10 @@ function ns._reportWindow() return win, box end
 
 -- /qs errors --------------------------------------------------------------------------------------------------------
 -- full: also what was running and the stack (for the copy window; the chat gets the short lines)
-function ns.errorLines(full)
+function ns.errorLines(full, all)
     local list = ns.db.errors or {}
     local out = {}
-    for i = math.max(1, #list - 9), #list do
+    for i = all and 1 or math.max(1, #list - 9), #list do
         local e = list[i]
         out[#out + 1] = string.format("[%s] %s%s", e.at or "?", e.source and (e.source .. ": ") or "", e.msg)
         if (e.count or 1) > 1 then out[#out + 1] = string.format("    (happened %d times)", e.count) end
@@ -261,26 +279,12 @@ function ns.errorLines(full)
     return out
 end
 
--- quiet: from the window's own button (the window only, no chat lines)
-function ns.errorsCommand(arg, quiet)
+function ns.errorsCommand(arg)
     if arg == "clear" then
         ns.db.errors = {}
         return ns.print("error log cleared")
     end
-    local lines = ns.errorLines()
-    local full = { "Quest Sharing " .. tostring(ns.version) .. " | game interface " ..
-        tostring(GetBuildInfo and select(4, GetBuildInfo()) or "?"), "" }
-    if #lines == 0 then
-        if not quiet then ns.print("no errors recorded - good") end
-        full[#full + 1] = "no errors recorded - good"
-    else
-        if not quiet then
-            for _, l in ipairs(lines) do ns.print(l) end
-            ns.print("the window has the details (what was running, the stack): Select all, then Cmd+C / Ctrl+C")
-        end
-        for _, l in ipairs(ns.errorLines(true)) do full[#full + 1] = l end
-    end
-    if quiet or #lines > 0 then ns.reportWindow("Quest Sharing - errors", full, "errors") end
+    ns.diagnostics()
 end
 
 -- The debug log: what the game did around the addon, the session header, /qs log ---------------------------------------
@@ -352,27 +356,25 @@ ns.on("CHAT_MSG_TEXT_EMOTE", function(_, msg, sender) if mine(sender) then ns.lo
 ns.on("CHAT_MSG_SYSTEM", function(_, msg) ns.log("game says", plainText(msg)) end)
 ns.on("UI_ERROR_MESSAGE", function(_, a, b) ns.log("game error", plainText(type(b) == "string" and b or a)) end)
 
--- /qs log: the newest lines in a window you can copy from; the whole log is in the file
-local SHOW = 1000
+-- All retained lines are included; copying the report never silently drops older context.
+function ns.logLines()
+    local L = type(QuestSharingLog) == "table" and QuestSharingLog or {}
+    local out = { string.format("debug log (%s): all %d retained lines; saved to " ..
+        "WTF/Account/<account>/SavedVariables/QuestSharing.lua after /reload or logout",
+        ns.logging() and "on" or "off", #L) }
+    if not ns.logging() then out[#out + 1] = "the debug log is off: /qs debug on resumes recording" end
+    if #L == 0 then out[#out + 1] = "the debug log is empty so far" end
+    for i = 1, #L do out[#out + 1] = L[i] end
+    return out
+end
+
 function ns.logCommand(arg)
     if arg == "clear" then
         QuestSharingLog = {}
         ns.logSession("log cleared")
         return ns.print("debug log cleared")
     end
-    local L = type(QuestSharingLog) == "table" and QuestSharingLog or {}
-    if #L == 0 then
-        local why = ns.logging() and "the debug log is empty so far" or "the debug log is off: Settings > General > Debug log, or /qs debug on"
-        ns.print(why)
-        if win and win:IsShown() then ns.reportWindow("Quest Sharing - debug log", { why }, "log") end
-        return
-    end
-    local out = { string.format("Quest Sharing %s - debug log (%s): the newest %d of %d lines; all of them are in " ..
-        "WTF/Account/<account>/SavedVariables/QuestSharing.lua after /reload or logout", tostring(ns.version),
-        ns.logging() and "on" or "off", math.min(SHOW, #L), #L), "" }
-    for i = math.max(1, #L - SHOW + 1), #L do out[#out + 1] = L[i] end
-    ns.print(string.format("debug log: %d lines (%s) - the window has them: Select all, then Cmd+C / Ctrl+C", #L, ns.logging() and "on" or "off"))
-    ns.reportWindow("Quest Sharing - debug log", out, "log")
+    ns.diagnostics()
 end
 
 -- /qs doctor ---------------------------------------------------------------------------------------------------------
@@ -439,12 +441,170 @@ function ns.doctorLines()
         " (into the chat box instead; tick Send the message at once again to retry)") or "none")
     out[#out + 1] = "debug log: " .. (ns.logging() and "on" or "off") .. ", " ..
         tostring(type(QuestSharingLog) == "table" and #QuestSharingLog or 0) .. " lines (/qs log)"
-    for _, l in ipairs(ns.errorLines(true)) do out[#out + 1] = "error: " .. l end
     return out
 end
 
+local function recordedErrors()
+    return type(ns.db.errors) == "table" and ns.db.errors or {}
+end
+
+local function blockedNames()
+    local names = {}
+    for key, value in pairs(ns.blockedFeatures) do
+        if value then names[#names + 1] = key end
+    end
+    table.sort(names)
+    return names
+end
+
+local function issueTitle(e)
+    if e.source == "BLOCKED by the game" then return "The game blocked an addon action" end
+    if e.source == "timer" then return "A background task failed" end
+    if e.source == "lua" then return "An addon action failed" end
+    return "An error was recorded"
+end
+
+-- Keep the overview readable; the full message and every stack line remain in the copied report.
+local function issueSummary(e)
+    local first = string.match(tostring(e.msg or ""), "[^\r\n]+") or "No message was provided"
+    if #first > 220 then first = string.sub(first, 1, 220) .. "... (full message in details)" end
+    return first
+end
+
+local featureNames = {
+    chat = "Sending chat messages", share = "Sharing quests", mappins = "Party members on the map",
+    markers = "Quest enemy markers", cvars = "Changing game settings", waypoint = "Map waypoints",
+    tracker = "Updating the quest list", pin = "Marking the nearest quest", hidetracker = "Hiding the quest list",
+    items = "Quest item buttons", ping = "Pings", emote = "Quick chat emotes",
+}
+
+local function setupNote(line)
+    if string.find(line, "BUT enemy nameplates are off", 1, true) then
+        return "Enemy health bars are reported off. Check Quest markers settings to enable them."
+    end
+    if string.sub(line, 1, 5) ~= "[--] " or string.find(line, "error(s) recorded", 1, true) then return nil end
+    local text = string.sub(line, 6)
+    if string.find(text, "click a tracked quest", 1, true) == 1 then
+        return "Quest tracker clicks are not active. Use the Party quests window or shift-click quest links."
+    elseif string.find(text, "quest log markers", 1, true) == 1 then
+        return "Shared-quest stars are not active in this quest log. The Party quests window still works."
+    elseif string.find(text, "quick chat wheel: key not set", 1, true) == 1 then
+        return "Quick chat has no shortcut. Set one in General > Quick chat key, or type /qs key V."
+    elseif string.find(text, "Questie:", 1, true) == 1 then
+        return "Extra quest information is unavailable. /qs questie explains the optional data source."
+    end
+    return text
+end
+
+function ns.diagnosticOverview(checks)
+    checks = checks or ns.doctorLines()
+    local errors, occurrences = recordedErrors(), 0
+    for _, e in ipairs(errors) do occurrences = occurrences + (e.count or 1) end
+    local logCount = type(QuestSharingLog) == "table" and #QuestSharingLog or 0
+    local out = {
+        "QUEST SHARING - ISSUE OVERVIEW", "",
+        string.format("Version %s  |  %s", tostring(ns.version), tostring(C.zone())),
+        string.format("Recorded errors: %d  |  Total occurrences: %d", #errors, occurrences),
+        "Recording: " .. (ns.logging() and "On" or "Off - /qs debug on resumes recording"),
+        string.format("Activity log: %d retained lines included with Copy all.", logCount), "",
+        "SHARE A PROBLEM",
+        "Click Copy all, then press Ctrl+C (Windows) or Cmd+C (Mac).",
+        "Paste it into your message and describe what you clicked and what you expected.", "",
+        "RECORDED ISSUES - newest first",
+    }
+    if #errors == 0 then
+        out[#out + 1] = "No addon errors have been recorded."
+        out[#out + 1] = "If something still looks wrong, reproduce it and copy this report."
+    end
+    for i = #errors, 1, -1 do
+        local e = errors[i]
+        out[#out + 1] = string.format("%d. %s", #errors - i + 1, issueTitle(e))
+        out[#out + 1] = "   " .. issueSummary(e)
+        out[#out + 1] = string.format("   Last seen: %s  |  Occurrences: %d  |  Source: %s",
+            tostring(e.at or "unknown"), e.count or 1, tostring(e.source or "unknown"))
+        out[#out + 1] = ""
+    end
+    local blocked = blockedNames()
+    if #blocked > 0 then
+        out[#out + 1] = "FEATURES PAUSED BY THE GAME"
+        for _, key in ipairs(blocked) do out[#out + 1] = "  - " .. (featureNames[key] or key) end
+        out[#out + 1] = "These features stay paused until /reload. Copy the report before reloading."
+        out[#out + 1] = ""
+    end
+    out[#out + 1] = "SETUP NOTES"
+    out[#out + 1] = "Setup or client limitations below are separate from recorded addon errors."
+    if ns.db.enabled == false then out[#out + 1] = "  - Quest Sharing is switched off in General settings." end
+    local notes = 0
+    for _, line in ipairs(checks) do
+        local note = setupNote(line)
+        if note then
+            out[#out + 1] = "  - " .. note
+            notes = notes + 1
+        end
+    end
+    if notes == 0 then out[#out + 1] = "  No client limitations reported by the setup check." end
+    out[#out + 1] = ""
+    out[#out + 1] = "Full messages, stacks, setup checks, settings and activity are available in Show full report."
+    return out
+end
+
+function ns.diagnosticLines(checks, overview)
+    checks = checks or ns.doctorLines()
+    overview = overview or ns.diagnosticOverview(checks)
+    local lines = {}
+    local function add(text) lines[#lines + 1] = text end
+    local function section(title) add(""); add("================ " .. title .. " ================"); add("") end
+    for _, line in ipairs(overview) do add(line) end
+    section("ERROR DETAILS - newest first")
+    local errors = recordedErrors()
+    if #errors == 0 then add("No addon errors have been recorded.") end
+    for i = #errors, 1, -1 do
+        local e = errors[i]
+        add(string.format("ISSUE %d: %s", #errors - i + 1, issueTitle(e)))
+        add("  Last seen: " .. tostring(e.at or "unknown"))
+        add("  Source: " .. tostring(e.source or "unknown"))
+        add("  Occurrences: " .. tostring(e.count or 1))
+        add("  Message:")
+        add(tostring(e.msg or ""))
+        if type(e.detail) == "table" and #e.detail > 0 then
+            add("  Technical context and stack:")
+            for _, detail in ipairs(e.detail) do add("    " .. tostring(detail)) end
+        end
+        add("")
+    end
+    section("SETUP CHECK")
+    for _, line in ipairs(checks) do
+        -- The complete settings follow one per line, instead of repeating a dense flag paragraph here.
+        if string.sub(line, 1, 10) ~= "settings: " then add(line) end
+    end
+    local blocked = blockedNames()
+    add("features blocked this session: " .. (#blocked == 0 and "none" or ""))
+    for _, key in ipairs(blocked) do add("  " .. key) end
+    section("SETTINGS - one per line")
+    local labels, keys = {}, {}
+    for _, row in ipairs(ns.settingRows or {}) do
+        if row.key then labels[row.key] = row.label end
+    end
+    for key in pairs(ns.defaults) do keys[#keys + 1] = key end
+    table.sort(keys)
+    for _, key in ipairs(keys) do
+        local value = ns.db[key]
+        local readable = type(value) == "boolean" and (value and "On" or "Off") or tostring(value)
+        add("  " .. (labels[key] or key) .. ": " .. readable .. " [" .. key .. "=" .. tostring(value) .. "]")
+    end
+    section("ACTIVITY LOG - oldest to newest")
+    for _, line in ipairs(ns.logLines()) do add(line) end
+    add("")
+    add("END OF REPORT - all retained records included")
+    return lines
+end
+
+function ns.diagnostics(details)
+    local checks = ns.doctorLines()
+    local overview = ns.diagnosticOverview(checks)
+    ns.reportWindow("Quest Sharing - diagnostics", ns.diagnosticLines(checks, overview), "diagnostics", overview, details)
+end
+
 function ns.doctor()
-    local lines = ns.doctorLines()
-    for _, l in ipairs(lines) do ns.print(l) end
-    ns.reportWindow("Quest Sharing - doctor", lines)
+    ns.diagnostics()
 end

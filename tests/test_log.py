@@ -1,5 +1,5 @@
 """The debug log: every action and its outcome, errors or not, kept in QuestSharingLog (the game saves it to the
-addon's SavedVariables file on /reload or logout); off by default.        python tests/test_log.py"""
+addon's SavedVariables file on /reload or logout); on by default.        python tests/test_log.py"""
 import pathlib
 import re
 import sys
@@ -25,19 +25,31 @@ def text(g):
 
 def on(style):
     g = quick_game(style)
+    g.slash("debug off")
+    g.run("QuestSharingLog = {}")
     g.slash("debug on")
     return g
 
 
-# ---- off by default ---------------------------------------------------------------------------------------------------
-def test_off_by_default_nothing_is_kept(style):
+# ---- default recording and migration -------------------------------------------------------------------------------
+def test_on_by_default_records_actions_and_errors(style):
     g = quick_game(style)
-    assert g.eval("NS.db.debug") is False
+    assert g.eval("NS.db.debug") is True
     target(g, "Lia")
     pick(g, 5)
-    g.slash("status")
     g.fire("ADDON_ACTION_BLOCKED", "QuestSharing", "UNKNOWN()")
-    assert log(g) == [], "nothing is written down while the switch is off"
+    assert "chat: sent to WHISPER Lia: Thanks!" in text(g)
+    assert "ERROR BLOCKED by the game" in text(g)
+
+
+def test_existing_installs_enable_once_then_preserve_explicit_off(style):
+    g = Game(style)
+    g.run("QuestSharingDB = { dbVersion = 3, debug = false }")
+    g.fire("ADDON_LOADED", "QuestSharing")
+    assert g.eval("NS.db.debug and NS.db.diagnosticsDefaultMigrated") is True
+    g.slash("debug off")
+    g.fire("ADDON_LOADED", "QuestSharing")
+    assert g.eval("NS.db.debug") is False
 
 
 def test_the_saved_variable_is_declared_and_the_settings_have_the_switch(style):
@@ -46,7 +58,7 @@ def test_the_saved_variable_is_declared_and_the_settings_have_the_switch(style):
     g = quick_game(style)
     keys = [g.eval(f"NS.settingRows[{i}].key") for i in range(1, int(g.eval("#NS.settingRows")) + 1)]
     labels = [g.eval(f"NS.settingRows[{i}].label") for i in range(1, int(g.eval("#NS.settingRows")) + 1)]
-    assert "debug" in keys and "Show the debug log" in labels
+    assert "debug" in keys and "Copy logs, errors and setup" in labels
 
 
 # ---- what goes in -------------------------------------------------------------------------------------------------------
@@ -170,13 +182,16 @@ def test_slash_log_shows_it_in_a_window_and_clear_empties_it(style):
     g.run("PRINTED = {}")
     g.slash("log")
     win, box = g.eval("NS._reportWindow()")
-    assert win.shown is True and "debug log (on)" in box.text and "chat: sent to WHISPER Lia: Thanks!" in box.text
+    assert win.shown is True and "ISSUE OVERVIEW" in box.text and "Recording: On" in box.text
+    assert "chat: sent to WHISPER Lia: Thanks!" not in box.text
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.selectAll)
+    assert "debug log (on)" in box.text and "chat: sent to WHISPER Lia: Thanks!" in box.text
     assert "SavedVariables/QuestSharing.lua" in box.text
     g.slash("log clear")
     assert len(log(g)) <= 3 and "debug log cleared" in "\n".join(g.printed())
 
 
-def test_the_window_scrolls_and_has_select_all_switch_clear_and_close(style):
+def test_the_window_scrolls_and_has_select_all_refresh_clear_and_close(style):
     g = on(style)
     g.run("for i = 1, 900 do NS.log('t', 'a long log, line ' .. i) end")
     g.slash("log")
@@ -186,39 +201,41 @@ def test_the_window_scrolls_and_has_select_all_switch_clear_and_close(style):
     g.run("NS._reportWindow().scroll.scrollRange = 5000")
     g.eval("function(s) s.scripts.OnMouseWheel(s, -1) end")(win.scroll)
     assert win.scroll.vscroll == 60, "the mouse wheel scrolls"
-    for b in ("selectAll", "showLog", "showErrors", "clear", "close"):
+    for b in ("selectAll", "details", "refresh", "clear", "close"):
         assert win[b] is not None, b
     g.run("PRINTED = {}")
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.selectAll)
     assert "press Cmd+C (Mac) or Ctrl+C (Windows)" in "\n".join(g.printed())
     g.eval("NS.logError")("x", "something broke")
-    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.showErrors)
-    assert "something broke" in box.text and "errors" in win.title.text and win.clear.shown is True
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.refresh)
+    assert "something broke" in box.text and "diagnostics" in win.title.text and win.clear.shown is True
+    assert "a long log, line 900" in box.text
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.clear)
-    assert len(g.eval("NS.db.errors")) == 0 and "no errors recorded" in box.text
-    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.showLog)
-    assert "a long log, line 900" in box.text and "debug log" in win.title.text
+    assert len(g.eval("NS.db.errors")) == 0 and "No addon errors have been recorded" in box.text
+    assert "a long log, line 900" not in box.text
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.refresh)
+    assert "logs and errors cleared" in win.fullText and "diagnostics" in win.title.text
     g.slash("doctor")
-    assert win.clear.shown is False, "nothing to clear in the doctor's report"
+    assert win.clear.shown is True, "doctor opens the same combined report"
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.close)
     assert win.shown is False
 
 
-def test_the_settings_have_buttons_for_the_log_and_the_errors(style):
+def test_the_settings_have_one_combined_report_button(style):
     g = quick_game(style)
     labels = [g.eval(f"NS.settingRows[{i}].label") for i in range(1, int(g.eval("#NS.settingRows")) + 1)]
-    assert "Show the debug log" in labels and "Show the errors" in labels
-    row = next(i for i in range(1, len(labels) + 1) if labels[i - 1] == "Show the errors")
+    assert "Copy logs, errors and setup" in labels and "Show the errors" not in labels
+    row = next(i for i in range(1, len(labels) + 1) if labels[i - 1] == "Copy logs, errors and setup")
     g.eval(f"NS.settingRows[{row}].action")()
     win, box = g.eval("NS._reportWindow()")
-    assert win.shown is True and "no errors recorded" in box.text
+    assert win.shown is True and "No addon errors have been recorded" in box.text
 
 
 def test_slash_log_when_it_is_off_says_how_to_switch_it_on(style):
     g = quick_game(style)
-    g.run("PRINTED = {}")
+    g.slash("debug off")
     g.slash("log")
-    assert "the debug log is off" in "\n".join(g.printed())
+    assert "Recording: Off" in g.eval("NS._reportWindow()")[1].text
 
 
 def test_switching_it_off_writes_a_last_line_and_stops(style):
@@ -229,6 +246,89 @@ def test_switching_it_off_writes_a_last_line_and_stops(style):
     target(g, "Lia")
     pick(g, 5)
     assert len(log(g)) == n
+
+
+def test_every_entry_opens_all_errors_stacks_and_all_retained_log_lines(style):
+    g = on(style)
+    g.run("for i = 1, 1200 do NS.log('test', 'retained line ' .. i) end")
+    g.run("for i = 1, 30 do NS.logError('test', 'failure ' .. i, {'stack detail ' .. i}) end")
+    for command in ("log", "errors", "doctor"):
+        g.run("PRINTED = {}")
+        g.slash(command)
+        assert g.printed() == [], "opening a report must not dump more text into chat"
+        win, box = g.eval("NS._reportWindow()")
+        assert win.shown and "Recorded errors: 30" in box.text
+        assert "stack detail 1" not in box.text
+        g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.selectAll)
+        assert box.text == win.fullText and "END OF REPORT" in box.text
+        assert "[enabled=true]" in box.text
+        assert "professionGuide=true" in box.text and "questPlanner=false" in box.text
+        assert "features blocked this session: none" in box.text
+        assert "failure 1\n" in box.text and "  Source: test" in box.text
+        assert "stack detail 1\n" in box.text and "stack detail 30" in box.text
+        assert "test: retained line 1\n" in box.text and "test: retained line 1200" in box.text
+
+
+def test_empty_report_opens_with_recording_off_and_refresh_is_explicit(style):
+    g = quick_game(style)
+    g.slash("debug off")
+    g.run("QuestSharingLog = {}")
+    g.slash("log")
+    win, box = g.eval("NS._reportWindow()")
+    assert win.shown and "0 retained lines" in box.text and "Recording: Off" in box.text
+    snapshot = box.text
+    g.eval("NS.logError")("test", "new failure")
+    assert box.text == snapshot, "recording must not replace selected text during copying"
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.refresh)
+    assert "new failure" in box.text
+
+
+def test_overview_is_readable_and_copy_all_includes_hidden_technical_details(style):
+    g = on(style)
+    g.run("NS.logError('timer', 'Something failed\\nsecond message line', {'deep stack detail'}); NS.blockedFeatures.chat=true")
+    g.run("local make=CreateFrame; CreateFrame=function(kind, ...) local f=make(kind, ...); if kind=='EditBox' then f.HighlightText=function(self) self.selected=self.text end end; return f end")
+    g.slash("log")
+    win, box = g.eval("NS._reportWindow()")
+    assert not win.showingDetails and box.selected is None, "overview should open ready to read, without selection"
+    assert "Sending chat messages" in box.text
+    assert "[--]" not in box.text and "tracker no" not in box.text
+    assert "A background task failed" in box.text
+    assert "Copy all" in box.text and "FEATURES PAUSED BY THE GAME" in box.text
+    assert "deep stack detail" not in box.text and "second message line" not in box.text
+    g.run("local _,b=NS._reportWindow(); b.HighlightText=function(self) self.selected=self.text end")
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.selectAll)
+    assert win.showingDetails and box.selected == win.fullText
+    assert "deep stack detail" in box.selected and "second message line" in box.selected
+    assert "press Ctrl+C" in win.hint.text
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.details)
+    assert not win.showingDetails and box.text == win.overviewText
+
+
+def test_details_and_copy_use_same_snapshot_until_refresh(style):
+    g = on(style)
+    g.slash("log")
+    win, box = g.eval("NS._reportWindow()")
+    full = win.fullText
+    g.eval("NS.log")("test", "new activity after opening")
+    for button in (win.details, win.selectAll):
+        g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(button)
+        assert box.text == full
+        assert "new activity after opening" not in box.text
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.refresh)
+    assert "new activity after opening" in box.text
+
+
+def test_full_report_has_one_setting_per_line_and_complete_messages(style):
+    g = on(style)
+    g.eval("NS.logError")("lua", "x" * 300 + "\nlast message line", g.lua.table_from(["one stack line"]))
+    g.slash("errors")
+    win, box = g.eval("NS._reportWindow()")
+    assert "full message in details" in box.text
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.selectAll)
+    assert "x" * 300 + "\nlast message line" in box.text
+    setting_lines = [line for line in box.text.splitlines() if re.search(r"\[[A-Za-z]+=[^]]+\]$", line)]
+    assert len(setting_lines) == int(g.eval("(function() local n=0; for k in pairs(NS.defaults) do n=n+1 end; return n end)()"))
+    assert all(line.count("[") == 1 for line in setting_lines)
 
 
 if __name__ == "__main__":

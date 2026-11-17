@@ -68,12 +68,13 @@ def test_errors_command_shows_them_in_a_window_and_clears(style):
     g = game(style)
     g.run("PRINTED = {}")
     g.slash("errors")
-    assert "no errors recorded" in printed(g)
+    assert "No addon errors have been recorded" in g.eval("NS._reportWindow()")[1].text
+    assert printed(g) == ""
     g.run('NS.logError("x", "something broke")')
     g.run("PRINTED = {}")
     g.slash("errors")
     win, box = g.eval("NS._reportWindow()")
-    assert win.shown is True and "something broke" in box.text and "something broke" in printed(g)
+    assert win.shown is True and "something broke" in box.text and printed(g) == ""
     g.slash("errors clear")
     assert len(g.eval("NS.db.errors")) == 0
 
@@ -83,14 +84,15 @@ def test_doctor_reports_what_works_on_a_classic_style_client():
     g = game("classic")
     g.slash("doctor")
     win, box = g.eval("NS._reportWindow()")
+    assert win.shown is True and "ISSUE OVERVIEW" in box.text
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.selectAll)
     text = box.text
-    assert win.shown is True and text == "\n".join(g.eval("NS.doctorLines()").values())
     assert f"Quest Sharing {VERSION} | game interface 16001 | classic quest API | 4 quests (3 in Elwynn Forest)" in text
     assert "[OK] share quests: push call yes, 9 reply messages recognised" in text
     assert "[--] click a tracked quest" in text and "shift-click links still work" in text
     assert "[OK] tracker follows you: zone mode (this client cannot measure distance)" in text
     assert "[--] quick chat wheel: key not set - type /qs key V" in text
-    assert "[OK] no errors recorded" in text and "settings: enabled=on" in text
+    assert "[OK] no errors recorded" in text and "[enabled=true]" in text
 
 
 def test_doctor_on_a_modern_client_and_with_a_key_set():
@@ -99,7 +101,8 @@ def test_doctor_on_a_modern_client_and_with_a_key_set():
     g.slash("key V")
     g.run("PRINTED = {}")
     g.slash("doctor")
-    text = printed(g)
+    assert printed(g) == ""
+    text = g.eval("NS._reportWindow()")[0].fullText
     assert "[OK] click a tracked quest (tracker yes, watch frame no)" in text
     assert "[OK] tracker follows you: distance mode" in text
     assert "[OK] quick chat wheel: key V" in text
@@ -110,8 +113,10 @@ def test_doctor_lists_recorded_errors(style):
     g = game(style)
     g.run('NS.logError("x", "it broke")')
     g.slash("doctor")
-    text = g.eval("NS._reportWindow()")[1].text
-    assert "[--] 1 error(s) recorded" in text and "error: [12:34:56] x: it broke" in text
+    win, box = g.eval("NS._reportWindow()")
+    assert "Recorded errors: 1" in box.text and "it broke" in box.text
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.selectAll)
+    assert "[--] 1 error(s) recorded" in box.text and "  Source: x" in box.text and "it broke" in box.text
 
 
 def test_the_report_text_cannot_be_edited_by_accident(style):

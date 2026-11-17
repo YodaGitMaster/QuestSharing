@@ -2,7 +2,7 @@
 ## Title: Quest Sharing
 ## Notes: Shares your quests with a new party, says which ones you have in common, and posts friendly quest progress to chat when you click a tracked quest.
 ## Author: YodaGitMaster
-## Version: 0.4.19
+## Version: 0.4.20
 ## SavedVariables: QuestSharingDB, QuestSharingLog
 ## OptionalDeps: Questie, QuestieDB, ShortestPathForever, AnglerAtlas, AtlasLootClassic, AtlasLootContinued
 
@@ -25,6 +25,7 @@ OptionalUI.lua
 QuestCleanup.lua
 QuestPlannerPath.lua
 QuestGuidance.lua
+QuestOptimizer.lua
 QuestPlanner.lua
 ItemSources.lua
 VendorMap.lua
@@ -36,6 +37,7 @@ Fishing.lua
 CookingReference.lua
 ProfessionReference.lua
 Professions.lua
+ProfessionUI.lua
 Rewards.lua
 Loot.lua
 DungeonQuests.lua

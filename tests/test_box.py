@@ -395,9 +395,12 @@ def test_the_errors_window_has_the_details_and_the_chat_stays_short(style):
     g.run("PRINTED = {}")
     g.slash("errors")
     chat = "\n".join(g.printed())
-    assert "from Compat.lua:" in chat and "stack (newest call first)" not in chat and "the window has the details" in chat
-    text = g.eval("NS._reportWindow()")[1].text
-    assert text.startswith("Quest Sharing ") and "running: a timer set at Share.lua:" in text and "  Compat.lua:" in text
+    assert chat == "", "the report should not dump technical errors into game chat"
+    win, box = g.eval("NS._reportWindow()")
+    assert "The game blocked an addon action" in box.text
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.selectAll)
+    text = box.text
+    assert "running: a timer set at Share.lua:" in text and "  Compat.lua:" in text
 
 
 # ---- calls the addon must never make (the game refuses them, or makes Blizzard code do it in our name) ----------------

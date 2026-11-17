@@ -451,27 +451,27 @@ local function build()
         focusTarget=nil
         query=text;page=1;refresh()
     end)
-    local all = S.button(f, "All dungeons", 190, function() E.dismissMenu();focusTarget=nil;chosen, encounter, page = nil, nil, 1; refresh() end)
+    local all = E.button(f, "All dungeons", 190, function() E.dismissMenu();focusTarget=nil;chosen, encounter, page = nil, nil, 1; refresh() end)
     W.all=all
     all:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -54)
-    W.selection = U.text(f, "All dungeons", 0, 87, 190)
+    W.selection = E.text(f, "All dungeons", 0, 87, 190)
     W.boss=E.dropdown(f,"Source",210,54,450,function()
         local list={"All encounters"};for _,who in ipairs(bosses()) do list[#list+1]=who end;return list
     end,function() return encounter or "All encounters" end,function(value)
         focusTarget=nil
         encounter=value~="All encounters" and value or nil;page=1;refresh()
     end)
-    W.instanceStatus = U.text(f, "", 0, 112, 190)
+    W.instanceStatus = E.text(f, "", 0, 112, 190)
     W.dungeonList=CreateFrame("Frame",nil,f)
     W.dungeonList:SetPoint("TOPLEFT",f,"TOPLEFT",0,-145);W.dungeonList:SetWidth(190);W.dungeonList:SetHeight(324)
     E.wheel(W.dungeonList,L.goInstances)
     for i = 1, INSTANCE_PAGE do
-        local b = S.button(W.dungeonList, "", 190, function(self) E.dismissMenu();focusTarget=nil;chosen, encounter, page = self.place.key, nil, 1; refresh() end)
+        local b = E.listButton(W.dungeonList, "", 190, function(self) E.dismissMenu();focusTarget=nil;chosen, encounter, page = self.place.key, nil, 1; refresh() end)
         b:SetPoint("TOPLEFT", W.dungeonList, "TOPLEFT", 0, -((i - 1) * 36))
         E.wheel(b,L.goInstances)
         W.instances[i] = b
     end
-    W.status = U.text(f, "", 210, 92, 450)
+    W.status = E.text(f, "", 210, 92, 450)
     W.list=CreateFrame("Frame",nil,f)
     W.list:SetPoint("TOPLEFT",f,"TOPLEFT",210,-120);W.list:SetWidth(450);W.list:SetHeight(371)
     E.wheel(W.list,L.go)
@@ -523,14 +523,14 @@ local function build()
         W.rows[i] = row
     end
     local function pager(label, x, fn)
-        local b = S.button(f, label, 90, fn); b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -500); return b
+        local b = E.button(f, label, 90, fn); b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -500); return b
     end
     W.instancePrev = pager("Previous", 0, function() L.goInstances(-1) end)
     W.instanceNext = pager("Next", 100, function() L.goInstances(1) end)
     W.prev = pager("Previous", 210, function() L.go(-1) end)
     W.next = pager("Next", 310, function() L.go(1) end)
     W.reload = pager("Refresh data", 570, function() L.scan() end)
-    W.note = U.text(f, "", 0, 536, 660)
+    W.note = E.text(f, "", 0, 536, 660)
     W.details, W.detailsText, W.setDetails = E.details(f, 684, 348, "Drop sources")
     E.navigation(W.search,W.rows,L.go)
     f.clear=function()

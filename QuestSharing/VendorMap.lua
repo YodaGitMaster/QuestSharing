@@ -183,6 +183,16 @@ local function clearLocations()
     for _, pin in ipairs(pins) do pin.result = nil; pin:Hide() end
 end
 
+local function resetIndex()
+    generation = generation + 1
+    if searchTimer then ns.cancel(searchTimer); searchTimer = nil end
+    Work.cancel("vendor-search")
+    clearLocations()
+    loading, ready, itemsReady = false, false, false
+    items, vendors, wordsByTitle = {}, {}, {}
+    npcIDs, itemIDs, npcCursor, itemCursor = nil, nil, 1, 1
+end
+
 local function mapInfo(map)
     local info = call(C_Map and C_Map.GetMapInfo, map)
     return type(info) == "table" and info or nil
@@ -613,13 +623,23 @@ function V.draw()
         end)
         hookedScroll = scroll
     end
+    if not Q.canEnumerate("npc") and not Q.canEnumerate("item") then
+        if ready or itemsReady or loading or next(hydrated) then resetIndex() end
+        ui.closest = nil; ui.waypoint:Hide(); ui.suggestionBox:Hide()
+        if Q.available() then
+            ui.status:SetText("Map search needs a newer QuestieDB.\nUpdate/enable QuestieDB, then /reload.\nCheck loaded data: /qs questie")
+        else
+            ui.status:SetText("Map search requires QuestieDB data.\nInstall/enable QuestieDB; /reload.\nQuestie is optional. Check: /qs questie")
+        end
+        return
+    end
     if query == "" then
         Work.pause("vendor-search")
         if lastRender and lastRender.empty and lastRender.map == map then return end
         ui.closest = nil; ui.waypoint:Hide(); ui.suggestionBox:Hide()
         for _, p in ipairs(pins) do p.result = nil; p:Hide() end
         lastRender = { empty = true, map = map }
-        ui.status:SetText("Type vendor for all sellers, or general vendor for general goods.\nSuggestions and pins use only this map.")
+        ui.status:SetText("Uses QuestieDB: type vendor, general vendor,\na trainer role or an item sold by vendors.\nSuggestions and pins use only this map.")
         return
     end
     if searchTimer then return end
@@ -703,13 +723,7 @@ end
 
 function V.refresh()
     if not ns.db.enabled or not ns.db.vendorSearch then
-        generation = generation + 1
-        if searchTimer then ns.cancel(searchTimer); searchTimer = nil end
-        Work.cancel("vendor-search")
-        if ready or itemsReady or loading or next(hydrated) then clearLocations() end
-        loading, ready, itemsReady = false, false, false
-        items, vendors, wordsByTitle = {}, {}, {}
-        npcIDs, itemIDs, npcCursor, itemCursor = nil, nil, 1, 1
+        resetIndex()
     end
     V.draw()
 end

@@ -338,8 +338,8 @@ def test_leaving_row_does_not_reopen_tooltip_after_async_rewards_or_item_event(s
 
 def test_expanded_location_rows_fit_page_and_page_navigation_still_works(style):
     g=game(style,HOVER_DATA);w=g.eval("NS.dungeonQuests._window()")
-    assert len(w.rows)==6
-    for row in w.rows.values():assert row.frame.height==84 and row.edge.height==84
+    assert len(w.rows)==5
+    for row in w.rows.values():assert row.frame.height==102 and row.edge.height==102
     assert g.eval("NS.dungeonQuests.go")(1)
     assert w.rows[1].result and w.rows[1].pickup.text.startswith("Pickup:")
 
@@ -356,6 +356,47 @@ def test_legacy_xp_module_fallback_and_multiple_locations_remain_visible(style):
     assert "XP: 1250 (base)" in tooltip(g)
     assert "+1 more" in row.pickup.text and "+1 more" in row.turnIn.text
     assert "Marshal McBride" in tooltip(g) and "Kobold Miner" in tooltip(g)
+
+
+def test_talk_only_and_chain_labels_are_separate_on_same_quest(style):
+    g=game(style,HOVER_DATA);filters(g,dungeon=1581)
+    row=hover(g,3)
+    assert "Chain quest: follow-up" in row['from'].text
+    assert "Talk only" in row.task.text and "Marshal McBride" in row.task.text
+    assert "Previous chain quests:" in tooltip(g) and "A dungeon job (2)" in tooltip(g)
+    assert "Talk only" in tooltip(g)
+
+
+def test_chain_start_is_recognised_by_incoming_prerequisite_link(style):
+    g=game(style,HOVER_DATA);filters(g,dungeon=1581)
+    row=hover(g,1)
+    assert "Chain quest: prerequisite" in row['from'].text
+    assert "Next chain quests:" in tooltip(g) and "A dungeon job (2)" in tooltip(g)
+    assert "Task unknown" in row.task.text
+
+
+def test_standalone_dungeon_kill_quest_has_work_label_not_talk_only(style):
+    g=game(style,HOVER_DATA);row=hover(g,4)
+    assert "Standalone quest" in row['from'].text and "Defeat enemies" in row.task.text
+    assert "Talk only" not in row.task.text
+
+
+def test_events_items_and_exploration_are_not_mislabelled_talk_only(style):
+    g=game(style,HOVER_DATA+r'''
+    QUESTIE_QUESTS[22]={name="Escort event",zoneOrSort=1581,specialFlags=3,finishedBy={{197}}}
+    QUESTIE_QUESTS[23]={name="Hidden collection",zoneOrSort=1581,requiredSourceItems={950},finishedBy={{197}}}
+    QUESTIE_QUESTS[24]={name="Given letter",zoneOrSort=1581,sourceItemId=951,finishedBy={{197}}}
+    ''')
+    for qid,label in ((22,"event / escort"),(23,"Deliver required items"),(24,"Deliver / use quest item"),(14,"Explore"),(5,"Collect items")):
+        row=hover(g,qid)
+        assert label in row.task.text and "Talk only" not in row.task.text
+
+
+def test_chain_status_visible_in_all_dungeons_and_no_linear_step_numbers_in_branches(style):
+    g=game(style,HOVER_DATA+'QUESTIE_QUESTS[4].preQuestSingle={1}')
+    row=hover(g,1)
+    assert "Chain quest" in row['from'].text and "step 1/" not in tooltip(g)
+    assert "A dungeon job (2)" in tooltip(g) and "Class mission (4)" in tooltip(g)
 
 
 if __name__=="__main__":

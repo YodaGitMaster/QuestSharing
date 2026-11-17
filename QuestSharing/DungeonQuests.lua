@@ -7,7 +7,7 @@ local ready, loading, page, progress, total = false, false, 1, 0, 0
 local selected, message, generation = nil, "Open to read dungeon quests.", 0
 local filterError
 local refreshPending=false
-local PAGE, OWNER, REWARDS_OWNER = 6, "dungeonQuests", "dungeonQuestRewards"
+local PAGE, OWNER, REWARDS_OWNER = 5, "dungeonQuests", "dungeonQuestRewards"
 local rewardIndex, rewardsReady, rewardsLoading = {}, false, false
 local hovered, showHover
 local paint
@@ -174,6 +174,26 @@ function D.scan()
             if progress%100==0 then paint() end
             ns.dataWork.yield()
         end
+        -- Chain membership is separate from what a step asks the player to do (a chain can include talk-only steps).
+        local function link(before,after)
+            before,after=math.abs(number(before)),math.abs(number(after))
+            if before==0 or after==0 or before==after then return end
+            if all[before] then
+                all[before].chainAfter=all[before].chainAfter or {}
+                all[before].chainAfter[after]=all[after] and all[after].name or ("Quest "..after)
+            end
+            if all[after] then
+                all[after].chainBefore=all[after].chainBefore or {}
+                all[after].chainBefore[before]=all[before] and all[before].name or ("Quest "..before)
+            end
+        end
+        for _,r in pairs(all) do
+            for _,list in ipairs({r.beforeAny or {},r.beforeAll or {}}) do
+                for _,before in ipairs(type(list)=="table" and list or {}) do link(before,r.id) end
+            end
+            if number(r.next)>0 then link(r.id,r.next) end
+            ns.dataWork.yield()
+        end
         -- Include outdoor preparation quests and explicit follow-ups, with cycle guards per dungeon.
         for _,seed in ipairs(seeds) do
             local direct={};for area in pairs(seed.dungeons) do direct[#direct+1]=area end
@@ -237,7 +257,7 @@ local function locations(r)
     local by=Q.get("quest",r.id,"finishedBy")
     for index,kind in ipairs({"npc","object"}) do
         for _,id in ipairs(type(by)=="table" and type(by[index])=="table" and by[index] or {}) do
-            list.turnIns[#list.turnIns+1]={source={name=Q.get(kind,id,"name") or "Unknown giver"},point=Q.nearest(Q.spawnList(kind,id),1)[1]}
+            list.turnIns[#list.turnIns+1]={source={kind=kind,name=Q.get(kind,id,"name") or "Unknown giver"},point=Q.nearest(Q.spawnList(kind,id),1)[1]}
         end
     end
     r.locations=list
@@ -251,6 +271,56 @@ end
 local function locationSummary(list)
     if #list==0 then return "Unknown location" end
     return pickupText(list[1])..(#list>1 and (" +"..(#list-1).." more") or "")
+end
+
+local function chainLabel(r)
+    if not r.chainBefore and not r.chainAfter then return "Standalone quest" end
+    local role=filters.dungeon~=0 and r.dungeons[filters.dungeon]
+    if role=="Preparation" then return "Chain quest: prerequisite" end
+    if role=="Follow-up" then return "Chain quest: follow-up" end
+    if role==true then return "Chain quest: dungeon step" end
+    return "Chain quest"
+end
+local function taskLabel(r)
+    if r.taskLabel then return r.taskLabel,r.talkOnly end
+    local actions={}
+    local objectives=Q.get("quest",r.id,"objectives")
+    local function has(value) return type(value)=="table" and next(value)~=nil end
+    local function add(label) for _,s in ipairs(actions) do if s==label then return end end;actions[#actions+1]=label end
+    for index,label in ipairs({"Defeat enemies","Use objects","Collect items","Gain reputation","Complete creature objective","Use quest spell/item"}) do
+        if type(objectives)=="table" and has(objectives[index]) then add(label) end
+    end
+    if has(Q.get("quest",r.id,"triggerEnd")) then add("Explore / reach a location") end
+    if has(Q.get("quest",r.id,"extraObjectives")) then add("Complete special objectives") end
+    if has(Q.get("quest",r.id,"requiredSourceItems")) then add("Deliver required items") end
+    local flags=number(Q.get("quest",r.id,"specialFlags"))
+    if math.floor(flags/2)%2==1 then add("Complete event / escort") end
+    local by=Q.get("quest",r.id,"startedBy")
+    if number(Q.get("quest",r.id,"sourceItemId"))>0 or (type(by)=="table" and has(by[3])) then add("Deliver / use quest item") end
+    if #actions==0 then
+        local e=C.findEntry(r.id)
+        if e and #C.objectives(e)>0 then add("Complete quest objectives") end
+    end
+    local turnIns=locations(r).turnIns
+    if #actions>0 then r.taskLabel=table.concat(actions," + ")
+    elseif turnIns[1] and turnIns[1].source.kind=="npc" then
+        r.talkOnly=true;r.taskLabel="Talk only — speak to "..turnIns[1].source.name
+    elseif turnIns[1] then r.taskLabel="Interact with quest object — "..turnIns[1].source.name
+    else r.taskLabel="Task unknown — check quest details" end
+    return r.taskLabel,r.talkOnly
+end
+local function chainLines(r)
+    local lines={chainLabel(r)}
+    for _,field in ipairs({"chainBefore","chainAfter"}) do
+        local list={}
+        for id,name in pairs(r[field] or {}) do list[#list+1]={id=id,name=name} end
+        table.sort(list,function(a,b)return a.id<b.id end)
+        if #list>0 then
+            lines[#lines+1]=field=="chainBefore" and "Previous chain quests:" or "Next chain quests:"
+            for _,q in ipairs(list) do lines[#lines+1]=q.name.." ("..q.id..")" end
+        end
+    end
+    return lines
 end
 
 local function baseXP(id)
@@ -300,7 +370,9 @@ end
 
 function D.hoverLines(r)
     local xp=baseXP(r.id)
-    local lines={xp~=nil and ("XP: "..xp.." (base)") or "XP: unknown in installed quest data"}
+    local lines=chainLines(r)
+    lines[#lines+1]="Task: "..taskLabel(r)
+    lines[#lines+1]=xp~=nil and ("XP: "..xp.." (base)") or "XP: unknown in installed quest data"
     if not rewardsReady then lines[#lines+1]="Item rewards: loading…"
     elseif not rewardIndex then lines[#lines+1]="Item rewards: unavailable in installed quest data"
     elseif not rewardIndex[r.id] or #rewardIndex[r.id]==0 then lines[#lines+1]="No item rewards listed in quest data."
@@ -375,6 +447,7 @@ function D.detail(r)
         end
     end
     table.insert(lines,5,"Class: "..(#classNames>0 and table.concat(classNames,", ") or "Unknown"))
+    table.insert(lines,6,chainLabel(r));table.insert(lines,7,"Task: "..taskLabel(r))
     local list=pickups(r)
     for _,p in ipairs(list) do lines[#lines+1]=pickupText(p) end
     if #list==0 then lines[#lines+1]=Q.whereText(r.id) or "Unknown pickup location in QuestieDB." end
@@ -384,6 +457,7 @@ function D.detail(r)
     for _,p in ipairs(turnIns) do lines[#lines+1]=pickupText(p) end
     local before,any=Q.before(r.id)
     if #before>0 then lines[#lines+1]="\nPrerequisites ("..(any and "any" or "all").."): "..table.concat(before,", ") end
+    for i,line in ipairs(chainLines(r)) do if i>1 then lines[#lines+1]=line end end
     local chain=Q.chainText(r.id,C.link(entry(r)))
     if chain then lines[#lines+1]="\n"..chain end
     local how=Q.howText(r.id,r.name)
@@ -418,9 +492,10 @@ paint=function()
     for i,row in ipairs(window.rows) do
         local r=results[(page-1)*PAGE+i];row.result=r
         if r then
-            local role=filters.dungeon~=0 and r.dungeons[filters.dungeon]
             E.paintRow(row,nil,r.name.." · level "..r.level.." · req "..r.required.."+",
-                (type(role)=="string" and (role.." · ") or "")..r.dungeonText..(completed(r.id) and " · Completed" or ""))
+                chainLabel(r).." · "..r.dungeonText..(completed(r.id) and " · Completed" or ""))
+            local task,talk=taskLabel(r)
+            row.task:SetText((talk and "|cff80e0ff" or S.GOLD).."Task: "..task.."|r")
             local list=locations(r)
             row.pickup:SetText("Pickup: "..locationSummary(list.pickups))
             row.turnIn:SetText("Turn-in: "..locationSummary(list.turnIns))
@@ -445,7 +520,7 @@ local function build()
     window.dungeon=choice("Dungeon",0,300,dungeonChoices,"dungeon")
     window.faction=choice(nil,310,165,{"All factions","Alliance","Horde"},"faction")
     window.class=choice(nil,485,165,classChoices,"class")
-    window.level=U.box(f,"Character level",0,43,100,filters.level,4)
+    window.level=E.box(f,"Character level",0,43,100,filters.level,4)
     E.liveBox(window.level,OWNER,function(text)
         local n=tonumber(text)
         if n and n>=1 and n<=1000 and n%1==0 then
@@ -455,35 +530,36 @@ local function build()
     window.level:SetScript("OnEscapePressed",function(self)
         self:SetText(tostring(filters.level));self.cancel();window.levelError=nil;self:ClearFocus();D.refresh()
     end)
-    window.levelMode=S.button(f,"All levels",180,function() filters.allLevels=not filters.allLevels;page=1;D.updateControls();D.refresh() end)
+    window.levelMode=E.button(f,"All levels",180,function() filters.allLevels=not filters.allLevels;page=1;D.updateControls();D.refresh() end)
     window.levelMode:SetPoint("TOPLEFT",f,"TOPLEFT",110,-60)
-    window.completed=S.button(f,"",180,function() filters.completed=not filters.completed;page=1;D.updateControls();D.refresh() end)
+    window.completed=E.button(f,"",180,function() filters.completed=not filters.completed;page=1;D.updateControls();D.refresh() end)
     window.completed:SetPoint("TOPLEFT",f,"TOPLEFT",300,-60)
-    window.mine=S.button(f,"My character",160,function()
+    window.mine=E.button(f,"My character",160,function()
         local dungeon=filters.dungeon;filters=defaults(true);filters.dungeon=dungeon
         window.level:SetText(tostring(filters.level));window.level.cancel();window.search:SetText("");window.search.cancel()
         window.levelError=nil;page=1;D.updateControls();D.refresh()
     end)
     window.mine:SetPoint("TOPLEFT",f,"TOPLEFT",490,-60)
     window.search,window.clearSearch=E.searchBox(f,"Search dungeon, quest or ID",0,90,470,OWNER,function(text) filters.text=text;page=1;D.refresh() end)
-    window.reset=S.button(f,"All quests",170,function()
+    window.reset=E.button(f,"All quests",170,function()
         local dungeon=filters.dungeon;filters=defaults();filters.dungeon=dungeon
         window.level:SetText(tostring(filters.level));window.level.cancel();window.search:SetText("");window.search.cancel()
         window.levelError=nil;page=1;D.updateControls();D.refresh()
     end)
     window.reset:SetPoint("TOPLEFT",f,"TOPLEFT",480,-108)
-    window.status=U.text(f,"",0,143,650)
+    window.status=E.text(f,"",0,143,650)
     window.list=CreateFrame("Frame",nil,f);window.list:SetPoint("TOPLEFT",f,"TOPLEFT",0,-170);window.list:SetWidth(650);window.list:SetHeight(530)
     E.wheel(window.list,D.go)
-    window.detailFrame,window.detailsText,window.setDetails=E.details(f,674,358,"Quest pickup and chain")
+    window.detailFrame,window.detailsText,window.setDetails=E.details(f,674,358,"Quest pickup and chain",690)
     window.detailFrame:SetHeight(690)
-    window.pickup=S.button(window.detailFrame,"Show pickup on map (open M)",320,function() if selected then D.showPickup(selected) end end)
+    window.pickup=E.button(window.detailFrame,"Show pickup on map (open M)",320,function() if selected then D.showPickup(selected) end end)
     window.pickup:SetPoint("BOTTOMLEFT",window.detailFrame,"BOTTOMLEFT",14,18)
     for i=1,PAGE do
-        local row=E.row(window.list,0,(i-1)*88,650,i);window.rows[i]=row
-        row.frame:SetHeight(84);row.edge:SetHeight(84)
-        row.pickup=U.text(row.frame,"",52,44,590);row.pickup:SetWordWrap(false)
-        row.turnIn=U.text(row.frame,"",52,62,590);row.turnIn:SetWordWrap(false)
+        local row=E.row(window.list,0,(i-1)*106,650,i);window.rows[i]=row
+        row.frame:SetHeight(102);row.edge:SetHeight(102)
+        row.task=E.text(row.frame,"",52,44,590);row.task:SetWordWrap(false)
+        row.pickup=E.text(row.frame,"",52,62,590);row.pickup:SetWordWrap(false)
+        row.turnIn=E.text(row.frame,"",52,80,590);row.turnIn:SetWordWrap(false)
         row.choose=function(auto)
             local r=row.result;if not r then return end
             if auto~=true then E.dismissMenu();ns.closeQuestMenu() end
@@ -497,9 +573,9 @@ local function build()
         end)
         row.frame:SetScript("OnLeave",function() if hovered==row then hovered=nil end;U.hideTip() end);E.wheel(row.frame,D.go)
     end
-    window.prev=S.button(f,"Previous",100,function() D.go(-1) end);window.prev:SetPoint("TOPLEFT",f,"TOPLEFT",0,-705)
-    window.next=S.button(f,"Next",100,function() D.go(1) end);window.next:SetPoint("TOPLEFT",f,"TOPLEFT",110,-705)
-    window.reload=S.button(f,"Refresh data",120,D.scan);window.reload:SetPoint("TOPLEFT",f,"TOPLEFT",530,-705)
+    window.prev=E.button(f,"Previous",100,function() D.go(-1) end);window.prev:SetPoint("TOPLEFT",f,"TOPLEFT",0,-705)
+    window.next=E.button(f,"Next",100,function() D.go(1) end);window.next:SetPoint("TOPLEFT",f,"TOPLEFT",110,-705)
+    window.reload=E.button(f,"Refresh data",120,D.scan);window.reload:SetPoint("TOPLEFT",f,"TOPLEFT",530,-705)
     E.navigation(window.search,window.rows,D.go)
     f.suspend=function()
         generation=generation+1;ns.dataWork.cancel(OWNER);ns.closeQuestMenu()
@@ -529,7 +605,10 @@ ns.on("QUEST_LOG_UPDATE",function()
     refreshPending=true
     ns.after(0.2,function()
         refreshPending=false
-        if shown() and ready then selected=nil;D.refresh() end
+        if shown() and ready then
+            for _,r in pairs(records) do r.taskLabel,r.talkOnly=nil,nil end
+            selected=nil;D.refresh()
+        end
     end)
 end)
 ns.on("GET_ITEM_INFO_RECEIVED",function()

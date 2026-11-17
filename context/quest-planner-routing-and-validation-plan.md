@@ -1,6 +1,11 @@
 # Quest planner routing and validation plan
 Last updated: 2026-11-16
 
+## Current integration — 2026-11-17
+- QuestOptimizer now owns schedule selection. The SPF bridge refines legal first-leg costs and queues a guarded cooperative recost, preserving action gates.
+- Whole-outing promotion remains a tested adapter helper. The live planner now uses atomic schedule costs and consecutive display grouping.
+- Current design and limits are in predictive-quest-optimizer.md.
+
 ## Implementation status — 2026-11-16
 - Implemented locally: optional `QuestPlannerPath.lua`, soft TOC ordering for SPF, explicit Follow with SPF and `/qs plan follow`, same-map asynchronous walk estimates chunked at 256, cancellation and stale-result guards, plus whole-outing promotion while preserving dependency edges.
 - The provider is not bundled. Without the supported API, Quest Sharing keeps its straight-map-distance outing route and native waypoint. Only the first outing is promoted by SPF walking costs; the rest of the itinerary is still approximate.

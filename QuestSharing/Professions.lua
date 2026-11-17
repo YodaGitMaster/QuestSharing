@@ -1,15 +1,15 @@
--- Read-only companion: never changes profession filters, crafts items, or navigates protected maps.
+-- Recipe/farming data and guarded native Cooking reads; presentation lives inside ProfessionUI.lua.
 local _, ns = ...
 local P, U, S, Q, D, C = {}, ns.optionalUI, ns.style, ns.questie, ns.professionReference, ns.cookingReference
 ns.professions = P
-local ui, page, view, selected, filter, faction = nil, 1, "cooking", nil, "All", "Both"
-local PAGE, results, learned, scanToken, nativeOwner, nativeEpoch = 6, {}, {}, 0, false, 0
-local nativeButtons, hooks = {}, {}
+local learned, liveInfo, scanToken, eventToken = {}, {}, 0, 0
 local materialCache, sourceCache = {}, {}
-local ingredientIDs={}
-for _,r in ipairs(C.recipes) do for _,i in ipairs(r.ingredients) do ingredientIDs[i[1]]=true end end
-local refresh
-local function show(frame,on) if on then frame:Show() else frame:Hide() end end
+local catalogue, byID, ingredientIDs, staticIDs = {}, {}, {}, {}
+for _,r in ipairs(C.recipes) do
+    catalogue[#catalogue+1]=r;byID[r.id]=r;staticIDs[r.id]=true
+    for _,i in ipairs(r.ingredients) do ingredientIDs[i[1]]=true end
+end
+local function ui() return ns.professionUI end
 local function enabled() return ns.db and ns.db.enabled and ns.db.professionGuide and not ns.isBlocked("professions") end
 local function api(name, ...) return U.call(C_TradeSkillUI and C_TradeSkillUI[name], ...) end
 local function ownCooking()
@@ -139,182 +139,134 @@ function P.recipeSources(r)
     return out
 end
 
-function P.recipes(query, mode)
+-- List labels are intentionally short; the selected pane/hover retains the full acquisition data.
+function P.shortSource(r)
+    local side=U.call(UnitFactionGroup,"player")
+    local lines=D.cookingSources[r.id] or r.sources or {}
+    local line=lines[1] or "Source unknown"
+    for _,v in ipairs(lines) do if side and v:find(side..":",1,true) then line=v;break end end
+    if line:find("[Bb]uy") or line:find("[Vv]endor") then
+        local place=line:match("%(([^)]+)%)")
+        for name,where in pairs(D.vendorPlaces) do
+            local other=side=="Alliance" and where:find("(Horde)",1,true) or side=="Horde" and where:find("(Alliance)",1,true)
+            if line:find(name,1,true) and not D.cookingSources[r.id] and not other then place=where;break end
+        end
+        return "Vendor"..(place and (" - "..place) or "")
+    end
+    if line:find("[Tt]rainer") then return "Trainer" end
+    if line:find("[Qq]uest") then return (line:gsub("^[^:]*[Qq]uest:%s*","Quest - ")) end
+    if line:find("[Dd]rop") then return (line:gsub("[Dd]rop:%s*","Drop - ")) end
+    return "Source unknown"
+end
+function P.acquisition(r)
+    local side=U.call(UnitFactionGroup,"player")
+    local out,seen={},{}
+    if D.cookingSources[r.id] then
+        local native=ownCooking() and api("GetRecipeSourceText",r.id)
+        if type(native)=="string" and native~="" then out[#out+1]=native end
+        for _,line in ipairs(D.cookingSources[r.id]) do
+            if not (side=="Alliance" and line:find("Horde:",1,true))
+                and not (side=="Horde" and line:find("Alliance:",1,true)) then out[#out+1]=line end
+        end
+        return out
+    end
+    for _,line in ipairs(P.recipeSources(r)) do
+        local hide=line:find("Reference checked",1,true) or line:find("Data: ",1,true)
+            or line:find("Recipe item:",1,true) or line:find("other recorded spawn",1,true)
+        if side=="Alliance" and line:find("Horde:",1,true) then hide=true end
+        if side=="Horde" and line:find("Alliance:",1,true) then hide=true end
+        if side=="Alliance" and line:find("(Horde)",1,true) then hide=true end
+        if side=="Horde" and line:find("(Alliance)",1,true) then hide=true end
+        if not hide and line~="" and not seen[line] then
+            seen[line]=true;out[#out+1]=line:gsub("^Live source:%s*","")
+        end
+    end
+    return out
+end
+function P.name(r) return liveInfo[r.id] and liveInfo[r.id].name or r.name end
+function P.state(r) return learned[r.id] end
+function P.live(r) return liveInfo[r.id] end
+function P.itemName(id) return itemName(id) end
+function P.active() return enabled() end
+function P.ownCooking() return ownCooking() end
+function P.record(id) return byID[id] end
+function P.recipes(query,mode)
     local out={};query=string.lower(query or "")
-    for _,r in ipairs(C.recipes) do
+    for _,r in ipairs(catalogue) do
         local state=learned[r.id]
         if (mode~="Missing" or state==false) and (mode~="Known" or state==true) then
-            local text=r.name
+            local text=P.name(r)
             for _,i in ipairs(r.ingredients) do text=text.." "..(C.items[i[1]] and C.items[i[1]].name or tostring(i[1])) end
             for _,s in ipairs(r.sources) do text=text.." "..s end
             if query=="" or string.find(string.lower(text),query,1,true) then out[#out+1]=r end
         end
     end
+    table.sort(out,function(a,b)
+        if (a.skill or 10000)~=(b.skill or 10000) then return (a.skill or 10000)<(b.skill or 10000) end
+        if P.name(a)~=P.name(b) then return P.name(a)<P.name(b) end
+        return a.id<b.id
+    end)
     return out
-end
-local function status(r)
-    return learned[r.id]==true and "Known" or learned[r.id]==false and "Missing" or "Unconfirmed"
 end
 function P.scan()
     scanToken=scanToken+1
     local token,index=scanToken,1
-    if not enabled() then return end
-    if not ownCooking() then if refresh then refresh() end;return end
+    local v=ui()
+    if not enabled() or not v or not v.activeCooking() then return end
+    if not ownCooking() then v.refresh();return end
     sourceCache={}
+    local ids=api("GetAllRecipeIDs") or api("GetFilteredRecipeIDs") or {}
+    local extraIndex=1
     local function step()
-        if token~=scanToken or not enabled() or not ownCooking() or not ui or not ui.frame:IsShown() then return end
+        if token~=scanToken or not enabled() or not ownCooking() or not v.activeCooking() then return end
         if U.call(InCombatLockdown) then ns.after(0.2,step);return end
         for _=1,12 do
             local r=C.recipes[index]
-            if not r then if refresh then refresh() end;return end
-            local info=api("GetRecipeInfo",r.id)
-            -- A missing record is unknown, never evidence of an unlearned recipe.
-            if type(info)=="table" and type(info.learned)=="boolean" then learned[r.id]=info.learned
-            else learned[r.id]=nil end
-            index=index+1
+            if r then
+                local info=api("GetRecipeInfo",r.id)
+                liveInfo[r.id]=type(info)=="table" and info or nil
+                if type(info)=="table" and type(info.learned)=="boolean" then learned[r.id]=info.learned
+                else learned[r.id]=nil end
+                index=index+1
+            else
+                local id=type(ids)=="table" and ids[extraIndex]
+                if not id then v.refresh();return end
+                extraIndex=extraIndex+1
+                -- The native API may return several professions; never mix them into Cooking.
+                if type(id)=="number" and not byID[id] and api("IsRecipeInSkillLine",id,185)==true then
+                    local info=api("GetRecipeInfo",id)
+                    if type(info)=="table" and type(info.name)=="string" then
+                        local record={id=id,name=info.name,ingredients={},books={},sources={"Source unknown"}}
+                        byID[id]=record;catalogue[#catalogue+1]=record
+                        liveInfo[id]=info
+                        if type(info.learned)=="boolean" then learned[id]=info.learned end
+                    end
+                elseif byID[id] and not staticIDs[id] then
+                    -- Existing live-only records are refreshed on later scans, too.
+                    local info=api("GetRecipeInfo",id)
+                    if type(info)=="table" then liveInfo[id]=info;learned[id]=info.learned end
+                end
+            end
         end
         ns.after(0,step)
     end
     step()
 end
-local function detail(r)
-    selected=r
-    ui.setDetail(r.name.." | "..status(r).." | Cooking "..tostring(r.skill or "unknown").."\n\n"..table.concat(P.recipeSources(r),"\n").."\n\nHover the ingredient buttons for farming locations and skills.")
-    for i,b in ipairs(ui.ingredients) do
-        local reagent=r.ingredients[i]
-        if reagent then b.itemID=reagent[1];b:SetLabel(reagent[2].."x "..itemName(reagent[1]));b:Show()
-        else b.itemID=nil;b:Hide() end
-    end
-end
-local function upgradeText(p)
-    local out={p.name.." - rank upgrades (both factions available)","Guide checked "..D.date.."; higher-rank guide data is partly beta-derived. Confirm with the live trainer."}
-    for _,r in ipairs(p.ranks) do
-        out[#out+1]="\n"..r.name.." - cap "..r.cap.." | requires skill "..r.skill..(r.level>0 and (", character level "..r.level) or ", no character-level requirement listed")
-        out[#out+1]=r.method
-        for _,side in ipairs({"Alliance","Horde"}) do if faction=="Both" or faction==side then out[#out+1]=side..": "..r[side] end end
-    end
-    out[#out+1]="\nSource: "..p.source
-    return table.concat(out,"\n")
-end
-refresh=function()
-    if not ui then return end
-    local cooking=view=="cooking"
-    show(ui.search,cooking);show(ui.searchLabel,cooking);show(ui.mode,cooking);show(ui.faction,not cooking)
-    ui.cookingTab:SetLabel((cooking and "> " or "").."Cooking recipes")
-    ui.upgradesTab:SetLabel((not cooking and "> " or "").."Upgrades")
-    for _,b in ipairs(ui.ingredients) do b:Hide() end
-    for _,b in ipairs(ui.professions) do show(b,not cooking) end
-    show(ui.previous,cooking);show(ui.nextPage,cooking)
-    if not cooking then
-        for _,r in ipairs(ui.rows) do r:Hide() end
-        ui.counter:SetText("All 12 professions | faction: "..faction)
-        ui.setDetail(upgradeText(ui.profession or D.professions[1]));return
-    end
-    results=P.recipes(ui.search:GetText(),filter)
-    local pages=math.max(1,math.ceil(#results/PAGE));page=math.max(1,math.min(page,pages))
-    for i,b in ipairs(ui.rows) do
-        local r=results[(page-1)*PAGE+i];b.recipe=r
-        if r then b:SetLabel(r.name.." | "..status(r).." | "..tostring(r.skill or "?"));b:Show() else b:Hide() end
-    end
-    ui.mode:SetLabel("Recipes: "..filter)
-    local confirmed=0;for _,v in pairs(learned) do if type(v)=="boolean" then confirmed=confirmed+1 end end
-    ui.counter:SetText(#results.." recipes | "..page.."/"..pages.." | "..confirmed.." learned states checked")
-    local found=false;for _,r in ipairs(results) do if r==selected then found=true;break end end
-    if not found then selected=results[1] end
-    if selected then detail(selected)
-    else ui.setDetail("No recipes match. Missing/Known require live learned-state data: open your own Cooking profession. Unconfirmed recipes remain visible under All.") end
-end
-local function build()
-    if ui then return true end
-    local f=U.window("QuestSharingProfessions",740,610,"Cooking and profession guide")
-    if not f then return end
-    if f.SetClampedToScreen then f:SetClampedToScreen(true) end
-    ui={frame=f,rows={},ingredients={},professions={}}
-    f:SetScript("OnHide",function() scanToken=scanToken+1;nativeEpoch=nativeEpoch+1 end)
-    ui.cookingTab=S.button(f,"Cooking recipes",155,function() view="cooking";refresh() end)
-    ui.cookingTab:SetPoint("TOPLEFT",f,"TOPLEFT",20,-34)
-    ui.upgradesTab=S.button(f,"Upgrades",135,function() view="upgrades";refresh() end)
-    ui.upgradesTab:SetPoint("LEFT",ui.cookingTab,"RIGHT",8,0)
-    local reload=S.button(f,"Refresh",90,function() materialCache={};sourceCache={};P.scan();refresh() end)
-    reload:SetPoint("TOPRIGHT",f,"TOPRIGHT",-20,-34)
-    ui.searchLabel=U.text(f,"Search recipe, ingredient or source",20,70,400)
-    ui.search=U.box(f,"",20,70,400,"",100)
-    ui.search:SetScript("OnTextChanged",function() page=1;refresh() end)
-    ui.mode=S.button(f,"Recipes: All",180,function()
-        filter=filter=="All" and "Missing" or filter=="Missing" and "Known" or "All";page=1;refresh()
-    end);ui.mode:SetPoint("TOPLEFT",f,"TOPLEFT",440,-87)
-    ui.faction=S.button(f,"Faction: Both",180,function()
-        faction=faction=="Both" and "Alliance" or faction=="Alliance" and "Horde" or "Both"
-        ui.faction:SetLabel("Faction: "..faction);refresh()
-    end);ui.faction:SetPoint("TOPLEFT",f,"TOPLEFT",20,-80)
-    ui.counter=U.text(f,"",20,122,700)
-    for i=1,PAGE do
-        local b=S.button(f,"",700,function(self) detail(self.recipe) end)
-        b:SetPoint("TOPLEFT",f,"TOPLEFT",20,-(144+(i-1)*26))
-        b:SetScript("OnEnter",function(self) if self.recipe then U.tip(self,self.recipe.name,P.recipeSources(self.recipe)) end end)
-        b:SetScript("OnLeave",U.hideTip);ui.rows[i]=b
-    end
-    ui.detail,ui.setDetail,ui.detailScroll=U.scrollText(f,250,314,470,220)
-    for i=1,6 do
-        local b=S.button(f,"",220,function() end)
-        b:SetPoint("TOPLEFT",f,"TOPLEFT",20,-(314+(i-1)*34))
-        b:SetScript("OnEnter",function(self) if self.itemID then U.tip(self,itemName(self.itemID),P.materialLines(self.itemID)) end end)
-        b:SetScript("OnLeave",U.hideTip);ui.ingredients[i]=b
-    end
-    -- Upgrade text uses the same scroll area with a wider, taller viewport.
-    ui.cookingDetail=ui.detail
-    local upgradeDetail,setUpgrade,upgradeScroll=U.scrollText(f,225,146,495,385)
-    ui.upgradeDetail=upgradeDetail
-    ui.detail:SetWordWrap(true);upgradeDetail:SetWordWrap(true)
-    upgradeScroll:Hide()
-    local setCooking=ui.setDetail
-    ui.setDetail=function(text)
-        local upgrades=view=="upgrades"
-        show(ui.detailScroll,not upgrades);show(upgradeScroll,upgrades)
-        if upgrades then setUpgrade(text);upgradeScroll:SetVerticalScroll(0)
-        else setCooking(text);ui.detailScroll:SetVerticalScroll(0) end
-    end
-    for i,p in ipairs(D.professions) do
-        local b=S.button(f,p.name,190,function() ui.profession=p;refresh() end)
-        b:SetPoint("TOPLEFT",f,"TOPLEFT",20,-(146+(i-1)*30));ui.professions[i]=b
-    end
-    ui.previous=S.button(f,"Previous",100,function() page=page-1;refresh() end)
-    ui.previous:SetPoint("BOTTOMLEFT",f,"BOTTOMLEFT",20,28)
-    ui.nextPage=S.button(f,"Next",100,function() page=page+1;refresh() end)
-    ui.nextPage:SetPoint("LEFT",ui.previous,"RIGHT",8,0)
-    U.text(f,"Reference information only. Unknown sources and learned states are labelled; /qs professions off disables integration.",20,588,700)
-    return true
-end
-
-function P.open(tab,fromNative)
+function P.clearCaches() materialCache={};sourceCache={} end
+function P.open(tab)
     if not ns.db.enabled then ns.print("switch Quest Sharing on first (/qs on)");return end
     if not ns.db.professionGuide then ns.setSetting("professionGuide",true) end
-    if not build() then return end
-    nativeOwner=fromNative==true;view=tab=="upgrades" and "upgrades" or "cooking"
-    ui.frame:Show();refresh()
-    if view=="cooking" then P.scan() end
-end
-function P.close() nativeEpoch=nativeEpoch+1;scanToken=scanToken+1;if ui then ui.frame:Hide() end end
-local function install()
-    for _,name in ipairs({"ProfessionsFrame","TradeSkillFrame","CraftFrame"}) do
-        local frame=_G[name]
-        if frame and frame.HookScript and not hooks[frame] and not U.call(InCombatLockdown) then
-            hooks[frame]=true
-            local strip=CreateFrame("Frame",nil,frame);strip:SetWidth(310);strip:SetHeight(26)
-            strip:SetPoint("TOPLEFT",frame,"BOTTOMLEFT",0,-5)
-            local b=S.button(strip,"QS Cooking",145,function() P.open("cooking",true) end)
-            b:SetPoint("TOPLEFT",strip,"TOPLEFT",0,0)
-            local u=S.button(strip,"QS Upgrades",145,function() P.open("upgrades",true) end)
-            u:SetPoint("LEFT",b,"RIGHT",8,0)
-            nativeButtons[#nativeButtons+1]=strip
-            show(strip,enabled())
-            frame:HookScript("OnHide",function() if nativeOwner then P.close() end end)
-        end
+    local v=ui()
+    if not v or not v.attach() then ns.print("Open the game's profession window (K), then choose Cooking or the Upgrades tab.");return end
+    if not ProfessionsFrame:IsShown() then
+        ns.print("Open the game's profession window (K); the Recipes and Upgrades tabs are inside it.");return
     end
+    v.open(tab=="upgrades" and "upgrades" or "cooking")
+    if tab~="upgrades" and not ownCooking() then ns.print("Choose Cooking using the profession tabs on the right.") end
 end
+function P.close() eventToken=eventToken+1;scanToken=scanToken+1;if ui() then ui().close() end end
 function P.settingChanged()
-    install()
-    for _,b in ipairs(nativeButtons) do show(b,enabled()) end
+    if ui() then ui().attach();ui().refresh() end
     if not enabled() then P.close() end
 end
 local pending=false
@@ -323,20 +275,17 @@ local function changed()
     pending=true
     ns.after(0.1,function()
         pending=false
-        if enabled() and ui and ui.frame:IsShown() and view=="cooking" then P.scan() end
+        if enabled() and ui() then ui().attach();ui().refresh();if ui().activeCooking() then P.scan() end end
     end)
 end
 local function shown()
-    if not enabled() then return end
-    install()
-    nativeEpoch=nativeEpoch+1
-    local epoch,attempt=nativeEpoch,0
+    eventToken=eventToken+1
+    local token,attempt=eventToken,0
     local function ready()
-        if epoch~=nativeEpoch or not enabled() then return end
+        if token~=eventToken or not enabled() then return end
         attempt=attempt+1
         if api("IsDataSourceChanging") and attempt<10 then ns.after(0.1,ready);return end
-        if ownCooking() then P.open("cooking",true)
-        elseif nativeOwner and ui and view=="cooking" then P.close() end
+        if ui() and ui().attach() then ui().refresh();if ui().activeCooking() then P.scan() end end
     end
     ns.after(0.1,ready)
 end
@@ -346,14 +295,13 @@ local function tooltip(self,data)
     local id=type(data)=="table" and data.id or type(link)=="string" and tonumber(link:match("item:(%d+)"))
     if type(id)~="number" or self.questSharingFarmID==id or not ingredientIDs[id] then return end
     self.questSharingFarmID=id
-    self:AddLine("Quest Sharing - ingredient sources",0.95,0.78,0.30)
+    self:AddLine("Where to gather",0.95,0.78,0.30)
     for _,line in ipairs(P.materialLines(id)) do self:AddLine(line,1,1,1,true) end
     self:Show()
 end
 local tooltipHooked=false
 local function setup()
-    install()
-    for _,b in ipairs(nativeButtons) do show(b,enabled()) end
+    if ui() then ui().attach();ui().refresh() end
     if not tooltipHooked and GameTooltip and GameTooltip.HookScript then
         tooltipHooked=true
         if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
@@ -363,12 +311,12 @@ local function setup()
     end
 end
 ns.on("PLAYER_LOGIN",setup)
-ns.on("ADDON_LOADED",function() materialCache={};sourceCache={};setup() end)
+ns.on("ADDON_LOADED",function() P.clearCaches();setup() end)
 ns.on("TRADE_SKILL_SHOW",shown)
-ns.on("TRADE_SKILL_CLOSE",function() nativeEpoch=nativeEpoch+1;scanToken=scanToken+1;if nativeOwner then P.close() end end)
+ns.on("TRADE_SKILL_CLOSE",function() P.close() end)
 ns.on("TRADE_SKILL_LIST_UPDATE",changed)
-ns.on("TRADE_SKILL_DATA_SOURCE_CHANGED",function() learned={};sourceCache={};shown() end)
-ns.on("SPELLS_CHANGED",function() learned={};sourceCache={};changed() end)
+ns.on("TRADE_SKILL_DATA_SOURCE_CHANGED",function() learned={};liveInfo={};sourceCache={};shown() end)
+ns.on("SPELLS_CHANGED",function() learned={};liveInfo={};sourceCache={};changed() end)
 ns.on("PLAYER_REGEN_ENABLED",setup)
-function P._window() return ui end
+function P._window() return ui() and ui()._view() end
 function P._learned() return learned end

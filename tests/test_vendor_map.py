@@ -462,6 +462,65 @@ def test_non_ascii_role_tokens_keep_literal_matching(style):
     assert [p.result.vendor.id for p in pins(g)] == [2]
 
 
+NO_DATABASE = "QuestDB=nil; NpcDB=nil; ItemDB=nil; ObjectDB=nil; LibQuestieDB=nil; QuestieLoader=nil; Questie=nil"
+
+
+def test_missing_database_explained_before_and_after_typing(style):
+    g = game(style, NO_DATABASE)
+    for query in ("", "vendor", "Paladin Trainer"):
+        type_query(g, query)
+        text = " ".join(labels(g))
+        assert "requires QuestieDB" in text, text
+        assert "/qs questie" in text and "Questie is optional" in text
+        assert "No known seller" not in text
+        assert not pins(g) and not suggestions(g)
+        assert not g.eval('NS.dataWork.busy("vendor-search")')
+
+
+def test_non_enumerable_database_explains_update_instead_of_no_seller(style):
+    g = game(style, "NpcDB.GetAllIds=nil; ItemDB.GetAllIds=nil")
+    type_query(g, "vendor")
+    text = " ".join(labels(g))
+    assert "newer QuestieDB" in text and "/qs questie" in text, text
+    assert not pins(g)
+
+
+def test_questiedb_without_questie_addon_can_search_and_says_so(style):
+    g = game(style, "Questie=nil; QuestieLoader=nil")
+    assert "QuestieDB" in " ".join(labels(g))
+    type_query(g, "vendor")
+    assert len(pins(g)) >= 3
+
+
+def test_late_database_recovers_same_query_without_toggle_or_reload(style):
+    g = game(style, "SAVED_NPC_DB=NpcDB; SAVED_ITEM_DB=ItemDB; SAVED_LIB=LibQuestieDB; " + NO_DATABASE)
+    type_query(g, "vendor")
+    g.run("NpcDB=SAVED_NPC_DB; ItemDB=SAVED_ITEM_DB; LibQuestieDB=SAVED_LIB; NS.vendorMap.refresh()")
+    g.advance(3)
+    assert len(pins(g)) >= 3
+    assert "requires QuestieDB" not in " ".join(labels(g))
+
+
+def test_lost_database_clears_stale_results_and_restores_fresh_index(style):
+    g = game(style)
+    type_query(g, "vendor")
+    assert pins(g)
+    g.run("SAVED_NPC_DB=NpcDB; SAVED_ITEM_DB=ItemDB; SAVED_LIB=LibQuestieDB; " + NO_DATABASE + "; NS.vendorMap.refresh()")
+    assert not pins(g) and not suggestions(g)
+    assert "requires QuestieDB" in " ".join(labels(g))
+    g.run("QUESTIE_NPCS[2].subName='Mage Trainer'; NpcDB=SAVED_NPC_DB; ItemDB=SAVED_ITEM_DB; LibQuestieDB=SAVED_LIB; NS.vendorMap.refresh()")
+    g.advance(3)
+    assert 2 not in [p.result.vendor.id for p in pins(g)]
+
+
+def test_libquestiedb_only_provider_is_supported(style):
+    g = game(style, "LibQuestieDB.Npc=NpcDB; LibQuestieDB.Item=ItemDB; "
+             "QuestDB=nil; NpcDB=nil; ItemDB=nil; Questie=nil; QuestieLoader=nil")
+    type_query(g, "vendor")
+    assert len(pins(g)) >= 3
+    assert "requires QuestieDB" not in " ".join(labels(g))
+
+
 if __name__ == "__main__":
     failed = total = 0
     for name, test in sorted(list(globals().items())):

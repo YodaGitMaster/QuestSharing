@@ -59,6 +59,87 @@ function C.entryMap()
     return m
 end
 
+-- Read carried inventory for the current plan only. A missing bag API remains unknown.
+function C.plannerInventory(itemIDs)
+    local slots = C_Container and C_Container.GetContainerNumSlots or GetContainerNumSlots
+    local info = C_Container and C_Container.GetContainerItemInfo
+    local legacyID = GetContainerItemID
+    local legacyInfo = GetContainerItemInfo
+    if type(slots) ~= "function" or (type(info) ~= "function" and type(legacyID) ~= "function") then
+        return nil
+    end
+    local snapshot = { counts = {}, freeSlots = 0 }
+    local totalSlots = 0
+    local lastBag = NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4
+    for bag = 0, lastBag do
+        local ok, count = pcall(slots, bag)
+        if ok and type(count) == "number" then
+            totalSlots = totalSlots + count
+            for slot = 1, count do
+                local id, quantity
+                if type(info) == "function" then
+                    local read, item = pcall(info, bag, slot)
+                    if read and type(item) == "table" then
+                        id, quantity = item.itemID, item.stackCount
+                    end
+                else
+                    local read, value = pcall(legacyID, bag, slot)
+                    if read then id = value end
+                    if id and type(legacyInfo) == "function" then
+                        local valid, _, n = pcall(legacyInfo, bag, slot)
+                        if valid then quantity = n end
+                    end
+                end
+                if not id then snapshot.freeSlots = snapshot.freeSlots + 1
+                elseif itemIDs[id] then
+                    snapshot.counts[id] = (snapshot.counts[id] or 0) + (tonumber(quantity) or 1)
+                end
+            end
+        end
+    end
+    if totalSlots == 0 then snapshot.freeSlots = nil end
+    return snapshot
+end
+
+-- Questie reputation thresholds use the game's absolute faction value. Only read
+-- factions referenced by this zone's candidate quests, once per plan snapshot.
+function C.plannerReputation(factionIDs)
+    local values = {}
+    for id in pairs(factionIDs or {}) do
+        local modern = C_Reputation and C_Reputation.GetFactionDataByID
+        if type(modern) == "function" then
+            local ok, data = pcall(modern, id)
+            if ok and type(data) == "table" and type(data.currentStanding) == "number"
+                and data.currentStanding == data.currentStanding and math.abs(data.currentStanding) < math.huge then
+                values[id] = data.currentStanding
+            end
+        end
+        if values[id] == nil and type(GetFactionInfoByID) == "function" then
+            local ok, _, _, _, _, _, value = pcall(GetFactionInfoByID, id)
+            if ok and type(value) == "number" and value == value and math.abs(value) < math.huge then
+                values[id] = value
+            end
+        end
+    end
+    return values
+end
+
+-- Forever exposes skill-line IDs directly. Other clients may not; missing ranks
+-- stay unknown rather than matching a localized name to the wrong profession.
+function C.plannerSkills(skillIDs)
+    local values = {}
+    local api = C_SkillInfo and C_SkillInfo.GetSkillLineInfoByID
+    if type(api) ~= "function" then return values end
+    for id in pairs(skillIDs or {}) do
+        local ok, data = pcall(api, id)
+        if ok and type(data) == "table" and type(data.rank) == "number"
+            and data.rank >= 0 and data.rank < math.huge then
+            values[id] = data.rank
+        end
+    end
+    return values
+end
+
 function C.findEntry(questID, index)
     for _, e in ipairs(C.entries()) do
         if (questID and e.questID == questID) or (not questID and index and e.index == index) then return e end

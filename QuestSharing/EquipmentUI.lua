@@ -5,6 +5,62 @@ ns.equipmentUI = E
 local host, active, pages, tabs = nil, nil, {}, {}
 local f = { category = "All equipment", subtype = "Any type", slot = "All slots", mode = "Required level", sort = "Highest item level", stats = {{},{},{}} }
 E.filters = f
+-- Scoped journal skin: other addon windows keep their own layout and controls.
+local function font(text,size,r,g,b)
+    if text.SetFont then text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",size) end
+    if r and text.SetTextColor then text:SetTextColor(r,g,b) end
+end
+function E.text(parent,value,x,y,width)
+    local text=U.text(parent,value,x,y,width)
+    font(text,12,0.91,0.84,0.67)
+    return text
+end
+function E.surface(frame,paper)
+    local base=S.fill(frame,"BACKGROUND",paper and 0.78 or 0.105,paper and 0.67 or 0.078,paper and 0.46 or 0.052,1)
+    base:SetAllPoints(frame)
+    local grain=frame:CreateTexture(nil,"BACKGROUND")
+    grain:SetTexture(paper and "Interface\\QuestFrame\\QuestBG" or "Interface\\DialogFrame\\UI-DialogBox-Background")
+    grain:SetAllPoints(frame);grain:SetAlpha(paper and 1 or 0.28)
+    local edges={}
+    for _,side in ipairs({"TOP","BOTTOM","LEFT","RIGHT"}) do
+        local edge=S.fill(frame,"BORDER",0.48,0.35,0.16,0.9)
+        if side=="TOP" or side=="BOTTOM" then
+            edge:SetHeight(1);edge:SetPoint(side.."LEFT",frame,side.."LEFT",0,0);edge:SetPoint(side.."RIGHT",frame,side.."RIGHT",0,0)
+        else
+            edge:SetWidth(1);edge:SetPoint("TOP"..side,frame,"TOP"..side,0,0);edge:SetPoint("BOTTOM"..side,frame,"BOTTOM"..side,0,0)
+        end
+        edges[#edges+1]=edge
+    end
+    frame.journalSurface={base=base,grain=grain,edges=edges,paper=paper==true}
+    return base
+end
+local function buttonTexture(b,method,path)
+    local texture=b:CreateTexture(nil,"BACKGROUND")
+    texture:SetTexture(path);texture:SetTexCoord(0,0.625,0,0.6875);texture:SetAllPoints(b)
+    if method=="SetHighlightTexture" then texture:SetBlendMode("ADD") end
+    b[method](b,texture)
+    return texture
+end
+function E.button(parent,label,width,click,tip)
+    local b=S.button(parent,label,width,click,tip)
+    b.bg:Hide();b.edge:Hide();b:SetHeight(24)
+    b.normalArt=buttonTexture(b,"SetNormalTexture","Interface\\Buttons\\UI-Panel-Button-Up")
+    buttonTexture(b,"SetPushedTexture","Interface\\Buttons\\UI-Panel-Button-Down")
+    buttonTexture(b,"SetHighlightTexture","Interface\\Buttons\\UI-Panel-Button-Highlight")
+    font(b.label,12,1,0.82,0)
+    return b
+end
+function E.listButton(parent,label,width,click,tip)
+    local b=S.button(parent,label,width,click,tip)
+    b.bg:Hide();b.edge:Hide();b.bg=E.surface(b);font(b.label,12,0.91,0.84,0.67)
+    return b
+end
+function E.box(parent,label,x,y,width,value,max)
+    local b=U.box(parent,label,x,y,width,value,max)
+    E.surface(b);font(b,12,1,0.94,0.8)
+    if b.SetTextInsets then b:SetTextInsets(7,7,0,0) end
+    return b
+end
 local categories = { "All equipment", "Weapons", "Armor", "Accessories" }
 local types = {
     ["All equipment"] = { "Any type" },
@@ -121,13 +177,13 @@ local function buildMenu()
     panel:SetWidth(250); panel:SetHeight(330); panel:SetFrameStrata("TOOLTIP")
     if panel.SetFrameLevel then panel:SetFrameLevel((host.GetFrameLevel and host:GetFrameLevel() or 0)+40) end
     panel:SetClampedToScreen(true); panel:EnableMouse(true)
-    S.fill(panel,"BACKGROUND",0.07,0.09,0.14,1):SetAllPoints(panel)
+    E.surface(panel)
     menu={frame=panel,rows={},offset=0,cursor=1}
-    menu.search=U.box(panel,"Find an option",10,8,230,"",80)
+    menu.search=E.box(panel,"Find an option",10,8,230,"",80)
     if menu.search.SetAltArrowKeyMode then menu.search:SetAltArrowKeyMode(false) end
-    menu.status=U.text(panel,"",10,307,230)
+    menu.status=E.text(panel,"",10,307,230)
     for i=1,10 do
-        local row=S.button(panel,"",230,function(self) chooseOption(self.entry) end)
+        local row=E.listButton(panel,"",230,function(self) chooseOption(self.entry) end)
         row:SetHeight(24);row:SetPoint("TOPLEFT",panel,"TOPLEFT",10,-(48+(i-1)*25))
         row.label:ClearAllPoints();row.label:SetPoint("LEFT",row,"LEFT",8,0);row.label:SetWidth(214);row.label:SetJustifyH("LEFT");row.label:SetWordWrap(false)
         row:HookScript("OnEnter",function(self) if self.entry then local _,label=option(self.entry);U.tip(self,label,{}) end end)
@@ -173,7 +229,7 @@ drawMenu=function()
 end
 
 function E.dropdown(parent,label,x,y,width,choices,read,choose)
-    local b=S.button(parent,"",width,function(self)
+    local b=E.button(parent,"",width,function(self)
         if menu and menu.owner==self and menu.frame:IsShown() then E.dismissMenu();return end
         U.hideTip();buildMenu();menu.owner=self;menu.offset,menu.cursor=0,1
         menu.frame:ClearAllPoints();menu.frame:SetPoint("TOPLEFT",self,"BOTTOMLEFT",0,-4)
@@ -184,7 +240,7 @@ function E.dropdown(parent,label,x,y,width,choices,read,choose)
     b:SetHeight(24);b:SetPoint("TOPLEFT",parent,"TOPLEFT",x,-y)
     b.choices,b.readValue,b.chooseValue=choices,read,choose
     b.label:ClearAllPoints();b.label:SetPoint("LEFT",b,"LEFT",8,0);b.label:SetWidth(width-30);b.label:SetJustifyH("LEFT");b.label:SetWordWrap(false)
-    U.text(b,"v",width-16,5,12)
+    E.text(b,"v",width-16,5,12)
     b.refresh=function()
         local current=read();local values=type(choices)=="function" and choices() or choices
         local text=tostring(current or "All")
@@ -211,9 +267,9 @@ function E.liveBox(box,key,apply)
     box:SetScript("OnEditFocusGained",E.dismissMenu)
 end
 function E.searchBox(parent,label,x,y,width,key,apply)
-    local box=U.box(parent,label,x,y,width-54,"",100)
+    local box=E.box(parent,label,x,y,width-54,"",100)
     E.liveBox(box,key,apply)
-    local clear=S.button(parent,"Clear",48,function() box:SetText("");box.flush();box:ClearFocus() end)
+    local clear=E.button(parent,"Clear",48,function() box:SetText("");box.flush();box:ClearFocus() end)
     clear:SetPoint("TOPLEFT",parent,"TOPLEFT",x+width-48,-(y+18))
     return box,clear
 end
@@ -395,24 +451,29 @@ function E.close(key)
 end
 local function build()
     if host then return true end
-    host = U.window("QuestSharingEquipment", 1080, 828, "Quest and equipment explorer")
+    host = U.window("QuestSharingEquipment", 1080, 828, "Quest Sharing — Adventurer's Journal")
     if not host then return false end
     local scale = math.min(1, (UIParent:GetWidth() - 40) / 1080, (UIParent:GetHeight() - 40) / 828)
     host:SetScale(math.max(0.5, scale))
-    S.fill(host, "BACKGROUND", 0.035, 0.055, 0.09, 1):SetAllPoints(host)
+    local lining=CreateFrame("Frame",nil,host)
+    lining:SetPoint("TOPLEFT",host,"TOPLEFT",15,-26);lining:SetPoint("BOTTOMRIGHT",host,"BOTTOMRIGHT",-15,16)
+    E.surface(lining)
+    if lining.SetFrameLevel and host.GetFrameLevel then lining:SetFrameLevel(host:GetFrameLevel()) end
+    font(host.title,16,1,0.82,0)
+    if host.plate then host.plate:SetWidth(430) end
     for i, key in ipairs({ "quests", "dungeons", "dungeonQuests" }) do
-        tabs[key] = S.button(host, tabNames[key], 184, function()
+        tabs[key] = E.button(host, tabNames[key], 184, function()
             if key == "quests" then ns.rewards.open() elseif key == "dungeons" then ns.loot.open() else ns.dungeonQuests.open() end
         end)
         tabs[key]:SetPoint("TOPLEFT", host, "TOPLEFT", 24 + (i-1)*194, -40)
     end
-    local hint=U.text(host, "Blue+ only • hover to compare", 620, 43, 200)
+    local hint=E.text(host, "Blue+ only • hover to compare", 620, 43, 200)
     local bar = CreateFrame("Frame", nil, host)
     bar:SetPoint("TOPLEFT", host, "TOPLEFT", 16, -73); bar:SetWidth(1048); bar:SetHeight(137)
-    S.fill(bar, "BACKGROUND", 0.09, 0.12, 0.18, 1):SetAllPoints(bar)
+    E.surface(bar)
     controls = {bar=bar,hint=hint}
     local function choice(key,label,x,width,values)
-        U.text(bar,label,x,5,width)
+        E.text(bar,label,x,5,width)
         controls[key]=E.dropdown(bar,nil,x,24,width,values,function() return f[key] end,function(value)
             f[key]=value
             if key=="category" then f.subtype="Any type";f.slot="All slots" end
@@ -424,30 +485,30 @@ local function build()
     choice("slot", "Slot", 328, 130, slots)
     choice("mode", "Level range measures", 468, 136, { "Required level", "Item level" })
     controls.sort=E.dropdown(host,"Sort",830,38,226,{"Highest item level","Lowest required level","Name A–Z"},function() return f.sort end,function(value) f.sort=value;labels();changed() end)
-    controls.min = U.box(bar, "Min", 614, 7, 60, "", 4)
-    controls.max = U.box(bar, "Max", 684, 7, 60, "", 4)
+    controls.min = E.box(bar, "Min", 614, 7, 60, "", 4)
+    controls.max = E.box(bar, "Max", 684, 7, 60, "", 4)
     local function apply()
         controls.min.cancel();controls.max.cancel()
         E.applyRange(controls.min:GetText(), controls.max:GetText())
     end
     for _,b in ipairs({controls.min,controls.max}) do E.liveBox(b,nil,apply) end
-    controls.apply = S.button(bar, "Apply", 70, apply); controls.apply:SetPoint("TOPLEFT", bar, "TOPLEFT", 754, -25)
-    controls.reset = S.button(bar, "Clear filters", 110, E.reset); controls.reset:SetPoint("TOPLEFT", bar, "TOPLEFT", 834, -25)
-    controls.mine=S.button(bar,"My level",86,E.myLevel,"Only equipment requiring your level or lower");controls.mine:SetPoint("TOPLEFT",bar,"TOPLEFT",954,-25)
-    controls.error = U.text(bar, "", 8, 49, 1020)
-    U.text(bar,"Stats • all selected must match",8,70,228)
+    controls.apply = E.button(bar, "Apply", 70, apply); controls.apply:SetPoint("TOPLEFT", bar, "TOPLEFT", 754, -25)
+    controls.reset = E.button(bar, "Clear filters", 110, E.reset); controls.reset:SetPoint("TOPLEFT", bar, "TOPLEFT", 834, -25)
+    controls.mine=E.button(bar,"My level",86,E.myLevel,"Only equipment requiring your level or lower");controls.mine:SetPoint("TOPLEFT",bar,"TOPLEFT",954,-25)
+    controls.error = E.text(bar, "", 8, 49, 1020)
+    E.text(bar,"Stats • all selected must match",8,70,228)
     controls.stats={}
     for i=1,3 do
         local index,x=i,8+(i-1)*344
         local row={};controls.stats[index]=row
-        row.min=U.box(bar,"Min bonus",x+238,74,88,"",6)
+        row.min=E.box(bar,"Min bonus",x+238,74,88,"",6)
         row.stat=E.dropdown(bar,nil,x,92,228,statChoices,function() return f.stats[index].stat or "" end,function(value)
             if E.applyStat(index,value,row.min:GetText()) and value=="" then row.min:SetText("");row.min.cancel() end
         end)
         E.liveBox(row.min,nil,function(text) E.applyStat(index,f.stats[index].stat or "",text) end)
         row.stat:HookScript("OnEnter",function(self) U.tip(self,"Item stat filter",{"All selected bonuses must meet their minimum.","Uses bonuses reported by the client; procs and unreported bonuses are not matched.","Ratings use rating points, not percentages."}) end)
     end
-    controls.statError=U.text(bar,statHint(),8,118,1020)
+    controls.statError=E.text(bar,statHint(),8,118,1020)
     labels()
     host:HookScript("OnMouseDown",E.dismissMenu)
     host:SetScript("OnHide", function() E.dismissMenu();if active then local key=active; active=nil; hidePage(key) end; U.hideTip() end)
@@ -474,15 +535,28 @@ function E.show(key)
         for _,b in ipairs({controls.min,controls.max}) do if b.dirty then b.flush() end end
         for _,row in ipairs(controls.stats) do if row.min.dirty then row.min.flush() end end
     end
-    for k,b in pairs(tabs) do b:SetLabel((k == key and S.GOLD or S.GREY) .. tabNames[k] .. "|r") end
+    for k,b in pairs(tabs) do
+        b:SetLabel((k == key and S.GOLD or "|cffd4be90") .. tabNames[k] .. "|r")
+        b.normalArt:SetTexture(k==key and "Interface\\Buttons\\UI-Panel-Button-Down" or "Interface\\Buttons\\UI-Panel-Button-Up")
+    end
     return true
 end
-function E.details(parent, x, width, title)
+function E.details(parent, x, width, title,height)
     local panel = CreateFrame("Frame", nil, parent)
-    panel:SetPoint("TOPLEFT", parent, "TOPLEFT", x, 0); panel:SetWidth(width); panel:SetHeight(550)
-    S.fill(panel, "BACKGROUND", 0.07, 0.09, 0.13, 1):SetAllPoints(panel)
-    U.text(panel, S.GOLD .. title .. "|r", 14, 14, width-28)
-    local text, set = U.scrollText(panel, 14, 44, width-28, 452)
+    height=height or 550
+    panel:SetPoint("TOPLEFT", parent, "TOPLEFT", x, 0); panel:SetWidth(width); panel:SetHeight(height)
+    E.surface(panel,true)
+    local header=S.fill(panel,"ARTWORK",0.17,0.10,0.045,0.97)
+    header:SetPoint("TOPLEFT",panel,"TOPLEFT",1,-1);header:SetPoint("TOPRIGHT",panel,"TOPRIGHT",-1,-1);header:SetHeight(34)
+    E.text(panel, S.GOLD .. title .. "|r", 14, 11, width-28)
+    local text, write,scroll = U.scrollText(panel, 16, 48, width-32, height-110)
+    font(text,13,0.18,0.105,0.045)
+    if text.SetShadowColor then text:SetShadowColor(0,0,0,0) end
+    local function set(value)
+        -- Quest links use yellow in dark tooltips; use dark ink on this parchment instead.
+        value=string.gsub(string.gsub(value,"|cffffff00","|cff4b2a11"),"|cffffd100","|cff4b2a11")
+        write(value)
+    end
     set("Select an item to see its source and details here.")
     return panel, text, set
 end
@@ -490,12 +564,17 @@ function E.row(parent, x, y, width, i)
     local row = { frame = CreateFrame("Button", nil, parent) }
     local b = row.frame
     b:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y); b:SetWidth(width); b:SetHeight(48)
-    row.bg = S.fill(b, "BACKGROUND", 0.10, 0.13, (i%2==0 and 0.20 or 0.17), 1); row.bg:SetAllPoints(b)
-    row.edge = S.fill(b, "OVERLAY", 0.3, 0.75, 1, 0.9); row.edge:SetWidth(3); row.edge:SetHeight(48); row.edge:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0); row.edge:Hide()
+    row.bg=E.surface(b)
+    row.edge = S.fill(b, "OVERLAY", 0.95, 0.7, 0.2, 0.95); row.edge:SetWidth(3); row.edge:SetHeight(48); row.edge:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0); row.edge:Hide()
+    row.selectedArt=S.fill(b,"BACKGROUND",0.58,0.34,0.08,0.25);row.selectedArt:SetAllPoints(b);row.selectedArt:Hide()
     row.icon = b:CreateTexture(nil, "ARTWORK"); row.icon:SetWidth(34); row.icon:SetHeight(34); row.icon:SetPoint("TOPLEFT", b, "TOPLEFT", 9, -7)
+    row.icon:SetTexCoord(0.06,0.94,0.06,0.94)
+    row.iconBorder=b:CreateTexture(nil,"OVERLAY");row.iconBorder:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+    row.iconBorder:SetWidth(54);row.iconBorder:SetHeight(54);row.iconBorder:SetPoint("CENTER",row.icon,"CENTER",0,0)
     row.rarity=S.fill(b,"ARTWORK",1,1,1,1);row.rarity:SetWidth(34);row.rarity:SetHeight(3);row.rarity:SetPoint("TOPLEFT",b,"TOPLEFT",9,-42)
-    row.item = U.text(b, "", 52, 6, width-60); row.item:SetFontObject(GameFontNormal or ChatFontNormal)
-    row.from = U.text(b, "", 52, 27, width-60)
+    row.item = E.text(b, "", 52, 6, width-60); row.item:SetFontObject(GameFontNormal or ChatFontNormal)
+    row.from = E.text(b, "", 52, 27, width-60)
+    font(row.item,13);font(row.from,12,0.8,0.72,0.56)
     if row.item.SetWordWrap then row.item:SetWordWrap(false); row.from:SetWordWrap(false) end
     b:RegisterForClicks("LeftButtonUp")
     return row
@@ -513,6 +592,7 @@ function E.select(rows, selected)
         r.selected=r==selected
         local tint=r.selected and 1.15 or 1;r.bg:SetVertexColor(tint,tint,tint)
         if r.selected then r.edge:Show() else r.edge:Hide() end
+        if r.selected then r.selectedArt:Show() else r.selectedArt:Hide() end
     end
 end
 function E._window() return host, controls, pages, tabs end

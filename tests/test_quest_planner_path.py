@@ -169,7 +169,7 @@ def test_planner_uses_spf_for_first_outing_and_follow_button_route():
     setup = QUEST_DATA + r'''
 QUESTIE_QUESTS[100].startedBy = { {197} }
 QUESTIE_QUESTS[102] = { name="Near Giver Quest", questLevel=2, requiredLevel=1,
-    startedBy={ {400} }, objectives={ { {400} } } }
+    startedBy={ {400} }, finishedBy={ {400} }, objectives={ { {400} } } }
 QuestDB.GetAllIds = function() return {100, 102} end
 QuestieLoader = { ImportModule = function(_, name)
     if name == "QuestieDB" then return { IsDoable = function() return true end } end
@@ -188,6 +188,7 @@ GetQuestDifficultyColor = function() return QuestDifficultyColors.standard end
     assert g.eval("#SPF_JOBS") == 1
     # Make the nearby giver outing win even if Quest Sharing's straight-line estimate chose the other one.
     g.run("local costs={}; for i,p in ipairs(SPF_JOBS[1].targets) do costs[i] = p.x > 0.5 and 10 or 900 end; SPF_FINISH(1, costs)")
+    g.advance(3)  # Cost callbacks queue cooperative predictive search.
     g.eval("NS.questPlanner.pin")()
     waypoint = g.eval("WAYPOINT")
     assert waypoint["map"] == 1429
