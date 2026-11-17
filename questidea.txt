@@ -1,0 +1,261 @@
+# Intelligent WoW Quest Optimizer — Algorithm Design
+
+## Your task
+
+Design the algorithm for an intelligent World of Warcraft quest optimizer, inspired by Zygor Guides but going beyond predefined leveling routes.
+
+**Do not write code.** I want the algorithmic architecture, planning logic, mathematical optimization strategy, and a worked example.
+
+The algorithm must optimize an entire zone by reasoning about both current quests and future quests that the player has not yet accepted or unlocked.
+
+The main requirement is **predictive optimization rather than reactive routing**.
+
+## 1. Fundamental objective
+
+Given one WoW zone, the player's current character state, and complete knowledge of the zone's quests, calculate the most efficient sequence of actions.
+
+The default objective is to complete all attainable, non-repeatable quests in that zone in the minimum expected total time.
+
+Also design support for alternative optimization objectives:
+
+- Fastest XP per hour, allowing inefficient quests to be skipped.
+- Fastest completion of a user-selected set of quests.
+- Maximum quest completion within a specified time budget.
+
+These objectives must remain distinct. The algorithm must not silently substitute one for another.
+
+## 2. Zone knowledge and player state
+
+Assume access to information about:
+
+**Player**
+- Position, level, faction, race, class, movement speed.
+- Active quests and objective progress.
+- Completed quests and quest history.
+- Available flight paths and travel abilities.
+- Inventory, quest-log capacity, and relevant eligibility conditions.
+
+**Quests**
+- All quests associated with the zone, including undiscovered quests.
+- Quest acceptance and turn-in NPCs.
+- Complete prerequisites and quest chains.
+- Level, faction, class, reputation, and other restrictions.
+- Mutually exclusive quests and optional branches.
+- Quest rewards and XP.
+- Objective types: kill, loot, interact, escort, explore, talk, use item, etc.
+- Whether a quest requires another quest to be completed, turned in, or merely accepted.
+
+**World**
+- NPC positions and quest hubs.
+- Mob spawn areas and density.
+- Item sources, drop probabilities, and required quantities.
+- Estimated combat, travel, respawn, and interaction times.
+- Travel connections between subareas.
+- Known uncertain or unverified game data.
+
+Stay focused on one zone. If a quest requires action outside the zone, represent that requirement explicitly as an external dependency rather than silently optimizing another zone.
+
+## 3. Build a quest dependency and objective graph
+
+Represent quests as a network of relationships, not an independent checklist.
+
+The algorithm must identify:
+
+1. Quest prerequisites and unlock conditions.
+2. Quests that depend on completing or turning in another quest.
+3. Quests that can be accepted together.
+4. Quests that require the same mobs, items, NPCs, or locations.
+5. Quests that are mutually exclusive.
+6. Quests that become available after leveling up or changing another player state.
+7. Quests whose objectives cannot progress until acceptance.
+
+Model both logical dependencies and geographical relationships.
+
+Importantly, distinguish between:
+
+- Quests already completed.
+- Quests currently accepted.
+- Quests available for acceptance now.
+- Quests unlockable through a sequence of actions.
+- Quests currently inaccessible but potentially unlockable later.
+- Quests permanently unavailable to this character.
+
+## 4. Predictive quest planning — the critical requirement
+
+Before recommending any action, look ahead across the entire zone's quest graph.
+
+### Example: The Murloc Problem
+
+Suppose three quests involve the same Murloc camp.
+
+**Quest A**
+- Currently active.
+- Kill 10 Murlocs.
+
+**Quest B**
+- Not yet accepted.
+- Obtain 5 items from those Murlocs.
+- Each Murloc has a 25% chance of dropping the item.
+
+**Quest C**
+- Not yet unlocked.
+- Kill 8 Murlocs.
+- Requires completing another quest elsewhere.
+
+The algorithm must NOT simply recommend completing Quest A because it is currently active and nearby.
+
+Instead:
+
+1. Detect that all three quests refer to the same mob population.
+2. Identify that Quest B could be accepted before visiting the camp.
+3. Determine what is required to unlock Quest C.
+4. Evaluate whether unlocking Quest C first is worthwhile.
+5. Estimate the number of kills and total time under different execution sequences.
+6. Account for which objectives can actually progress together.
+7. Choose the sequence with the lowest expected total completion time.
+
+If all three objectives can be active simultaneously, kills might contribute to multiple quests.
+
+If Quest C requires turning in Quest A first, however, its kill objective cannot overlap with Quest A. The algorithm must respect that dependency.
+
+**Never assume that a shared mob implies shared quest progress.**
+
+This reasoning must happen before the player begins farming, not after the optimizer notices that the same mobs are needed again.
+
+## 5. Merge compatible objectives
+
+The optimizer must consolidate related activities into efficient execution groups.
+
+For example, one location might contain:
+
+- Two different kill objectives.
+- An item collection quest.
+- An NPC to talk to.
+- An object to interact with.
+- A quest that becomes available after killing a named enemy.
+
+Instead of planning each quest independently, group compatible objectives by location, mob population, and activation requirements.
+
+Calculate how much progress a single action can contribute to all currently eligible objectives.
+
+For probabilistic drops, calculate expected completion costs without simply adding the individual expected kill counts.
+
+Also distinguish between objectives that progress simultaneously and objectives that must happen sequentially.
+
+## 6. Global planning and optimization
+
+Design an optimization function that minimizes:
+
+**Expected total time = travel + combat + collection + interactions + waiting + other required actions.**
+
+Avoid double-counting work when several objectives progress simultaneously.
+
+The planner must evaluate:
+
+- Whether to accept more quests before leaving an NPC hub.
+- Whether to unlock a chain before farming a shared location.
+- Whether to delay a currently available quest.
+- Whether to complete an objective immediately or bundle it with another later.
+- Whether a detour prevents more expensive backtracking.
+- Whether doing a mob cluster twice is actually cheaper than unlocking another quest first.
+- Whether completing a quest changes player eligibility and unlocks new opportunities.
+
+Compare at least three planning approaches:
+
+1. **Greedy planning:** Always choose the nearest or currently cheapest objective.
+2. **Lookahead planning:** Evaluate the next several actions and their consequences.
+3. **Global or rolling-horizon optimization:** Search for an efficient route across the complete quest dependency network, recalculating as needed.
+
+Explain whether graph search, heuristic search, beam search, dynamic programming, or another approach is most suitable.
+
+Discuss computational complexity and how to achieve high-quality solutions without requiring exhaustive search through every possible action sequence.
+
+Do not claim mathematical optimality unless the algorithm can actually establish it.
+
+## 7. Dynamic replanning
+
+Like Zygor, the optimizer should detect the player's progress, but it must also reconsider the execution plan when significant changes occur.
+
+Replanning triggers include:
+
+- Accepting or completing a quest.
+- Unlocking a new quest chain.
+- Receiving a rare quest item.
+- Unexpectedly poor drop rates.
+- Discovering a missed quest giver.
+- Changing location or travel capabilities.
+- Finding a mob location overcrowded or unavailable.
+- Reaching a level that unlocks additional quests.
+
+However, small changes should not constantly cause the route to switch.
+
+Describe how to maintain route stability while still reacting to meaningful improvements.
+
+## 8. Data uncertainty and correctness
+
+The optimizer must never assume its quest database is perfectly accurate.
+
+For example, WoW Forever can differ from historical Classic quest data.
+
+Distinguish:
+
+- Verified game data.
+- Data inferred from external databases.
+- Estimated drop rates or travel times.
+- Unknown prerequisites or objectives.
+
+Explain how uncertainty influences route selection.
+
+When information is missing, the algorithm should avoid presenting an unsupported route as optimal.
+
+## 9. Zygor-style player instructions
+
+The resulting plan should be an ordered series of clear, actionable instructions.
+
+Example:
+
+1. Accept Quests A and B from the nearby NPC hub.
+2. Complete Quest D to unlock Quest C.
+3. Return to the hub and accept Quest C.
+4. Travel to the Murloc camp.
+5. Kill Murlocs while progressing A, B, and C simultaneously.
+6. Continue until the required kill and item objectives are satisfied.
+7. Visit the next nearby objective cluster.
+8. Turn in completed quests in the most efficient order.
+
+The instructions should show current actions, upcoming objectives, and useful completion progress.
+
+The system should also be capable of explaining its reasoning:
+
+- "Accept Quest B first because it requires mobs you are about to kill."
+- "Delay the Murloc camp until Quest C is unlocked."
+- "Complete Quest A now because unlocking Quest C first would increase total expected completion time."
+
+The explanations must reflect the actual cost comparison, not arbitrary rules.
+
+## 10. Expected design deliverables
+
+Produce a technical algorithm design covering:
+
+1. **State model:** How to represent the player and the world.
+2. **Quest dependency graph:** How quests and their unlock conditions are linked.
+3. **Shared-objective model:** How simultaneous progress is detected and quantified.
+4. **Predictive planning algorithm:** How future objectives affect current actions.
+5. **Optimization function:** How execution sequences are evaluated.
+6. **Search strategy:** How to find a high-quality route efficiently.
+7. **Dynamic replanning:** When and how to update the plan.
+8. **Worked simulation:** A complete small-zone example with at least 8 quests, including missing quests, chained quests, shared mobs, and uncertain drops.
+9. **Comparison:** Compare the optimized route against a simple nearest-quest greedy approach, using the same assumptions and estimated costs.
+10. **Failure cases:** Identify situations where the algorithm could produce a poor or incorrect recommendation.
+
+For the simulation, include an explicit action order, estimated travel time, expected kills, expected completion time, and reasons for the chosen sequence.
+
+## Final requirement
+
+I do not want a list of generic recommendations or a disguised hardcoded Zygor guide.
+
+I want a genuine **dependency-aware, probabilistic, predictive quest scheduling and routing algorithm**.
+
+Its defining capability must be understanding what the player will need to do later, then using that information to decide what the player should do now.
+
+**Do not implement anything. Design the algorithm first.**

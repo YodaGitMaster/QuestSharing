@@ -27,6 +27,7 @@ local PLAN_ROW_HEIGHT, PLAN_LIST_HEIGHT, PLAN_WIDTH = 56, 280, 320
 local panelDismissed, refreshQueued, refreshForce, refreshZoneEntry = false, false, false, false
 local lastLogMembers, lastLogStructure, lastLogProgress = nil, nil, nil
 local panelMoved, lastLevelStats = false, { localCount = 0, below = 0, above = 0, eligible = 0, unknown = 0 }
+local lastPlanOptions
 
 local function questie() return ns.questie end
 
@@ -568,6 +569,7 @@ function P.cancelEstimate()
     Work.cancel("quest-improve")
     if Path then Path.cancelWalkEstimates() end
     report = nil
+    lastPlanOptions = nil
 end
 
 local function atom(stops, kind, point, quest, task, destination, key)
@@ -908,6 +910,7 @@ buildRoute = function()
         local ordered, result = ns.questOptimizer.optimize(catalog, stops, opts)
         if generation ~= token then return end
         report = result or {}
+        lastPlanOptions = opts
         report.estimatedScale = estimatedScale
         report.range = P.levelScope
         previousMap, previousPlan = origin.map, {}
@@ -1462,6 +1465,138 @@ ns.on("UNIT_QUEST_LOG_CHANGED", function() scheduleRefresh(false, false) end)
 local modeNames = {all="Complete the zone", xp="Fastest quest XP/hour", selected="Selected quests", budget="Quest count within time"}
 function P.report() return report end
 
+local function debugIDs(values, array)
+    local ids = {}
+    for key, value in pairs(values or {}) do
+        local id = array and value or key
+        if type(id) == "number" and (array or value) then ids[#ids + 1] = id end
+    end
+    table.sort(ids)
+    if #ids == 0 then return "none" end
+    for i, id in ipairs(ids) do ids[i] = tostring(id) end
+    return table.concat(ids, ",")
+end
+
+local function debugPoint(point)
+    if not point then return "unknown" end
+    return string.format("map %s (%.4f, %.4f)", tostring(point.map), tonumber(point.x) or 0,
+        tonumber(point.y) or 0)
+end
+
+local function debugValues(values)
+    local keys, parts = {}, {}
+    for id in pairs(values or {}) do if type(id) == "number" then keys[#keys + 1] = id end end
+    table.sort(keys)
+    for _, id in ipairs(keys) do parts[#parts + 1] = tostring(id) .. "=" .. tostring(values[id]) end
+    return #parts > 0 and table.concat(parts, ", ") or "none"
+end
+
+-- Explicit snapshot only: use the already planned candidate/action data, never enumerate QuestieDB.
+function P.debugText()
+    local lines, opts = {"Quest Sharing planner snapshot"}, lastPlanOptions or {}
+    local function add(value) lines[#lines + 1] = value end
+    local liveMap, liveX, liveY = ns.compat.playerPos()
+    local liveLog = ns.compat.entryMap()
+    local logIDs = {}
+    for id in pairs(liveLog) do logIDs[id] = true end
+    add("State: " .. (loading and "loading" or sessionActive and "open" or "closed") ..
+        "; generation=" .. generation .. "; selected step=" .. selected .. "/" .. #route)
+    add("Zone map: " .. tostring(plannedMap or "none") .. "; plan origin: " .. debugPoint(opts.origin) ..
+        "; live position: " .. debugPoint(liveMap and {map=liveMap,x=liveX,y=liveY}))
+    add("Goal: " .. tostring(goal.mode) .. "; level scope=" .. P.levelScope ..
+        "; selected quests=" .. debugIDs(goal.selectedIDs) .. "; budget seconds=" .. tostring(goal.budgetSeconds))
+    add("Character at plan: level=" .. tostring(opts.level or "unknown") ..
+        "; XP=" .. tostring(opts.currentXP or "unknown") .. "/" .. tostring(opts.nextLevelXP or "unknown") ..
+        "; quest log=" .. tostring(opts.logCount or "unknown") .. "/" .. tostring(opts.logCapacity or "unknown"))
+    add("Live quest log IDs: " .. debugIDs(logIDs))
+    add("Carried relevant items: " .. debugValues(opts.inventory and opts.inventory.counts) ..
+        "; free bag slots=" .. tostring(opts.inventory and opts.inventory.freeSlots or "unknown"))
+    add("Known reputation: " .. debugValues(opts.reputation))
+    add("Known skill ranks: " .. debugValues(opts.skillRanks))
+    if report then
+        add(string.format("Forecast: %.1f sec total, %.1f travel, %.1f work, %.1f wait, %.2f kills, %.0f XP, %d hand-ins",
+            report.expectedSeconds or 0, report.travelSeconds or 0, report.workSeconds or 0,
+            report.waitSeconds or 0, report.expectedKills or 0, report.expectedXP or 0, report.coverage or 0))
+        add("Search: checks=" .. tostring(report.searchChecks or "unknown") ..
+            "; exhausted=" .. tostring(report.searchExhausted) .. "; uncertain=" .. tostring(report.uncertain) ..
+            "; nearest=" .. tostring(report.nearestSeconds or "unknown") .. " sec/" ..
+            tostring(report.nearestCoverage or "unknown") .. " hand-ins; same-work baseline=" ..
+            tostring(report.baselineSeconds or "unknown") .. " sec; comparable=" .. tostring(report.baselineComparable))
+        add("Planned quest IDs: " .. debugIDs(report.plannedIDs) ..
+            "; completed quest IDs: " .. debugIDs(report.completedIDs) ..
+            "; missing quest IDs: " .. debugIDs(report.missingIDs))
+    else add("No completed plan snapshot; open /qs plan and wait for its scan, then run /qs plan debug again.") end
+    add("")
+    add("ROUTE (actual atomic order)")
+    if #route == 0 then add("none") end
+    for step, group in ipairs(route) do
+        add(string.format("Step %d%s: %s at %s", step, step == selected and " [selected]" or "",
+            tostring(group.kind), debugPoint(group.point)))
+        for _, atom in ipairs(group.atoms or {}) do
+            local qid = next(atom.quests or {})
+            add(string.format("  action %s quest %s %s; deps=%s; task=%s", tostring(atom.id),
+                tostring(qid), tostring(atom.kind), debugIDs(atom.deps), table.concat(atom.tasks or {}, " | ")))
+            for _, row in ipairs(atom.objectives or {}) do
+                local target = row.target or {}
+                add("    objective=" .. tostring(target.kind) .. " " .. tostring(target.name or "") ..
+                    "; remaining=" .. tostring(row.remaining or "unknown") .. "; source NPC=" ..
+                    tostring(row.sourceID or "unknown") .. "; item=" .. tostring(target.itemID or "none") ..
+                    "; credit=" .. tostring(target.creditID or "none") ..
+                    "; drop rates=" .. debugValues(target.dropRates))
+            end
+            if report and report.reasons and report.reasons[atom.id] then
+                add("    reason: " .. report.reasons[atom.id])
+            end
+        end
+    end
+    add("")
+    add("LOCAL QUEST CANDIDATES (including unscheduled)")
+    local ids = {}
+    for id in pairs(catalog) do ids[#ids + 1] = id end
+    table.sort(ids)
+    if #ids == 0 then add("none") end
+    for _, id in ipairs(ids) do
+        local q = catalog[id]
+        add(string.format("%d %s | status=%s band=%s level=%s required=%s XP=%s active=%s finishHere=%s planned=%s completed=%s",
+            id, tostring(q.name), tostring(q.status), tostring(q.band), tostring(q.level),
+            tostring(q.requiredLevel), tostring(q.xp or "unknown"), tostring(q.entry ~= nil),
+            tostring(q.canFinishHere), tostring(report and report.plannedIDs[id] or false),
+            tostring(report and report.completedIDs[id] or false)))
+        for _, gate in ipairs(q.gates or {}) do
+            add("  gate " .. tostring(gate.kind) .. " one of [" .. debugIDs(gate.choices, true) ..
+                "] initially satisfied=" .. tostring(gate.satisfied == true))
+        end
+        if q.requiredMinRep then add("  min reputation " .. table.concat(q.requiredMinRep, ":")) end
+        if q.requiredMaxRep then add("  max reputation " .. table.concat(q.requiredMaxRep, ":")) end
+        if q.requiredSkill then add("  skill " .. table.concat(q.requiredSkill, ":")) end
+        for _, rank in ipairs(q.requiredRanks or {}) do add("  alternative rank " .. table.concat(rank, ":")) end
+        if q.availableUntilCompleted then add("  available until quest " .. q.availableUntilCompleted .. " completed") end
+        if q.exclusiveTo and #q.exclusiveTo > 0 then add("  exclusive with " .. debugIDs(q.exclusiveTo, true)) end
+        for _, target in ipairs(q.targets or {}) do
+            add("  target " .. tostring(target.kind) .. " " .. tostring(target.name or "") ..
+                "; required=" .. tostring(target.required or "unknown") .. "; have=" ..
+                tostring(target.have or "unknown") .. "; count source=" .. tostring(target.countSource or "unknown") ..
+                "; item=" .. tostring(target.itemID or "none") .. "; credit=" ..
+                tostring(target.creditID or "none") .. "; rates=" .. debugValues(target.dropRates))
+        end
+    end
+    add("")
+    add("EXCLUDED OR UNVERIFIED QUESTS")
+    for _, category in ipairs({"external", "unknown", "blocked", "filtered", "repeatable", "completed"}) do
+        local excluded = {}
+        for id in pairs(coverage[category]) do excluded[#excluded + 1] = id end
+        table.sort(excluded)
+        for _, id in ipairs(excluded) do add(category .. " " .. id .. ": " .. tostring(coverage[category][id])) end
+    end
+    return table.concat(lines, "\n")
+end
+
+function P.debug()
+    if ns.reportWindow then
+        ns.reportWindow("Quest Sharing - plan debug", {P.debugText()}, "planner", nil, nil, P.debug)
+    else ns.print("Plan debug report is unavailable; try /reload.") end
+end
+
 local function explainPlan()
     local lines = {modeNames[goal.mode] .. " • " .. (P.levelScope == "all" and "All acceptance levels" or "Green/yellow only")}
     if report then
@@ -1537,6 +1672,7 @@ function P.options()
         local _, setText = U.scrollText(optionsPanel,12,210,396,268)
         optionsText=setText
         S.button(optionsPanel,"Refresh report",134,function() P.options() end):SetPoint("BOTTOMLEFT",optionsPanel,"BOTTOMLEFT",12,10)
+        S.button(optionsPanel,"Copy plan debug",134,function() P.debug() end):SetPoint("BOTTOMLEFT",optionsPanel,"BOTTOMLEFT",154,10)
     end
     optionsText(explainPlan())
     optionsPanel:Show()
@@ -1547,6 +1683,7 @@ function P.command(arg)
     local mode, value = arg:match("^(%S+)%s*(.-)$")
     if mode == "all" or mode == "xp" or mode == "selected" or mode == "budget" then P.setGoal(mode,value)
     elseif arg == "options" or arg == "why" then P.options()
+    elseif arg == "debug" then P.debug()
     elseif arg == "range" or arg == "unrestricted" then
         P.levelScope=arg=="range" and "green-yellow" or "all"
         selectionLocked=false; previousPlan=nil

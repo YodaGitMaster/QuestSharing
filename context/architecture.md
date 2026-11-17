@@ -54,6 +54,8 @@ QuestSharing/  # Repository root
 │   ├── VendorMap.lua  # optional item/vendor map search, database availability feedback, autocomplete and own pins
 │   └── ZoneLevels.lua  # Read-only map questing ranges, outdoor zone badges and hover panel
 ├── README.md  # User documentation
+├── bug.txt  # User-provided v0.4.21 diagnostic report
+├── questidea.txt  # User-provided predictive quest optimizer design requirements
 ├── build_release.py  # Build install ZIP and release notes
 ├── tools/  # Local UI emulation utilities, never shipped in the addon
 │   ├── build_cooking_reference.py  # Rebuild pinned factual Cooking subset with upstream MIT attribution
@@ -184,6 +186,7 @@ flowchart TD
     DB[Optional QuestieDB] --> Q[Questie.lua: ns.questie]
     Settings --> Planner[QuestPlanner.lua: optional local quest plan]
     Core --> Planner
+    Planner --> Diagnostics
     Planner --> Guidance[QuestGuidance.lua: arrow, distance, numbered stops and straight connections]
     Guidance --> MapAPI
     Planner --> DataWork
@@ -304,6 +307,11 @@ sequenceDiagram
     Player->>Player: Ctrl+C / Cmd+C copies everything
     Player->>Report: Refresh (explicit only)
     Report->>Saved: Read fresh snapshot and preserve current view
+    Player->>Planner: /qs plan debug or Copy plan debug
+    Planner->>Report: reportWindow with debugText snapshot and refresh callback
+    Report-->>Player: Copy plan snapshot; hide diagnostic Clear records
+    Player->>Report: Refresh planner snapshot
+    Report->>Planner: Invoke stored refreshAction
 ```
 
 

@@ -153,12 +153,14 @@ local function reportView(details)
     if box.SetCursorPosition then box:SetCursorPosition(0) end
     win.scroll:SetVerticalScroll(0)
     win.details:SetText(win.showingDetails and "Show overview" or "Show full report")
-    win.hint:SetText("Copy all includes every issue, error stack, setting and log line. Then press Ctrl+C (Windows) or Cmd+C (Mac).")
+    win.hint:SetText(win.kind == "planner"
+        and "Copy all selects this plan snapshot. Then press Ctrl+C (Windows) or Cmd+C (Mac)."
+        or "Copy all includes every issue, error stack, setting and log line. Then press Ctrl+C (Windows) or Cmd+C (Mac).")
 end
 
--- kind: "diagnostics" shows Clear all; nil leaves other reports intact (the ring test).
+-- kind: "diagnostics" shows Clear all; other reports keep their own snapshot and optional refresh.
 local W_WIDTH, W_HEIGHT = 720, 500
-function ns.reportWindow(title, lines, kind, overview, details)
+function ns.reportWindow(title, lines, kind, overview, details, refreshAction)
     local text = table.concat(lines, "\n")
     if not win then
         if not (CreateFrame and UIParent) then return false end
@@ -232,8 +234,9 @@ function ns.reportWindow(title, lines, kind, overview, details)
         f.details = button("Show full report", 120, function() reportView(not win.showingDetails) end,
             "Switch between the readable overview and full technical details; Copy all always includes everything")
         f.details:SetPoint("LEFT", f.selectAll, "RIGHT", 8, 0)
-        f.refresh = button("Refresh", 80, function() ns.diagnostics(win.showingDetails) end,
-            "Refresh the setup check, all recorded errors and all saved debug lines together")
+        f.refresh = button("Refresh", 80, function()
+            if win.refreshAction then win.refreshAction() else ns.diagnostics(win.showingDetails) end
+        end, "Refresh this report from current information")
         f.refresh:SetPoint("LEFT", f.details, "RIGHT", 8, 0)
         f.clear = button("Clear records", 110, function()
             QuestSharingLog, ns.db.errors = {}, {}
@@ -252,9 +255,11 @@ function ns.reportWindow(title, lines, kind, overview, details)
     end
     win.title:SetText(title)
     win.kind = kind
+    win.refreshAction = refreshAction
     win.fullText = text
     win.overviewText = overview and table.concat(overview, "\n") or nil
-    if kind then win.clear:Show() else win.clear:Hide() end
+    if kind == "diagnostics" then win.clear:Show() else win.clear:Hide() end
+    if kind == "diagnostics" or refreshAction then win.refresh:Show() else win.refresh:Hide() end
     if overview then win.details:Show() else win.details:Hide() end
     reportView(details == true)
     win:Show()
