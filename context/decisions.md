@@ -637,3 +637,8 @@
 - Dropped the one-time upgrade steps for saves older than 0.4.12 (user asked to remove the "legacy" list items 1 and 2). Consequence: an ancient save keeps its old `near/panel/chat/announce/pickup/zoneLevels/debug` values; `dbVersion` is still stored for any future migration.
 - Progressive versions (same day): the build refuses a version that already has a git tag `vX.Y.Z`, skips ahead of or goes back from the last tag (allowed next: patch+1, minor+1.0, major+1.0.0), a CHANGELOG not newest-first (`Unreleased` first), or a newer zip in `dist/`. `python build_release.py --bump [patch|minor|major]` raises `## Version` in the .toc and turns the CHANGELOG `## Unreleased` notes into the new section; it refuses while the current version has no tag. Without git, the previous release is taken from the CHANGELOG. Tests build with `policy=False` so they never depend on release state.
 
+
+## 2026-11-18 — Script-driven v0.4.26
+- User requested pull and release in the same QuestSharing distribution repository. Source snapshot = cutpdf/main `5b2bbf1`; destination main remains README-only, source is retained on the release tag. No cutpdf refs change.
+- Align metadata with published v0.4.25, restore published changelog and use unmodified build_release.py --bump, --check and build for 0.4.26; no --force. Release notes contain only new feature/fix notes, no manually added source download links.
+- Test runner checks process status, explicit FAIL lines and summary counts: some current scripts may exit 0 after reporting failed checks.
