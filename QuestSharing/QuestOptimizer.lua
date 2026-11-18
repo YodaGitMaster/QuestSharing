@@ -42,6 +42,12 @@ local function campKey(point, npc)
         string.format("%.7f", point.y), tostring(npc) }, "/")
 end
 
+-- A place's identity for options.preferredSites (the planner remembers its chosen camps with it).
+function O.siteKey(point)
+    if not point or not finite(point.x) or not finite(point.y) then return nil end
+    return string.format("%s/%.5f/%.5f", tostring(point.map), point.x, point.y)
+end
+
 local function farmAt(stop, point, npc)
     local rows = stop.objectives
     if stop.kind ~= "objective" or not rows or #rows ~= 1 then return end
@@ -104,6 +110,12 @@ local function compile(quests, stops, options)
         if not qid or not quests[qid] or not stop.id or m.byID[stop.id] then return end
         local d = { s = stop, id = stop.id, qid = qid, order = i, parents = {}, children = {}, sites = sitesFor(stop) }
         d.farm = d.sites[1].farm
+        local remembered = options.preferredSites and stop.key and options.preferredSites[stop.key]
+        if remembered and #d.sites > 1 then
+            for _, site in ipairs(d.sites) do
+                if O.siteKey(site.point) == remembered then d.held = site; break end
+            end
+        end
         m.list[i], m.byID[d.id] = d, d
         local qs = m.byQuest[qid] or {}; m.byQuest[qid] = qs; qs[#qs + 1] = d
         local seen = {}
@@ -218,23 +230,33 @@ local function service(m, d, s, site)
             or (capped and "Large drop counts use a conservative estimate." or nil), bounds
 end
 
+-- A remembered site (options.preferredSites) stays unless another is cheaper by both margins, so small
+-- cost changes between re-plans (a few steps of movement) cannot flip the step back and forth.
+-- Too large a margin would keep a clearly worse camp; these values switch at about a quarter of the visit's cost.
+local SWITCH_SHARE, SWITCH_SECONDS = 0.25, 20
+
 -- Where this visit happens: the site with the least travel plus incremental work from here,
 -- so a camp already being farmed for another quest wins when its shared kills save time.
 local function place(m, s, d)
-    local sites = d.sites
+    local sites, held = d.sites, d.held
     if #sites == 1 then
         local t, approx = travel(m, s.at, sites[1].point)
         return sites[1], t, approx
     end
-    local best, bestTravel, bestApprox, bestCost
+    local best, bestTravel, bestApprox, bestCost, heldTravel, heldApprox, heldCost
     for _, site in ipairs(sites) do
         local t, approx = travel(m, s.at, site.point)
         if t < math.huge then
             local cost = t + service(m, d, s, site)
+            if site == held then heldTravel, heldApprox, heldCost = t, approx, cost end
             if not bestCost or cost < bestCost - 0.000001 then best, bestTravel, bestApprox, bestCost = site, t, approx, cost end
         end
     end
     if not best then return sites[1], math.huge end
+    if heldCost and best ~= held
+        and (bestCost > heldCost * (1 - SWITCH_SHARE) or heldCost - bestCost < SWITCH_SECONDS) then
+        return held, heldTravel, heldApprox
+    end
     return best, bestTravel, bestApprox
 end
 
@@ -508,65 +530,12 @@ local function cloneState(s)
     return copy
 end
 
--- Explore distinct feasible action orders only while the plan is small enough to
--- fit the shared UI budget. The incumbent from attempt always survives exhaustion.
-local function beamSearch(m, incumbent)
-    if #m.list > 40 then return incumbent, false end
-    if m.alternativeChecks >= m.limit then return incumbent, true end
-    local mode, width = m.options.mode, math.min(32, number(m.options.beamWidth, 20))
-    local frontier, best, exhausted = {newState(m)}, incumbent, false
-    for _ = 1, #m.list do
-        local nextStates = {}
-        for _, s in ipairs(frontier) do
-            for i, d in ipairs(s.ready) do
-                m.alternativeChecks = m.alternativeChecks + 1
-                if m.alternativeChecks > m.limit then exhausted = true; break end
-                if eligible(m, s, d) then
-                    local site, t, approx = place(m, s, d)
-                    local effort = t < math.huge and service(m, d, s, site) or math.huge
-                    local opens = m.options.availableAfter and m.options.availableAfter[d.id]
-                    local arrival = math.max(s.time + t, number(opens, 0)) + effort
-                    if t < math.huge and (mode ~= "budget" or arrival <= m.options.budgetSeconds) then
-                        local child = cloneState(s)
-                        child.ready[i] = child.ready[#child.ready]
-                        child.ready[#child.ready] = nil
-                        advance(m, child, d, t, approx, nil, site)
-                        nextStates[#nextStates + 1] = child
-                        if d.s.kind == "turnin" then
-                            local current = snapshot(child, mode)
-                            if better(current, best) then
-                                current.path = {}; for j, action in ipairs(child.order) do current.path[j] = action end
-                                best = current
-                            end
-                        end
-                    end
-                end
-                if i % 16 == 1 then m.checkpoint() end
-            end
-            if exhausted then break end
-        end
-        if exhausted or #nextStates == 0 then break end
-        table.sort(nextStates, function(a, b)
-            local ap, aq, ar = score(mode, a)
-            local bp, bq, br = score(mode, b)
-            if ap ~= bp then return ap > bp end
-            if aq ~= bq then return aq > bq end
-            if ar ~= br then return ar > br end
-            if #a.order ~= #b.order then return #a.order > #b.order end
-            return a.order[#a.order].order < b.order[#b.order].order
-        end)
-        frontier = {}
-        for i = 1, math.min(width, #nextStates) do frontier[i] = nextStates[i] end
-        m.checkpoint()
-    end
-    return best, exhausted
-end
-
 -- Replay one fixed action order; nil when it breaks a dependency, eligibility, reachability or budget.
 -- `saved` holds states of the incumbent every STRIDE actions, so a candidate that differs from position
 -- `from` onward resumes there. In "all" mode every feasible permutation hands in the same quests, so a
 -- candidate already slower than `bound` cannot win and stops early (exact pruning).
 local STRIDE = 8
+local YIELD_STEPS = 32 -- simulated actions between yields, so a whole-route replay never holds the shared slice
 local function evaluate(m, path, from, saved, bound, record)
     local mode = m.options.mode
     local flexible = mode == "budget" or mode == "xp" or mode == "selected"
@@ -589,6 +558,7 @@ local function evaluate(m, path, from, saved, bound, record)
         end
         advance(m, s, d, t, approx, nil, site)
         m.evalSteps = (m.evalSteps or 0) + 1
+        if m.evalSteps % YIELD_STEPS == 0 then m.checkpoint() end
         if bound and not flexible and s.time > bound + 0.0000001 then return nil end
         if flexible and d.s.kind == "turnin" then
             local current = snapshot(s, mode)
@@ -621,15 +591,24 @@ local function reversed(path, i, j)
     return out
 end
 
--- Local search over the best schedule found so far, any zone size: move runs of up to three actions
--- (or-opt) and reverse short segments (2-opt) within a window, keeping the first strict improvement.
--- Every candidate is fully re-simulated, so prerequisites, slots, budgets and shared camps stay exact.
--- Bounded by simulated action steps; the incumbent always survives.
+-- Local search over the start of the best schedule found so far (a rolling horizon): move runs of up to
+-- three actions (or-opt) and reverse short segments (2-opt) within a window, keeping the first strict
+-- improvement. Only the first options.horizon actions move (the whole route when it has at most
+-- WHOLE_ROUTE): the far tail rests on guessed costs and is planned again as the player gets there,
+-- so it keeps its seeded order. Every candidate is fully re-simulated, so prerequisites, slots,
+-- budgets and shared camps stay exact. Bounded by simulated action steps; the incumbent always survives.
+local HORIZON, WHOLE_ROUTE = 12, 40 -- routes up to 40 actions (about 13 quests) are polished whole
 local function improve(m, incumbent)
     local budget = number(m.options.maxImproveSteps, 250000)
     local window = math.max(1, math.floor(number(m.options.improveWindow, 10)))
+    local horizon = math.max(1, math.floor(number(m.options.horizon, HORIZON)))
     local best, used, moves, saved = incumbent, 0, 0, nil
     if #incumbent.path < 3 or budget <= 0 then return best, moves, false, 0 end
+    -- The last position a move may touch; the route can change length in the flexible goals.
+    local function reach()
+        local n = #best.path
+        return n <= WHOLE_ROUTE and n or math.min(n, horizon)
+    end
     local function remember()
         saved = {}
         local replay = evaluate(m, best.path, 1, nil, nil, saved)
@@ -647,7 +626,7 @@ local function improve(m, incumbent)
     -- All moves that start at action i; true after the first strict improvement.
     local function movesAt(i)
         local path = best.path
-        local n = #path
+        local n = reach()
         for len = 1, 3 do
             if i + len - 1 > n then break end
             for j = math.max(0, i - 1 - window), math.min(n, i + len - 1 + window) do
@@ -661,10 +640,10 @@ local function improve(m, incumbent)
         end
         return false
     end
-    -- Cycle through positions and stop after one full lap without any improvement.
+    -- Cycle through the horizon's positions and stop after one full lap without any improvement.
     local i, quiet = 1, 0
-    while used < budget and quiet < #best.path do
-        if i > #best.path then i = 1 end
+    while used < budget and quiet < reach() do
+        if i > reach() then i = 1 end
         if movesAt(i) then quiet = 0 else quiet, i = quiet + 1, i + 1 end
     end
     return best, moves, used >= budget, used
@@ -689,6 +668,26 @@ local function located(stop, site)
     if site.questTasks then copy.questTasks = site.questTasks end
     if site.destination then copy.destination = site.destination end
     return copy
+end
+
+local function samePath(a, b)
+    if #a ~= #b then return false end
+    for i = 1, #a do if a[i] ~= b[i] then return false end end
+    return true
+end
+
+-- The previous plan (options.preferredIDs) stays unless the new one is clearly better: it hands in more
+-- quests (the goal's coverage keys) or saves at least max(options.stabilitySeconds, 5 % of the previous
+-- plan's time); for the XP goal, it earns at least 5 % more XP per second. Costs are estimates, so smaller
+-- gains would only make the route jump back and forth between re-plans.
+local STABLE_SECONDS, STABLE_SHARE, STABLE_CAP = 12, 0.05, 60
+local function keepPrevious(mode, preferred, best, stabilitySeconds)
+    if mode == "xp" then return best[1] < preferred[1] * (1 + STABLE_SHARE) end
+    for i = 1, mode == "selected" and 2 or 1 do
+        if best[i] > preferred[i] + 0.0000001 then return false end
+    end
+    return preferred.time - best.time
+        < math.max(number(stabilitySeconds, STABLE_SECONDS), math.min(preferred.time * STABLE_SHARE, STABLE_CAP))
 end
 
 function O.optimize(quests, stops, options)
@@ -766,12 +765,14 @@ function O.optimize(quests, stops, options)
             try({ group = {}, prep = m.ancestors({ goal }), road = mode == "all" })
         end
     end
-    local searchExhausted
-    best, searchExhausted = beamSearch(m, best)
+    local searchExhausted = m.alternativeChecks >= m.limit
     local improveMoves, improveExhausted, improveSteps
     best, improveMoves, improveExhausted, improveSteps = improve(m, best)
-    if preferred and best ~= preferred and preferred[1] == best[1] and preferred[2] == best[2]
-        and preferred.time - best.time <= number(options.stabilitySeconds, 0) then best = preferred end
+    local keptPrevious = false
+    if preferred and best ~= preferred and not samePath(preferred.path, best.path)
+        and keepPrevious(mode, preferred, best, options.stabilitySeconds) then
+        best, keptPrevious = preferred, true
+    end
     -- A mode can choose a different subset than nearest-first. Reprice that exact set
     -- before claiming a time saving; the original unconstrained result is also retained.
     local comparable = baseline
@@ -793,6 +794,7 @@ function O.optimize(quests, stops, options)
         travelSeconds = best.travel, workSeconds = best.work, waitSeconds = best.wait, expectedXP = best.xp,
         uncertain = best.uncertain, iterations = iterations, searchChecks = m.alternativeChecks,
         searchExhausted = searchExhausted, improveMoves = improveMoves, improveExhausted = improveExhausted, improveSteps = improveSteps,
+        keptPrevious = keptPrevious,
         coverage = best.count, baselineCoverage = comparable.count,
         baselineComparable = matched, nearestCoverage = baseline.count, nearestSeconds = baseline.time,
         plannedIDs = {}, completedIDs = {}, missingIDs = {}, reasons = {}, lootBounds = {}, baselineRoute = {} }

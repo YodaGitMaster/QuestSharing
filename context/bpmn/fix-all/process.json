@@ -1,0 +1,590 @@
+{
+  "id": "fix-all",
+  "name": "Fix the audited bugs: planner regressions, map search, dungeon menu — three parallel streams with reviews",
+  "runTimeout": 160,
+  "context": {
+    "prompt": "Record the fixes from context/fix-plan-2026-11-17.md: mark each stream's bugs fixed in source in that plan file, append dated addenda (status -> solved in source, native pending) to context/BUGS/2026-11-17-planner-step-one-on-player.md, 2026-11-17-guidance-map-click-event-argument.md, 2026-11-17-map-search-missing-database.md and 2026-11-17-dungeon-quests-slow-first-load.md; update state.md, decisions.md (hysteresis margin, refine trigger, vendor-index split) and architecture.md diagrams if the planner or vendor-search flow changed."
+  },
+  "lanes": [
+    {
+      "id": "builder",
+      "name": "Builder",
+      "agent": "bpmn:worker"
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "agent": "bpmn:reviewer",
+      "timeout": 15
+    }
+  ],
+  "data": {
+    "patch_a": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests",
+          "changelog"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "tests": {
+            "type": "string"
+          },
+          "changelog": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "patch_b": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests",
+          "changelog"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "tests": {
+            "type": "string"
+          },
+          "changelog": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "patch_c": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests",
+          "changelog"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "tests": {
+            "type": "string"
+          },
+          "changelog": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "verdict_a": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "verdict_b": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "verdict_c": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "fixes_a": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "fixes_b": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "fixes_c": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "integration": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "suite",
+          "compile",
+          "summary"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "suite": {
+            "type": "string"
+          },
+          "compile": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "final": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues",
+          "summary"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "name": "Fix plan approved"
+    },
+    {
+      "id": "split",
+      "type": "and",
+      "join": "join"
+    },
+    {
+      "id": "build_a",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix planner regressions",
+      "out": "patch_a",
+      "timeout": 50,
+      "prompt": "Implement stream A (bugs A1-A5) exactly as written in context/fix-plan-2026-11-17.md. Read that file, context/architecture.md and context/BUGS/2026-11-17-planner-step-one-on-player.md (latest addendum) first. Repo /Users/cozzolif/Desktop/cutpdf, WoW addon in Lua 5.1. You own ONLY: QuestSharing/QuestPlanner.lua, QuestSharing/QuestOptimizer.lua, tests/test_quest_optimizer.py, tests/test_quest_planner_zone_steps.py, tests/test_data_budget.py. Do not edit any other file (no CHANGELOG/README/context — return a changelog snippet instead). Follow the bug protocol: write each regression test first and show it fails on the current code, then fix with a minimal diff. Audit repro scripts you may reuse: /tmp/bugaudit-g4/walk4.py, /tmp/bugaudit-g4/mixed.py, /tmp/bugaudit-r4/rwalk.py, /tmp/bugaudit-r4/rmixed.py, /tmp/bugaudit-refute-g5/click_step2_during_improve.py, /tmp/bugaudit-g3/check_select_drift2.py, /tmp/bugaudit-refute-g6/probes/contention.py. Run tests from tests/ with /tmp/qs-test-env/bin/python test_<name>.py (both client styles run automatically). Before reporting: the planner/optimizer/zone/guide/path/facts/data_budget/guidance suites must all pass and every Lua file must compile under lupa.lua51. Report files changed, a summary per bug (A1..A5) with before/after evidence, the test commands and results, and a CHANGELOG '## Unreleased' snippet."
+    },
+    {
+      "id": "review_a",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review planner fixes",
+      "in": [
+        "patch_a",
+        "fixes_a?"
+      ],
+      "out": "verdict_a",
+      "prompt": "Independent review of stream A in context/fix-plan-2026-11-17.md (bugs A1-A5). Builder report: {{patch_a.summary}} Files: {{patch_a.files}}. Re-run the tests yourself from tests/ (/tmp/qs-test-env/bin/python test_<name>.py) and re-run the audit repros (/tmp/bugaudit-r4/rwalk.py new spf 3 and 1.5, /tmp/bugaudit-r4/rmixed.py, /tmp/bugaudit-refute-g5/click_step2_during_improve.py, /tmp/bugaudit-refute-g6/probes/contention.py) against the current tree. Check: each bug's promised behaviour now holds; the diff stays inside the owned files; no regression in the original 'step one on player' promise (lone strays never become steps, no-SPF switch point unchanged at POS 0.56); shared-kill expectation 20.0947 kept; optimizer resumes stay short. Approve only if every check passes; otherwise list concrete issues with path:line."
+    },
+    {
+      "id": "ok_a",
+      "type": "xor",
+      "name": "Planner fixes approved?"
+    },
+    {
+      "id": "fix_a",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix planner review issues",
+      "in": [
+        "verdict_a"
+      ],
+      "out": "fixes_a",
+      "timeout": 25,
+      "prompt": "Fix these review issues in stream A (context/fix-plan-2026-11-17.md), touching only QuestSharing/QuestPlanner.lua, QuestSharing/QuestOptimizer.lua, tests/test_quest_optimizer.py, tests/test_quest_planner_zone_steps.py, tests/test_data_budget.py: {{verdict_a.issues}}. Re-run the affected suites from tests/ with /tmp/qs-test-env/bin/python and report files and a summary."
+    },
+    {
+      "id": "build_b",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix map search typing",
+      "out": "patch_b",
+      "timeout": 45,
+      "prompt": "Implement stream B (B1-B4) exactly as written in context/fix-plan-2026-11-17.md. Read that file, context/architecture.md and context/BUGS/2026-11-17-map-search-missing-database.md (all addenda) first. Repo /Users/cozzolif/Desktop/cutpdf, WoW addon in Lua 5.1. You own ONLY QuestSharing/VendorMap.lua and tests/test_vendor_map.py. Do not edit DataWork.lua (use the existing Work.start budget argument), Questie.lua or any other file; return a CHANGELOG snippet instead of editing it. Write the budgeted Classic-size latency test first (debugprofilestop mock: 4 us per scalar read, 10 us per table read; 10,122 NPCs / 14,899 items; typing 10 keys/s) and show it fails on the current code; reusable repros: /tmp/bugaudit-g5/repro_suggest_delay.py, /tmp/bugaudit-refute-g5/suggest_latency.py. Keep the no-preload guarantee (tests/test_data_budget.py test_enabling_map_search_or_showing_blank_map_does_not_preload_data must still pass — run it, do not edit it). Run tests from tests/ with /tmp/qs-test-env/bin/python. Before reporting: test_vendor_map.py, test_data_budget.py, test_questmap.py, test_optional.py, test_settings.py pass and every Lua file compiles under lupa.lua51. Report files, a summary per item with measured latencies before/after, test results, and a CHANGELOG '## Unreleased' snippet."
+    },
+    {
+      "id": "review_b",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review map search fix",
+      "in": [
+        "patch_b",
+        "fixes_b?"
+      ],
+      "out": "verdict_b",
+      "prompt": "Independent review of stream B in context/fix-plan-2026-11-17.md (B1-B4). Builder report: {{patch_b.summary}} Files: {{patch_b.files}}. Re-run tests from tests/ (/tmp/qs-test-env/bin/python test_vendor_map.py, test_data_budget.py, test_questmap.py, test_optional.py) and the audit latency repros (/tmp/bugaudit-g5/repro_suggest_delay.py, /tmp/bugaudit-refute-g5/suggest_latency.py) against the current tree. Check: first suggestion <= 1.5 s cold / <= 0.3 s warm at Classic size; suggestions and pins still only for the shown map; no catalogue read on map open or blank map; keystrokes no longer discard index progress; the larger slice applies only while the map is shown and out of combat; the diff stays inside VendorMap.lua and test_vendor_map.py. Approve only if every check passes; otherwise list concrete issues with path:line."
+    },
+    {
+      "id": "ok_b",
+      "type": "xor",
+      "name": "Map search fix approved?"
+    },
+    {
+      "id": "fix_b",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix map search issues",
+      "in": [
+        "verdict_b"
+      ],
+      "out": "fixes_b",
+      "timeout": 25,
+      "prompt": "Fix these review issues in stream B (context/fix-plan-2026-11-17.md), touching only QuestSharing/VendorMap.lua and tests/test_vendor_map.py: {{verdict_b.issues}}. Re-run the affected suites from tests/ with /tmp/qs-test-env/bin/python and report files and a summary."
+    },
+    {
+      "id": "build_c",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Keep dungeon menu open",
+      "out": "patch_c",
+      "timeout": 15,
+      "prompt": "Implement stream C1 exactly as written in context/fix-plan-2026-11-17.md: the Dungeon quests right-click menu must not close 0.2 s after a QUEST_LOG_UPDATE unless its quest left the results. Read context/BUGS/2026-11-17-dungeon-quests-slow-first-load.md first. Repo /Users/cozzolif/Desktop/cutpdf, WoW addon in Lua 5.1. You own ONLY QuestSharing/DungeonQuests.lua and tests/test_dungeon_quests.py; return a CHANGELOG snippet instead of editing it. Write the failing test first, then the minimal fix. Run tests from tests/ with /tmp/qs-test-env/bin/python test_dungeon_quests.py and test_menu.py; DungeonQuests.lua must compile under lupa.lua51. Report files, summary, test results and a CHANGELOG '## Unreleased' snippet. Do NOT attempt C2 (needs user data)."
+    },
+    {
+      "id": "review_c",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review dungeon menu fix",
+      "in": [
+        "patch_c",
+        "fixes_c?"
+      ],
+      "out": "verdict_c",
+      "prompt": "Independent review of stream C1 in context/fix-plan-2026-11-17.md. Builder report: {{patch_c.summary}} Files: {{patch_c.files}}. Re-run tests/test_dungeon_quests.py and tests/test_menu.py with /tmp/qs-test-env/bin/python from tests/. Check: the menu stays open through QUEST_LOG_UPDATE while its quest is still listed, closes when the quest leaves the results or on page change/close/combat, the list still refreshes, and the diff stays inside DungeonQuests.lua and test_dungeon_quests.py. Approve only if every check passes; otherwise list concrete issues with path:line."
+    },
+    {
+      "id": "ok_c",
+      "type": "xor",
+      "name": "Dungeon fix approved?"
+    },
+    {
+      "id": "fix_c",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix dungeon review issues",
+      "in": [
+        "verdict_c"
+      ],
+      "out": "fixes_c",
+      "timeout": 15,
+      "prompt": "Fix these review issues in stream C1 (context/fix-plan-2026-11-17.md), touching only QuestSharing/DungeonQuests.lua and tests/test_dungeon_quests.py: {{verdict_c.issues}}. Re-run the affected suites and report files and a summary."
+    },
+    {
+      "id": "join",
+      "type": "and"
+    },
+    {
+      "id": "integrate",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Integrate and run suite",
+      "in": [
+        "patch_a",
+        "patch_b",
+        "patch_c",
+        "verdict_a",
+        "verdict_b",
+        "verdict_c"
+      ],
+      "out": "integration",
+      "timeout": 20,
+      "prompt": "Integrate the three streams of context/fix-plan-2026-11-17.md. Add these snippets under CHANGELOG.md '## Unreleased' (keep existing entries, plain user-facing wording): A: {{patch_a.changelog}} B: {{patch_b.changelog}} C: {{patch_c.changelog}}. Update README.md only where the planner camp choice/background refinement or map-search typing text is now inaccurate. Edit no Lua or test files. Then run every test file in tests/ (for f in test_*.py: /tmp/qs-test-env/bin/python $f) and report the total, compile every QuestSharing/*.lua under lupa.lua51, and run git diff --check. Note any stream whose review ended with status 'changes' ({{verdict_a.status}}, {{verdict_b.status}}, {{verdict_c.status}}). Report files changed, suite total, compile result and a summary."
+    },
+    {
+      "id": "final_review",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review integrated tree",
+      "in": [
+        "integration"
+      ],
+      "out": "final",
+      "timeout": 20,
+      "prompt": "Final independent review of the integrated tree for context/fix-plan-2026-11-17.md. Integration report: {{integration.summary}} Suite: {{integration.suite}}. Re-run the full suite yourself (all tests/test_*.py with /tmp/qs-test-env/bin/python), confirm the CHANGELOG/README text matches the code, confirm no file outside the plan's ownership table changed (git diff --stat f9bb992), and spot-check A1, A2, B4 and C1 against their plan acceptance criteria. Approve or list concrete issues."
+    },
+    {
+      "id": "done",
+      "type": "end",
+      "name": "Fixes integrated"
+    }
+  ],
+  "flows": [
+    {
+      "from": "start",
+      "to": "split"
+    },
+    {
+      "from": "split",
+      "to": "build_a"
+    },
+    {
+      "from": "build_a",
+      "to": "review_a"
+    },
+    {
+      "from": "review_a",
+      "to": "ok_a"
+    },
+    {
+      "from": "ok_a",
+      "to": "join",
+      "name": "approved or 2nd round",
+      "when": {
+        "any": [
+          {
+            "path": "verdict_a.status",
+            "eq": "approved"
+          },
+          {
+            "path": "$loop.ok_a",
+            "gte": 2
+          }
+        ]
+      }
+    },
+    {
+      "from": "ok_a",
+      "to": "fix_a",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_a",
+      "to": "review_a"
+    },
+    {
+      "from": "split",
+      "to": "build_b"
+    },
+    {
+      "from": "build_b",
+      "to": "review_b"
+    },
+    {
+      "from": "review_b",
+      "to": "ok_b"
+    },
+    {
+      "from": "ok_b",
+      "to": "join",
+      "name": "approved or 2nd round",
+      "when": {
+        "any": [
+          {
+            "path": "verdict_b.status",
+            "eq": "approved"
+          },
+          {
+            "path": "$loop.ok_b",
+            "gte": 2
+          }
+        ]
+      }
+    },
+    {
+      "from": "ok_b",
+      "to": "fix_b",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_b",
+      "to": "review_b"
+    },
+    {
+      "from": "split",
+      "to": "build_c"
+    },
+    {
+      "from": "build_c",
+      "to": "review_c"
+    },
+    {
+      "from": "review_c",
+      "to": "ok_c"
+    },
+    {
+      "from": "ok_c",
+      "to": "join",
+      "name": "approved or 2nd round",
+      "when": {
+        "any": [
+          {
+            "path": "verdict_c.status",
+            "eq": "approved"
+          },
+          {
+            "path": "$loop.ok_c",
+            "gte": 2
+          }
+        ]
+      }
+    },
+    {
+      "from": "ok_c",
+      "to": "fix_c",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_c",
+      "to": "review_c"
+    },
+    {
+      "from": "join",
+      "to": "integrate"
+    },
+    {
+      "from": "integrate",
+      "to": "final_review"
+    },
+    {
+      "from": "final_review",
+      "to": "done"
+    }
+  ]
+}

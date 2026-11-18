@@ -6,17 +6,68 @@ local S = ns.style
 
 local ON, OFF = "|cff55ff55[ON] |r", "|cffff5555[OFF]|r"
 
+-- Classic WoW options palette: gold titles, white values, soft white help, muted parchment notes. No blue anywhere.
+local GOLD, WHITE, GREY = S.GOLD, S.WHITE, S.GREY
+local HELP = "|cffe6e6e6"      -- explanation under a setting (the game's option descriptions are near-white)
+local NOTE = "|cffb5a888"      -- a secondary note (what a tool needs): muted parchment
+local DIM = "|cffc8c8c8"       -- a choice that is not picked
+
+-- The Quest guide tab talks to QuestPlanner.lua / QuestCalibration.lua only through their public functions,
+-- and every call checks first that the function exists (older or partly loaded versions keep working).
+local function guide(name)
+    return function()
+        local fn = ns.questPlanner and ns.questPlanner[name]
+        if type(fn) == "function" then return fn() end
+        ns.print("the quest guide cannot do this in this version - update the addon or /reload")
+    end
+end
+
+local function seconds(v) return (string.gsub(string.format("%.1f", tonumber(v) or 0), "%.0$", "")) end
+
+-- "10 s per kill (default); 3 s per quest giver (default)" or "7 s per kill, from 23 kills; ..."
+local function paceText()
+    local cal
+    if ns.questCalibration and type(ns.questCalibration.get) == "function" then
+        local ok, value = pcall(ns.questCalibration.get)
+        if ok and type(value) == "table" then cal = value end
+    end
+    cal = cal or {}
+    local kill = cal.killCalibrated and string.format("%s s per kill, from %d kills", seconds(cal.killSeconds), cal.killSamples or 0)
+        or string.format("%s s per kill (default)", seconds(cal.killSeconds or 10))
+    local talk = cal.interactionCalibrated
+        and string.format("%s s per quest giver, from %d visits", seconds(cal.interactionSeconds), cal.interactionSamples or 0)
+        or string.format("%s s per quest giver (default)", seconds(cal.interactionSeconds or 3))
+    return kill .. "; " .. talk
+end
+
+local function resetPace()
+    if not (ns.questCalibration and type(ns.questCalibration.reset) == "function") then
+        return ns.print("the quest guide has no learned pace in this version - update the addon or /reload")
+    end
+    ns.questCalibration.reset()
+    -- replan at once with the default times
+    if ns.questPlanner and type(ns.questPlanner.applySettings) == "function" then ns.questPlanner.applySettings() end
+end
+
+-- keep only the numbers someone typed: "12, abc 345" -> "12, 345"
+local function questIDs(text)
+    local ids = {}
+    for id in string.gmatch(tostring(text or ""), "%d+") do ids[#ids + 1] = id end
+    return table.concat(ids, ", ")
+end
+
 ns.settingTabs = {
-    { id = "general", title = "General", intro = "Start here: turn the addon on, choose how messages are sent, or check your setup." },
-    { id = "objectives", title = "Quest markers", intro = "Add ! above quest enemies and help find your next quest objective." },
+    { id = "general", group = "Basics", title = "General", intro = "Start here: turn the addon on, choose how messages are sent, or check your setup." },
+    { id = "objectives", group = "Questing", title = "Quest markers", intro = "Add ! above quest enemies and help find your next quest objective." },
     { id = "tracker", title = "Quest list", intro = "Choose which quests appear in the game's quest list on the right of your screen." },
     { id = "dialogs", title = "Accept & turn in", intro = "Let the addon accept quest offers or finish ready quests when you talk to an NPC." },
-    { id = "sharing", title = "Quest sharing", intro = "Offer your quests to party members and choose which updates go to party chat." },
+    { id = "sharing", group = "Group play", title = "Quest sharing", intro = "Offer your quests to party members and choose which updates go to party chat." },
     { id = "party", title = "Party window", intro = "Show who has each quest, choose what clicks do, and manage party friends." },
     { id = "actions", title = "Pings & quest items", intro = "Point out quest targets and use the items your quests need." },
     { id = "quick", title = "Quick chat", intro = "Send a saved message from a ring of choices. Set the key and edit messages below." },
-    { id = "maps", title = "Map", intro = "Show zone level guides and party locations on the world map." },
-    { id = "browser", title = "Browser DB", intro = "Find equipment, dungeon quests, recipes and item sources. Choose what you want to look up below." },
+    { id = "maps", group = "Map & route", title = "Map", intro = "Show zone level guides and party locations on the world map." },
+    { id = "guide", title = "Quest guide", intro = "Turn on the quest route guide and choose what it plans. Changes reach the open guide at once." },
+    { id = "browser", group = "Look up & tools", title = "Browser DB", intro = "Find equipment, dungeon quests, recipes and item sources. Choose what you want to look up below." },
     { id = "optional", title = "Extra tools", intro = "Plan your next quests, tidy your bags, update spells or save fishing spots. Open a tool below." },
 }
 
@@ -181,11 +232,54 @@ ns.settingRows = {
     { tab = "maps", kind = "bool", key = "teamWaypoint", label = "Add a waypoint where a teammate found quest items",
       desc = "Turn on to mark a location a teammate shares for quest items you still need. Requires a client with waypoints." },
 
+    { tab = "guide", kind = "header", label = "Quest guide" },
+    { tab = "guide", kind = "bool", key = "questPlanner", card = true, label = "Quest route guide", button = "Open plan",
+      desc = "Shows your next quest stop, numbers the route on your map and lists the steps after it. Open plan shows the guide now.",
+      note = "Requires QuestieDB. Optional: Shortest Path Forever for walking routes.", toggle = "Enable the quest guide",
+      action = guide("open") },
+    { tab = "guide", kind = "choice", key = "questPlannerGoal", label = "What the route aims for", values = { "all", "xp", "selected", "budget" },
+      names = { all = "Complete zone", xp = "Quest XP/hour", selected = "Chosen quests", budget = "Time limit" },
+      desc = "Choose which quests the route includes. The open guide replans at once.",
+      help = { all = "Complete zone: picks up and hands in every quest it can in this zone, in the quickest order.",
+               xp = "Quest XP/hour: keeps the quests that give the most experience for the time they take.",
+               selected = "Chosen quests: plans only the quests whose IDs you type in the box below.",
+               budget = "Time limit: hands in as many quests as fit in the minutes set below." } },
+    { tab = "guide", kind = "number", key = "questPlannerBudget", label = "Minutes for the Time limit goal", min = 5, max = 240, step = 5,
+      inactive = function(d) return d.questPlannerGoal ~= "budget" end,
+      desc = "Used when the goal is Time limit: the route keeps only quests you can hand in within this many minutes. Shift-click: 25 at a time." },
+    { tab = "guide", kind = "text", key = "questPlannerSelected", label = "Quest IDs for the Chosen quests goal", maxLetters = 200,
+      inactive = function(d) return d.questPlannerGoal ~= "selected" end, clean = questIDs,
+      desc = "Type quest IDs separated by spaces or commas, then press Enter. Used when the goal is Chosen quests." },
+    { tab = "guide", kind = "choice", key = "questPlannerScope", label = "Which quests by level", values = { "all", "green-yellow" },
+      names = { all = "Every level", ["green-yellow"] = "Green and yellow only" },
+      desc = "Choose whether the route skips quests far from your level.",
+      help = { all = "Every level: includes every quest you can accept, also grey (low level) and red (high level) quests.",
+               ["green-yellow"] = "Green and yellow only: skips grey quests that give little experience and red quests that are too hard." } },
+    { tab = "guide", kind = "header", label = "Camps" },
+    { tab = "guide", kind = "action", label = "Mark selected camp busy (5 min)", button = "Camp busy",
+      desc = "Select an objective step in the guide first. The route visits other camps for 5 minutes, then comes back.",
+      action = guide("markCampBusy") },
+    { tab = "guide", kind = "action", label = "Clear camp waits", button = "Clear waits",
+      desc = "Click to forget busy camps and the camps the route chose earlier, so the guide plans the zone afresh.",
+      action = guide("clearCampWaits") },
+    { tab = "guide", kind = "header", label = "Learned pace" },
+    { tab = "guide", kind = "info", label = "Times the route uses now", info = paceText,
+      desc = "The guide times your kills and quest giver visits while it is open. After 5 of each, your own pace replaces the default." },
+    { tab = "guide", kind = "action", label = "Reset learned pace", button = "Reset pace",
+      desc = "Click to forget the learned times. The route goes back to 10 seconds per kill and 3 seconds per quest giver.",
+      action = resetPace },
+    { tab = "guide", kind = "header", label = "Report" },
+    { tab = "guide", kind = "action", label = "Show plan report", button = "Show report",
+      desc = "Opens a window explaining the current route: estimated time, travel, kills, and which quests are left out and why.",
+      action = guide("showReport") },
+    { tab = "guide", kind = "action", label = "Copy plan debug", button = "Copy debug",
+      desc = "Opens the full planner details. Click Copy all and press Ctrl+C (Windows) or Cmd+C (Mac) to share them in a bug report.",
+      action = guide("debug") },
+
     { tab = "optional", kind = "header", label = "Questing" },
-    { tab = "optional", kind = "bool", key = "questPlanner", label = "Quest planner", button = "Open plan",
-      desc = "Build a route through nearby quest pickups, objectives and turn-ins.",
-      note = "Requires QuestieDB. Optional: Shortest Path Forever for walking routes.", toggle = "Enable quest planner",
-      action = function() ns.questPlanner.open() end },
+    { tab = "optional", kind = "action", label = "Quest guide - moved to its own tab", button = "Open tab",
+      desc = "The quest route guide, its on/off switch and all its options are now in the Quest guide tab.",
+      action = function() ns.settingsTab("guide") end },
     { tab = "optional", kind = "action", label = "Review quest items left in my bags", title = "Bag cleanup", button = "Review items",
       desc = "Review possible leftover quest items. You confirm each stack before it is deleted.",
       note = "Requires QuestieDB. Active quest items and quest starters are protected.",
@@ -236,7 +330,7 @@ ns.settingRows = {
 }
 
 for _, row in ipairs(ns.settingRows) do
-    row.card = (row.tab == "optional" or row.tab == "browser") and row.kind ~= "header"
+    row.card = row.card == true or ((row.tab == "optional" or row.tab == "browser") and row.kind ~= "header")
 end
 
 local function limit(v) if type(v) == "function" then return v() end return v end
@@ -254,13 +348,27 @@ function ns.rowText(row)
         return (d[row.key] and ON or OFF) .. " " .. row.label
     elseif row.kind == "choice" then
         local v = d[row.key]
-        return row.label .. ": |cff55ccff" .. ((row.names and row.names[v]) or tostring(v)) .. "|r"
+        return row.label .. ": |cffffffff" .. ((row.names and row.names[v]) or tostring(v)) .. "|r"
     elseif row.kind == "number" then
-        return string.format("%s: |cff55ccff%d|r", row.label, d[row.key] or 0)
+        return string.format("%s: |cffffffff%d|r", row.label, d[row.key] or 0)
     elseif row.kind == "key" then
-        return row.label .. ": |cff55ccff" .. (keyName(row) or "not set") .. "|r"
+        return row.label .. ": |cffffffff" .. (keyName(row) or "not set") .. "|r"
+    elseif row.kind == "text" then
+        local v = tostring(d[row.key] or "")
+        return row.label .. ": |cffffffff" .. (v ~= "" and v or "none") .. "|r"
+    elseif row.kind == "info" then
+        return row.label .. ": |cffffffff" .. row.info() .. "|r"
     end
     return "|cffffd100" .. row.label .. "|r"
+end
+
+-- A text row (i, an index into ns.settingRows) gets typed text: Enter or clicking away saves it.
+function ns.settingsText(i, text)
+    local row = ns.settingRows[i]
+    if not (row and row.kind == "text") then return end
+    local value = row.clean and row.clean(text) or (string.gsub(tostring(text or ""), "^%s*(.-)%s*$", "%1"))
+    if value ~= tostring(ns.db[row.key] or "") then ns.setSetting(row.key, value) end    -- unchanged: no replan
+    if ns.refreshSettings then ns.refreshSettings() end                                 -- shows what was kept
 end
 
 -- What a click on row i (an index into ns.settingRows) does. Used by the window and by the tests.
@@ -308,6 +416,9 @@ local CONTENT = WIDTH - LEFT - 28
 local TOP, VIEW_H = 118, HEIGHT - 166
 local ROW_H, HEADER_H = 26, 32
 local MIN_ROWS = 18
+-- the category list on the left: a gold caption per group, then its categories
+local NAV_X, NAV_W = 18, 178
+local GROUP_H, GROUP_GAP, TAB_H, TAB_STEP = 20, 6, 24, 28
 
 local function shorten(s, n) if #s <= n then return s end return string.sub(s, 1, n - 3) .. "..." end
 
@@ -318,6 +429,37 @@ local function clickable(parent, w, h, onClick)
     f:EnableMouse(true)
     f:SetScript("OnMouseUp", onClick)
     return f
+end
+
+-- Four 1-px lines around `anchor` (default: the owner frame), drawn on `owner`: the classic option-panel edge.
+local function edges(owner, anchor, r, g, b)
+    anchor = anchor or owner
+    local list = {}
+    for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+        local e = S.fill(owner, "BORDER", r or 0.62, g or 0.5, b or 0.22, 1)
+        if side == "TOP" or side == "BOTTOM" then
+            e:SetHeight(1); e:SetPoint(side .. "LEFT", anchor, side .. "LEFT", 0, 0); e:SetPoint(side .. "RIGHT", anchor, side .. "RIGHT", 0, 0)
+        else
+            e:SetWidth(1); e:SetPoint("TOP" .. side, anchor, "TOP" .. side, 0, 0); e:SetPoint("BOTTOM" .. side, anchor, "BOTTOM" .. side, 0, 0)
+        end
+        list[#list + 1] = e
+    end
+    return list
+end
+
+-- A recessed dark well with a bronze edge, painted on the window itself so every child frame draws above it.
+local function well(f, x, y, w, h)
+    local base = S.fill(f, "BACKGROUND", 0.03, 0.025, 0.02, 1)
+    base:SetPoint("TOPLEFT", f, "TOPLEFT", x, -y)
+    base:SetWidth(w); base:SetHeight(h)
+    edges(f, base, 0.42, 0.33, 0.18)
+    return base
+end
+
+-- A tool card: warm opaque plate with a gold edge. Shown and hidden as one piece.
+local function showCard(r, on)
+    if on then r.card:Show() else r.card:Hide() end
+    for _, e in ipairs(r.cardEdges) do if on then e:Show() else e:Hide() end end
 end
 
 -- Press-a-key capture for the quick chat key ------------------------------------------------------------------------
@@ -372,7 +514,7 @@ function ns.editorRefresh()
     for i, b in ipairs(ed.pageButtons or {}) do
         local pg = pages[i]
         if pg then
-            b.text:SetText((i == ed.page and "|cffffd100[" or "|cff55ccff ") .. pg.title .. (i == ed.page and "]|r" or " |r"))
+            b.text:SetText((i == ed.page and "|cffffd100[" or "|cffc8c8c8 ") .. pg.title .. (i == ed.page and "]|r" or " |r"))
             b.frame:Show()
         else
             b.frame:Hide()
@@ -384,7 +526,7 @@ function ns.editorRefresh()
         if list[i] then
             local hot = (ed.selected == i)
             line.text:SetText(string.format("%s%d.  [%s]  %s%s|r", hot and "|cffffd100" or "|cffffffff", i, list[i].label,
-                shorten(list[i].text, 50), "  |cff88ccff" .. (ns.QUICK_ROUTE_TAG[list[i].channel or "auto"] or "auto") .. "|r"))
+                shorten(list[i].text, 50), "  |cff9d9d9d" .. (ns.QUICK_ROUTE_TAG[list[i].channel or "auto"] or "auto") .. "|r"))
             if hot then line.mark:Show() else line.mark:Hide() end
             line.frame:Show()
         else
@@ -401,7 +543,7 @@ function ns.editorRefresh()
     for _, c in ipairs(ed.routeButtons) do
         if item and not isEmote then
             local hot = (c.route == route)
-            c.text:SetText((hot and "|cffffd100[" or "|cff55ccff ") .. c.title .. (hot and "]|r" or " |r"))
+            c.text:SetText((hot and "|cffffd100[" or "|cffc8c8c8 ") .. c.title .. (hot and "]|r" or " |r"))
             c.frame:Show()
         else
             c.frame:Hide()
@@ -499,8 +641,7 @@ local function buildEditor(parent)
         b:SetWidth(width)
         b:SetHeight(20)
         b:SetPoint("TOPLEFT", f, "TOPLEFT", x, -234)
-        local bg = S.fill(b, "BACKGROUND", 0, 0, 0, 0.6)
-        bg:SetAllPoints(b)
+        S.inset(b)
         if ChatFontNormal then b:SetFontObject(ChatFontNormal) end
         b:SetAutoFocus(false)
         b:SetMaxLetters(max)
@@ -568,10 +709,10 @@ local function textHeight(font, text, width, size)
 end
 
 local function paintTool(r, row)
-    r.card:Show()
+    showCard(r, true)
     r.text:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 16, -12)
     local labelH = textHeight(r.text, row.title or row.label, CONTENT - (row.action and 184 or 32), 14)
-    r.text:SetText(S.WHITE .. (row.title or row.label) .. "|r")
+    r.text:SetText(GOLD .. (row.title or row.label) .. "|r")
     if row.action then
         r.button:SetLabel(row.button or "Open")
         r.button:ClearAllPoints(); r.button:SetPoint("TOPRIGHT", r.frame, "TOPRIGHT", -12, -10)
@@ -580,11 +721,11 @@ local function paintTool(r, row)
     local y = math.max(44, labelH + 22)
     r.desc:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 16, -y)
     y = y + textHeight(r.desc, row.desc, CONTENT - 32, 13) + 8
-    r.desc:SetText("|cffd0d5df" .. row.desc .. "|r")
+    r.desc:SetText(HELP .. row.desc .. "|r")
     if row.note then
         r.note:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 16, -y)
         y = y + textHeight(r.note, row.note, CONTENT - 32, 12) + 8
-        r.note:SetText("|cff9daabd" .. row.note .. "|r")
+        r.note:SetText(NOTE .. row.note .. "|r")
         r.note:Show()
     end
     if row.kind == "bool" then
@@ -592,6 +733,7 @@ local function paintTool(r, row)
         r.toggle:ClearAllPoints(); r.toggle:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 12, -y)
         r.toggleText:ClearAllPoints(); r.toggleText:SetPoint("TOPLEFT", r.toggle, "TOPLEFT", 30, -4)
         local toggleH = math.max(26, textHeight(r.toggleText, (row.toggle or row.label) .. (enabled and "  |cff55ff55On|r" or "  |cff9d9d9dOff|r"), CONTENT - 58, 13) + 8)
+        r.toggleText:SetText(WHITE .. (row.toggle or row.label) .. "|r" .. (enabled and ("  " .. S.GREEN .. "On|r") or ("  " .. GREY .. "Off|r")))
         r.toggle:SetHeight(toggleH); r.toggle:Show(); r.toggleText:Show()
         r.box:ClearAllPoints(); r.box:SetPoint("TOPLEFT", r.toggle, "TOPLEFT", 0, 0)
         r.box:Show()
@@ -601,15 +743,44 @@ local function paintTool(r, row)
     return y + 8
 end
 
+-- The single-line box of a text row, made the first time a row frame shows one.
+local function textBox(r)
+    local b = CreateFrame("EditBox", nil, r.frame)
+    b:SetHeight(22)
+    S.inset(b)
+    -- EditBox:SetFont rejects nil flags in the client (FontString accepts them): always pass "".
+    if b.SetFont then b:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 13, "") end
+    b:SetAutoFocus(false)
+    if b.SetTextInsets then b:SetTextInsets(6, 6, 0, 0) end
+    -- Clearing the focus fires OnEditFocusLost, which saves; the extra save after it is a no-op.
+    b:SetScript("OnEnterPressed", function(self) self:ClearFocus(); ns.settingsText(self.rowIndex, self:GetText()) end)
+    b:SetScript("OnEditFocusLost", function(self) if self.rowIndex then ns.settingsText(self.rowIndex, self:GetText()) end end)
+    b:SetScript("OnEscapePressed", function(self)
+        local row = self.rowIndex and ns.settingRows[self.rowIndex]
+        if row then self:SetText(tostring(ns.db[row.key] or "")) end
+        self:ClearFocus()
+    end)
+    r.edit = b
+    return b
+end
+
 local function paintRow(r, row)
     local d = ns.db
+    -- The box stays put while the same text row is repainted (typing is not interrupted). Otherwise hide it first:
+    -- a box that loses focus by hiding still saves to the row it belonged to.
+    if r.edit and not (row.kind == "text" and r.edit.rowIndex == r.index) then
+        r.edit:Hide(); r.edit.rowIndex = nil
+    end
     r.box:Hide(); r.tick:Hide(); r.value:SetText(""); r.button:Hide(); r.line:Hide()
-    r.card:Hide(); r.note:Hide(); r.toggle:Hide(); r.toggleText:Hide()
+    showCard(r, false); r.note:Hide(); r.toggle:Hide(); r.toggleText:Hide()
     r.note:ClearAllPoints()
     r.less:Hide(); r.more:Hide()
     for _, b in ipairs(r.choices) do b:Hide() end
     r.text:ClearAllPoints()
     r.desc:ClearAllPoints()
+    -- section headings use the larger gold font; everything else the normal gold option font
+    local font = (row.kind == "header" and not row.card) and GameFontNormalLarge or GameFontNormal
+    if font and r.text.SetFontObject then r.text:SetFontObject(font) end
     if row.card then return paintTool(r, row) end
     r.box:ClearAllPoints(); r.box:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 0, 1)
     r.button:ClearAllPoints(); r.button:SetPoint("TOPRIGHT", r.frame, "TOPRIGHT", -4, -1)
@@ -618,7 +789,7 @@ local function paintRow(r, row)
         r.desc:SetText("")
         r.text:SetPoint("BOTTOMLEFT", r.frame, "BOTTOMLEFT", 0, 8)
         r.text:SetWidth(CONTENT)
-        r.text:SetText(S.GOLD .. row.label .. "|r")
+        r.text:SetText(GOLD .. row.label .. "|r")
         r.line:Show()
         return HEADER_H
     end
@@ -626,12 +797,13 @@ local function paintRow(r, row)
     local reserved = (row.kind == "bool" and 56) or ((row.kind == "number" or row.kind == "action" or row.kind == "key") and 150) or 0
     r.text:SetPoint("TOPLEFT", r.frame, "TOPLEFT", inset, -4)
     local labelH = textHeight(r.text, row.label, CONTENT - inset - reserved, 14)
+    r.text:SetText(GOLD .. row.label .. "|r")
     local y = math.max(ROW_H, labelH + 10)
     if row.kind == "bool" then
         r.box:Show()
         if d[row.key] then r.tick:Show() end
-        r.value:SetText(d[row.key] and (S.GREEN .. "On|r") or (S.GREY .. "Off|r"))
-        if d.enabled == false and row.key ~= "enabled" then r.text:SetText(S.GREY .. row.label .. "|r") end
+        r.value:SetText(d[row.key] and (S.GREEN .. "On|r") or (GREY .. "Off|r"))
+        if d.enabled == false and row.key ~= "enabled" then r.text:SetText(GREY .. row.label .. "|r") end
     elseif row.kind == "choice" then
         local w = (CONTENT - (#row.values - 1) * 6) / #row.values
         for i, value in ipairs(row.values) do
@@ -640,29 +812,45 @@ local function paintRow(r, row)
             b.value = value
             b:SetWidth(w)
             b:ClearAllPoints(); b:SetPoint("TOPLEFT", r.frame, "TOPLEFT", (i - 1) * (w + 6), -y)
-            b:SetLabel((selected and S.GOLD or S.WHITE) .. (selected and "[x] " or "[ ] ") .. ((row.names and row.names[value]) or tostring(value)) .. "|r")
+            -- the picked choice: gold text on lit button art with a gold rule; the others are dimmed
+            b:SetLabel((selected and GOLD or DIM) .. (selected and "[x] " or "[ ] ") .. ((row.names and row.names[value]) or tostring(value)) .. "|r")
+            local lit = selected and 1 or 0.55
+            b.bg:SetVertexColor(lit, lit, lit)
+            if selected then b.edge:Show() else b.edge:Hide() end
             b:Show()
         end
         y = y + 30
     elseif row.kind == "number" then
-        r.value:SetText(S.BLUE .. tostring(d[row.key] or 0) .. "|r")
+        r.value:SetText(WHITE .. tostring(d[row.key] or 0) .. "|r")
         r.value:ClearAllPoints(); r.value:SetPoint("TOPRIGHT", r.frame, "TOPRIGHT", -52, -5)
         r.less:Show(); r.more:Show()
     elseif row.kind == "key" then
         local mine = W.capturing and (W.captureFor == row.which)
-        r.button:SetLabel(mine and (S.GOLD .. "press a key...|r") or (keyName(row) or "Set key"))
+        r.button:SetLabel(mine and (GOLD .. "press a key...|r") or (keyName(row) or "Set key"))
         r.button:Show()
     elseif row.kind == "action" then
         r.button:SetLabel(row.button or "Open")
         r.button:Show()
+    elseif row.kind == "text" then
+        local box = r.edit or textBox(r)
+        box:ClearAllPoints(); box:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 0, -y)
+        box:SetWidth(CONTENT - 4)
+        if box.SetMaxLetters then box:SetMaxLetters(row.maxLetters or 200) end
+        box.rowIndex = r.index
+        if not (box.HasFocus and box:HasFocus()) then box:SetText(tostring(d[row.key] or "")) end
+        box:Show()
+        y = y + 30
     end
+    -- An option used by only one choice (e.g. the minutes of the Time limit goal) is greyed while another is picked.
+    if row.inactive and row.inactive(d) then r.text:SetText(GREY .. row.label .. "|r") end
     if row.kind ~= "number" then
         r.value:ClearAllPoints(); r.value:SetPoint("TOPRIGHT", r.frame, "TOPRIGHT", -6, -5)
     end
     local desc = description(row)
+    local value = row.info and row.info()                                   -- read-only value line above the help
     r.desc:SetPoint("TOPLEFT", r.frame, "TOPLEFT", inset, -y)
-    local h = textHeight(r.desc, desc, CONTENT - inset, 13)
-    r.desc:SetText("|cffbbc2cf" .. desc .. "|r")
+    local h = textHeight(r.desc, value and (value .. "\n" .. desc) or desc, CONTENT - inset, 13)
+    r.desc:SetText((value and (WHITE .. value .. "|r\n") or "") .. HELP .. desc .. "|r")
     return y + h + 12
 end
 
@@ -695,6 +883,7 @@ function ns.refreshSettings()
             r.frame:Show()
             y = y + h + (ns.settingRows[idx].card and 12 or 4)
         else
+            if r.edit then r.edit:Hide(); r.edit.rowIndex = nil end     -- never leave the keyboard in a hidden box
             r.index = nil
             r.frame:Hide()
         end
@@ -702,9 +891,10 @@ function ns.refreshSettings()
     for _, t in ipairs(ns.settingTabs) do
         local tab = W.tabs[t.id]
         local open = (t.id == W.tab)
-        tab.text:SetText((open and S.GOLD or S.BLUE) .. t.title .. "|r")
-        if open then tab.under:Show(); tab.bg:SetVertexColor(1.6, 1.6, 1.6) else tab.under:Hide(); tab.bg:SetVertexColor(1, 1, 1) end
-        if open then W.heading:SetText(t.title); W.intro:SetText("|cffbbc2cf" .. t.intro .. "|r") end
+        -- classic options list: categories in white, the open one gold on a gold wash with a gold bar
+        tab.text:SetText((open and GOLD or WHITE) .. t.title .. "|r")
+        if open then tab.under:Show(); tab.bg:Show() else tab.under:Hide(); tab.bg:Hide() end
+        if open then W.heading:SetText(t.title); W.intro:SetText(HELP .. t.intro .. "|r") end
     end
     if W.tab == "quick" then
         ed.frame:ClearAllPoints()
@@ -720,7 +910,7 @@ function ns.refreshSettings()
     ns.settingsScroll(0) -- Keep the reading position when a setting changes.
 end
 
-function ns.settingsTab(id)
+local function selectTab(id)
     for _, t in ipairs(ns.settingTabs) do
         if t.id == id then
             if W.tab ~= id and W.rowScroll then W.rowScroll:SetVerticalScroll(0) end
@@ -729,6 +919,13 @@ function ns.settingsTab(id)
     end
     if W.capturing then stopCapture() end
     ns.refreshSettings()
+end
+
+-- Other windows ask for a tab with the settings closed (the quest guide's Options button, /qs plan options):
+-- then the window opens on that tab.
+function ns.settingsTab(id)
+    if not (W.win and W.win:IsShown()) then return ns.toggleSettings(true, id) end
+    selectTab(id)
 end
 
 local function tooltip(owner, text)
@@ -744,13 +941,15 @@ buildRow = function(f, n)
     local r = { choices = {} }
     local frame = clickable(f, CONTENT, ROW_H, nil)
     r.frame = frame
-    r.card = S.fill(frame, "BACKGROUND", 0.09, 0.11, 0.16, 0.98)
-    r.card:SetAllPoints(frame); r.card:Hide()
-    r.hover = S.fill(frame, "BACKGROUND", 1, 1, 1, 0.06)
+    r.card = S.fill(frame, "BACKGROUND", 0.13, 0.095, 0.06, 1)
+    r.card:SetAllPoints(frame)
+    r.cardEdges = edges(frame)
+    showCard(r, false)
+    r.hover = S.fill(frame, "BACKGROUND", 1, 0.82, 0, 0.08)
     r.hover:SetAllPoints(frame); r.hover:Hide()
     r.box, r.tick = S.checkBox(frame)
     r.box:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 1)
-    r.text = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    r.text = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     r.text:SetJustifyH("LEFT"); r.text:SetWordWrap(true)
     r.desc = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     r.desc:SetJustifyH("LEFT"); r.desc:SetWordWrap(true)
@@ -763,7 +962,7 @@ buildRow = function(f, n)
     r.toggleText:SetJustifyH("LEFT"); r.toggleText:SetWordWrap(true)
     r.value = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     r.value:SetJustifyH("RIGHT")
-    r.line = S.fill(frame, "ARTWORK", 1, 0.82, 0, 0.35)
+    r.line = S.fill(frame, "ARTWORK", 1, 0.82, 0, 0.45)
     r.line:SetHeight(1)
     r.line:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 2)
     r.line:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 2)
@@ -813,31 +1012,46 @@ local function build()
     version:SetText(S.GREY .. "version " .. tostring(ns.version or "?") .. "|r")
     W.close = S.closeButton(f, function() f:Hide() end, -6, -6)
 
-    local sidebar = S.fill(f, "BACKGROUND", 0.08, 0.1, 0.15, 0.9)
-    sidebar:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -48)
-    sidebar:SetWidth(180); sidebar:SetHeight(HEIGHT - 72)
-    local navTitle = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    navTitle:SetPoint("TOPLEFT", f, "TOPLEFT", 30, -60)
-    navTitle:SetText("WHAT DO YOU WANT TO CHANGE?")
-    navTitle:SetWidth(154); navTitle:SetWordWrap(true)
+    -- Left: the category list in a dark well, grouped under gold captions (like the game's Interface Options).
+    well(f, NAV_X, 46, NAV_W, HEIGHT - 70)
+    W.groups = {}
+    local y = 58
     for i, t in ipairs(ns.settingTabs) do
-        local b = clickable(f, 164, 36, function() ns.settingsTab(t.id) end)
-        b:SetPoint("TOPLEFT", f, "TOPLEFT", 26, -(100 + (i - 1) * 40))
-        local bg = S.fill(b, "BACKGROUND", 0.12, 0.14, 0.2, 0.9)
-        bg:SetAllPoints(b)
-        local under = S.fill(b, "ARTWORK", 1, 0.82, 0, 0.9)
-        under:SetWidth(3); under:SetHeight(36)
+        if t.group then
+            if i > 1 then y = y + GROUP_GAP end
+            local cap = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            cap:SetPoint("TOPLEFT", f, "TOPLEFT", NAV_X + 10, -y)
+            cap:SetText(GOLD .. string.upper(t.group) .. "|r")
+            local rule = S.fill(f, "ARTWORK", 1, 0.82, 0, 0.45)
+            rule:SetHeight(1); rule:SetWidth(NAV_W - 20)
+            rule:SetPoint("TOPLEFT", f, "TOPLEFT", NAV_X + 10, -(y + 14))
+            W.groups[#W.groups + 1] = { text = cap, rule = rule }
+            y = y + GROUP_H
+        end
+        local b = clickable(f, NAV_W - 12, TAB_H, function() ns.settingsTab(t.id) end)
+        b:SetPoint("TOPLEFT", f, "TOPLEFT", NAV_X + 6, -y)
+        local bg = S.fill(b, "BACKGROUND", 1, 0.82, 0, 0.16)          -- the open category's gold wash
+        bg:SetAllPoints(b); bg:Hide()
+        local hover = S.fill(b, "BACKGROUND", 1, 1, 1, 0.07)
+        hover:SetAllPoints(b); hover:Hide()
+        b:SetScript("OnEnter", function() hover:Show() end)
+        b:SetScript("OnLeave", function() hover:Hide() end)
+        local under = S.fill(b, "ARTWORK", 1, 0.82, 0, 1)
+        under:SetWidth(3); under:SetHeight(TAB_H)
         under:SetPoint("LEFT", b, "LEFT", 0, 0)
-        local text = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        text:SetPoint("LEFT", b, "LEFT", 10, 0)
-        text:SetWidth(150); text:SetJustifyH("LEFT"); text:SetWordWrap(true)
-        W.tabs[t.id] = { frame = b, text = text, under = under, bg = bg }
+        local text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        text:SetPoint("LEFT", b, "LEFT", 12, 0)
+        text:SetWidth(NAV_W - 30); text:SetJustifyH("LEFT"); text:SetWordWrap(true)
+        W.tabs[t.id] = { frame = b, text = text, under = under, bg = bg, hover = hover }
+        y = y + TAB_STEP
     end
+    -- Right: the open category's title and one-line summary, then its settings in a dark well.
     W.heading = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     W.heading:SetPoint("TOPLEFT", f, "TOPLEFT", LEFT, -52)
     W.intro = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    W.intro:SetPoint("TOPLEFT", f, "TOPLEFT", LEFT, -78)
+    W.intro:SetPoint("TOPLEFT", f, "TOPLEFT", LEFT, -76)
     W.intro:SetWidth(CONTENT); W.intro:SetWordWrap(true)
+    W.well = well(f, LEFT - 10, TOP - 8, CONTENT + 20, VIEW_H + 12)
 
     W.rowScroll = CreateFrame("ScrollFrame", nil, f)
     W.rowScroll:SetPoint("TOPLEFT", f, "TOPLEFT", LEFT, -TOP)
@@ -849,16 +1063,17 @@ local function build()
     W.rowScroll:SetScrollChild(W.rowBody)
     for n = 1, MIN_ROWS do buildRow(W.rowBody, n) end
     buildEditor(W.rowBody)
-    W.scrollHint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    W.scrollHint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     W.scrollHint:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", LEFT, 24)
     W.scrollUp = S.button(f, "Scroll up", 92, function() ns.settingsScroll(-VIEW_H * 0.75) end)
     W.scrollUp:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -128, 16)
     W.scrollDown = S.button(f, "Scroll down", 92, function() ns.settingsScroll(VIEW_H * 0.75) end)
     W.scrollDown:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28, 16)
-    local saved = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    saved:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 30, 32)
-    saved:SetText("Changes save automatically.")
+    local saved = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    saved:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", NAV_X + 10, 32)
+    saved:SetText(GREY .. "Changes save automatically.|r")
     saved:SetWidth(150); saved:SetWordWrap(true)
+    W.savedNote = saved
     -- Keep this wider layout usable on short or narrow screens.
     if UIParent.GetWidth and UIParent.GetHeight then
         local scale = math.min(1, (UIParent:GetWidth() - 24) / WIDTH, (UIParent:GetHeight() - 48) / HEIGHT)
@@ -874,7 +1089,7 @@ function ns.toggleSettings(show, tab)
     local f = build()
     if not f then return ns.print("this client does not allow the settings window (frame creation failed)") end
     if show == nil then show = not f:IsShown() end
-    if tab then ns.settingsTab(tab) end
+    if tab then selectTab(tab) end
     if show then ns.refreshSettings(); f:Show() else f:Hide() end
 end
 

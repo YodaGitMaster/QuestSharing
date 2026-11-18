@@ -314,6 +314,137 @@ end
 
 
 
+# Frame levels/strata like the client: children start one level above their parent; a native map pin sits on the
+# canvas far above the canvas itself (Blizzard and addon pin templates use levels in the hundreds).
+LEVELS = r'''
+LEVEL_SETS=0
+function TRACK(f)
+ f.level,f.strata=f.level or 0,f.strata or "MEDIUM"
+ function f:SetFrameLevel(n) self.level=n;LEVEL_SETS=LEVEL_SETS+1 end
+ function f:GetFrameLevel() return self.level end
+ function f:SetFrameStrata(s) self.strata=s end
+ function f:GetFrameStrata() return self.strata end
+ local font=f.CreateFontString
+ function f:CreateFontString(...)
+  local t=font(self,...)
+  function t:SetShadowOffset(x,y) self.shadow={x,y} end
+  function t:SetShadowColor(r,g,b,a) self.shadowColor={r,g,b,a} end
+  return t
+ end
+ return f
+end
+local create=CreateFrame
+CreateFrame=function(kind,name,parent)
+ local f=TRACK(create(kind,name,parent))
+ if parent and parent.level then f.level,f.strata=parent.level+1,parent.strata end
+ return f
+end
+CANVAS=TRACK(WorldMapFrame.ScrollContainer.Child)
+CANVAS.level,CANVAS.strata=3,"HIGH"
+NATIVE_PIN=CreateFrame("Frame",nil,CANVAS);NATIVE_PIN.level=CANVAS.level+500
+function RAISE_CANVAS(n) CANVAS.level=CANVAS.level+n;NATIVE_PIN.level=NATIVE_PIN.level+n end
+function SHOW_MAP() WorldMapFrame:Show();for _,fn in ipairs((WorldMapFrame.posthooks or {}).OnShow or {}) do fn(WorldMapFrame) end end
+'''
+
+
+def test_neighbouring_step_markers_never_overlap_and_merge_instead(style):
+    g = game(style)
+    open_guide(g)
+    g.run(r'''
+local stops={}
+for i=1,9 do stops[i]={point={map=1436,x=0.05+i*0.09,y=0.15},kind="objective",destination="Far "..i} end
+stops[10]={point={map=1436,x=0.500,y=0.60},kind="objective",destination="Camp A"}
+stops[11]={point={map=1436,x=0.501,y=0.60},kind="objective",destination="Camp A"}
+stops[12]={point={map=1436,x=0.527,y=0.60},kind="pickup",destination="Giver"}
+NS.questGuidance.set(stops,1,QuestSharingPlannerPanel,function() end,"Far 1")
+''')
+    pins = markers(g)
+    def rect(p):
+        cx, cy, w, h = p.point[4] * p.scale, p.point[5] * p.scale, p.width, p.height
+        return cx - w / 2, cx + w / 2, cy - h / 2, cy + h / 2
+    for i, a in enumerate(pins):
+        for b in pins[i + 1:]:
+            ax0, ax1, ay0, ay1 = rect(a)
+            bx0, bx1, by0, by1 = rect(b)
+            overlap = min(ax1, bx1) - max(ax0, bx0) > 0.5 and min(ay1, by1) - max(ay0, by0) > 0.5
+            assert not overlap, (a.text.text, b.text.text, rect(a), rect(b))
+    merged = next(p for p in pins if 10 in list(p.steps.values()))
+    assert sorted(merged.steps.values()) == [10, 11, 12], list(merged.steps.values())
+
+
+def assert_on_top(g):
+    canvas, native = g.eval("CANVAS"), g.eval("NATIVE_PIN")
+    overlay, pins = g.eval("QuestSharingRouteOverlay"), markers(g)
+    assert pins
+    assert overlay.level == min(9900, canvas.level + 2000), (overlay.level, canvas.level)
+    assert overlay.strata == canvas.strata
+    legend = next(c for c in overlay.children.values() if c.kind == "Frame" and not c.steps and c.text)
+    assert legend.level == overlay.level + 1 and legend.strata == canvas.strata
+    for pin in pins:
+        assert pin.level == overlay.level + (3 if pin.selectedStop else 2), (pin.level, overlay.level)
+        assert pin.strata == canvas.strata
+        assert pin.level > native.level > canvas.level, (pin.level, native.level)
+
+
+def test_map_step_numbers_stay_above_native_pins_on_every_redraw_and_map_show(style):
+    g = game(style, LEVELS)
+    open_guide(g)
+    assert_on_top(g)
+    # Stationary redraws keep the cached geometry and do not touch levels that are already right.
+    sets = g.eval("LEVEL_SETS")
+    for _ in range(20):
+        tick(g)
+    assert g.eval("LEVEL_SETS") == sets
+    # The map raises its canvas (and its own pins with it); the next redraw restates our stacking.
+    g.run("RAISE_CANVAS(300)")
+    tick(g)
+    assert_on_top(g)
+    # Closing and reopening the map re-applies the stacking on show, before the next redraw tick.
+    g.run("WorldMapFrame:Hide()")
+    tick(g)
+    assert not g.eval("QuestSharingRouteOverlay.shown")
+    g.run("RAISE_CANVAS(300);SHOW_MAP()")
+    assert g.eval("QuestSharingRouteOverlay.level") == g.eval("CANVAS.level") + 2000
+    tick(g)
+    assert_on_top(g)
+    # Near the client's level ceiling the overlay is clamped and markers stay above the native pin.
+    g.run("RAISE_CANVAS(8400)")
+    tick(g)
+    assert g.eval("QuestSharingRouteOverlay.level") == 9900
+    assert_on_top(g)
+
+
+def test_map_step_numbers_use_large_outlined_text_bright_border_and_dark_face(style):
+    g = game(style, LEVELS)
+    open_guide(g)
+    for scale in (1, 0.5, 3):
+        g.run(f"WorldMapFrame.ScrollContainer.Child.scale={scale}")
+        tick(g)
+        pins = markers(g)
+        assert len(pins) == 2
+        for pin in pins:
+            _, size, flags = pin.text.font[1], pin.text.font[2], pin.text.font[3]
+            assert size >= 13 and flags is not None and "OUTLINE" in flags, (size, flags)
+            assert pin.text.shadow[1] == 1 and pin.text.shadow[2] == -1
+            assert pin.text.shadowColor[4] == 1
+            # On-screen size: the canvas zoom times the pin's inverse scale stays 1.
+            assert pin.width * pin.scale * scale >= 30 and pin.height * pin.scale * scale >= 24
+            border, face = list(pin.border.vertex.values()), list(pin.face.vertex.values())
+            assert face[3] == 1 and max(face[:3]) <= 0.2, face
+            if pin.selectedStop:
+                assert border == [1, 0.82, 0, 1], border
+                assert "|cffffd100" in pin.text.text
+            else:
+                assert min(border[:3]) >= 0.75 and max(border[:3]) - min(border[:3]) < 0.05 and border[3] == 1, border
+                assert "|cffffffff" in pin.text.text
+    # Selecting another stop moves the gold border and keeps the label format.
+    shared = next(p for p in markers(g) if len(p.steps) == 2)
+    click(g, shared)
+    assert shared.selectedStop == 3 and "1/3" in shared.text.text
+    assert list(shared.border.vertex.values()) == [1, 0.82, 0, 1]
+    assert_on_top(g)
+
+
 def test_missing_metric_retries_are_throttled_and_stop_when_guide_closes(style):
     g = game(style, r'''
 METRIC_READS=0

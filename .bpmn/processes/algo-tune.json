@@ -1,0 +1,590 @@
+{
+ "id": "algo-tune",
+ "name": "Tune the planner algorithm and give the quest guide its own settings tab",
+ "runTimeout": 150,
+ "context": {
+  "prompt": "Record the algorithm tuning from context/algo-plan-2026-11-17.md: mark E1-E4 done/partial in that file with evidence, add decisions.md entries (stability margin max(12 s, 5 %), horizon 12 atoms / whole path <= 16, beam removed, calibration sample rules and clamps, yard constants 45/30), update schema.md (QuestSharingDB.plannerCalibration, report.keptPrevious), architecture.md (new QuestCalibration.lua in the file tree, planner flow/sequence) and state.md. Note that party-aware planning is still an open user decision. Also record item E5+G (dedicated 'Quest guide' settings tab, persisted goal keys questPlannerGoal/Budget/Selected/Scope, planner API applySettings/markCampBusy/clearCampWaits/showReport) in schema.md, decisions.md (goals now persist) and the architecture flowchart."
+ },
+ "lanes": [
+  {
+   "id": "builder",
+   "name": "Builder",
+   "agent": "bpmn:worker"
+  },
+  {
+   "id": "reviewer",
+   "name": "Reviewer",
+   "agent": "bpmn:reviewer",
+   "timeout": 15
+  }
+ ],
+ "data": {
+  "patch_opt": {
+   "schema": {
+    "type": "object",
+    "required": [
+     "files",
+     "summary",
+     "tests",
+     "changelog"
+    ],
+    "properties": {
+     "files": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "summary": {
+      "type": "string"
+     },
+     "tests": {
+      "type": "string"
+     },
+     "changelog": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "patch_plan": {
+   "schema": {
+    "type": "object",
+    "required": [
+     "files",
+     "summary",
+     "tests",
+     "changelog"
+    ],
+    "properties": {
+     "files": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "summary": {
+      "type": "string"
+     },
+     "tests": {
+      "type": "string"
+     },
+     "changelog": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "verdict_opt": {
+   "schema": {
+    "type": "object",
+    "required": [
+     "status",
+     "issues"
+    ],
+    "properties": {
+     "status": {
+      "enum": [
+       "approved",
+       "changes"
+      ]
+     },
+     "issues": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   }
+  },
+  "verdict_plan": {
+   "schema": {
+    "type": "object",
+    "required": [
+     "status",
+     "issues"
+    ],
+    "properties": {
+     "status": {
+      "enum": [
+       "approved",
+       "changes"
+      ]
+     },
+     "issues": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   }
+  },
+  "fixes_opt": {
+   "schema": {
+    "type": "object",
+    "required": [
+     "files",
+     "summary"
+    ],
+    "properties": {
+     "files": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "summary": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "fixes_plan": {
+   "schema": {
+    "type": "object",
+    "required": [
+     "files",
+     "summary"
+    ],
+    "properties": {
+     "files": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "summary": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "integration": {
+   "schema": {
+    "type": "object",
+    "required": [
+     "files",
+     "suite",
+     "compile",
+     "summary"
+    ],
+    "properties": {
+     "files": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "suite": {
+      "type": "string"
+     },
+     "compile": {
+      "type": "string"
+     },
+     "summary": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "final": {
+   "schema": {
+    "type": "object",
+    "required": [
+     "status",
+     "issues",
+     "summary"
+    ],
+    "properties": {
+     "status": {
+      "enum": [
+       "approved",
+       "changes"
+      ]
+     },
+     "issues": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "summary": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "patch_g": {
+   "schema": {
+    "type": "object",
+    "required": [
+     "files",
+     "summary",
+     "tests",
+     "changelog"
+    ],
+    "properties": {
+     "files": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "summary": {
+      "type": "string"
+     },
+     "tests": {
+      "type": "string"
+     },
+     "changelog": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "verdict_g": {
+   "schema": {
+    "type": "object",
+    "required": [
+     "status",
+     "issues"
+    ],
+    "properties": {
+     "status": {
+      "enum": [
+       "approved",
+       "changes"
+      ]
+     },
+     "issues": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   }
+  },
+  "fixes_g": {
+   "schema": {
+    "type": "object",
+    "required": [
+     "files",
+     "summary"
+    ],
+    "properties": {
+     "files": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "summary": {
+      "type": "string"
+     }
+    }
+   }
+  }
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "type": "start",
+   "name": "Tuning approved"
+  },
+  {
+   "id": "split",
+   "type": "and",
+   "join": "join"
+  },
+  {
+   "id": "build_opt",
+   "type": "agent",
+   "lane": "builder",
+   "name": "Fix stability, add horizon",
+   "out": "patch_opt",
+   "timeout": 35,
+   "prompt": "Implement items E1 and E3 of context/algo-plan-2026-11-17.md exactly. Read that file, context/architecture.md and QuestSharing/QuestOptimizer.lua (O.optimize, improve, beamSearch) first. Repo /Users/cozzolif/Desktop/cutpdf, WoW addon in Lua 5.1. You own ONLY QuestSharing/QuestOptimizer.lua and tests/test_quest_optimizer.py; return a CHANGELOG snippet instead of editing CHANGELOG. Another stream edits QuestPlanner.lua in parallel \u2014 do not touch it; the planner keeps passing preferredIDs and stabilitySeconds (you may change the default when the option is absent). Tests first (show they fail on the current code), then minimal changes. Keep every existing optimizer behaviour that the tests cover (goals, gates, shared-drop expectation 20.0947, site choice, yield every 32 actions, selection-independent output). Run from tests/ with /tmp/qs-test-env/bin/python: test_quest_optimizer.py, test_quest_planner_zone_steps.py, test_quest_planner_guide.py, test_data_budget.py, test_planner_facts.py (run, do not edit the others); compile under lupa.lua51. Report files, a summary per item with before/after evidence (including CPU steps on a 50-quest synthetic zone before vs after), test results and a CHANGELOG '## Unreleased' snippet."
+  },
+  {
+   "id": "review_opt",
+   "type": "agent",
+   "lane": "reviewer",
+   "name": "Review optimizer tuning",
+   "in": [
+    "patch_opt",
+    "fixes_opt?"
+   ],
+   "out": "verdict_opt",
+   "prompt": "Independent review of E1 (stability rule) and E3 (rolling horizon, beam removed) from context/algo-plan-2026-11-17.md. Builder report: {{patch_opt.summary}} Files: {{patch_opt.files}}. Re-run tests from tests/ with /tmp/qs-test-env/bin/python and probe yourself: near-equal plans (< margin) never flip across repeated optimizes with preferredIDs; a clearly better plan (>= max(12 s, 5 %)) and any higher coverage replace it; xp mode uses a relative margin; local-search moves stay within the horizon; tiny routes (<= 16 atoms) still match the exhaustive reference; beamSearch is gone and report fields stay valid; CPU steps drop on a large synthetic zone; diff stays inside QuestOptimizer.lua and test_quest_optimizer.py. Approve only if every check passes; otherwise list concrete issues with path:line."
+  },
+  {
+   "id": "ok_opt",
+   "type": "xor",
+   "name": "Optimizer tuning approved?"
+  },
+  {
+   "id": "fix_opt",
+   "type": "agent",
+   "lane": "builder",
+   "name": "Fix optimizer review issues",
+   "in": [
+    "verdict_opt"
+   ],
+   "out": "fixes_opt",
+   "timeout": 20,
+   "prompt": "Fix these review issues touching only QuestSharing/QuestOptimizer.lua and tests/test_quest_optimizer.py: {{verdict_opt.issues}}. Re-run the affected suites from tests/ with /tmp/qs-test-env/bin/python and report files and a summary."
+  },
+  {
+   "id": "build_plan",
+   "type": "agent",
+   "lane": "builder",
+   "name": "Calibrate, yards, guide API",
+   "out": "patch_plan",
+   "timeout": 55,
+   "prompt": "Implement items E2, E4 and the E-plan half of 'E5 + G' (planner API, persisted goal keys read via P.applySettings, P.options -> ns.settingsTab('guide'), in-guide options panel replaced by one Options button, calibration get/reset API) of context/algo-plan-2026-11-17.md exactly. Read that file, context/architecture.md, context/schema.md and QuestSharing/QuestPlanner.lua (planOptions, groupCamps, targetLocation, visibleStops, scan/session events) first. Repo /Users/cozzolif/Desktop/cutpdf, WoW addon in Lua 5.1. You own ONLY QuestSharing/QuestPlanner.lua, a new QuestSharing/QuestCalibration.lua, QuestSharing/QuestSharing.toc (add QuestCalibration.lua before QuestPlanner.lua), tests/test_quest_planner_zone_steps.py and a new tests/test_planner_calibration.py (copy the harness/Game usage style of tests/test_quest_planner_zone_steps.py). Do not edit QuestOptimizer.lua, Settings.lua or Core.lua (other streams own them; stream G adds the settings tab, Core defaults and the ns.setSetting hook that calls P.applySettings) or CHANGELOG/README (return a snippet). Calibration must do no work at login or while the guide is closed, never call protected APIs, and persist under QuestSharingDB.plannerCalibration. Tests first (show they fail on the current code), then minimal changes. Keep all existing planner behaviour covered by tests (camps, mixed camps, busy camps, selection, zone scope). Run from tests/ with /tmp/qs-test-env/bin/python: test_planner_calibration.py, test_quest_planner_zone_steps.py, test_quest_optimizer.py, test_quest_planner_guide.py, test_quest_planner_ui.py, test_quest_planner_path.py, test_data_budget.py, test_quest_guidance.py; compile all touched Lua under lupa.lua51. Report files, a summary per item with evidence, test results and a CHANGELOG '## Unreleased' snippet."
+  },
+  {
+   "id": "review_plan",
+   "type": "agent",
+   "lane": "reviewer",
+   "name": "Review calibration and API",
+   "in": [
+    "patch_plan",
+    "fixes_plan?"
+   ],
+   "out": "verdict_plan",
+   "prompt": "Independent review of E2 (cost calibration) and E4 (camp radius in yards) from context/algo-plan-2026-11-17.md. Builder report: {{patch_plan.summary}} Files: {{patch_plan.files}}. Re-run tests from tests/ with /tmp/qs-test-env/bin/python and probe yourself: kill/interaction samples follow the plan's rules (gap filters, increments of n, median of last 40, clamps, >= 5 samples before override); values persist in QuestSharingDB.plannerCalibration across a simulated reload; /qs plan calibrate and reset work; planOptions uses the calibrated values and the report says calibrated vs default; zero work at login and with the guide closed (test_data_budget no-preload tests pass); no protected API calls; yard radius groups identically on small vs large maps and falls back when the map size is unknown; QuestCalibration.lua is in the toc before QuestPlanner.lua; diff stays inside the owned files. Also check the E5 contract in that file: P.applySettings/markCampBusy/clearCampWaits/showReport exist and work, P.options and /qs plan options open ns.settingsTab('guide'), the in-guide options panel is gone (one Options button remains), ns.questCalibration.get/reset match the contract. Approve only if every check passes; otherwise list concrete issues with path:line."
+  },
+  {
+   "id": "ok_plan",
+   "type": "xor",
+   "name": "Calibration approved?"
+  },
+  {
+   "id": "fix_plan",
+   "type": "agent",
+   "lane": "builder",
+   "name": "Fix calibration review issues",
+   "in": [
+    "verdict_plan"
+   ],
+   "out": "fixes_plan",
+   "timeout": 20,
+   "prompt": "Fix these review issues touching only QuestSharing/QuestPlanner.lua, QuestSharing/QuestCalibration.lua, QuestSharing/QuestSharing.toc, tests/test_quest_planner_zone_steps.py and tests/test_planner_calibration.py: {{verdict_plan.issues}}. Re-run the affected suites from tests/ with /tmp/qs-test-env/bin/python and report files and a summary."
+  },
+  {
+   "id": "build_g",
+   "type": "agent",
+   "lane": "builder",
+   "name": "Build quest guide tab",
+   "out": "patch_g",
+   "timeout": 35,
+   "prompt": "Implement the G half of 'E5 + G' in context/algo-plan-2026-11-17.md exactly: a dedicated 'Quest guide' settings tab holding every quest-guide option. Read that section, context/architecture.md and QuestSharing/Settings.lua (ns.settingTabs, ns.settingRows, row kinds, ns.settingsTab, layout/scroll) first. Repo /Users/cozzolif/Desktop/cutpdf, WoW addon in Lua 5.1. You own ONLY QuestSharing/Settings.lua, QuestSharing/Core.lua (defaults and the ns.setSetting hook only), tests/test_settings.py and tests/test_look.py; return a CHANGELOG snippet instead of editing CHANGELOG. Another stream builds the planner API in QuestPlanner.lua/QuestCalibration.lua in parallel: call it ONLY through the contract (ns.questPlanner.applySettings, markCampBusy, clearCampWaits, showReport, debug, open; ns.questCalibration.get/reset), guarding every call with an existence check so the tab works (and tests pass) even before that stream lands. Add the new 'text' row kind with an EditBox (SetFont must pass flags, never nil). Add Core.lua defaults for questPlannerGoal/Budget/Selected/Scope and, in ns.setSetting, call ns.questPlanner.applySettings() for any key starting with 'questPlanner' other than 'questPlanner' itself. Tests first in tests/test_settings.py (and tests/test_look.py layout): the tab exists after Map, contains every row from the plan, the questPlanner toggle is no longer a full row in Extra tools (a pointer card opens the tab), each control saves its key and calls the planner API (stub it in the test), the learned-pace line shows default vs calibrated text from a stubbed ns.questCalibration.get, all rows fit and do not overlap (existing layout test style), ns.settingsTab('guide') selects it. Run from tests/ with /tmp/qs-test-env/bin/python: test_settings.py, test_look.py, test_classic_style.py, test_quest_planner_guide.py, test_data_budget.py; compile Settings.lua and Core.lua under lupa.lua51. Report files, summary, tests and a CHANGELOG '## Unreleased' snippet."
+  },
+  {
+   "id": "review_g",
+   "type": "agent",
+   "lane": "reviewer",
+   "name": "Review quest guide tab",
+   "in": [
+    "patch_g",
+    "fixes_g?"
+   ],
+   "out": "verdict_g",
+   "prompt": "Independent review of the dedicated 'Quest guide' settings tab ('E5 + G' in context/algo-plan-2026-11-17.md). Builder report: {{patch_g.summary}} Files: {{patch_g.files}}. Re-run tests/test_settings.py, test_look.py, test_classic_style.py with /tmp/qs-test-env/bin/python from tests/ and probe yourself: every quest-guide option from the plan is in this tab and nowhere else except the pointer card; controls save their keys (defaults in Core.lua) and call the planner API through existence-guarded calls; the text row's EditBox passes SetFont flags; layout fits the scroll body with no overlap on every tab; labels explain the visible effect; diff stays inside QuestSharing/Settings.lua, QuestSharing/Core.lua (defaults and the ns.setSetting hook only), tests/test_settings.py and tests/test_look.py. Approve only if every check passes; otherwise list concrete issues with path:line."
+  },
+  {
+   "id": "ok_g",
+   "type": "xor",
+   "name": "Guide tab approved?"
+  },
+  {
+   "id": "fix_g",
+   "type": "agent",
+   "lane": "builder",
+   "name": "Fix guide tab issues",
+   "in": [
+    "verdict_g"
+   ],
+   "out": "fixes_g",
+   "timeout": 20,
+   "prompt": "Fix these review issues touching only QuestSharing/Settings.lua, QuestSharing/Core.lua (defaults and the ns.setSetting hook only), tests/test_settings.py and tests/test_look.py: {{verdict_g.issues}}. Re-run the affected suites from tests/ with /tmp/qs-test-env/bin/python and report files and a summary."
+  },
+  {
+   "id": "join",
+   "type": "and"
+  },
+  {
+   "id": "integrate",
+   "type": "agent",
+   "lane": "builder",
+   "name": "Integrate and run suite",
+   "in": [
+    "patch_opt",
+    "patch_plan",
+    "verdict_opt",
+    "verdict_plan",
+    "patch_g",
+    "verdict_g"
+   ],
+   "out": "integration",
+   "timeout": 20,
+   "prompt": "Integrate the algorithm tuning (context/algo-plan-2026-11-17.md). Add these snippets under CHANGELOG.md '## Unreleased' (keep existing entries; plain user-facing wording): {{patch_opt.changelog}} {{patch_plan.changelog}} {{patch_g.changelog}}. Update README.md where the quest guide options are described (they now live in Settings > Quest guide) and where the planner's stability, search, cost estimates or camp grouping are described, and add QuestCalibration.lua / test_planner_calibration.py wherever README lists modules or test files. Edit no Lua or test files. Run every tests/test_*.py with /tmp/qs-test-env/bin/python from tests/ and report the total; compile every QuestSharing/*.lua under lupa.lua51; git diff --check. Note any stream whose review ended with 'changes' (opt: {{verdict_opt.status}}, plan: {{verdict_plan.status}}, guide tab: {{verdict_g.status}}). Report files, suite, compile and a summary."
+  },
+  {
+   "id": "final_review",
+   "type": "agent",
+   "lane": "reviewer",
+   "name": "Review tuned planner",
+   "in": [
+    "integration"
+   ],
+   "out": "final",
+   "timeout": 20,
+   "prompt": "Final independent review of the tuned planner (context/algo-plan-2026-11-17.md). Integration: {{integration.summary}} Suite: {{integration.suite}}. Re-run the full suite yourself, then probe end-to-end in the harness: a guide session in the Westfall fixture walking several re-plans shows no route churn from sub-margin differences; calibrated kill time changes expectedSeconds; camp grouping uses yards; map search and dungeon scan still keep their speed while the guide refines (idle priority from the previous run still in place). Open Settings > Quest guide in the harness: every option works end-to-end against the real planner (goal change rescans, camp busy/clear, learned pace shown and reset, report/debug open) and the guide's Options button opens this tab. Confirm CHANGELOG/README match the code. Approve or list concrete issues with path:line."
+  },
+  {
+   "id": "done",
+   "type": "end",
+   "name": "Planner tuned"
+  }
+ ],
+ "flows": [
+  {
+   "from": "start",
+   "to": "split"
+  },
+  {
+   "from": "split",
+   "to": "build_opt"
+  },
+  {
+   "from": "build_opt",
+   "to": "review_opt"
+  },
+  {
+   "from": "review_opt",
+   "to": "ok_opt"
+  },
+  {
+   "from": "ok_opt",
+   "to": "join",
+   "name": "approved or 2nd round",
+   "when": {
+    "any": [
+     {
+      "path": "verdict_opt.status",
+      "eq": "approved"
+     },
+     {
+      "path": "$loop.ok_opt",
+      "gte": 2
+     }
+    ]
+   }
+  },
+  {
+   "from": "ok_opt",
+   "to": "fix_opt",
+   "name": "changes",
+   "default": true
+  },
+  {
+   "from": "fix_opt",
+   "to": "review_opt"
+  },
+  {
+   "from": "split",
+   "to": "build_plan"
+  },
+  {
+   "from": "build_plan",
+   "to": "review_plan"
+  },
+  {
+   "from": "review_plan",
+   "to": "ok_plan"
+  },
+  {
+   "from": "ok_plan",
+   "to": "join",
+   "name": "approved or 2nd round",
+   "when": {
+    "any": [
+     {
+      "path": "verdict_plan.status",
+      "eq": "approved"
+     },
+     {
+      "path": "$loop.ok_plan",
+      "gte": 2
+     }
+    ]
+   }
+  },
+  {
+   "from": "ok_plan",
+   "to": "fix_plan",
+   "name": "changes",
+   "default": true
+  },
+  {
+   "from": "fix_plan",
+   "to": "review_plan"
+  },
+  {
+   "from": "join",
+   "to": "integrate"
+  },
+  {
+   "from": "integrate",
+   "to": "final_review"
+  },
+  {
+   "from": "final_review",
+   "to": "done"
+  },
+  {
+   "from": "split",
+   "to": "build_g"
+  },
+  {
+   "from": "build_g",
+   "to": "review_g"
+  },
+  {
+   "from": "review_g",
+   "to": "ok_g"
+  },
+  {
+   "from": "ok_g",
+   "to": "join",
+   "name": "approved or 2nd round",
+   "when": {
+    "any": [
+     {
+      "path": "verdict_g.status",
+      "eq": "approved"
+     },
+     {
+      "path": "$loop.ok_g",
+      "gte": 2
+     }
+    ]
+   }
+  },
+  {
+   "from": "ok_g",
+   "to": "fix_g",
+   "name": "changes",
+   "default": true
+  },
+  {
+   "from": "fix_g",
+   "to": "review_g"
+  }
+ ]
+}

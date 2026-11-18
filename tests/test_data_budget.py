@@ -238,6 +238,158 @@ end)''')
     assert g.eval("WORK_REPLACED") == 1
 
 
+IDLE_JOBS = r'''
+PROFILE, NORMAL, IDLE, ORDER = 0, 0, {}, {}
+function startNormal(n, valid)
+ NS.dataWork.start("normal", function()
+  for i=1,n do PROFILE=PROFILE+0.4; NORMAL=NORMAL+1; NS.dataWork.yield() end
+ end, valid)
+end
+-- An idle job (n=nil: never finishes) that records how often and in which order it ran.
+function startIdle(owner, n)
+ IDLE[owner] = 0
+ NS.dataWork.start(owner, function()
+  local i = 0
+  while not n or i < n do
+   i = i + 1; PROFILE=PROFILE+0.4; IDLE[owner]=IDLE[owner]+1; ORDER[#ORDER+1]=owner; NS.dataWork.yield()
+  end
+ end, nil, function(ok) IDLE_DONE = ok end, nil, "idle")
+end
+'''
+
+
+def idle_game(profiler):
+    g = game(WESTFALL + IDLE_JOBS)
+    if profiler:
+        g.run("debugprofilestop=function() return PROFILE end")
+    return g
+
+
+def normal_job_pumps(with_idle, profiler, n):
+    g = idle_game(profiler)
+    if with_idle:
+        g.eval("startIdle")("refine")
+    g.eval("startNormal")(n)
+    pumps = 0
+    while g.eval("NORMAL") < n and pumps < 1000:
+        g.advance(0.1)
+        pumps += 1
+    return pumps
+
+
+def test_idle_job_that_never_ends_leaves_a_normal_job_at_least_90_percent_of_its_pace():
+    for profiler, n in ((False, 800), (True, 200)):
+        solo, shared = normal_job_pumps(False, profiler, n), normal_job_pumps(True, profiler, n)
+        assert 0 < solo < 1000
+        assert shared * 0.9 <= solo, (profiler, solo, shared)
+
+
+def test_idle_job_alone_still_finishes_within_the_shared_slice():
+    for profiler in (False, True):
+        g = idle_game(profiler)
+        g.eval("startIdle")("refine", 200)
+        before, steps = 0, 0
+        for _ in range(200):
+            g.advance(0.1)
+            now, done = g.eval("PROFILE"), g.eval("IDLE.refine")
+            assert (now - before <= 2.401) if profiler else (done - steps <= 80), (profiler, now - before, done - steps)
+            before, steps = now, done
+            if not g.eval('NS.dataWork.busy("refine")'):
+                break
+        assert g.eval("IDLE.refine") == 200 and g.eval("IDLE_DONE") is True
+
+
+def test_idle_job_started_first_yields_every_slice_to_a_later_normal_job():
+    g = idle_game(False)
+    g.eval("startIdle")("refine")
+    g.advance(0.5)
+    assert g.eval("IDLE.refine") > 0
+    g.eval("startNormal")(400)
+    for _ in range(50):
+        idle, normal = g.eval("IDLE.refine"), g.eval("NORMAL")
+        g.advance(0.1)
+        if not g.eval('NS.dataWork.busy("normal")'):
+            break
+        assert g.eval("IDLE.refine") == idle, "the idle job ran while a normal job could run"
+        assert g.eval("NORMAL") - normal in (0, 80)
+    assert g.eval("NORMAL") == 400
+    idle = g.eval("IDLE.refine")
+    g.advance(0.3)
+    assert g.eval("IDLE.refine") > idle, "the idle job did not continue after the normal job finished"
+
+
+def test_paused_or_invalid_normal_jobs_do_not_hold_back_idle_jobs():
+    g = idle_game(False)
+    g.run("VALID=false")
+    g.eval("startNormal")(400, g.eval("function() return VALID end"))
+    g.eval("startIdle")("refine")
+    g.advance(0.3)
+    assert g.eval("NORMAL") == 0 and g.eval("IDLE.refine") > 0
+    g.run("VALID=true")
+    g.eval("NS.dataWork.resume")("normal")
+    g.advance(0.2)
+    idle = g.eval("IDLE.refine")
+    g.advance(0.2)
+    assert g.eval("NORMAL") > 0 and g.eval("IDLE.refine") == idle
+    g.eval("NS.dataWork.pause")("normal")
+    g.advance(0.3)
+    assert g.eval("IDLE.refine") > idle
+
+
+def test_idle_jobs_keep_their_order_and_obey_pause_resume_cancel_and_combat():
+    g = idle_game(False)
+    g.eval("startIdle")("first", 100)
+    g.eval("startIdle")("second", 100)
+    g.advance(0.1)
+    assert list(g.eval("ORDER").values())[:4] == ["first", "second", "first", "second"]
+    g.eval("NS.dataWork.pause")("first")
+    first = g.eval("IDLE.first")
+    g.advance(0.5)
+    assert g.eval("IDLE.first") == first and g.eval("IDLE.second") == 100
+    assert g.eval('NS.dataWork.busy("first")')
+    g.run("IN_COMBAT=true")
+    g.eval("NS.dataWork.resume")("first")
+    g.advance(1)
+    assert g.eval("IDLE.first") == first
+    g.run("IN_COMBAT=false")
+    g.fire("PLAYER_REGEN_ENABLED")
+    g.advance(1)
+    assert g.eval("IDLE.first") == 100 and not g.eval('NS.dataWork.busy("first")')
+    g.eval("startIdle")("cancelled")
+    g.eval("NS.dataWork.cancel")("cancelled")
+    g.advance(0.5)
+    assert g.eval("IDLE.cancelled") == 0 and not g.eval('NS.dataWork.busy("cancelled")')
+
+
+def test_idle_job_paused_while_waiting_stays_paused_until_resumed():
+    g = idle_game(False)
+    g.eval("startIdle")("refine")
+    g.run(r'''NS.dataWork.start("normal", function()
+ NS.dataWork.pause("refine"); NS.dataWork.yield(); NORMAL = 1
+end)''')
+    g.advance(1)
+    assert g.eval("NORMAL") == 1 and g.eval("IDLE.refine") == 0
+    assert g.eval('NS.dataWork.busy("refine")')
+    g.eval("NS.dataWork.resume")("refine")
+    g.advance(0.2)
+    assert g.eval("IDLE.refine") > 0
+
+
+def test_normal_job_started_by_an_idle_job_takes_over_the_same_slice():
+    g = idle_game(False)
+    g.run(r'''
+NS.dataWork.start("refine", function()
+ IDLE.refine = 0
+ while true do
+  IDLE.refine = IDLE.refine + 1
+  if IDLE.refine == 3 then startNormal(1000) end
+  NS.dataWork.yield()
+ end
+end, nil, nil, nil, "idle")''')
+    g.advance(0.1)
+    assert g.eval("IDLE.refine") == 3 and g.eval("NORMAL") == 77
+
+
 def test_shared_planner_starter_cache_avoids_redecoding_same_world_npc():
     g = game(WESTFALL + r'''
 local ids={9000}
@@ -319,6 +471,106 @@ ItemDB.Get=function(id,key) if key=="name" then ITEM_NAME_READS=ITEM_NAME_READS+
     assert g.eval("ITEM_NAME_READS") == 1
     assert g.eval("SPAWN_READS") == 1
     assert [p.result.vendor.id for p in pins(g)] == [4]
+
+SYNTHETIC_ZONE = r'''
+function syntheticZone(n)
+ local quests, stops, seed = {}, {}, 777
+ local function rnd() seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 end
+ local function add(qid, kind, deps, target)
+  local id = #stops + 1
+  stops[id] = {id=id,kind=kind,point={map=1436,x=rnd(),y=rnd()},quests={[qid]="Q"..qid},deps=deps or {}}
+  if target then
+   stops[id].objectives={{questID=qid,target=target,sourceID=600+qid%7,remaining=target.required,shareable=true}}
+  end
+  return id
+ end
+ for qid = 1, n do
+  quests[qid] = {id=qid,name="Q"..qid,status="ready",xp=qid*50}
+  local p = add(qid, "pickup")
+  local o = add(qid, "objective", {[p]=true}, {kind="kill",creditID=600+qid%7,required=6+qid%5})
+  add(qid, "turnin", {[o]=true})
+ end
+ return quests, stops
+end
+'''
+
+
+def test_route_search_yields_at_least_every_64_simulated_actions():
+    # Every stop has its own point, so each simulated action asks for exactly one travel time.
+    g = game(WESTFALL + SYNTHETIC_ZONE)
+    g.run(r'''
+SINCE, WORST, YIELDS = 0, 0, 0
+local q, s = syntheticZone(40)
+ROUTE, REPORT = NS.questOptimizer.optimize(q, s, {mode="all", origin={map=1436,x=.5,y=.5}, killSeconds=10,
+ interactionSeconds=3, maxImproveSteps=250000,
+ travelSeconds=function(a, b) SINCE = SINCE + 1; local x, y = a.x - b.x, a.y - b.y; return math.sqrt(x*x + y*y) * 600 end,
+ checkpoint=function() WORST = math.max(WORST, SINCE); SINCE = 0; YIELDS = YIELDS + 1 end})
+WORST = math.max(WORST, SINCE)
+''')
+    assert g.eval("REPORT.coverage") == 40
+    assert g.eval("REPORT.improveSteps") > 0
+    assert g.eval("WORST") <= 64, g.eval("WORST")
+
+
+GUIDE_ZONE = r'''
+QUESTIE_QUESTS[9000],QUESTIE_QUESTS[9001],QUESTIE_QUESTS[9002]=nil,nil,nil
+local seed = 7
+local function at() seed = (seed * 1103515245 + 12345) % 2147483648; return 15 + seed % 70 end
+for k = 0, 11 do
+ local giver, mob = 6100 + k, 6200 + k
+ local gx, gy, mx, my = at(), at(), at(), at()
+ QUESTIE_QUESTS[9100 + k] = {name="Task "..k,questLevel=8,zoneOrSort=40,startedBy={{giver}},objectives={{{mob,5}}},finishedBy={{giver}}}
+ QUESTIE_NPCS[giver] = {name="Giver "..k,spawns={[40]={{gx,gy}}}}
+ QUESTIE_NPCS[mob] = {name="Mob "..k,spawns={[40]={{mx,my},{mx+1,my},{mx,my+1}}}}
+end
+local ids = {}
+for id = 1, 3000 do
+ ids[#ids + 1] = id
+ QUESTIE_NPCS[id] = {subName=id==2 and "Skinning Trainer" or "General Goods",spawns={[12]={{20,30}}}}
+end
+NpcDB.GetAllIds = function() return ids end
+for id = 20000, 23000 do QUESTIE_QUESTS[id] = {name="Filler "..id,questLevel=30} end
+'''
+
+
+def database_job_pumps(job, guide):
+    """Pumps (0.1 s slices, step-capped as in the harness) until map search or the dungeon scan is done."""
+    from test_vendor_map import pins
+    g = game(VENDOR_DATA + WESTFALL + GUIDE_ZONE)
+    g.advance(1)
+    if guide:
+        g.eval("NS.setSetting")("questPlanner", True)
+        for _ in range(3000):
+            g.advance(0.1)
+            if not g.eval('NS.dataWork.busy("quest-plan") or NS.dataWork.busy("quest-improve")'):
+                break
+    if job == "vendor":
+        show_search(g, "general vendor")
+        def done():
+            return len(pins(g)) > 0 and not g.eval('NS.dataWork.busy("vendor-search") or NS.dataWork.busy("vendor-index")')
+    else:
+        g.slash("dungeons")
+        def done():
+            return not g.eval('NS.dataWork.busy("dungeonQuests")')
+    pumps, x = 0, 0.5
+    while not done() and pumps < 3000:
+        g.advance(0.1)
+        pumps += 1
+        if guide and pumps % 10 == 0:  # the player walks; the open guide re-plans every 3 s
+            x = 0.53 if x == 0.5 else 0.5
+            g.run(f"POS.x, POS.y = {x}, {x}")
+    return pumps
+
+
+def test_map_search_and_dungeon_scan_keep_half_their_pace_while_the_guide_replans():
+    # Guard, not an A4 regression test: the 0.03 moves stay under REFINE_MOVE, so the guide re-plans (solve(0))
+    # but never refines during the measured window, and this already passed before the A4 fix. The A4 regression
+    # tests are the 64-action yield test above and the local-search gate tests in test_quest_optimizer.py.
+    for job in ("vendor", "dungeon"):
+        solo, shared = database_job_pumps(job, False), database_job_pumps(job, True)
+        assert 0 < solo < 3000
+        assert shared <= 2 * solo, (job, solo, shared)
+
 
 if __name__ == "__main__":
     failed = total = 0

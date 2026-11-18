@@ -1,5 +1,45 @@
 # Insights
 
+## 2026-11-17 — Decouple run r-20261117-234605-6ba9 (streams D1–D3)
+- **One decision, one cost source.** Feeding an optional, asynchronous provider (SPF walk costs) into a choice that also has a fallback cost (straight line) makes the result depend on whether the provider is installed and when it answers. That needed a lock and a second solve, and still risked flips. Use the optional provider only for its own visible feature (the Follow arrow) and plan with a single source.
+- **Measure when two requirements look compatible.** The builder measured the actual cost gap (camp B only about 10 s cheaper at POS 0.56) and showed that "stickiness without SPF" and "keep the 0.56 switch" cannot both hold. Flag a conflict like this with numbers instead of quietly satisfying one side.
+- **Unbounded background work needs a priority, not just a budget.** One resume per job per turn still let a 0.7 s-CPU refine take a share of every slice from map search and the dungeon scan. DataWork `"idle"` keeps normal jobs at >= 90 % of their solo pace (D6).
+- **Frame levels relative to a host must be restated, not set once.** The map canvas and its pins can re-level after creation. Restate on every draw and on show, and compare before writing so steady redraws cost nothing (D8, `BUGS/2026-11-17-guidance-map-numbers-hidden.md`).
+- Harness gap: the mock `FontString` has no `GetFont`, so the locale font file branch in `QuestGuidance.makeMarker` is untested.
+
+## 2026-11-17 — Fix-all run r-20261117-215940-e171 (streams A/B/C)
+- **A moving input needs memory, not just a better rule.** The step-one bug (nearest spawn to the player) and its regression (camp re-chosen from first-leg costs on every 3 s re-plan) are the same trap. Remember the chosen value, and switch only past a documented margin (D1: 25 % and 20 s).
+- **Read shared UI state when you use it, not when a long job starts.** `refine()` captured the selected step at job start, and a cooperative job runs for seconds. Any background job that swaps `route` must read `selectionLocked`/`route[selected]` at the swap.
+- **Classic quest-log indices move.** A UI table that holds a log entry across QUEST_LOG_UPDATE (menus, callbacks) must refresh `index` in place or close. Matching by quest ID is not enough. Round-1 review caught "Offer it to the party" pushing [200] instead of [2], by testing on classic.
+- **Keep long-lived work apart from per-keystroke work.** Cancelling one job on every keystroke threw away the whole catalogue index. A persistent index job plus a per-query match job, started by typing (not map open), keeps the no-preload guarantee and gives about 0.3 s suggestions.
+- **Latency bugs need a clock in the harness.** Without `debugprofilestop` the harness runs 80 steps per pump and uses tiny fixtures, so a 3-8 s delay is invisible. The new Classic-size tests (10k NPCs / 15k items, mock clock) are the regression guard. Contention tests need the same approach (`test_map_search_and_dungeon_scan_keep_half_their_pace_while_the_guide_replans`).
+- **Review rounds paid off.** Streams A and C each needed a second round for blocking issues. The reviewers' mutation checks (revert the fix in memory, and the new test must fail) confirmed that the new tests are not vacuous.
+- During stream B, another session edited `VendorMap.lua` (`ensureUI` now uses `S.panel`/`S.inset` from the Style.lua restyle). With parallel sessions, keep foreign hunks and say so in the step output.
+
+## 2026-11-17 — Bug audit of all 34 BUGS reports (run r-20261117-212533-cf04)
+- Method: 6 groups (equipment/spell, UI/settings, planner Nov 16, planner Nov 17, guidance/map, data/dungeon), each with a checker and then an independent refuter.
+  - The checker re-ran the covering suites (`tests/` with `/tmp/qs-test-env/bin/python`), cited file:line evidence and wrote scratch repros under `/tmp/bugaudit-*`.
+  - The refuter re-ran the suites, mutation-tested the fix (revert it in a scratch copy and the covering test must fail) and probed variants.
+  - Final verdict = the refuter's `corrected_verdict` wherever it disagreed with the checker.
+  - Full suite 1766/1766.
+- Results: 29 holds, 3 partially_fixed, 1 regressed (`2026-11-17-planner-step-one-on-player.md`), 1 open (`2026-11-17-map-search-missing-database.md`).
+- Mutation checks show the covering tests are not vacuous: reverted fixes reproduce the reports' pre-fix counts (e.g. loot 38/58 without the slot gate; usability 28/30 without the apply() cancel).
+- The brief's "uncommitted planner diff" was stale: it is committed (f1b34e9, f9bb992). The audit range was d2387c3 (= v0.4.21) to HEAD.
+- Most new risk comes from f1b34e9's background `quest-improve` / `refine()`:
+  - Selection reset: refine captures the selection key at job start (`QuestPlanner.lua:924`) and sets `selected=1` after solve (`:927`). A map click, row click or Next during the job therefore snaps the guide back while the waypoint stays on the clicked stop. This contradicts CHANGELOG Unreleased ("keeping your selected step"). Fix: read the key after solve() returns, then add a test that clicks while `NS.dataWork.busy('quest-improve')`. The refuter of `2026-11-17-guidance-map-click-event-argument.md` rated that report partially_fixed for this reason; no addendum has been written yet.
+  - SPF camp flicker and mixed-creature camp loss: see the addendum in the step-one report.
+  - CPU contention: DataWork gives each job one resume per turn whatever that resume costs (`DataWork.lua:62-86`). improve resumes reach 2.4-3.9 ms because evaluate()/remember() (`QuestOptimizer.lua:570`, `:633-641`) replay paths without yielding. Result: vendor search runs at 5-9% of solo speed, the dungeon 8 ms scan at 74-75%, and the reward index slows about as much as vendor search. Options: per-job time accounting in DataWork.pump, checkpoints inside evaluate/remember, pausing quest-improve while a foreground or map job is queued, or not restarting it on small movement rebuilds.
+  - Unverified (code reading only): "Camp busy 5 min" (`QuestPlanner.lua:1667`) keys waitingAt by the chosen point, but planOptions (`:885`) reads the default `stop.point`, so it may do nothing for alternative camps.
+- Misattributed root cause: the user's "won't open / black" symptom in `2026-11-17-dungeon-loot-does-not-open.md` ("not a bug") and `2026-11-17-dungeon-quests-slow-first-load.md` was the EditBox:SetFont-without-flags build failure. Under the strict harness, v0.4.20 and v0.4.21 fail test_loot (2/58) and test_dungeon_quests (0/64). The fix is f1b34e9 and is unreleased: toc 0.4.21, no tag contains it. Both reports are partially_fixed. The dungeon report's "wrong/missing quests" and its QUEST_LOG_UPDATE menu auto-close (`DungeonQuests.lua:475-477`, `:611-619`) are still open.
+- Stale report bookkeeping, no behaviour impact:
+  - settings-extra-tools-overflow: replaced by the v0.4.16 scroll redesign.
+  - zone-levels-opt-in: the toggle is now in the Map tab (`Settings.lua:176`).
+  - Shipped although the reports still say local: recruitment (7c3cc2c, v0.4.16), profession layout (cb45f17, v0.4.20), vendor-map (v0.4.19).
+  - journal-black-page: committed in f1b34e9.
+- Test gaps found:
+  - No committed test for: `/qs plan next`, the distant same-creature no-merge case, explicit-nil or numeric-string Questie levels, the city guard, SPF together with alternatives, mixed-creature camps, a click during quest-improve, Classic-size suggestion latency, or quest-improve contention.
+  - Planner UI tests run in modern style only.
+
 ## 2026-11-17 — Quest planner: "where" and "which" are different questions
 - QuestieDB spawn lists hold every individual spawn; common mobs have lone spawns across the whole zone. Any "nearest spawn to the player" choice therefore lands at the player's feet and follows them (3 s movement re-plan). Choose among camps (grouped spawns), never single spawns.
 - "Has a point on this map" is not "belongs to this map". Membership comes from Questie `zoneOrSort` (positive = zone area, negative = class/profession/event category). Location rules only decide whether the work can be done here.
@@ -437,3 +477,4 @@
 - First version replayed every candidate from action 1 and restarted the scan after each improvement: 250k steps bought only 1-4 moves. Counting real steps (with pruning), checkpoints every 8 actions and a cyclic scan made 20 quests converge within budget.
 - Planner shared-kill e2e fixture: drop from two mobs + kill quest on one of them went from 30 expected kills (separate camps) to 20.09 (shared joint expectation).
 - 2026-11-17: Client API differs by widget: `EditBox:SetFont` requires `flags` (Nilable=false), `FontString:SetFont` does not (Blizzard_APIDocumentationGenerated, classic_era + live). Always pass `""`. Harness frames previously lacked `SetFont`, so `if x.SetFont` guards silently skipped the call in tests; harness now enforces the signature by `CreateFrame` kind. Lesson: a `if obj.Method then` guard + a mock without that method = untested native path.
+- 2026-11-17: Button textures set with SetNormalTexture/SetPushedTexture are shown again by the client on state changes, so `b.bg:Hide()` does not stick; draw button art as plain textures and swap pushed art in OnMouseDown/OnMouseUp. Harness fills (SetColorTexture) are no-ops, so check opacity by wrapping `NS.style.fill` in tests (see tests/test_classic_style.py).

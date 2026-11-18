@@ -1,0 +1,59 @@
+flowchart LR
+  %% Tune the planner algorithm and give the quest guide its own settings tab · 8 agents: 4 × bpmn:worker, 4 × bpmn:reviewer · up to 14 with loop rounds
+  subgraph n_lane_builder["🤖 Builder · bpmn:worker"]
+    n_start(("Tuning approved"))
+    n_split{"+"}
+    n_build_opt["⚙ Fix stability, add horizon · ⏱ 35 min"]
+    n_fix_opt["⚙ Fix optimizer review issues · ⏱ 20 min"]
+    n_build_plan["⚙ Calibrate, yards, guide API · ⏱ 55 min"]
+    n_fix_plan["⚙ Fix calibration review issues · ⏱ 20 min"]
+    n_build_g["⚙ Build quest guide tab · ⏱ 35 min"]
+    n_fix_g["⚙ Fix guide tab issues · ⏱ 20 min"]
+    n_integrate["⚙ Integrate and run suite · ⏱ 20 min"]
+    n_review_opt__merge{"✕"}
+    n_review_plan__merge{"✕"}
+    n_review_g__merge{"✕"}
+  end
+  subgraph n_lane_reviewer["🤖 Reviewer · bpmn:reviewer · ⏱ 15 min"]
+    n_review_opt["⚙ Review optimizer tuning"]
+    n_ok_opt{"Optimizer tuning approved?"}
+    n_review_plan["⚙ Review calibration and API"]
+    n_ok_plan{"Calibration approved?"}
+    n_review_g["⚙ Review quest guide tab"]
+    n_ok_g{"Guide tab approved?"}
+    n_join{"+"}
+    n_final_review["⚙ Review tuned planner · ⏱ 20 min"]
+    n_done((("Planner tuned")))
+  end
+  n_start --> n_split
+  n_split --> n_build_opt
+  n_build_opt --> n_review_opt__merge
+  n_review_opt --> n_ok_opt
+  n_ok_opt -- "approved or 2nd round" --> n_join
+  n_ok_opt -- "changes" --> n_fix_opt
+  n_fix_opt --> n_review_opt__merge
+  n_split --> n_build_plan
+  n_build_plan --> n_review_plan__merge
+  n_review_plan --> n_ok_plan
+  n_ok_plan -- "approved or 2nd round" --> n_join
+  n_ok_plan -- "changes" --> n_fix_plan
+  n_fix_plan --> n_review_plan__merge
+  n_join --> n_integrate
+  n_integrate --> n_final_review
+  n_final_review --> n_done
+  n_split --> n_build_g
+  n_build_g --> n_review_g__merge
+  n_review_g --> n_ok_g
+  n_ok_g -- "approved or 2nd round" --> n_join
+  n_ok_g -- "changes" --> n_fix_g
+  n_fix_g --> n_review_g__merge
+  n_review_opt__merge --> n_review_opt
+  n_review_plan__merge --> n_review_plan
+  n_review_g__merge --> n_review_g
+  classDef done fill:#e6f4ea,stroke:#1e8e3e,color:#0d3b1e
+  classDef running fill:#e8f0fe,stroke:#1a73e8,color:#0b2a5b
+  classDef ready fill:#fef7e0,stroke:#b06000,color:#4a3600
+  classDef failed fill:#fce8e6,stroke:#c5221f,color:#5f0d06
+  classDef cancelled fill:#f1f3f4,stroke:#80868b,color:#3c4043
+  class n_start,n_split,n_build_plan,n_build_g done
+  class n_build_opt failed

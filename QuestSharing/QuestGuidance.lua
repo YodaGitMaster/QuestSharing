@@ -97,15 +97,36 @@ local function project(p, map)
     if finite(x) and finite(y) and x >= 0 and x <= 1 and y >= 0 and y <= 1 then return x, y end
 end
 
+-- Native/addon map pins use levels hundreds above the canvas, and the map can re-level its canvas later:
+-- restate strata and levels on every draw and map show, touching only values that differ.
+local function setLevel(frame, level, strata)
+    if strata and call(frame.GetFrameStrata, frame) ~= strata then frame:SetFrameStrata(strata) end
+    if call(frame.GetFrameLevel, frame) ~= level then frame:SetFrameLevel(level) end
+end
+local function stack()
+    if not (layer and canvas) then return end
+    local strata = call(canvas.GetFrameStrata, canvas)
+    local level = math.min(9900, (call(canvas.GetFrameLevel, canvas) or 0) + 2000)
+    setLevel(layer, level, strata); setLevel(legend, level + 1, strata)
+    for _, pin in ipairs(markers) do setLevel(pin, level + (pin.selectedStop and 3 or 2), strata) end
+end
+local function inset(texture, pin, px)
+    texture:SetPoint("TOPLEFT", pin, "TOPLEFT", px, -px); texture:SetPoint("BOTTOMRIGHT", pin, "BOTTOMRIGHT", -px, px)
+    return texture
+end
 local function makeMarker()
     -- Avoid map pin pools/data providers and click scripts traversed by the client's secure gamepad cursor.
     local pin = CreateFrame("Frame", nil, layer)
-    pin:SetWidth(34); pin:SetHeight(22); pin:EnableMouse(true)
-    pin.bg = S.fill(pin, "BACKGROUND", 0.02, 0.025, 0.03, 1); pin.bg:SetAllPoints(pin)
-    pin.face = S.fill(pin, "BORDER", 0.31, 0.48, 0.59, 1)
-    pin.face:SetPoint("TOPLEFT", pin, "TOPLEFT", 1, -1); pin.face:SetPoint("BOTTOMRIGHT", pin, "BOTTOMRIGHT", -1, 1)
+    pin:SetWidth(32); pin:SetHeight(26); pin:EnableMouse(true)
+    -- Dark 1 px edge, 2 px bright border (colored per draw), dark solid face: readable on light and dark map art.
+    pin.bg = S.fill(pin, "BACKGROUND", 0, 0, 0, 1); pin.bg:SetAllPoints(pin)
+    pin.border = inset(S.fill(pin, "BORDER", 1, 1, 1, 1), pin, 1)
+    pin.face = inset(S.fill(pin, "ARTWORK", 1, 1, 1, 1), pin, 3)
     pin.text = pin:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     pin.text:SetAllPoints(pin)
+    -- FontString flags must never be nil; keep the template's (locale) font file, only larger and outlined.
+    pin.text:SetFont(call(pin.text.GetFont, pin.text) or STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
+    call(pin.text.SetShadowOffset, pin.text, 1, -1); call(pin.text.SetShadowColor, pin.text, 0, 0, 0, 1)
     pin:SetScript("OnEnter", function(self)
         hovered = self
         local details = { "Click to select; repeated clicks cycle stops at this location." }
@@ -167,21 +188,21 @@ drawMap = function()
     local width, height, scale = call(child.GetWidth, child), call(child.GetHeight, child), call(child.GetScale, child) or 1
     if not (finite(width) and finite(height) and width > 0 and height > 0 and finite(scale) and scale > 0) then hideMap(); return end
     if lastView and lastView.map == map and lastView.width == width and lastView.height == height
-        and lastView.scale == scale and lastView.revision == revision and canvas == child then return end
+        and lastView.scale == scale and lastView.revision == revision and canvas == child then stack(); return end
     if not layer then
         layer = CreateFrame("Frame", "QuestSharingRouteOverlay", UIParent)
         layer:EnableMouse(false)
         legend = CreateFrame("Frame", nil, layer)
         legend:SetWidth(246); legend:SetHeight(20); legend:EnableMouse(false)
-        S.fill(legend, "BACKGROUND", 0.035, 0.032, 0.027, 0.96):SetAllPoints(legend)
+        S.panel(legend)
         legend.text = legend:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         legend.text:SetAllPoints(legend)
         legend:SetPoint("BOTTOMLEFT", layer, "BOTTOMLEFT", 8, 8)
         legend.text:SetText("Quest stops · straight connections")
+        if wm.HookScript then pcall(wm.HookScript, wm, "OnShow", stack) end
     end
     if canvas ~= child then
         layer:SetParent(child); layer:SetAllPoints(child)
-        layer:SetFrameLevel((call(child.GetFrameLevel, child) or 0) + 10)
         canvas = child
     end
     layer:Show(); hovered, pressed = nil, nil
@@ -211,6 +232,33 @@ drawMap = function()
             group.steps[#group.steps + 1] = i
         end
     end
+    -- Markers are wider than the grouping cell (multi-number labels, 32 px minimum), so merge any two groups
+    -- whose drawn markers would overlap; one combined label stays readable where two overlapping ones do not.
+    local function footprint(steps)
+        local count = math.min(3, #steps)
+        local chars = count - 1 + (#steps > 3 and 1 or 0)
+        for j = 1, count do chars = chars + #tostring(steps[j]) end
+        return math.max(32, chars * 8 + 16) + 8 -- slack: the selected step may replace the third number
+    end
+    local merged = true
+    while merged do
+        merged = false
+        for a = 1, #groups - 1 do
+            local A = groups[a]
+            for b = a + 1, #groups do
+                local B = groups[b]
+                if math.abs(A.x - B.x) * width * scale < (footprint(A.steps) + footprint(B.steps)) / 2
+                    and math.abs(A.y - B.y) * height * scale < 28 then
+                    for _, step in ipairs(B.steps) do A.steps[#A.steps + 1] = step end
+                    table.sort(A.steps)
+                    table.remove(groups, b)
+                    merged = true
+                    break
+                end
+            end
+            if merged then break end
+        end
+    end
     local used = 0
     for i = 2, #route do
         local a, b = points[i - 1], points[i]
@@ -230,14 +278,18 @@ drawMap = function()
         local label = table.concat(labels, "/") .. (#group.steps > 3 and "+" or "")
         pin.steps, pin.selectedStop = group.steps, active and selected or nil
         pin.text:SetText((active and S.GOLD or S.WHITE) .. label .. "|r")
-        pin.face:SetVertexColor(active and 0.29 or 0.08, active and 0.19 or 0.22, active and 0.055 or 0.28, 1)
-        pin:SetWidth(math.max(26, #label * 6 + 10)); pin:ClearAllPoints(); pin:SetScale(1 / scale)
+        if active then
+            pin.border:SetVertexColor(1, 0.82, 0, 1); pin.face:SetVertexColor(0.17, 0.1, 0.02, 1)
+        else
+            pin.border:SetVertexColor(0.85, 0.85, 0.85, 1); pin.face:SetVertexColor(0.05, 0.06, 0.07, 1)
+        end
+        pin:SetWidth(math.max(32, #label * 8 + 16)); pin:ClearAllPoints(); pin:SetScale(1 / scale)
         local position = active and points[selected] or group
         pin:SetPoint("CENTER", layer, "TOPLEFT", position.x * width * scale, -position.y * height * scale)
-        pin:SetFrameLevel((call(layer.GetFrameLevel, layer) or 0) + (active and 2 or 1)); pin:Show()
+        pin:Show()
     end
     for i = #groups + 1, #markers do markers[i].steps = nil; markers[i]:Hide() end
-    legend:SetScale(1 / scale)
+    stack(); legend:SetScale(1 / scale)
     if #groups > 0 then legend:Show() else legend:Hide(); layer:Hide() end
     lastView = { map = map, width = width, height = height, scale = scale, revision = revision }
 end
@@ -290,7 +342,7 @@ function G.set(stops, index, anchor, onSelect, caption)
         hud.arrow:SetTexture("Interface\\Minimap\\MinimapArrow")
         hud.arrow:SetVertexColor(0.45, 1, 0.27, 1)
         hud.arrow:SetWidth(40); hud.arrow:SetHeight(40); hud.arrow:SetPoint("TOP", hud, "TOP", 0, 0)
-        hud.bg = S.fill(hud, "BACKGROUND", 0.035, 0.032, 0.027, 0.96)
+        hud.bg = S.fill(hud, "BACKGROUND", 0.055, 0.05, 0.045, 1)
         hud.bg:SetPoint("TOPLEFT", hud, "TOPLEFT", 0, -42); hud.bg:SetPoint("BOTTOMRIGHT", hud, "BOTTOMRIGHT", 0, 0)
         hud.title = hud:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         hud.title:SetPoint("TOPLEFT", hud, "TOPLEFT", 6, -45); hud.title:SetWidth(288); hud.title:SetWordWrap(true)

@@ -457,3 +457,97 @@
 
 ## 2026-11-17 — Client-accurate SetFont in test harness
 - `tests/harness.py` `CreateFrame` records the widget kind; `SetFont` errors for EditBox without flags (client Nilable=false), FontString flags optional. Chosen over a lenient mock so `if x.SetFont` guards cannot hide native-only failures. Addon code always passes `""` flags.
+
+## 2026-11-17 — Classic WoW menu look for all windows
+- User choice: Stone dialog (Esc menu / Interface Options) look, fully opaque on every window including on-screen HUDs. Rejected: parchment quest-log look, stone+parchment mix, keeping HUDs translucent.
+- Opacity guaranteed by a solid base fill under the stone tile (texture alpha unknown); backdrop draws only the edge (no bgFile).
+- Button art uses plain textures + OnMouseDown/Up instead of SetNormal/PushedTexture so callers hiding `b.bg` (planner text-only header buttons) stay hidden; avoided editing QuestPlanner.lua during concurrent work.
+- Journal reading panes keep parchment (`E.surface(frame,true)`); dim selection/hover washes (<=0.25 alpha) over opaque bases are kept.
+
+## D1 — 2026-11-17 — Camp hysteresis: 25 % and 20 s, and only walking costs may switch (fix-all run A2)
+- **Partly superseded by D5/D7 (decouple run r-20261117-234605-6ba9):** the 25 % / 20 s margin stays; `lockSites`, "only walking costs may switch", the walk-costed-only `siteMemory` rule and "without SPF preferredSites is nil (switch at 0.56)" are gone.
+- Choice: the optimizer gets `options.preferredSites[stop.key] = O.siteKey(point)`. `place()` keeps the held site unless another is cheaper by **both** `SWITCH_SHARE=0.25` of the held visit cost **and** `SWITCH_SECONDS=20` (`QuestOptimizer.lua` ~:236).
+- With SPF available, `options.lockSites` keeps every reachable remembered site in the straight-line `solve(0)`. Only the walking-costed solve may switch, and then only past the margin.
+- The planner writes `siteMemory={map,sites}` only from a walking-costed solve, or from any solve when SPF is absent or cannot estimate. It resets per map.
+- Why: re-plans every 3 s change first-leg costs a little, and the straight-line and SPF costs differ. Without memory the step flipped A→B→A. Requiring both margins blocks flips on small and large visits alike. About a quarter of the visit cost still switches to a clearly better camp.
+- Without SPF: `preferredSites`/`lockSites` are nil, so the old nearest-camp timeline is unchanged (switch at POS 0.56).
+- A failed `EstimateWalks`, or an SPF without it, lifts the lock: the plan behaves as without SPF, and the margin still guards remembered camps.
+- Busy camps (A5) beat stickiness: `avoidBusyCamps` runs before the optimizer.
+- Not chosen (audit fix options): keeping the previous `firstLeg` costs across re-plans; offering alternatives only once SPF costs exist for all of them. The plan noted the risk that too much stickiness keeps a worse camp, which is why the margin is a documented constant.
+
+## D2 — 2026-11-17 — Local search runs again only when its inputs change (fix-all run A4)
+- **Partly superseded by D5/D6 (decouple run):** the `refinedPlan` gate and `YIELD_STEPS=32` stay. The `quest-costs` path and "recorded only after a walking-costed refine" are gone; "pausing quest-improve while another job is queued" (rejected below) is now done as DataWork idle priority (D6).
+- Choice: `refinedPlan` stores the inputs of the last completed `quest-improve`: map, joined stop keys, and goal (mode, budget, `P.levelScope`, selected IDs, busy camp keys), plus origin.
+- `refineNeeded` is true when there is no prior order (`#preferredIDs==0`), when any input differs, or when the player moved >= `REFINE_MOVE=0.1` map units. Otherwise `solve(0)` reuses the refined order through `preferredIDs`.
+- With SPF, `refinedPlan` is recorded only after a walking-costed refine.
+- quest-costs now runs `solve(0)` with walking costs, renders, then `refine("quest-improve")`. Before, it ran the full 250k-step local search before rendering.
+- `evaluate()` yields every `YIELD_STEPS=32` simulated actions, so no optimizer resume replays a whole route inside one slice. The test bound is <= 64.
+- Why: DataWork gives each job one resume per turn whatever that resume costs. Long improve resumes (2.4-3.9 ms) slowed vendor search to 5-9 % of its solo speed, and the 3 s movement re-plan restarted the 0.7 s-CPU search all the time.
+- Not chosen (audit options): per-job time accounting in `DataWork.pump` (the plan keeps `DataWork.lua` untouched; fixes stay in callers); pausing quest-improve while a foreground or map job is queued.
+- Accepted trade-off (from the plan): fewer refinements while moving; the route stays stable through `preferredIDs`.
+
+## D3 — 2026-11-17 — Map search: persistent `vendor-index` job, separate from per-query `vendor-search` (fix-all run B1-B3)
+- Choice: a `vendor-index` job (roles, then items once a query needs them) starts on the first typed character. Keystrokes never cancel it; only `resetIndex()` does (disable or provider loss).
+  - Its valid() needs `indexToken`, the map shown and a non-empty query, so it pauses when the map is hidden or the box is emptied.
+  - Budget is `FOREGROUND_MS=8` only after typing (`typed=true`). A programmatic `V.search` with no typing keeps the shared 2 ms slice.
+- `vendor-search` (per query) only matches the in-memory index and hydrates candidates.
+  - Decoded spawns persist in `cached` across keystrokes, bounded at `SPAWN_CACHE=2000` NPCs plus the current matches; past the bound, `dropSpawns(candidates)` keeps only the current query's.
+  - The cache clears on a map change, on Clear and through `resetIndex`.
+- Suggestions refresh at the first local match, then each time the local count doubles. Earlier suggestions stay visible while the user refines the text.
+- Why: suggestions used to wait for the whole catalogue job, and every keystroke threw it away (about 3-8 s at Classic size). Indexing on map open would break the no-preload guarantee from the 2026-11-17 lightweight-database decision.
+- Rejected: building the index on map open (preload); changing `DataWork.lua` or `Questie.lua` (the existing per-job budget argument was enough).
+
+## D4 — 2026-11-17 — Dungeon quests: a kept-open menu follows its quest, not the log index (fix-all run C1)
+- Choice: quest-log events call `D.refresh(true)`. It considers only our own open menu (`menu.entry==menuEntry`).
+  - It closes the menu when its quest left the results, or when its log membership changed (`(live==nil)~=(menuEntry.catalogue==true)`).
+  - Otherwise it copies `index/complete/title` from `C.findEntry` into the same `menuEntry` table, so `menu.entry==menuEntry` stays true and the item callbacks act on the current classic log index.
+- `D.refresh()` with no argument (filters, search, buttons) still closes the menu.
+- Why: on classic a quest-log index shifts when quests above it are added or removed. A kept menu would then act on another quest; review round 1 caught "Offer it to the party" pushing [200] instead of [2].
+- Accepted limits: the shared menu is read through `ns._questMenu()`, a test accessor in `Menu.lua` (guarded; Menu.lua was out of scope). A kept menu keeps the item list it was built with.
+- Superseded within the run: the first C1 patch only checked that the quest was still in the results. Round-1 review rejected it because of the stale classic index.
+- Update (decouple run r-20261117-234605-6ba9): `Menu.lua` now has the proper accessor `ns.questMenuEntry()` (open menu's entry or nil); `DungeonQuests.lua` compares `ns.questMenuEntry()==menuEntry`. `ns._questMenu()` stays for the tests only.
+
+## D5 — 2026-11-17 — SPF only draws the Follow arrow; it never feeds camp choice or route cost (decouple run r-20261117-234605-6ba9)
+- Choice: `planOptions()` uses straight-line `travelSeconds` only (map world size / run speed). `QuestPlannerPath.lua` keeps `Path.available()` and `Path.follow()` (→ SPF `Navigate`); `EstimateWalks`, `firstLeg`, `walkCosted`, `options.lockSites` and the `quest-costs` job are removed. Every route is `solve(0)` → render, then optional idle `quest-improve`.
+- Camp stickiness (`preferredSites` from `siteMemory`, 25 % / 20 s margin of D1) now applies with or without SPF.
+- Why: two cost sources (straight line now, SPF walk later, async) for one decision made the camp depend on SPF presence and answer timing, needed a lock, and doubled solves per re-plan. One source makes the guide identical with or without SPF (tested across all SPF builds, `SPF_ESTIMATES == 0`).
+- Brief conflict resolved: "stickiness without SPF" and "keep the no-SPF switch at POS 0.56" cannot both hold (measured: at 0.56 camp B is only about 10 s cheaper). Stickiness won. New `TWO_CAMPS` timeline for 0.50→0.53→0.56→0.65→0.56→0.53→0.44→0.53: A,A,A,B,B,B,A,A.
+- Abandoned: the fix-all A2 design (lock remembered camps until walking costs arrive; only the walk-costed solve may switch); pairwise or first-leg SPF costs (gap 5 stays undone, now on purpose).
+- Accepted trade-off: the plan ignores terrain (cliffs, water, caves). Follow with SPF still walks the real path to the selected step.
+
+## D6 — 2026-11-17 — DataWork `"idle"` priority for the background local search (decouple run)
+- Choice: `W.start(owner, run, valid, finished, budget, priority)`; `priority == "idle"` sets `job.idle`. In `pump()`, an idle job inside its slice is set aside (`waiting`) whenever `canRun(queue)` or `canRun(deferred)` finds a non-idle job that is current, not paused and `valid()`. If the others finish or pause mid-slice, waiting idle jobs get the rest of that slice. Idle jobs keep their order and the same budget, combat, cancel, pause, resume and busy rules. `requeue()` skips jobs paused while waiting.
+- Only `quest-improve` (`QuestPlanner.lua` `refine()`) passes `"idle"`. With `priority` nil nothing changes (no `canRun` call).
+- Why: DataWork gives each job one resume per turn; a 0.7 s-CPU refine shared the 2 ms slice with map search and the dungeon scan. Measured guard: a never-ending idle job leaves a normal job >= 90 % of its solo pace (`test_idle_job_that_never_ends_leaves_a_normal_job_at_least_90_percent_of_its_pace`).
+- Requirement on callers: `canRun` calls other jobs' `valid()` without pausing them, so `valid()` should stay side-effect free.
+- Still not done (D2): per-job time accounting in `pump`.
+
+## D7 — 2026-11-17 — Camp memory skips stops whose camp "Camp busy" forced (decouple run)
+- Choice: `avoidBusyCamps(stop, now)` also returns `narrowed` (any of the stop's camps was busy). `planOptions` collects those stop keys in `forced`; `solve()` writes `siteMemory.sites[stop.key]` only for objective stops not in `forced`. "Clear camp wait" resets `waitingAt` and `siteMemory`.
+- Why: with memory always on (D5), recording the camp a busy mark forced would keep the player there after the 5-minute wait. Skipping it brings back the camp chosen before the mark; clearing lets the guide choose afresh from the player's position.
+- Tests: `test_camp_chosen_before_a_busy_mark_returns_when_the_wait_ends`, `test_clear_camp_wait_chooses_the_camp_afresh_from_where_you_stand`, `test_busy_default_camp_gives_way_to_a_free_alternative` (each with and without SPF builds).
+
+## D8 — 2026-11-17 — Map step numbers: overlay at canvas+2000, restated on every draw and map show (decouple run, stream D3)
+- Choice: `QuestGuidance.lua` `stack()` sets overlay `QuestSharingRouteOverlay` = `min(9900, canvasLevel+2000)`, legend +1, markers +2 (selected +3), all in the canvas strata, writing only values that differ. Runs on every `drawMap` (also the cached path) and on `WorldMapFrame` OnShow (`pcall(HookScript)`, installed once at overlay creation).
+- Why: native/addon pins sit hundreds of levels above the canvas and the client can re-level the canvas later; a level set once at creation (old child+10) ended up under them. Compare-before-write keeps the 4 Hz stationary redraw free of level calls. 9900 clamps below the client's frame-level ceiling.
+- Still avoided: a map pin data provider/pool (kept out for secure gamepad paths, see "Selected-step arrow and route positioning"). The OnShow hook is installed lazily, so login cost stays zero.
+- Open risk (review_d3, non-blocking): the overlay may now cover the player arrow or map overlay buttons in the same strata; pins grew to min 32x26 but the 26x22 grouping cell did not. Bug report: `BUGS/2026-11-17-guidance-map-numbers-hidden.md`.
+
+## 2026-11-18 — Tuning run stopped; trade-off choices (user)
+- Stability margin capped: keep the previous route unless the new one saves >= max(12 s, min(5 %, 60 s)) or hands in more quests. Why: uncapped 5 % meant 90-180 s on long plans and discarded real improvements.
+- Whole-route polish up to 40 actions, 12-action horizon beyond. Why: removing the beam made a 36-action zone 7 % slower (= nearest-first); whole-route local search at that size costs well under 1 s CPU.
+- User chose to stop after the failed run: E-plan (calibration, yards, planner API) deferred. The Quest guide tab ships only when the planner API (`applySettings`, `markCampBusy`, `clearCampWaits`, `showReport`, options -> tab) exists — do not release it half-wired without telling the user.
+- Lesson: three builders running the full suite in parallel on this machine blew 35-55 min limits; next time run builders serially or give 90 min limits and have builders run only their own suites.
+
+## 2026-11-18 — Settings window redone in classic gold (user request)
+- User: "entire setting re-done for clarity, colour classic yellow WoW style". Scope = Settings.lua window only (plus the quick chat editor inside it); other windows and `Style.lua` unchanged.
+- Palette (locals in Settings.lua): titles/labels/headings `S.GOLD` (ffd100), values `S.WHITE`, help `HELP` e6e6e6, notes `NOTE` b5a888 (parchment), unpicked choices `DIM` c8c8c8, greyed `S.GREY`. No blue (`S.BLUE`, 55ccff, 88ccff, bbc2cf, d0d5df, 9daabd removed from Settings.lua).
+- Layout: sidebar = dark well with 5 gold group captions taken from the `group` field on the first tab of each group (tab order and ids unchanged, so no saved-variable or deep-link change). Tab step 28 px (was 40). Open tab = gold text + gold wash (`tab.bg`) + 3 px gold bar; others white. Settings area = dark well (`W.well`) behind the scroll frame. Cards keep the opaque brown plate and get a gold edge (`r.cardEdges`, toggled by `showCard`).
+- Chose to keep the "[x] / [ ]" markers and green On / grey Off: they carry state, tests pin them, and the game uses green for enabled.
+- Tests updated only where they pinned the old look: open/other tab colour (test_settings), tab spacing 40->28 (test_look), editor channel tag colour (test_quick), raw label compare now strips colour codes (test_items).
+
+## 2026-11-18 — Quest guide tab finished; v0.4.22 (user)
+- User chose "finish the tab" over hiding it. Settings are the single source of truth for goal/minutes/IDs/scope: `readSettings()` runs when the guide opens and in `applySettings()`; `/qs plan xp|budget|selected|range` write the saved keys (`saveGoal`) so command and tab never disagree.
+- Chosen-quests goal with no IDs keeps the previous goal and prints a hint (no empty plan).
+- Pace: median of last 40 samples, >= 5 needed, clamped (kill 4-40 s, talk 1-15 s); kill sample = gap between two rises of the same objective (1-90 s; a rise of n = n samples of gap/n); talk sample = QUEST_DETAIL/QUEST_COMPLETE to QUEST_ACCEPTED/QUEST_TURNED_IN (<= 60 s). Chosen over the planned yard-proximity timer: no position polling, no timers. Auto-accept gives ~0 s samples (clamped to 1 s).
+- E4 (camp radius in yards) stays deferred; not needed by the tab.

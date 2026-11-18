@@ -90,7 +90,7 @@ local function viewFor(canvas,scroll)
     v.panel=CreateFrame("Frame",nil,scroll)
     v.panel:SetWidth(290);v.panel:SetHeight(48);v.panel:SetPoint("TOPLEFT",scroll,"TOPLEFT",12,-12)
     v.panel:EnableMouse(false)
-    S.fill(v.panel,"BACKGROUND",0.025,0.04,0.065,0.88):SetAllPoints(v.panel)
+    S.panel(v.panel)
     v.heading=U.text(v.panel,S.GOLD.."Questing levels|r",8,6,274)
     v.text=U.text(v.panel,"",8,25,274);v.text:SetWordWrap(false)
     views[canvas]=v;return v
@@ -128,7 +128,7 @@ local function labelFor(v,i)
     if v.labels[i] then return v.labels[i] end
     local p=CreateFrame("Frame",nil,v.canvas)
     p:SetWidth(72);p:SetHeight(19);p:EnableMouse(false)
-    S.fill(p,"BACKGROUND",0.025,0.04,0.065,0.8):SetAllPoints(p)
+    S.inset(p)
     p.text=U.text(p,"",2,3,68);p.text:SetJustifyH("CENTER");p.text:SetWordWrap(false)
     v.labels[i]=p;return p
 end

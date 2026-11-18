@@ -460,7 +460,7 @@ def test_the_editor_shows_and_sets_the_channel_of_the_selected_message(style):
     g.eval("function(f) f.scripts.OnMouseUp(f, 'LeftButton') end")(party.frame)       # one click on "/p Party"
     assert g.eval("NS.db.quickItems[3].channel") == "party"
     assert party.text.text.startswith("|cffffd100[/p Party") and "/p the party only" in ed.routeText.text
-    assert ed.lines[3].text.text.endswith("|cff88ccff/p|r|r"), "the list shows each message's channel"
+    assert ed.lines[3].text.text.endswith("|cff9d9d9d/p|r|r"), "the list shows each message's channel"
     g.eval("NS.editorRoute")()                                   # no argument: the next one
     assert g.eval("NS.db.quickItems[3].channel") == "whisper"
     g.eval("NS.editorRoute")()
@@ -821,7 +821,7 @@ def test_the_editor_lives_in_the_quick_chat_tab(style):
     W = g.eval("NS._settingsWindow()")
     ed = W.ed
     assert W.win.shown is True and W.tab == "quick" and ed.frame.shown is True
-    assert ed.lines[1].text.text == "|cffffffff1.  [Hello]  Hey {name}! o/  |cff88ccff/w or /s|r|r" and ed.lines[8].frame.shown is True
+    assert ed.lines[1].text.text == "|cffffffff1.  [Hello]  Hey {name}! o/  |cff9d9d9d/w or /s|r|r" and ed.lines[8].frame.shown is True
     g.eval("function(l) l.frame.scripts.OnMouseUp(l.frame, 'LeftButton') end")(ed.lines[3])
     assert ed.labelBox.text == "What I need" and ed.textBox.text == "I need to: {need}" and ed.lines[3].text.text.startswith("|cffffd100")
     assert "Looks like:" in ed.preview.text and "Wolf slain 3/8" in ed.preview.text

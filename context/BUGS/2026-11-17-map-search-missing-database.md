@@ -1,6 +1,6 @@
 # 2026-11-17 — Map search hides missing database
 
-**Status**: solved (dependency feedback and late-provider mechanism; user's live cause unverified)
+**Status**: solved in source (2026-11-17, run r-20261117-215940-e171: the "no suggestions while typing" regression is fixed; uncommitted/unreleased); native WoW validation pending. The user's live empty-result cause is still unverified (no `/qs questie` report yet).
 **Severity**: medium
 **Tags**: VendorMap.lua Questie.lua QuestieDB missing database empty search no known seller late provider canEnumerate
 
@@ -61,3 +61,34 @@
 - Evidence: `/tmp/qs-repro/repro_suggest.py`, `repro_vendor.py` with Classic Era counts (10,122 NPCs / 14,899 items per QuestieDB read-performance.md) and `debugprofilestop` advanced 4 µs/scalar and 10 µs/table read. First suggestion after typing stops: `gen` 2.5 s, `linen` 9 s, cold `vendor` 12 s (23 s at 2× cost). Warm `gene` 0.5 s. Status shows only "Searching vendor data in small batches…" meanwhile. Test suites never see this because the harness has no `debugprofilestop` (80 steps/pump, no time budget) and uses ≤600 NPCs.
 - Trap category: scope/lifecycle (UI feedback depends on whole-catalogue background job) + stale/cleared cache per keystroke.
 - Result / new status: open. Delay mechanism reproduced; user's live "never" vs "slow" not confirmed. No code changed; fix plan proposed (warm index on visible map, suggestions from in-memory index, keep last suggestions + progress text, larger slice only while map open/out of combat, budgeted Classic-size test).
+
+---
+## Addendum 2026-11-17 — audit
+- Source: BPMN run r-20261117-212533-cf04 (check_g5 + refute_g5). Verdict **open**; the refuter agreed. VendorMap.lua last changed in cb45f17 (v0.4.20), so v0.4.21 and HEAD f9bb992 behave the same.
+- Still fixed: `Q.canEnumerate` (`Questie.lua:374-378`), the missing/outdated QuestieDB messages (`VendorMap.lua:626-635`) and the reset on provider loss (`:186-194`). test_vendor_map.py passes 88/88 on modern and classic.
+- Still broken, unchanged mechanism: OnTextChanged (`VendorMap.lua:551-562`) cancels vendor-search, sets `resolved=nil` through clearLocations (`:181`) and hides the box (`:559`). After the 0.18 s debounce, V.draw calls startSearch (`:647-650`). startSearch (`:317-338`) indexes every NPC with one yield each (`:138-150`), every item for seller and item queries (`:152-177`) and the spawns of every candidate (`:330-334`). Only then does it set `resolved` and call refreshSuggestions, which returns early while `resolved==nil` (`:456`). `Work.start('vendor-search')` passes no budget (`:321`), so it stays on the 2 ms / 80-step slice (`DataWork.lua:5`, `:44-67`).
+- Measured delay from the last keystroke to the first suggestion, at Classic size, typing 10 keys/s, with a 2 ms clock charging 4 µs per scalar read and 10 µs per table read:
+  - Checker `/tmp/bugaudit-g5/repro_suggest_delay.py` (10,122 NPCs, 14,899 items): gene 2.9 s, linen 7.7 s, vendor 7.9 s, warm gener 0.8 s. With no clock (80 steps per pump): 20.3, 50.3, 54.0 and 7.7 s.
+  - Refuter `/tmp/bugaudit-refute-g5/suggest_latency.py` (10,000 NPCs, 15,000 items): gene 2.5 s, linen 5.7 s, warm 0.7 s. With no clock: 16.0, 36.6 and 11.0 s.
+  - In both runs the panel shows 0 rows and "Searching vendor data in small batches…" one second after typing, on both styles.
+- Test gap: `test_typing_during_batched_loading_refreshes_pins_and_suggestions` passes but allows 20 s for 600 NPCs, so it cannot catch this. The budgeted Classic-size latency test is still missing.
+- New aggravation from unreleased f1b34e9: the planner's background `quest-improve` job (`QuestPlanner.lua:922-935`, IMPROVE_STEPS 250000) shares the DataWork queue. DataWork gives each job one resume per turn whatever that resume costs (`DataWork.lua:62-86`), and improve resumes reach 2.4-3.9 ms. In a real-clock probe the vendor search ran at 5-9% of its solo speed while the guide refined (`/tmp/bugaudit-refute-g6/probes/contention.py`).
+- Result / new status: open. The proposed fix from the previous addendum is not implemented and still awaits user approval.
+
+---
+## Addendum 2026-11-17 — typing latency fixed in source (fix-all run)
+- What happened: BPMN run r-20261117-215940-e171 carried out stream B (B1–B4) of `context/fix-plan-2026-11-17.md`. The user approved the plan. A builder made the change, and the reviewer approved it in round 1. Only `QuestSharing/VendorMap.lua` and `tests/test_vendor_map.py` changed.
+- Why the previous state failed: UI feedback waited for a whole-catalogue background job, and every keystroke threw that job away.
+- New approach + methodology:
+  1. Split long-lived work from per-query work. A persistent `vendor-index` job (`startIndex`) indexes roles, and items when a query needs them.
+     - It starts on the first typed character, from OnTextChanged. Nothing is read on login or a blank map; the no-preload guarantee holds.
+     - Keystrokes never cancel it. Only `resetIndex()` does (disable or provider loss).
+     - Its valid() needs `indexToken`, the map shown and a non-empty query, and `V.draw` pauses it while the map is hidden.
+     - Budget is `FOREGROUND_MS=8` once the user typed. DataWork already pauses all jobs in combat.
+  2. `vendor-search` now only matches and hydrates. Decoded spawns stay in `cached` across keystrokes, bounded at `SPAWN_CACHE=2000` NPCs plus the current query's matches. The cache clears on a map change, on Clear and through `resetIndex`.
+  3. Suggestions are incremental. `hydrate()` refreshes suggestions at the first local match and each time the local count doubles. `keepMatching` keeps earlier suggestions that still match while the user types. The status shows `Indexing N / M NPCs…`, `… items…` and `Finding locations: N / M matches…`.
+  4. Budgeted Classic-size tests use a mock clock, which closes the old harness gap (no `debugprofilestop`, 600 NPCs). They are `test_classic_size_suggestions_arrive_quickly_while_typing` and `test_classic_size_item_query_indexes_items_once_and_suggests_local_items`.
+- Result per CHANGELOG `## Unreleased`: the first suggestion arrives about 0.3 s after typing stops (was about 3 s); item queries take about 1.4 s (was about 8 s). This is harness timing, not native.
+- Related: stream A4 (optimizer yields every 32 simulated actions; quest-improve no longer restarts on small moves) removes most of the quest-improve contention noted in the audit addendum.
+- If it shows up again: check that OnTextChanged does not call `Work.cancel("vendor-index")`. Check that `clearResults()` (per query) is used, not `clearLocations()`/`dropSpawns(nil)`. Check that the index job gets the 8 ms budget (`typed=true`).
+- Result / new status: solved in source (uncommitted, unreleased). Native check pending: type in the map search in Stormwind. The user's separate live empty-result report still needs `/qs questie` output.

@@ -1,0 +1,1045 @@
+{
+  "id": "bug-audit",
+  "name": "Re-check every context/BUGS report against the current tree, with an independent refuter per group",
+  "runTimeout": 75,
+  "context": {
+    "prompt": "Record the bug audit in context/state.md (one dated line: counts per verdict, which reports regressed/open) and context/insights.md (dated entry: method + key findings). For every report whose FINAL verdict is regressed or open (checker verdict, overridden by the refuter's corrected_verdict when agree=false), append a dated '## Addendum 2026-11-17 — audit' to that context/BUGS report with the evidence and update its Status line; never rewrite earlier sections. Do not touch reports whose verdict holds."
+  },
+  "lanes": [
+    {
+      "id": "checker",
+      "name": "Checker",
+      "agent": "bpmn:reviewer",
+      "timeout": 25
+    },
+    {
+      "id": "refuter",
+      "name": "Refuter",
+      "agent": "bpmn:reviewer",
+      "timeout": 20
+    }
+  ],
+  "data": {
+    "checks_g1": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "reports"
+        ],
+        "properties": {
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "bug_file",
+                "verdict",
+                "fix_present",
+                "fix_evidence",
+                "tests",
+                "recent_change_impact",
+                "native_pending",
+                "gaps",
+                "summary"
+              ],
+              "properties": {
+                "bug_file": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "enum": [
+                    "holds",
+                    "regressed",
+                    "open",
+                    "partially_fixed",
+                    "not_a_bug",
+                    "unverifiable"
+                  ]
+                },
+                "fix_present": {
+                  "type": "boolean"
+                },
+                "fix_evidence": {
+                  "type": "string"
+                },
+                "tests": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "file",
+                      "test",
+                      "result"
+                    ],
+                    "properties": {
+                      "file": {
+                        "type": "string"
+                      },
+                      "test": {
+                        "type": "string"
+                      },
+                      "result": {
+                        "enum": [
+                          "pass",
+                          "fail",
+                          "not_run",
+                          "missing"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "recent_change_impact": {
+                  "type": "string"
+                },
+                "native_pending": {
+                  "type": "boolean"
+                },
+                "gaps": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "checks_g2": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "reports"
+        ],
+        "properties": {
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "bug_file",
+                "verdict",
+                "fix_present",
+                "fix_evidence",
+                "tests",
+                "recent_change_impact",
+                "native_pending",
+                "gaps",
+                "summary"
+              ],
+              "properties": {
+                "bug_file": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "enum": [
+                    "holds",
+                    "regressed",
+                    "open",
+                    "partially_fixed",
+                    "not_a_bug",
+                    "unverifiable"
+                  ]
+                },
+                "fix_present": {
+                  "type": "boolean"
+                },
+                "fix_evidence": {
+                  "type": "string"
+                },
+                "tests": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "file",
+                      "test",
+                      "result"
+                    ],
+                    "properties": {
+                      "file": {
+                        "type": "string"
+                      },
+                      "test": {
+                        "type": "string"
+                      },
+                      "result": {
+                        "enum": [
+                          "pass",
+                          "fail",
+                          "not_run",
+                          "missing"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "recent_change_impact": {
+                  "type": "string"
+                },
+                "native_pending": {
+                  "type": "boolean"
+                },
+                "gaps": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "checks_g3": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "reports"
+        ],
+        "properties": {
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "bug_file",
+                "verdict",
+                "fix_present",
+                "fix_evidence",
+                "tests",
+                "recent_change_impact",
+                "native_pending",
+                "gaps",
+                "summary"
+              ],
+              "properties": {
+                "bug_file": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "enum": [
+                    "holds",
+                    "regressed",
+                    "open",
+                    "partially_fixed",
+                    "not_a_bug",
+                    "unverifiable"
+                  ]
+                },
+                "fix_present": {
+                  "type": "boolean"
+                },
+                "fix_evidence": {
+                  "type": "string"
+                },
+                "tests": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "file",
+                      "test",
+                      "result"
+                    ],
+                    "properties": {
+                      "file": {
+                        "type": "string"
+                      },
+                      "test": {
+                        "type": "string"
+                      },
+                      "result": {
+                        "enum": [
+                          "pass",
+                          "fail",
+                          "not_run",
+                          "missing"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "recent_change_impact": {
+                  "type": "string"
+                },
+                "native_pending": {
+                  "type": "boolean"
+                },
+                "gaps": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "checks_g4": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "reports"
+        ],
+        "properties": {
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "bug_file",
+                "verdict",
+                "fix_present",
+                "fix_evidence",
+                "tests",
+                "recent_change_impact",
+                "native_pending",
+                "gaps",
+                "summary"
+              ],
+              "properties": {
+                "bug_file": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "enum": [
+                    "holds",
+                    "regressed",
+                    "open",
+                    "partially_fixed",
+                    "not_a_bug",
+                    "unverifiable"
+                  ]
+                },
+                "fix_present": {
+                  "type": "boolean"
+                },
+                "fix_evidence": {
+                  "type": "string"
+                },
+                "tests": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "file",
+                      "test",
+                      "result"
+                    ],
+                    "properties": {
+                      "file": {
+                        "type": "string"
+                      },
+                      "test": {
+                        "type": "string"
+                      },
+                      "result": {
+                        "enum": [
+                          "pass",
+                          "fail",
+                          "not_run",
+                          "missing"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "recent_change_impact": {
+                  "type": "string"
+                },
+                "native_pending": {
+                  "type": "boolean"
+                },
+                "gaps": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "checks_g5": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "reports"
+        ],
+        "properties": {
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "bug_file",
+                "verdict",
+                "fix_present",
+                "fix_evidence",
+                "tests",
+                "recent_change_impact",
+                "native_pending",
+                "gaps",
+                "summary"
+              ],
+              "properties": {
+                "bug_file": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "enum": [
+                    "holds",
+                    "regressed",
+                    "open",
+                    "partially_fixed",
+                    "not_a_bug",
+                    "unverifiable"
+                  ]
+                },
+                "fix_present": {
+                  "type": "boolean"
+                },
+                "fix_evidence": {
+                  "type": "string"
+                },
+                "tests": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "file",
+                      "test",
+                      "result"
+                    ],
+                    "properties": {
+                      "file": {
+                        "type": "string"
+                      },
+                      "test": {
+                        "type": "string"
+                      },
+                      "result": {
+                        "enum": [
+                          "pass",
+                          "fail",
+                          "not_run",
+                          "missing"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "recent_change_impact": {
+                  "type": "string"
+                },
+                "native_pending": {
+                  "type": "boolean"
+                },
+                "gaps": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "checks_g6": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "reports"
+        ],
+        "properties": {
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "bug_file",
+                "verdict",
+                "fix_present",
+                "fix_evidence",
+                "tests",
+                "recent_change_impact",
+                "native_pending",
+                "gaps",
+                "summary"
+              ],
+              "properties": {
+                "bug_file": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "enum": [
+                    "holds",
+                    "regressed",
+                    "open",
+                    "partially_fixed",
+                    "not_a_bug",
+                    "unverifiable"
+                  ]
+                },
+                "fix_present": {
+                  "type": "boolean"
+                },
+                "fix_evidence": {
+                  "type": "string"
+                },
+                "tests": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "file",
+                      "test",
+                      "result"
+                    ],
+                    "properties": {
+                      "file": {
+                        "type": "string"
+                      },
+                      "test": {
+                        "type": "string"
+                      },
+                      "result": {
+                        "enum": [
+                          "pass",
+                          "fail",
+                          "not_run",
+                          "missing"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "recent_change_impact": {
+                  "type": "string"
+                },
+                "native_pending": {
+                  "type": "boolean"
+                },
+                "gaps": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "reviews_g1": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "reviews"
+        ],
+        "properties": {
+          "reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "bug_file",
+                "agree",
+                "corrected_verdict",
+                "reasoning",
+                "evidence"
+              ],
+              "properties": {
+                "bug_file": {
+                  "type": "string"
+                },
+                "agree": {
+                  "type": "boolean"
+                },
+                "corrected_verdict": {
+                  "enum": [
+                    "holds",
+                    "regressed",
+                    "open",
+                    "partially_fixed",
+                    "not_a_bug",
+                    "unverifiable"
+                  ]
+                },
+                "reasoning": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "reviews_g2": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "reviews"
+        ],
+        "properties": {
+          "reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "bug_file",
+                "agree",
+                "corrected_verdict",
+                "reasoning",
+                "evidence"
+              ],
+              "properties": {
+                "bug_file": {
+                  "type": "string"
+                },
+                "agree": {
+                  "type": "boolean"
+                },
+                "corrected_verdict": {
+                  "enum": [
+                    "holds",
+                    "regressed",
+                    "open",
+                    "partially_fixed",
+                    "not_a_bug",
+                    "unverifiable"
+                  ]
+                },
+                "reasoning": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "reviews_g3": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "reviews"
+        ],
+        "properties": {
+          "reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "bug_file",
+                "agree",
+                "corrected_verdict",
+                "reasoning",
+                "evidence"
+              ],
+              "properties": {
+                "bug_file": {
+                  "type": "string"
+                },
+                "agree": {
+                  "type": "boolean"
+                },
+                "corrected_verdict": {
+                  "enum": [
+                    "holds",
+                    "regressed",
+                    "open",
+                    "partially_fixed",
+                    "not_a_bug",
+                    "unverifiable"
+                  ]
+                },
+                "reasoning": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "reviews_g4": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "reviews"
+        ],
+        "properties": {
+          "reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "bug_file",
+                "agree",
+                "corrected_verdict",
+                "reasoning",
+                "evidence"
+              ],
+              "properties": {
+                "bug_file": {
+                  "type": "string"
+                },
+                "agree": {
+                  "type": "boolean"
+                },
+                "corrected_verdict": {
+                  "enum": [
+                    "holds",
+                    "regressed",
+                    "open",
+                    "partially_fixed",
+                    "not_a_bug",
+                    "unverifiable"
+                  ]
+                },
+                "reasoning": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "reviews_g5": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "reviews"
+        ],
+        "properties": {
+          "reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "bug_file",
+                "agree",
+                "corrected_verdict",
+                "reasoning",
+                "evidence"
+              ],
+              "properties": {
+                "bug_file": {
+                  "type": "string"
+                },
+                "agree": {
+                  "type": "boolean"
+                },
+                "corrected_verdict": {
+                  "enum": [
+                    "holds",
+                    "regressed",
+                    "open",
+                    "partially_fixed",
+                    "not_a_bug",
+                    "unverifiable"
+                  ]
+                },
+                "reasoning": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "reviews_g6": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "reviews"
+        ],
+        "properties": {
+          "reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "bug_file",
+                "agree",
+                "corrected_verdict",
+                "reasoning",
+                "evidence"
+              ],
+              "properties": {
+                "bug_file": {
+                  "type": "string"
+                },
+                "agree": {
+                  "type": "boolean"
+                },
+                "corrected_verdict": {
+                  "enum": [
+                    "holds",
+                    "regressed",
+                    "open",
+                    "partially_fixed",
+                    "not_a_bug",
+                    "unverifiable"
+                  ]
+                },
+                "reasoning": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "name": "Audit requested"
+    },
+    {
+      "id": "split",
+      "type": "and",
+      "join": "join"
+    },
+    {
+      "id": "check_g1",
+      "type": "agent",
+      "lane": "checker",
+      "name": "Check equipment/spell bugs",
+      "out": "checks_g1",
+      "prompt": "READ-ONLY BUG AUDIT. Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/). Read context/architecture.md first. Bug reports are in context/BUGS/ (the latest '## Addendum' wins over older sections). HEAD = d2387c3 (v0.4.21 released). On top there is an UNCOMMITTED diff (`git diff -- QuestSharing`): QuestOptimizer.lua + QuestPlanner.lua gained per-creature camp clustering in targetLocation(), stop.alternatives (up to 4 real camps per objective; optimizer place() picks a camp per visit from the simulated route position, so it is no longer always the camp nearest the player), or-opt/2-opt local search improve(), and a background Work job 'quest-improve' that swaps the route keeping the selection. Run tests from tests/: `/tmp/qs-test-env/bin/python test_<name>.py` (prints ok/FAIL per test and client style, then N/M passed); one test: `/tmp/qs-test-env/bin/python -c \"import test_<name> as t; t.<fn>('modern'); t.<fn>('classic'); print('ok')\"`. Native WoW cannot run here: anything needing the real client is native_pending, not a failure. Do NOT modify any repository file (no edits, no git stash/checkout/reset); scratch files only under /tmp/bugaudit-*. Cite evidence as path:line.\n\nFor EACH report below: (1) read it fully incl. addenda; (2) locate the described fix in the current source and confirm it is still present and behaves as promised; (3) find the covering tests (its Verification section; grep tests/ for its tags, function names and symptom text) and run them; (4) judge whether the uncommitted diff touches the fix's code path or changes its promised behaviour, writing a tiny /tmp harness check if needed; (5) verdict: holds | regressed | open | partially_fixed | not_a_bug | unverifiable (a report that says it still awaits work or approval is open). Report one entry per report.\n\nReports: 2026-11-13-debounced-filter-reapply.md, 2026-11-13-dropdown-offscreen-selection.md, 2026-11-13-equipment-duplicate-rows.md, 2026-11-13-instance-loot-non-equipment.md, 2026-11-13-spell-rank-cursor-read.md, 2026-11-13-spell-rank-hidden-pages.md, 2026-11-13-spell-rank-zero-spec.md"
+    },
+    {
+      "id": "refute_g1",
+      "type": "agent",
+      "lane": "refuter",
+      "name": "Refute equipment/spell verdicts",
+      "in": [
+        "checks_g1"
+      ],
+      "out": "reviews_g1",
+      "prompt": "INDEPENDENT FOUR-EYES REVIEW, READ-ONLY. Repo /Users/cozzolif/Desktop/cutpdf (WoW addon, Lua 5.1 in QuestSharing/, harness in tests/: `/tmp/qs-test-env/bin/python test_<name>.py` from tests/). HEAD = v0.4.21; uncommitted diff in QuestOptimizer.lua/QuestPlanner.lua (camp alternatives, local search, background route swap). Do NOT modify repository files; scratch only under /tmp/bugaudit-*. A checker produced these verdicts for reports in context/BUGS/: {{checks_g1.reports}}\n\nFor EACH entry try to REFUTE it: re-read the report (latest addendum wins) and the cited lines yourself, re-run the covering tests yourself, try to reproduce the original symptom against the current tree (scratch harness under /tmp if no test covers it), and check whether the uncommitted diff alters the promised behaviour. Is a claimed regression real or an intended, documented change? agree=true only if you could not refute; otherwise give corrected_verdict with concrete evidence (path:line, commands and output)."
+    },
+    {
+      "id": "check_g2",
+      "type": "agent",
+      "lane": "checker",
+      "name": "Check UI/settings bugs",
+      "out": "checks_g2",
+      "prompt": "READ-ONLY BUG AUDIT. Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/). Read context/architecture.md first. Bug reports are in context/BUGS/ (the latest '## Addendum' wins over older sections). HEAD = d2387c3 (v0.4.21 released). On top there is an UNCOMMITTED diff (`git diff -- QuestSharing`): QuestOptimizer.lua + QuestPlanner.lua gained per-creature camp clustering in targetLocation(), stop.alternatives (up to 4 real camps per objective; optimizer place() picks a camp per visit from the simulated route position, so it is no longer always the camp nearest the player), or-opt/2-opt local search improve(), and a background Work job 'quest-improve' that swaps the route keeping the selection. Run tests from tests/: `/tmp/qs-test-env/bin/python test_<name>.py` (prints ok/FAIL per test and client style, then N/M passed); one test: `/tmp/qs-test-env/bin/python -c \"import test_<name> as t; t.<fn>('modern'); t.<fn>('classic'); print('ok')\"`. Native WoW cannot run here: anything needing the real client is native_pending, not a failure. Do NOT modify any repository file (no edits, no git stash/checkout/reset); scratch files only under /tmp/bugaudit-*. Cite evidence as path:line.\n\nFor EACH report below: (1) read it fully incl. addenda; (2) locate the described fix in the current source and confirm it is still present and behaves as promised; (3) find the covering tests (its Verification section; grep tests/ for its tags, function names and symptom text) and run them; (4) judge whether the uncommitted diff touches the fix's code path or changes its promised behaviour, writing a tiny /tmp harness check if needed; (5) verdict: holds | regressed | open | partially_fixed | not_a_bug | unverifiable (a report that says it still awaits work or approval is open). Report one entry per report.\n\nReports: 2026-11-13-zone-levels-empty-native-data.md, 2026-11-13-zone-levels-opt-in.md, 2026-11-15-settings-extra-tools-overflow.md, 2026-11-16-quest-recruitment-extra-editor.md, 2026-11-17-journal-black-page-editbox-setfont.md, 2026-11-17-profession-window-layout.md"
+    },
+    {
+      "id": "refute_g2",
+      "type": "agent",
+      "lane": "refuter",
+      "name": "Refute UI/settings verdicts",
+      "in": [
+        "checks_g2"
+      ],
+      "out": "reviews_g2",
+      "prompt": "INDEPENDENT FOUR-EYES REVIEW, READ-ONLY. Repo /Users/cozzolif/Desktop/cutpdf (WoW addon, Lua 5.1 in QuestSharing/, harness in tests/: `/tmp/qs-test-env/bin/python test_<name>.py` from tests/). HEAD = v0.4.21; uncommitted diff in QuestOptimizer.lua/QuestPlanner.lua (camp alternatives, local search, background route swap). Do NOT modify repository files; scratch only under /tmp/bugaudit-*. A checker produced these verdicts for reports in context/BUGS/: {{checks_g2.reports}}\n\nFor EACH entry try to REFUTE it: re-read the report (latest addendum wins) and the cited lines yourself, re-run the covering tests yourself, try to reproduce the original symptom against the current tree (scratch harness under /tmp if no test covers it), and check whether the uncommitted diff alters the promised behaviour. Is a claimed regression real or an intended, documented change? agree=true only if you could not refute; otherwise give corrected_verdict with concrete evidence (path:line, commands and output)."
+    },
+    {
+      "id": "check_g3",
+      "type": "agent",
+      "lane": "checker",
+      "name": "Check planner bugs (Nov 16)",
+      "out": "checks_g3",
+      "prompt": "READ-ONLY BUG AUDIT. Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/). Read context/architecture.md first. Bug reports are in context/BUGS/ (the latest '## Addendum' wins over older sections). HEAD = d2387c3 (v0.4.21 released). On top there is an UNCOMMITTED diff (`git diff -- QuestSharing`): QuestOptimizer.lua + QuestPlanner.lua gained per-creature camp clustering in targetLocation(), stop.alternatives (up to 4 real camps per objective; optimizer place() picks a camp per visit from the simulated route position, so it is no longer always the camp nearest the player), or-opt/2-opt local search improve(), and a background Work job 'quest-improve' that swaps the route keeping the selection. Run tests from tests/: `/tmp/qs-test-env/bin/python test_<name>.py` (prints ok/FAIL per test and client style, then N/M passed); one test: `/tmp/qs-test-env/bin/python -c \"import test_<name> as t; t.<fn>('modern'); t.<fn>('classic'); print('ok')\"`. Native WoW cannot run here: anything needing the real client is native_pending, not a failure. Do NOT modify any repository file (no edits, no git stash/checkout/reset); scratch files only under /tmp/bugaudit-*. Cite evidence as path:line.\n\nFor EACH report below: (1) read it fully incl. addenda; (2) locate the described fix in the current source and confirm it is still present and behaves as promised; (3) find the covering tests (its Verification section; grep tests/ for its tags, function names and symptom text) and run them; (4) judge whether the uncommitted diff touches the fix's code path or changes its promised behaviour, writing a tiny /tmp harness check if needed — these are quest-planner reports, so the diff is directly relevant; (5) verdict: holds | regressed | open | partially_fixed | not_a_bug | unverifiable (a report that says it still awaits work or approval is open). Report one entry per report.\n\nReports: 2026-11-16-quest-planner-distant-spawns-and-next-command.md, 2026-11-16-quest-planner-empty-level-and-candidate-shape.md, 2026-11-16-quest-planner-final-batch-and-zone-scope.md, 2026-11-16-quest-planner-missing-local-pickups.md, 2026-11-16-quest-planner-movable-panel.md, 2026-11-16-quest-planner-scroll-row-overlap.md"
+    },
+    {
+      "id": "refute_g3",
+      "type": "agent",
+      "lane": "refuter",
+      "name": "Refute planner verdicts (Nov 16)",
+      "in": [
+        "checks_g3"
+      ],
+      "out": "reviews_g3",
+      "prompt": "INDEPENDENT FOUR-EYES REVIEW, READ-ONLY. Repo /Users/cozzolif/Desktop/cutpdf (WoW addon, Lua 5.1 in QuestSharing/, harness in tests/: `/tmp/qs-test-env/bin/python test_<name>.py` from tests/). HEAD = v0.4.21; uncommitted diff in QuestOptimizer.lua/QuestPlanner.lua (camp alternatives, local search, background route swap) — directly relevant to these quest-planner reports. Do NOT modify repository files; scratch only under /tmp/bugaudit-*. A checker produced these verdicts for reports in context/BUGS/: {{checks_g3.reports}}\n\nFor EACH entry try to REFUTE it: re-read the report (latest addendum wins) and the cited lines yourself, re-run the covering tests yourself, try to reproduce the original symptom against the current tree (scratch harness under /tmp if no test covers it), and check whether the uncommitted diff alters the promised behaviour. Is a claimed regression real or an intended, documented change (see CHANGELOG.md '## Unreleased' and context/decisions.md 2026-11-17 optimizer entry)? agree=true only if you could not refute; otherwise give corrected_verdict with concrete evidence (path:line, commands and output)."
+    },
+    {
+      "id": "check_g4",
+      "type": "agent",
+      "lane": "checker",
+      "name": "Check planner bugs (Nov 17)",
+      "out": "checks_g4",
+      "prompt": "READ-ONLY BUG AUDIT. Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/). Read context/architecture.md first. Bug reports are in context/BUGS/ (the latest '## Addendum' wins over older sections). HEAD = d2387c3 (v0.4.21 released). On top there is an UNCOMMITTED diff (`git diff -- QuestSharing`): QuestOptimizer.lua + QuestPlanner.lua gained per-creature camp clustering in targetLocation(), stop.alternatives (up to 4 real camps per objective; optimizer place() picks a camp per visit from the simulated route position, so it is no longer always the camp nearest the player), or-opt/2-opt local search improve(), and a background Work job 'quest-improve' that swaps the route keeping the selection. Run tests from tests/: `/tmp/qs-test-env/bin/python test_<name>.py` (prints ok/FAIL per test and client style, then N/M passed); one test: `/tmp/qs-test-env/bin/python -c \"import test_<name> as t; t.<fn>('modern'); t.<fn>('classic'); print('ok')\"`. Native WoW cannot run here: anything needing the real client is native_pending, not a failure. Do NOT modify any repository file (no edits, no git stash/checkout/reset); scratch files only under /tmp/bugaudit-*. Cite evidence as path:line.\n\nFor EACH report below: (1) read it fully incl. addenda; (2) locate the described fix in the current source and confirm it is still present and behaves as promised; (3) find the covering tests (its Verification section; grep tests/ for its tags, function names and symptom text) and run them; (4) judge whether the uncommitted diff touches the fix's code path or changes its promised behaviour, writing a tiny /tmp harness check if needed — these are planner/optimizer reports, so the diff is directly relevant. In particular planner-step-one-on-player promised that the step 'switches only when another real camp becomes nearer' and stays put while the player walks: test whether the new alternatives + place() + background local search can make the objective step jump between camps as the player moves (write a harness check moving POS several times like tests/test_quest_planner_zone_steps.py does); (5) verdict: holds | regressed | open | partially_fixed | not_a_bug | unverifiable. Report one entry per report.\n\nReports: 2026-11-17-planner-step-one-on-player.md, 2026-11-17-planner-multiple-drop-confidence.md, 2026-11-17-planner-or-parent-selection.md, 2026-11-17-planner-predictive-work-timing.md, 2026-11-17-dropdb-percentage-units.md"
+    },
+    {
+      "id": "refute_g4",
+      "type": "agent",
+      "lane": "refuter",
+      "name": "Refute planner verdicts (Nov 17)",
+      "in": [
+        "checks_g4"
+      ],
+      "out": "reviews_g4",
+      "prompt": "INDEPENDENT FOUR-EYES REVIEW, READ-ONLY. Repo /Users/cozzolif/Desktop/cutpdf (WoW addon, Lua 5.1 in QuestSharing/, harness in tests/: `/tmp/qs-test-env/bin/python test_<name>.py` from tests/). HEAD = v0.4.21; uncommitted diff in QuestOptimizer.lua/QuestPlanner.lua (camp alternatives, local search, background route swap) — directly relevant to these planner/optimizer reports. Do NOT modify repository files; scratch only under /tmp/bugaudit-*. A checker produced these verdicts for reports in context/BUGS/: {{checks_g4.reports}}\n\nFor EACH entry try to REFUTE it: re-read the report (latest addendum wins) and the cited lines yourself, re-run the covering tests yourself, try to reproduce the original symptom against the current tree (scratch harness under /tmp if no test covers it; for planner-step-one-on-player move the player several times and watch whether the objective waypoint jumps between camps), and check whether the uncommitted diff alters the promised behaviour. Is a claimed regression real or an intended, documented change (see CHANGELOG.md '## Unreleased' and context/decisions.md 2026-11-17 optimizer entry)? agree=true only if you could not refute; otherwise give corrected_verdict with concrete evidence (path:line, commands and output)."
+    },
+    {
+      "id": "check_g5",
+      "type": "agent",
+      "lane": "checker",
+      "name": "Check guidance/map bugs",
+      "out": "checks_g5",
+      "prompt": "READ-ONLY BUG AUDIT. Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/). Read context/architecture.md first. Bug reports are in context/BUGS/ (the latest '## Addendum' wins over older sections). HEAD = d2387c3 (v0.4.21 released). On top there is an UNCOMMITTED diff (`git diff -- QuestSharing`): QuestOptimizer.lua + QuestPlanner.lua gained per-creature camp clustering in targetLocation(), stop.alternatives (up to 4 real camps per objective; optimizer place() picks a camp per visit from the simulated route position), or-opt/2-opt local search improve(), and a background Work job 'quest-improve' that swaps the route keeping the selection. Run tests from tests/: `/tmp/qs-test-env/bin/python test_<name>.py` (prints ok/FAIL per test and client style, then N/M passed); one test: `/tmp/qs-test-env/bin/python -c \"import test_<name> as t; t.<fn>('modern'); t.<fn>('classic'); print('ok')\"`. Native WoW cannot run here: anything needing the real client is native_pending, not a failure. Do NOT modify any repository file (no edits, no git stash/checkout/reset); scratch files only under /tmp/bugaudit-*. Cite evidence as path:line.\n\nFor EACH report below: (1) read it fully incl. addenda; (2) locate the described fix in the current source and confirm it is still present and behaves as promised; (3) find the covering tests (its Verification section; grep tests/ for its tags, function names and symptom text) and run them; (4) judge whether the uncommitted diff touches the fix's code path or changes its promised behaviour (guidance/waypoints consume planner route stops, whose point may now be an alternative camp), writing a tiny /tmp harness check if needed; (5) verdict: holds | regressed | open | partially_fixed | not_a_bug | unverifiable. map-search-missing-database has a 2026-11-17 addendum reporting that v0.4.20/0.4.21 world-map search shows no suggestions while typing with a fix plan awaiting user approval: confirm whether that is still unfixed in the current tree (reproduce the suggestion delay in the harness if feasible). Report one entry per report.\n\nReports: 2026-11-17-guidance-late-map-metrics.md, 2026-11-17-guidance-map-click-event-argument.md, 2026-11-17-guidance-selected-cluster-marker.md, 2026-11-17-guidance-submap-rectangle.md, 2026-11-17-map-search-missing-database.md, 2026-11-17-map-suggestions-readable-background.md"
+    },
+    {
+      "id": "refute_g5",
+      "type": "agent",
+      "lane": "refuter",
+      "name": "Refute guidance/map verdicts",
+      "in": [
+        "checks_g5"
+      ],
+      "out": "reviews_g5",
+      "prompt": "INDEPENDENT FOUR-EYES REVIEW, READ-ONLY. Repo /Users/cozzolif/Desktop/cutpdf (WoW addon, Lua 5.1 in QuestSharing/, harness in tests/: `/tmp/qs-test-env/bin/python test_<name>.py` from tests/). HEAD = v0.4.21; uncommitted diff in QuestOptimizer.lua/QuestPlanner.lua (camp alternatives, local search, background route swap). Do NOT modify repository files; scratch only under /tmp/bugaudit-*. A checker produced these verdicts for reports in context/BUGS/: {{checks_g5.reports}}\n\nFor EACH entry try to REFUTE it: re-read the report (latest addendum wins) and the cited lines yourself, re-run the covering tests yourself, try to reproduce the original symptom against the current tree (scratch harness under /tmp if no test covers it; for map search, measure whether suggestions appear while typing), and check whether the uncommitted diff alters the promised behaviour. agree=true only if you could not refute; otherwise give corrected_verdict with concrete evidence (path:line, commands and output)."
+    },
+    {
+      "id": "check_g6",
+      "type": "agent",
+      "lane": "checker",
+      "name": "Check data/dungeon bugs",
+      "out": "checks_g6",
+      "prompt": "READ-ONLY BUG AUDIT. Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/). Read context/architecture.md first. Bug reports are in context/BUGS/ (the latest '## Addendum' wins over older sections). HEAD = d2387c3 (v0.4.21 released). On top there is an UNCOMMITTED diff (`git diff -- QuestSharing`) limited to QuestOptimizer.lua + QuestPlanner.lua (camp alternatives, local search, background route swap via the shared DataWork scheduler job 'quest-improve'). Run tests from tests/: `/tmp/qs-test-env/bin/python test_<name>.py` (prints ok/FAIL per test and client style, then N/M passed); one test: `/tmp/qs-test-env/bin/python -c \"import test_<name> as t; t.<fn>('modern'); t.<fn>('classic'); print('ok')\"`. Native WoW cannot run here: anything needing the real client is native_pending, not a failure. Do NOT modify any repository file (no edits, no git stash/checkout/reset); scratch files only under /tmp/bugaudit-*. Cite evidence as path:line.\n\nFor EACH report below: (1) read it fully incl. addenda; (2) locate the described fix in the current source and confirm it is still present and behaves as promised; (3) find the covering tests (its Verification section; grep tests/ for its tags, function names and symptom text) and run them; (4) judge whether the uncommitted diff touches the fix's code path or changes its promised behaviour — note the new background planner job shares the DataWork scheduler with Dungeon quests and database work, so check for starvation or eager-loading effects; (5) verdict: holds | regressed | open | partially_fixed | not_a_bug | unverifiable. Report one entry per report.\n\nReports: 2026-11-16-vendor-map-scope-and-missing-roles.md, 2026-11-17-dungeon-loot-does-not-open.md, 2026-11-17-dungeon-quests-slow-first-load.md, 2026-11-17-optional-database-eager-loading.md"
+    },
+    {
+      "id": "refute_g6",
+      "type": "agent",
+      "lane": "refuter",
+      "name": "Refute data/dungeon verdicts",
+      "in": [
+        "checks_g6"
+      ],
+      "out": "reviews_g6",
+      "prompt": "INDEPENDENT FOUR-EYES REVIEW, READ-ONLY. Repo /Users/cozzolif/Desktop/cutpdf (WoW addon, Lua 5.1 in QuestSharing/, harness in tests/: `/tmp/qs-test-env/bin/python test_<name>.py` from tests/). HEAD = v0.4.21; uncommitted diff in QuestOptimizer.lua/QuestPlanner.lua (camp alternatives, local search, background route swap on the shared DataWork scheduler). Do NOT modify repository files; scratch only under /tmp/bugaudit-*. A checker produced these verdicts for reports in context/BUGS/: {{checks_g6.reports}}\n\nFor EACH entry try to REFUTE it: re-read the report (latest addendum wins) and the cited lines yourself, re-run the covering tests yourself, try to reproduce the original symptom against the current tree (scratch harness under /tmp if no test covers it), and check whether the uncommitted diff alters the promised behaviour (e.g. scheduler starvation of Dungeon quests by the background planner job). agree=true only if you could not refute; otherwise give corrected_verdict with concrete evidence (path:line, commands and output)."
+    },
+    {
+      "id": "join",
+      "type": "and"
+    },
+    {
+      "id": "done",
+      "type": "end",
+      "name": "Audit complete"
+    }
+  ],
+  "flows": [
+    {
+      "from": "start",
+      "to": "split"
+    },
+    {
+      "from": "split",
+      "to": "check_g1"
+    },
+    {
+      "from": "check_g1",
+      "to": "refute_g1"
+    },
+    {
+      "from": "refute_g1",
+      "to": "join"
+    },
+    {
+      "from": "split",
+      "to": "check_g2"
+    },
+    {
+      "from": "check_g2",
+      "to": "refute_g2"
+    },
+    {
+      "from": "refute_g2",
+      "to": "join"
+    },
+    {
+      "from": "split",
+      "to": "check_g3"
+    },
+    {
+      "from": "check_g3",
+      "to": "refute_g3"
+    },
+    {
+      "from": "refute_g3",
+      "to": "join"
+    },
+    {
+      "from": "split",
+      "to": "check_g4"
+    },
+    {
+      "from": "check_g4",
+      "to": "refute_g4"
+    },
+    {
+      "from": "refute_g4",
+      "to": "join"
+    },
+    {
+      "from": "split",
+      "to": "check_g5"
+    },
+    {
+      "from": "check_g5",
+      "to": "refute_g5"
+    },
+    {
+      "from": "refute_g5",
+      "to": "join"
+    },
+    {
+      "from": "split",
+      "to": "check_g6"
+    },
+    {
+      "from": "check_g6",
+      "to": "refute_g6"
+    },
+    {
+      "from": "refute_g6",
+      "to": "join"
+    },
+    {
+      "from": "join",
+      "to": "done"
+    }
+  ]
+}

@@ -9,6 +9,11 @@ local itemIDs, npcIDs, itemCursor, npcCursor, itemsReady, mask = nil, nil, 1, 1,
 local wordsByTitle, resolved, hydrated, searchTimer = {}, nil, {}, nil
 local generation, currentQuery, currentOnly, currentKind = 0, "", true, nil
 local mapUI, hookedScroll, pins, lastRender = nil, nil, {}, nil
+-- Typing gets a larger slice; DataWork runs nothing in combat and the jobs pause while the map is hidden.
+-- Locations read for earlier keystrokes stay cached, up to SPAWN_CACHE NPCs besides the current matches.
+local FOREGROUND_MS, SPAWN_CACHE = 8, 2000
+local cached, cachedCount, typed, wantItems, waiting, failed = {}, 0, false, false, nil, nil
+local indexToken, indexBudget, scan, progress = 0, nil, nil, nil
 local function call(fn, ...) return U.call(fn, ...) end
 local function trim(s) return (string.gsub(string.gsub(tostring(s or ""), "^%s+", ""), "%s+$", "")) end
 local function lower(s) return string.lower(type(s) == "string" and s or "") end
@@ -144,6 +149,7 @@ local function indexRoles()
     while npcIDs[npcCursor] do
         metadata(npcIDs[npcCursor])
         npcCursor = npcCursor + 1
+        if npcCursor % 500 == 1 then progress() end
         Work.yield()
     end
     ready, npcIDs = true, nil
@@ -171,26 +177,101 @@ local function indexItems()
             end
         end
         itemCursor = itemCursor + 1
+        if itemCursor % 500 == 1 then progress() end
         Work.yield()
     end
     itemsReady, itemIDs = true, nil
 end
 
-local function clearLocations()
-    for id in pairs(hydrated) do if vendors[id] then vendors[id].spawns = nil end end
-    hydrated, resolved, lastRender = {}, nil, nil
-    if mapUI then mapUI.suggestions = {} end
+-- keep: ids whose cached locations stay (the current matches); nil drops every cached location.
+local function dropSpawns(keep)
+    for id in pairs(cached) do
+        if not (keep and keep[id]) then
+            if vendors[id] then vendors[id].spawns = nil end
+            cached[id], cachedCount = nil, cachedCount - 1
+        end
+    end
+end
+
+local function readSpawns(id)
+    if cached[id] then return end
+    vendors[id].spawns = Q.spawnList("npc", id)
+    cached[id], cachedCount = true, cachedCount + 1
+end
+
+-- A new query: forget its results and pins; cached locations and visible suggestions stay until replaced.
+local function clearResults()
+    hydrated, resolved, lastRender, waiting, scan = {}, nil, nil, nil, nil
     for _, pin in ipairs(pins) do pin.result = nil; pin:Hide() end
 end
 
+local function clearLocations()
+    clearResults()
+    dropSpawns(nil)
+    if mapUI then mapUI.suggestions = {}; mapUI.suggestionBox:Hide() end
+end
+
 local function resetIndex()
-    generation = generation + 1
+    generation, indexToken = generation + 1, indexToken + 1
     if searchTimer then ns.cancel(searchTimer); searchTimer = nil end
-    Work.cancel("vendor-search")
+    Work.cancel("vendor-search"); Work.cancel("vendor-index")
     clearLocations()
-    loading, ready, itemsReady = false, false, false
+    loading, ready, itemsReady, wantItems, typed, failed, indexBudget = false, false, false, false, false, nil, nil
     items, vendors, wordsByTitle = {}, {}, {}
     npcIDs, itemIDs, npcCursor, itemCursor = nil, nil, 1, 1
+end
+
+local function thousands(n)
+    local s, k = tostring(n), 1
+    while k > 0 do s, k = string.gsub(s, "^(%d+)(%d%d%d)", "%1,%2") end
+    return s
+end
+
+local function progressText()
+    local line
+    if not ready then
+        line = npcIDs and ("Indexing " .. thousands(npcCursor - 1) .. " / " .. thousands(#npcIDs) .. " NPCs…")
+            or "Indexing QuestieDB NPCs…"
+    elseif waiting == generation and not itemsReady then
+        line = itemIDs and ("Indexing " .. thousands(itemCursor - 1) .. " / " .. thousands(#itemIDs) .. " items…")
+            or "Indexing QuestieDB items…"
+    elseif scan then
+        line = "Finding locations: " .. thousands(scan.done) .. " / " .. thousands(scan.total) .. " matches…"
+    else
+        line = "Searching vendor data…"
+    end
+    return line .. "\nSuggestions appear as soon as matches are found."
+end
+
+progress = function()
+    if mapUI and currentQuery ~= "" and not resolved and failed ~= generation then
+        mapUI.status:SetText(progressText())
+    end
+end
+
+-- The catalogue index (NPC roles, then items once a query needs them) is one job that keystrokes never cancel. It
+-- starts on the first typed character (never on login or a blank map) and runs only while the map shows a query.
+local function startIndex(withItems)
+    if withItems then wantItems = true end
+    if ready and (itemsReady or not wantItems) then return end
+    loading = true
+    local budget = typed and FOREGROUND_MS or nil
+    if Work.busy("vendor-index") and (indexBudget == budget or not budget) then Work.resume("vendor-index"); return end
+    -- Start, or restart with the typing slice: the cursors keep the progress, an interrupted item is read again.
+    indexBudget = budget
+    local token = indexToken
+    Work.start("vendor-index", function()
+        indexRoles()
+        if wantItems then indexItems() end
+    end, function()
+        return token == indexToken and ns.db.enabled and ns.db.vendorSearch and currentQuery ~= ""
+            and WorldMapFrame and call(WorldMapFrame.IsShown, WorldMapFrame)
+    end, function(ok)
+        if token ~= indexToken then return end
+        if ok then V.draw(); return end
+        loading, failed = false, generation
+        if mapUI then mapUI.status:SetText("Vendor search stopped; try the search again.") end
+    end, budget)
 end
 
 local function mapInfo(map)
@@ -314,37 +395,69 @@ local function mapSearch(map)
     return selected
 end
 
+-- Read locations for the current matches. Suggestions update at the first local match and whenever the number of
+-- local matches doubles, so they appear before the whole list is read.
+local function hydrate(candidates, query)
+    local map = call(WorldMapFrame.GetMapID, WorldMapFrame)
+    local localCount, nextRefresh = 0, 1
+    -- Bounded cache: past SPAWN_CACHE, keep only what this query needs (at most SPAWN_CACHE + one query's matches).
+    if cachedCount > SPAWN_CACHE then dropSpawns(candidates) end
+    scan = { done = 0, total = 0 }
+    for _ in pairs(candidates) do scan.total = scan.total + 1 end
+    for id in pairs(candidates) do
+        if not hydrated[id] then
+            readSpawns(id)
+            hydrated[id] = true
+            for _, spawn in ipairs(vendors[id].spawns) do
+                if mappedPoint(spawn, map) then localCount = localCount + 1; break end
+            end
+            if localCount >= nextRefresh and mapUI and mapUI.suggesting then
+                nextRefresh = localCount * 2
+                mapUI.refreshSuggestions(query)
+            end
+            Work.yield()
+        end
+        scan.done = scan.done + 1
+        if scan.done % 256 == 0 then progress() end
+    end
+end
+
+-- Per query: match the in-memory index and read locations. The index job supplies roles and, on request, items.
 local function startSearch(query)
     if Work.busy("vendor-search") then Work.resume("vendor-search"); return end
-    loading = true
+    loading, waiting, scan = true, nil, nil
     local token, kind = generation, currentKind
     Work.start("vendor-search", function()
-        indexRoles()
         local selected, fuzzy, candidates = matchVendors(query)
         local sellers = sellerQuery(query) or kind == "seller"
         -- Explicit roles never need the item catalogue. Otherwise try roles before item fallback.
-        if not itemsReady and (kind == "item" or (kind ~= "vendor" and (next(selected) == nil or sellers))) then
-            indexItems()
+        local needItems = not itemsReady and (kind == "item" or (kind ~= "vendor" and (next(selected) == nil or sellers)))
+        hydrate(candidates, query)
+        if needItems then
+            if not itemsReady then
+                -- Role matches are suggested already; V.draw searches again when the item index is complete.
+                waiting = token
+                startIndex(true)
+                progress()
+                return
+            end
+            -- The item index finished while these locations were read.
             selected, fuzzy, candidates = matchVendors(query)
-        end
-        for id in pairs(candidates) do
-            vendors[id].spawns = Q.spawnList("npc", id)
-            hydrated[id] = true
-            Work.yield()
+            hydrate(candidates, query)
         end
         resolved = { query = query, kind = kind, exact = selected, fuzzy = fuzzy }
-        loading = false
+        loading, scan = false, nil
         V.draw()
-        if mapUI then mapUI.refreshSuggestions(query) end
+        if mapUI then mapUI.refreshSuggestions(query, true) end
     end, function()
         return token == generation and ns.db.enabled and ns.db.vendorSearch and currentQuery ~= ""
             and WorldMapFrame and call(WorldMapFrame.IsShown, WorldMapFrame)
     end, function(ok)
         if not ok then
-            loading, resolved = false, nil
+            loading, resolved, failed = false, nil, token
             if mapUI then mapUI.status:SetText("Vendor search stopped; try the search again.") end
         end
-    end)
+    end, typed and FOREGROUND_MS or nil)
 end
 
 local function nearestVendor(selected)
@@ -396,7 +509,7 @@ local function ensureUI(wm)
     if mapUI then return mapUI end
     local panel = CreateFrame("Frame", nil, wm, "BackdropTemplate")
     panel:SetWidth(400); panel:SetHeight(122); panel:SetPoint("BOTTOMRIGHT", wm, "BOTTOMRIGHT", -20, 24)
-    S.fill(panel, "BACKGROUND", 0.025, 0.04, 0.065, 0.94):SetAllPoints(panel)
+    S.panel(panel)
     local heading = U.text(panel, "Search this map", 8, 5, 384)
     heading:SetWordWrap(false)
     local edit = CreateFrame("EditBox", nil, panel)
@@ -404,7 +517,7 @@ local function ensureUI(wm)
     if ChatFontNormal then edit:SetFontObject(ChatFontNormal) end
     edit:SetAutoFocus(false); edit:SetMaxLetters(70)
     if edit.SetTextInsets then edit:SetTextInsets(5, 28, 0, 0) end
-    S.fill(edit, "BACKGROUND", 0, 0, 0, 0.8):SetAllPoints(edit)
+    S.inset(edit)
     edit:SetScript("OnEnterPressed", function(self) self:ClearFocus(); V.search(self:GetText(), true, currentKind) end)
     edit:SetScript("OnEscapePressed", function(self)
         self:ClearFocus(); mapUI.suggesting = false; mapUI.suggestionBox:Hide()
@@ -449,16 +562,51 @@ local function ensureUI(wm)
         searchIcon = searchIcon, clearButton = clearButton,
         suggestionBox = suggestionBox, suggestionRows = {}, suggestions = {}, settingText = false }
 
-    local function refreshSuggestions(text)
+    local function showSuggestions(list)
+        local state = mapUI
+        state.suggestions = list
+        for i = 1, 6 do
+            local row = state.suggestionRows[i]
+            if not row then
+                row = CreateFrame("Button", nil, state.suggestionBox)
+                row:SetHeight(22); row:SetWidth(300)
+                row:SetPoint("TOPLEFT", state.suggestionBox, "TOPLEFT", 8, -(5 + (i - 1) * 22))
+                row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+                row.text:SetPoint("LEFT", row, "LEFT", 2, 0)
+                row.text:SetWidth(296); row.text:SetJustifyH("LEFT"); row.text:SetWordWrap(false)
+                row.highlight = S.fill(row, "BACKGROUND", 1, 1, 1, 0.12); row.highlight:SetAllPoints(row); row.highlight:Hide()
+                row:SetScript("OnEnter", function(self) self.highlight:Show() end)
+                row:SetScript("OnLeave", function(self) self.highlight:Hide() end)
+                row:SetScript("OnClick", function(self)
+                    local suggestion = self.suggestion
+                    if suggestion then
+                        state.settingText = true; state.edit:SetText(suggestion.value); state.settingText = false
+                        state.suggestionBox:Hide()
+                        V.search(suggestion.value, true, suggestion.kind)
+                    end
+                end)
+                state.suggestionRows[i] = row
+            end
+            local suggestion = list[i]
+            if suggestion then
+                row.suggestion = suggestion
+                row.text:SetText(S.WHITE .. suggestion.label .. "|r")
+                row:Show()
+            else
+                row.suggestion = nil; row:Hide()
+            end
+        end
+        if #list > 0 then state.suggestionBox:Show() else state.suggestionBox:Hide() end
+    end
+
+    -- final: the whole result is known. A partial result with nothing local yet keeps the shown suggestions.
+    local function refreshSuggestions(text, final)
         local state = mapUI
         local query = trim(text)
-        state.suggestions = {}
-        if not state.suggesting or not resolved or #query < 2 then
-            state.suggestionBox:Hide()
-            return
-        end
-        local found = {}
-        local localIDs = vendorsOnMap(call(wm.GetMapID, wm))
+        if not state.suggesting or #query < 2 then showSuggestions({}); return end
+        local map = call(wm.GetMapID, wm)
+        local list, found = {}, {}
+        local localIDs = vendorsOnMap(map)
         local sellersOnly, roleQuery = sellerQuery(query)
         local roleNeedle = sellersOnly and roleQuery or query
         local parsed = roleWords(roleNeedle)
@@ -470,7 +618,7 @@ local function ensureUI(wm)
             local key = lower(value)
             if key == "" or key == lower(query) or found[key] then return end
             found[key] = true
-            state.suggestions[#state.suggestions + 1] = { value = value, label = label, rank = rank, kind = kind }
+            list[#list + 1] = { value = value, label = label, rank = rank, kind = kind }
         end
         -- Offer the useful role word first: typing "tail" can complete to "Tailor", which still matches
         -- every role containing Tailor, including "Senior Master Tailor".
@@ -509,55 +657,44 @@ local function ensureUI(wm)
                 if itemCount >= 80 then break end
             end
         end
-        table.sort(state.suggestions, function(a, b)
+        table.sort(list, function(a, b)
             if a.rank ~= b.rank then return a.rank < b.rank end
             return lower(a.value) < lower(b.value)
         end)
-        local count = math.min(6, #state.suggestions)
-        for i = 1, 6 do
-            local row = state.suggestionRows[i]
-            if not row then
-                row = CreateFrame("Button", nil, state.suggestionBox)
-                row:SetHeight(22); row:SetWidth(300)
-                row:SetPoint("TOPLEFT", state.suggestionBox, "TOPLEFT", 8, -(5 + (i - 1) * 22))
-                row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-                row.text:SetPoint("LEFT", row, "LEFT", 2, 0)
-                row.text:SetWidth(296); row.text:SetJustifyH("LEFT"); row.text:SetWordWrap(false)
-                row.highlight = S.fill(row, "BACKGROUND", 1, 1, 1, 0.12); row.highlight:SetAllPoints(row); row.highlight:Hide()
-                row:SetScript("OnEnter", function(self) self.highlight:Show() end)
-                row:SetScript("OnLeave", function(self) self.highlight:Hide() end)
-                row:SetScript("OnClick", function(self)
-                    local suggestion = self.suggestion
-                    if suggestion then
-                        state.settingText = true; state.edit:SetText(suggestion.value); state.settingText = false
-                        state.suggestionBox:Hide()
-                        V.search(suggestion.value, true, suggestion.kind)
-                    end
-                end)
-                state.suggestionRows[i] = row
-            end
-            local suggestion = state.suggestions[i]
-            if suggestion then
-                row.suggestion = suggestion
-                row.text:SetText(S.WHITE .. suggestion.label .. "|r")
-                row:Show()
-            else
-                row.suggestion = nil; row:Hide()
-            end
-        end
-        if count > 0 then state.suggestionBox:Show() else state.suggestionBox:Hide() end
+        -- This can yield inside the search job: a keystroke or map change meanwhile makes the list stale.
+        if query ~= currentQuery or not state.suggesting or call(wm.GetMapID, wm) ~= map then return end
+        if final or #list > 0 then showSuggestions(list) end
     end
     mapUI.refreshSuggestions = refreshSuggestions
+
+    -- A keystroke keeps the shown suggestions that the new text still matches by the rules above, until replaced.
+    local function keepMatching(query)
+        local kept = {}
+        local sellersOnly, roleQuery = sellerQuery(query)
+        local roleNeedle = sellersOnly and roleQuery or query
+        local parsed, roleKind = roleWords(roleNeedle), sellersOnly and "seller" or "vendor"
+        for _, s in ipairs(#query >= 2 and mapUI.suggestions or {}) do
+            local match
+            if s.kind == "item" then match = matchesWords(s.value, query)
+            else match = s.kind == roleKind and (sellersOnly and roleNeedle == "" or roleMatch(roleWords(s.value), parsed, true)) end
+            if match and lower(s.value) ~= lower(query) then kept[#kept + 1] = s end
+        end
+        showSuggestions(kept)
+    end
     edit:SetScript("OnTextChanged", function(self)
         if mapUI.settingText then return end
         if searchTimer then ns.cancel(searchTimer); searchTimer = nil end
         generation = generation + 1
         Work.cancel("vendor-search"); loading = false
-        clearLocations()
         currentQuery, currentOnly, currentKind = trim(self:GetText()), true, nil
         mapUI.suggesting = true
-        mapUI.suggestionBox:Hide()
-        if currentQuery == "" then V.draw(); return end
+        if currentQuery == "" then typed = false; clearLocations(); V.draw(); return end
+        -- Keystrokes keep the catalogue index and cached locations; the first typed character starts the index.
+        clearResults()
+        keepMatching(currentQuery)
+        typed = true
+        if ns.db.enabled and ns.db.vendorSearch and not ns.isBlocked("vendormap")
+            and (Q.canEnumerate("npc") or Q.canEnumerate("item")) then startIndex() end
         searchTimer = ns.after(0.18, function() searchTimer = nil; V.draw() end)
     end)
     edit:SetScript("OnTabPressed", function()
@@ -574,15 +711,16 @@ end
 function V.search(query, mapOnly, kind)
     if searchTimer then ns.cancel(searchTimer); searchTimer = nil end
     query = trim(query)
-    if query ~= currentQuery or kind ~= currentKind then
+    -- An explicit search after a failed vendor job retries it, also with the same text and kind.
+    if query ~= currentQuery or kind ~= currentKind or failed == generation then
         generation = generation + 1
         Work.cancel("vendor-search"); loading = false
-        clearLocations()
+        if query == "" then typed = false; clearLocations() else clearResults() end
     end
     currentQuery, currentOnly, currentKind = query, mapOnly ~= false, kind
     if not mapUI then return end
     lastRender = nil
-    mapUI.suggesting = false
+    mapUI.suggesting, mapUI.suggestions = false, {}
     mapUI.suggestionBox:Hide()
     mapUI.settingText = true
     mapUI.edit:SetText(currentQuery)
@@ -596,7 +734,7 @@ function V.draw()
     local canvas = scroll and scroll.Child
     local on = ns.db.enabled and ns.db.vendorSearch and not ns.isBlocked("vendormap")
     if not (on and wm and canvas and call(wm.IsShown, wm)) then
-        Work.pause("vendor-search")
+        Work.pause("vendor-search"); Work.pause("vendor-index")
         if mapUI and call(mapUI.frame.IsShown, mapUI.frame) then
             mapUI.frame:Hide(); mapUI.suggestionBox:Hide()
             for _, p in ipairs(pins) do p:Hide() end
@@ -611,7 +749,10 @@ function V.draw()
     ui.heading:SetText("Search this map: " .. mapName)
     if ui.map ~= map then
         ui.map, currentOnly, lastRender = map, true, nil
-        if resolved then ui.refreshSuggestions(query) end
+        -- Suggestions and cached locations belong to the shown map; only the current matches keep theirs.
+        dropSpawns(hydrated)
+        ui.suggestions = {}; ui.suggestionBox:Hide()
+        if resolved or next(hydrated) then ui.refreshSuggestions(query, resolved ~= nil) end
     end
     if scroll ~= hookedScroll and scroll.HookScript then
         scroll:HookScript("OnMouseDown", function(_, button)
@@ -624,7 +765,9 @@ function V.draw()
         hookedScroll = scroll
     end
     if not Q.canEnumerate("npc") and not Q.canEnumerate("item") then
-        if ready or itemsReady or loading or next(hydrated) then resetIndex() end
+        if ready or itemsReady or loading or next(hydrated) or next(cached) or Work.busy("vendor-index") then
+            resetIndex()
+        end
         ui.closest = nil; ui.waypoint:Hide(); ui.suggestionBox:Hide()
         if Q.available() then
             ui.status:SetText("Map search needs a newer QuestieDB.\nUpdate/enable QuestieDB, then /reload.\nCheck loaded data: /qs questie")
@@ -634,7 +777,7 @@ function V.draw()
         return
     end
     if query == "" then
-        Work.pause("vendor-search")
+        Work.pause("vendor-search"); Work.pause("vendor-index")
         if lastRender and lastRender.empty and lastRender.map == map then return end
         ui.closest = nil; ui.waypoint:Hide(); ui.suggestionBox:Hide()
         for _, p in ipairs(pins) do p.result = nil; p:Hide() end
@@ -646,8 +789,11 @@ function V.draw()
     Work.resume("vendor-search")
     if not resolved then
         ui.closest = nil; ui.waypoint:Hide()
-        ui.status:SetText("Searching vendor data in small batches…")
-        startSearch(query); return
+        if failed == generation then return end
+        if not ready or (waiting == generation and not itemsReady) then startIndex(waiting == generation)
+        else startSearch(query) end
+        progress()
+        return
     end
 
     local width, height = call(canvas.GetWidth, canvas), call(canvas.GetHeight, canvas)

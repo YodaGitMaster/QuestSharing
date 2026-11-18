@@ -1,6 +1,6 @@
 # 2026-11-17 — Dungeon loot browser does not open / misbehaves
 
-**Status**: closed — not a bug (user meant Dungeon quests; see addendum)
+**Status**: reopened — real defect (EditBox:SetFont) in v0.4.20/v0.4.21; fixed in source f1b34e9, unreleased (see addendum 2026-11-17)
 **Severity**: medium
 **Tags**: Loot.lua EquipmentUI.lua Settings.lua "Browse drops" "Instance drops" /qs loot AtlasLootClassic DungeonsAndRaids LoadOnDemand QuestieDB v0.4.20
 
@@ -30,3 +30,10 @@
 - What happened: user clarified "i speak about dungeon quests" — the report was about the Dungeon quests tab, not instance loot.
 - Instance loot browser: no defect found (all checks above stand).
 - New status: closed / not a bug. Real bug tracked in `2026-11-17-dungeon-quests-slow-first-load.md`.
+
+---
+## Addendum 2026-11-17 — audit: "not a bug" closure was wrong
+- What happened: bug audit (BPMN run r-20261117-212533-cf04; checker + refuter). Under the client-accurate strict `EditBox:SetFont` harness, the Instance drops browser of v0.4.20 and v0.4.21 cannot build: the shared journal host creates its Min/Max boxes with `E.box` (`EquipmentUI.lua:489-490`) and release `font()` called `SetFont` without flags. `test_loot.py` against v0.4.20/v0.4.21 sources: 2/58 pass, 56 fail with `Usage: EditBox:SetFont(fontFile, height, flags)`. HEAD: 58/58.
+- Why the earlier conclusion failed: the old harness had no SetFont mock and the `if text.SetFont` guard skipped the call, so "no defect found" was a harness blind spot, not evidence. Same root cause as `2026-11-17-journal-black-page-editbox-setfont.md`.
+- Fix: f1b34e9 (`EquipmentUI.lua:10-11` passes `""` flags; strict harness at `tests/harness.py`). Not released — v0.4.21 users still have the broken tab.
+- Result / new status: fixed in source, pending release + native confirmation. Unverified items from the original report (Settings layering, old AtlasLoot without ItemDB.Storage, live combat deferral) remain open.

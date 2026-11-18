@@ -462,6 +462,166 @@ def test_non_ascii_role_tokens_keep_literal_matching(style):
     assert [p.result.vendor.id for p in pins(g)] == [2]
 
 
+# Classic Era size (QuestieDB read-performance.md): 10,122 NPCs and 14,899 items. NPCs 1..1500 are sellers in Elwynn
+# (area 12, the shown map 1429), the rest are untitled mobs; items 1..3000 are sold by them. debugprofilestop is a
+# virtual clock that charges each database read like the game does: 4 us for a scalar (or nil), 10 us for a table.
+CLASSIC_CATALOGUE = r'''
+local NPCS, SELLERS, ITEMS, SOLD = 10122, 1500, 14899, 3000
+QUESTIE_NPCS, QUESTIE_ITEMS = {}, {}
+local npcIDs, itemIDs = {}, {}
+for id = 1, NPCS do
+    npcIDs[id] = id
+    QUESTIE_NPCS[id] = id <= SELLERS and { subName = id % 3 == 0 and "Trade Supplies" or "General Goods",
+        spawns = { [12] = { { (id % 100) / 1.01, 50 } } } } or { name = "Mob " .. id }
+end
+for id = 1, ITEMS do
+    itemIDs[id] = 100000 + id
+    QUESTIE_ITEMS[100000 + id] = id <= SOLD and { name = "Linen Cloth " .. id, vendors = { id % SELLERS + 1 } }
+        or { name = "Drop " .. id }
+end
+VCLOCK, ENUMS, SPAWN_READS = 0, { npc = 0, item = 0 }, 0
+debugprofilestop = function() return VCLOCK end
+local function charge(v) VCLOCK = VCLOCK + (type(v) == "table" and 0.010 or 0.004); return v end
+NpcDB.Get = function(id, key)
+    if key == "spawns" then SPAWN_READS = SPAWN_READS + 1 end
+    local r = QUESTIE_NPCS[id]; return charge(r and r[key])
+end
+ItemDB.Get = function(id, key) local r = QUESTIE_ITEMS[id]; return charge(r and r[key]) end
+NpcDB.GetAllIds = function() ENUMS.npc = ENUMS.npc + 1; return npcIDs end
+ItemDB.GetAllIds = function() ENUMS.item = ENUMS.item + 1; return itemIDs end
+-- test-side reader of the visible suggestion rows (one Lua loop instead of one Python call per frame)
+function SHOWN_SUGGESTIONS()
+    local out = {}
+    for _, f in ipairs(FRAMES) do
+        if f.suggestion and f.shown and f.parent and f.parent.shown then out[#out + 1] = f.suggestion.value end
+    end
+    return table.concat(out, "|")
+end
+'''
+
+
+def classic_game(style):
+    g = Game(style, SETUP + CLASSIC_CATALOGUE, fresh=True)
+    g.start()
+    g.run("NS.db.vendorSearch=true; WorldMapFrame:Show(); NS.vendorMap.refresh()")
+    g.advance(3)
+    return g
+
+
+def type_keys(g, edit, word, start=1):
+    """A player typing 10 keys per second; returns right after the last key."""
+    for i in range(start, len(word) + 1):
+        edit.SetText(edit, word[:i])
+        edit.scripts.OnTextChanged(edit)
+        if i < len(word):
+            g.advance(0.1)
+
+
+def wait_for(g, ready, cap=30, each=None):
+    """Seconds (0.1 s frames) from the last keystroke until ready(); None if it never happens within cap."""
+    for frame in range(1, int(cap * 10) + 1):
+        g.advance(0.1)
+        if each:
+            each(frame)
+        if ready():
+            return frame / 10
+    return None
+
+
+def test_classic_size_suggestions_arrive_quickly_while_typing(style):
+    g = classic_game(style)
+    assert dict(g.eval("ENUMS").items()) == {"npc": 0, "item": 0}, "map open enumerated the catalogue"
+    assert g.eval("VCLOCK") == 0, "map open read the database"
+    edit = ui(g)
+    shown = lambda: g.eval("SHOWN_SUGGESTIONS()")
+    status = []
+    type_keys(g, edit, "gene")
+    cold = wait_for(g, lambda: "General Goods" in shown(), each=lambda _: status.append(" ".join(labels(g))))
+    assert cold is not None, "no suggestion for cold 'gene'"
+    assert cold <= 1.5, f"cold 'gene' first suggestion after {cold}s (target <= 1.5 s)"
+    assert any("Indexing" in s and "/ 10,122 NPCs" in s for s in status), status
+
+    # Refining the text keeps the last suggestions visible until the new ones replace them.
+    type_keys(g, edit, "gener", start=5)
+    for _ in range(10):
+        g.advance(0.1)
+        assert "General Goods" in shown(), "suggestions blinked out while refining the query"
+    spawn_reads = g.eval("SPAWN_READS")
+    type_keys(g, edit, "general", start=6)
+    g.advance(2)
+    assert g.eval("SPAWN_READS") == spawn_reads, "locations of the same matches were read again"
+
+    # An unrelated query never shows the previous suggestions, then gets its own from the warm index.
+    type_keys(g, edit, "trade")
+    assert "General" not in shown()
+    warm = wait_for(g, lambda: "Trade Supplies" in shown())
+    assert warm is not None, "no suggestion for warm 'trade'"
+    assert warm <= 0.3, f"warm 'trade' first suggestion after {warm}s (target <= 0.3 s)"
+    assert dict(g.eval("ENUMS").items()) == {"npc": 1, "item": 0}, "keystrokes restarted the catalogue index"
+
+
+def test_classic_size_item_query_indexes_items_once_and_suggests_local_items(style):
+    g = classic_game(style)
+    edit = ui(g)
+    type_keys(g, edit, "linen")
+    first = wait_for(g, lambda: "Linen Cloth" in g.eval("SHOWN_SUGGESTIONS()"))
+    assert first is not None, "no item suggestion for 'linen'"
+    assert first <= 3, f"cold 'linen' first suggestion after {first}s"
+    type_keys(g, edit, "linen cloth 1", start=6)
+    g.advance(2)
+    assert "Linen Cloth 1" in g.eval("SHOWN_SUGGESTIONS()")
+    assert dict(g.eval("ENUMS").items()) == {"npc": 1, "item": 1}
+
+
+def test_typing_uses_the_foreground_slice_and_a_programmatic_search_keeps_the_shared_one(style):
+    def slices(g, seconds):
+        out, before = [], g.eval("VCLOCK")
+        for _ in range(int(seconds * 10)):
+            g.advance(0.1)
+            now = g.eval("VCLOCK")
+            out.append(now - before)
+            before = now
+        return out
+
+    g = classic_game(style)
+    edit = ui(g)
+    type_keys(g, edit, "g")
+    typed = slices(g, 1.5)
+    assert max(typed) <= 8.02, typed  # 8 ms foreground slice plus at most one database read
+    assert max(typed) > 6, typed
+    g = classic_game(style)
+    g.eval("NS.vendorMap.search")("General Goods", True, "vendor")
+    assert max(slices(g, 1.5)) <= 2.02  # no typing: the shared 2 ms slice, as for every background job
+
+
+def test_hidden_map_pauses_the_typed_index_and_reopening_continues_it(style):
+    g = classic_game(style)
+    edit = ui(g)
+    type_keys(g, edit, "gene")
+    g.advance(0.2)
+    g.run("WorldMapFrame:Hide(); NS.vendorMap.refresh()")
+    before = g.eval("VCLOCK")
+    g.advance(3)
+    assert g.eval("VCLOCK") == before, "the index read data while the map was hidden"
+    g.run("WorldMapFrame:Show(); NS.vendorMap.refresh()")
+    assert wait_for(g, lambda: "General Goods" in g.eval("SHOWN_SUGGESTIONS()"), cap=5) is not None
+    assert g.eval("ENUMS.npc") == 1
+
+
+def test_locations_stay_cached_across_queries_until_map_change_or_provider_loss(style):
+    g = game(style)
+    type_query(g, "gene")
+    general = pins(g)[0].result.vendor
+    type_query(g, "trade")
+    trade = pins(g)[0].result.vendor
+    assert general.spawns is not None, "a keystroke wiped the cached locations"
+    g.run("WORLDMAP_ID=1436; NS.vendorMap.refresh()")
+    assert general.spawns is None, "map change kept locations of an earlier query"
+    assert trade.spawns is not None, "map change dropped the current matches"
+    g.run("SAVED_NPC_DB=NpcDB; SAVED_ITEM_DB=ItemDB; " + NO_DATABASE + "; NS.vendorMap.refresh()")
+    assert trade.spawns is None
+
+
 NO_DATABASE = "QuestDB=nil; NpcDB=nil; ItemDB=nil; ObjectDB=nil; LibQuestieDB=nil; QuestieLoader=nil; Questie=nil"
 
 
@@ -511,6 +671,53 @@ def test_lost_database_clears_stale_results_and_restores_fresh_index(style):
     g.run("QUESTIE_NPCS[2].subName='Mage Trainer'; NpcDB=SAVED_NPC_DB; ItemDB=SAVED_ITEM_DB; LibQuestieDB=SAVED_LIB; NS.vendorMap.refresh()")
     g.advance(3)
     assert 2 not in [p.result.vendor.id for p in pins(g)]
+
+
+FAIL_ONCE = r'''
+WorldMapFrame.ScrollContainer.HookScript = function(self, event, fn) self.hooks = self.hooks or {}; self.hooks[event] = fn end
+'''
+# An error in the add-on's own job code (QuestieDB getter errors are already caught): once in the role index, or
+# once while the search job reads locations.
+BREAK_ONCE = {
+    "index": '''local get = NS.questie.get
+NS.questie.get = function(kind, id, key)
+    if key == "subName" then NS.questie.get = get; error("simulated index failure") end
+    return get(kind, id, key)
+end''',
+    "search": '''local spawns = NS.questie.spawnList
+NS.questie.spawnList = function(...) NS.questie.spawnList = spawns; error("simulated search failure") end''',
+}
+
+
+def explicit_search(g, action):
+    edit = ui(g)
+    if action == "enter":
+        edit.scripts.OnEnterPressed(edit)
+    elif action == "icon":
+        icon = next(c for c in edit.children.values() if c.scripts and c.scripts.OnClick)
+        icon.scripts.OnClick(icon)
+    else:
+        g.run("CTRL=true; WorldMapFrame.ScrollContainer.hooks.OnMouseDown(WorldMapFrame.ScrollContainer, 'RightButton'); CTRL=false")
+
+
+def test_explicit_search_with_the_same_text_retries_after_a_failed_vendor_job(style):
+    g = game(style, FAIL_ONCE)
+    type_query(g, "gene")
+    expected = sorted(p.result.vendor.id for p in pins(g))
+    assert expected
+    for job, code in BREAK_ONCE.items():
+        for action in ("enter", "icon", "ctrl-right-click"):
+            g = game(style, FAIL_ONCE)
+            g.run(code)
+            type_query(g, "gene")
+            g.advance(3)  # the map's own redraws do not retry a failed job
+            assert not pins(g), (job, action)
+            assert "try the search again" in " ".join(labels(g)), (job, action)
+            explicit_search(g, action)
+            assert ui(g).text == "gene"
+            g.advance(3)
+            assert sorted(p.result.vendor.id for p in pins(g)) == expected, (job, action)
+            assert "try the search again" not in " ".join(labels(g)), (job, action)
 
 
 def test_libquestiedb_only_provider_is_supported(style):

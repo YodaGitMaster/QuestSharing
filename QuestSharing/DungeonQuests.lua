@@ -7,6 +7,7 @@ local ready, loading, page, progress, total = false, false, 1, 0, 0
 local selected, message, generation = nil, "Open to read dungeon quests.", 0
 local filterError
 local refreshPending=false
+local menuEntry, menuQuest -- what D.menu last opened, to tell our right-click menu from other windows' menus
 local PAGE, OWNER, REWARDS_OWNER = 5, "dungeonQuests", "dungeonQuestRewards"
 local FOREGROUND_MS = 8 -- the player is waiting on this visible list; it reads ~18 fields per quest
 local rewardIndex, rewardsReady, rewardsLoading = {}, false, false
@@ -428,6 +429,7 @@ function D.menu(id)
         if #list==0 then ns.print(Q.whereText(id) or "Quest pickup location unknown in QuestieDB.") end
         for _,p in ipairs(list) do ns.print(pickupText(p)) end
     end})
+    menuEntry,menuQuest=e,id
     ns.openQuestMenu(e,items)
 end
 function D.detail(r)
@@ -472,9 +474,23 @@ function D.go(delta)
     if wanted==page then return false end
     page=wanted;ns.closeQuestMenu();paint();return true
 end
-function D.refresh()
+-- keepMenu (quest-log events): leave an open right-click menu alone unless its quest left the results.
+function D.refresh(keepMenu)
     if not shown() then return end
-    ns.closeQuestMenu();D.search();paint()
+    local open=keepMenu and menuEntry and ns.questMenuEntry()==menuEntry and menuQuest
+    if not keepMenu then ns.closeQuestMenu() end
+    D.search()
+    if open then
+        local kept=false
+        for _,r in ipairs(results) do if r.id==open then kept=true;break end end
+        -- The menu's actions hold menuEntry. On classic they act on its quest-log index, which moves when quests
+        -- above it are added or removed: refresh it in place, and close if the quest joined or left the log.
+        local live=C.findEntry(open)
+        if kept and (live==nil)~=(menuEntry.catalogue==true) then kept=false end
+        if not kept then ns.closeQuestMenu()
+        elseif live then menuEntry.index,menuEntry.complete,menuEntry.title=live.index,live.complete,live.title end
+    end
+    paint()
 end
 function D.updateControls()
     if not window then return end
@@ -615,7 +631,7 @@ ns.on("QUEST_LOG_UPDATE",function()
         refreshPending=false
         if shown() and ready then
             for _,r in pairs(records) do r.taskLabel,r.talkOnly=nil,nil end
-            selected=nil;D.refresh()
+            selected=nil;D.refresh(true)
         end
     end)
 end)

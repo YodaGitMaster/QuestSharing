@@ -47,7 +47,7 @@ def printed(g):
 def test_every_tab_has_a_short_intro_and_sections(style):
     g = game(style)
     W = window(g)
-    for t in ("general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "browser", "optional"):
+    for t in ("general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional"):
         g.eval("NS.settingsTab")(t)
         assert len(plain(W.intro.text)) > 20, t
     g.eval("NS.settingsTab")("sharing")
@@ -57,12 +57,14 @@ def test_every_tab_has_a_short_intro_and_sections(style):
     assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["The separate Party quests window", "Posting progress by clicking", "Adding party members as friends"]
     g.eval("NS.settingsTab")("general")
     assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Start here", "Try it and check your setup", "Troubleshooting and reset"]
+    g.eval("NS.settingsTab")("guide")
+    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Quest guide", "Camps", "Learned pace", "Report"]
 
 
 def test_rows_are_laid_out_top_to_bottom_without_overlapping_and_fit_in_the_window(style):
     g = game(style)
     W = window(g)
-    for t in ("general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "browser", "optional"):
+    for t in ("general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional"):
         g.eval("NS.settingsTab")(t)
         tops = [-r.frame.point[5] for r in rows(W)]
         heights = [r.frame.height for r in rows(W)]
@@ -78,6 +80,33 @@ def test_rows_are_laid_out_top_to_bottom_without_overlapping_and_fit_in_the_wind
             assert -W.ed.frame.point[5] + W.ed.frame.height <= W.rowBody.height
         g.eval("NS.settingsScroll")(-10000)
         assert W.rowScroll.vscroll == 0
+
+
+def test_the_quest_guide_tab_fits_the_sidebar_and_its_quest_id_box_sits_inside_its_row(style):
+    g = game(style)
+    W = window(g, "guide")
+    # Twelve categories still sit above the "Changes save automatically." note at the bottom of the sidebar.
+    last = W.tabs.guide.frame
+    for tab in W.tabs.values():
+        last = tab.frame if -tab.frame.point[5] > -last.point[5] else last
+    note = W.savedNote
+    note_top = W.win.height - note.point[5] - note.GetStringHeight(note)
+    assert -last.point[5] + last.height <= note_top
+    assert -W.tabs.guide.frame.point[5] == -W.tabs.maps.frame.point[5] + 28, "right after Map, same group"
+    box_row = next(r for r in rows(W) if r.edit and r.edit.shown)
+    box = box_row.edit
+    assert "Quest IDs" in plain(box_row.text.text)
+    top = -box.point[5]
+    assert g.eval("function(a, b) return a == b end")(box.point[2], box_row.frame), "anchored in its own row"
+    assert box.point[1] == "TOPLEFT" and top >= 20, "below the label"
+    assert box.width <= W.rowScroll.width and box.height >= 20
+    assert -box_row.desc.point[5] >= top + box.height, "the help text starts under the box"
+    assert box_row.frame.height >= top + box.height + 12
+    assert box.font[3] is not None, "EditBox:SetFont needs flags"
+    pace = next(r for r in rows(W) if "Times the route uses now" in plain(r.text.text))
+    assert "per kill" in plain(pace.desc.text) and not pace.button.shown
+    g.eval("NS.settingsTab")("optional")
+    assert not [r for r in rows(W) if r.edit and r.edit.shown]
 
 
 def test_a_check_box_shows_the_setting_and_a_description_says_what_it_does(style):

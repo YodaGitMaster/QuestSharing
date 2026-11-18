@@ -144,7 +144,6 @@ local function clearPlan(reason)
     if P.cancelEstimate then P.cancelEstimate() end
     coverage = emptyCoverage()
     Work.cancel("quest-plan")
-    if Path then Path.cancelWalkEstimates() end
     loading, catalog, route, selected, plannedMap = false, {}, {}, 1, nil
     lastLevelStats = { localCount = 0, below = 0, above = 0, eligible = 0, unknown = 0 }
     selectionLocked = false
@@ -317,7 +316,6 @@ local function scan(rediscover)
     coverage = emptyCoverage()
     generation = generation + 1
     Work.cancel("quest-plan")
-    if Path then Path.cancelWalkEstimates() end
     local thisGeneration = generation
     local q = questie()
     local zone, locationError, zoneMap = currentZone()
@@ -558,16 +556,21 @@ local function addTask(stop, quest, text, destination)
 end
 
 local goal = { mode = "all", selectedIDs = {}, budgetSeconds = 1800 }
+local readSettings                      -- saved goal settings -> goal (defined with the other goal functions)
 local report, previousPlan, previousMap, lastOrigin, plannedSpeed
 local waitingAt = {}
+-- The camp each objective (stop.key) last used, per map. A camp forced by "Camp busy" is never recorded, so the
+-- camp chosen before the mark returns when the wait ends; "Clear camp wait" forgets them all.
+local siteMemory = { map = nil, sites = {} }
+-- The last completed background local search; it only runs again when the plan's inputs really change.
+local refinedPlan
+local REFINE_MOVE = 0.1 -- map units of movement after which the local search runs again
 local function campKey(p)
     return string.format("%d/%.5f/%.5f", p.map, p.x, p.y)
 end
 
 function P.cancelEstimate()
-    Work.cancel("quest-costs")
     Work.cancel("quest-improve")
-    if Path then Path.cancelWalkEstimates() end
     report = nil
     lastPlanOptions = nil
 end
@@ -683,11 +686,12 @@ end
 -- alternatives the optimizer may pick from its route position. A camp is real when it has REAL_CAMP spawns,
 -- or as many as the target's biggest camp on any map when the mob never gathers that many, so a lone stray
 -- never outranks a camp. Camps are clustered per creature, so every quest on the same creature sees the
--- very same camp points and the optimizer can share their kills.
+-- very same camp points and the optimizer can share their kills. Creatures that share one camp (2 + 2 spawns)
+-- are also clustered together: a creature's camp inside such a real mixed area is real as well.
 targetLocation = function(target)
     if #(target.sources or {}) == 0 then return nearestPoint(target.points) end
     if not target.camps then
-        local largest, here = 0, {}
+        local largest, here, pooled = 0, {}, {}
         for _, source in ipairs(target.sources) do
             local probability = target.dropRates and target.dropRates[source.id]
             if source.kind ~= "npc" or target.kind ~= "loot" or probability ~= 0 then
@@ -697,9 +701,10 @@ targetLocation = function(target)
                         local point = pointForSpawn(spawn)
                         -- Spawns elsewhere only size the biggest camp; local camps are the destinations.
                         local key = point and "here" or (spawn.map and ("m" .. spawn.map) or ("a" .. tostring(spawn.area)))
-                        byMap[key] = byMap[key] or {}
-                        table.insert(byMap[key], { point = point,
-                            x = point and point.x or spawn.x / 100, y = point and point.y or spawn.y / 100 })
+                        local x, y = point and point.x or spawn.x / 100, point and point.y or spawn.y / 100
+                        byMap[key], pooled[key] = byMap[key] or {}, pooled[key] or {}
+                        table.insert(byMap[key], { point = point, x = x, y = y })
+                        table.insert(pooled[key], { point = point, x = x, y = y })
                     end
                 end
                 for key, list in pairs(byMap) do
@@ -710,9 +715,24 @@ targetLocation = function(target)
                 end
             end
         end
+        local pooledLargest, areas, mixed = 0, {}, {}
+        for key, list in pairs(pooled) do
+            for _, camp in ipairs(groupCamps(list)) do
+                pooledLargest = math.max(pooledLargest, #camp.members)
+                if key == "here" then areas[#areas + 1] = camp end
+            end
+        end
+        for _, camp in ipairs(areas) do
+            if #camp.members >= math.min(REAL_CAMP, pooledLargest) then mixed[#mixed + 1] = camp.mark.point end
+        end
         target.camps = {}
         for _, row in ipairs(here) do
-            if #row.camp.members >= math.min(REAL_CAMP, largest) then
+            local real = #row.camp.members >= math.min(REAL_CAMP, largest)
+            for _, mark in ipairs(mixed) do
+                if real then break end
+                real = distance(mark, row.camp.mark.point) <= CLUSTER_DISTANCE
+            end
+            if real then
                 target.camps[#target.camps + 1] = { point = row.camp.mark.point, source = row.source }
             end
         end
@@ -841,17 +861,39 @@ local function runSpeed()
     return 7
 end
 
+-- "Camp busy" marks the camp the player was sent to, which can be one of the objective's alternatives.
+-- Busy alternatives are dropped; a busy default gives way to a free alternative; when every camp is busy,
+-- the one that frees up first becomes the default. Returns the seconds until the stop's camp is free, and
+-- whether any of its camps was busy (its camp choice was then forced, not chosen).
+local function avoidBusyCamps(stop, now)
+    local free, soonest, soonestAt = {}, nil, nil
+    for _, alt in ipairs(stop.alternatives or {}) do
+        local expires = waitingAt[campKey(alt.point)]
+        if not expires then free[#free + 1] = alt
+        elseif not soonestAt or expires < soonestAt then soonest, soonestAt = alt, expires end
+    end
+    local busyUntil, promote = waitingAt[campKey(stop.point)], nil
+    local narrowed = busyUntil ~= nil or soonest ~= nil
+    if busyUntil and free[1] then
+        promote, busyUntil = table.remove(free, 1), nil
+    elseif busyUntil and soonestAt and soonestAt < busyUntil then
+        promote, busyUntil = soonest, soonestAt
+    end
+    if promote then
+        stop.point, stop.tasks, stop.questTasks = promote.point, promote.tasks, promote.questTasks
+        stop.objectives[1].sourceID = promote.sourceID
+    end
+    stop.alternatives = free[1] and free or nil
+    return busyUntil and busyUntil - now, narrowed
+end
+
 local function planOptions(stops, origin)
     local width, height = U.call(C_Map and C_Map.GetMapWorldSize, origin.map)
     local estimatedScale = not (finite(width) and width > 0 and finite(height) and height > 0)
     if estimatedScale then width, height = 3000, 2000 end
-    local speed, firstLeg = runSpeed(), {}
+    -- Straight-line travel only: the plan never depends on the optional Shortest Path Forever.
+    local speed = runSpeed()
     local function travel(a, b)
-        if a == origin then
-            local walking = firstLeg[campKey(b)]
-            if type(walking) == "number" then return walking / speed end
-            if walking == false then return math.huge end
-        end
         local dx, dy = (a.x - b.x) * width, (a.y - b.y) * height
         return math.sqrt(dx * dx + dy * dy) / speed
     end
@@ -877,25 +919,32 @@ local function planOptions(stops, origin)
     end
     local reputation = ns.compat.plannerReputation(factions)
     local skillRanks = ns.compat.plannerSkills(skills)
-    local availableAfter, byKey, preferred = {}, {}, {}
+    local availableAfter, byKey, preferred, forced = {}, {}, {}, {}
     local now = GetTime()
     for key, expires in pairs(waitingAt) do if expires <= now then waitingAt[key] = nil end end
     for _, stop in ipairs(stops) do
         byKey[stop.key] = stop.id
-        local expires = stop.kind == "objective" and waitingAt[campKey(stop.point)]
-        if expires then availableAfter[stop.id] = expires - now end
+        if stop.kind == "objective" then
+            local wait, narrowed = avoidBusyCamps(stop, now)
+            availableAfter[stop.id] = wait
+            if narrowed then forced[stop.key] = true end
+        end
     end
     if previousMap == origin.map then
         for _, key in ipairs(previousPlan or {}) do if byKey[key] then preferred[#preferred + 1] = byKey[key] end end
     end
+    -- Remembered camps stay unless another camp is clearly cheaper (the optimizer's switch margin).
     return { mode = goal.mode, selectedIDs = goal.selectedIDs, budgetSeconds = goal.budgetSeconds, origin = origin,
-        checkpoint = Work.checkpoint, travelSeconds = travel, killSeconds = 10, interactionSeconds = 3,
+        checkpoint = Work.checkpoint, travelSeconds = travel,
+        killSeconds = ns.questCalibration and ns.questCalibration.killSeconds() or 10,
+        interactionSeconds = ns.questCalibration and ns.questCalibration.interactionSeconds() or 3,
         logCount = count, logCapacity = capacity, preferredIDs = preferred, stabilitySeconds = 10,
+        preferredSites = siteMemory.map == origin.map and siteMemory.sites or nil,
         availableAfter = availableAfter, inventory = inventory,
         reputation = reputation,
         skillRanks = skillRanks,
         level = U.call(UnitLevel, "player"), currentXP = U.call(UnitXP, "player"),
-        nextLevelXP = U.call(UnitXPMax, "player") }, firstLeg, estimatedScale, speed
+        nextLevelXP = U.call(UnitXPMax, "player") }, estimatedScale, speed, forced
 end
 
 buildRoute = function()
@@ -903,8 +952,23 @@ buildRoute = function()
     nextStopID = 0
     local stops, origin = questActions(), playerPoint
     if not origin then route = {}; return end
-    local opts, firstLeg, estimatedScale, speed = planOptions(stops, origin)
+    local opts, estimatedScale, speed, forced = planOptions(stops, origin)
     local token = generation
+    local keys, selection, busy = {}, {}, {}
+    for i, stop in ipairs(stops) do keys[i] = stop.key end
+    for id in pairs(goal.selectedIDs) do selection[#selection + 1] = id end
+    table.sort(selection)
+    for key in pairs(waitingAt) do busy[#busy + 1] = key end -- planOptions already dropped expired waits
+    table.sort(busy)
+    local inputs = { map = origin.map, origin = origin, stops = table.concat(keys, ";"),
+        goal = table.concat({ goal.mode, tostring(goal.budgetSeconds), P.levelScope, table.concat(selection, ","),
+            table.concat(busy, ",") }, "|") }
+    -- Local search runs again only for a new stop set, goal or scope, or after real movement; otherwise solve(0)
+    -- starts from the refined order (preferredIDs), so it runs as well when that order was discarded.
+    local last = refinedPlan
+    local refineNeeded = #opts.preferredIDs == 0 or not (last and last.map == inputs.map and last.stops == inputs.stops
+        and last.goal == inputs.goal and distance(last.origin, origin) < REFINE_MOVE)
+    local function current() return generation == token and sessionActive and not panelDismissed and ns.db.enabled end
     local function solve(improveSteps)
         opts.maxImproveSteps = improveSteps or 0
         local ordered, result = ns.questOptimizer.optimize(catalog, stops, opts)
@@ -916,44 +980,33 @@ buildRoute = function()
         previousMap, previousPlan = origin.map, {}
         for _, stop in ipairs(ordered or {}) do previousPlan[#previousPlan + 1] = stop.key end
         lastOrigin, plannedSpeed = origin, speed
-        route = visibleStops(ordered or {}, report.reasons)
-    end
-    -- The fast schedule shows at once; local search refines it in the background and swaps it in.
-    local function refine(owner)
-        Work.start(owner, function()
-            local key = selectionLocked and route[selected] and stopIdentity(route[selected])
-            solve(IMPROVE_STEPS)
-            if token ~= generation then return end
-            selected = 1
-            if key then
-                for i, stop in ipairs(route) do if stopIdentity(stop) == key then selected = i; break end end
-            end
-            render()
-        end, function() return generation == token and sessionActive and not panelDismissed and ns.db.enabled end)
-    end
-    solve(0)
-    refine("quest-improve")
-    if Path and Path.available() then
-        local targets, seen = {}, {}
-        for _, stop in ipairs(stops) do
-            if not next(stop.deps) then
-                -- Alternative camps need walking costs too, or a straight-line guess would undercut the default.
-                local points = { stop.point }
-                for _, alt in ipairs(stop.alternatives or {}) do points[#points + 1] = alt.point end
-                for _, point in ipairs(points) do
-                    local key = campKey(point)
-                    if not seen[key] then targets[#targets + 1], seen[key] = point, true end
-                end
+        -- Every plan records its camps, except a camp "Camp busy" forced: that stop keeps its earlier memory.
+        if siteMemory.map ~= origin.map then siteMemory = { map = origin.map, sites = {} } end
+        for _, stop in ipairs(ordered or {}) do
+            if stop.kind == "objective" and not forced[stop.key] then
+                siteMemory.sites[stop.key] = ns.questOptimizer.siteKey(stop.point)
             end
         end
-        Path.estimateWalks(origin, targets, function(costs)
-            if not costs or generation ~= token or not sessionActive then return end
-            for i, point in ipairs(targets) do firstLeg[campKey(point)] = costs[i] end
-            -- Walking costs change every first leg; the refinement restarts with them.
-            Work.cancel("quest-improve")
-            refine("quest-costs")
-        end)
+        -- The step the player chose is read now, not when a background job started: the search takes many slices.
+        local key = selectionLocked and route[selected] and stopIdentity(route[selected])
+        route = visibleStops(ordered or {}, report.reasons)
+        selected = 1
+        if key then
+            for i, stop in ipairs(route) do if stopIdentity(stop) == key then selected = i; break end end
+        end
     end
+    -- The fast schedule shows at once; local search refines it in the background and swaps it in. It is idle work:
+    -- it runs only while no other data work (map search, dungeon scan) is waiting.
+    local function refine()
+        Work.start("quest-improve", function()
+            solve(IMPROVE_STEPS)
+            if token ~= generation then return end
+            refinedPlan = inputs
+            render()
+        end, current, nil, nil, "idle")
+    end
+    solve(0)
+    if refineNeeded then refine() end
 end
 
 local function stopLabel(stop)
@@ -1332,6 +1385,7 @@ function P.open()
     if not ns.db.questPlanner then ns.setSetting("questPlanner", true); return end
     panelDismissed = false
     sessionActive = true
+    readSettings()
     if not ensurePanel() then return ns.print("this client cannot open the quest plan panel") end
     dockPanel()
     panel:Show()
@@ -1376,7 +1430,6 @@ function P.masterChanged(enabled)
     generation = generation + 1
     Work.cancel("quest-plan")
     P.cancelEstimate()
-    if Path then Path.cancelWalkEstimates() end
     loading = false
     if panel then panel:Hide() end
 end
@@ -1386,7 +1439,6 @@ rebuildProgress = function(log, zone)
     local oldIndex, oldKey = selected, selectionLocked and route[selected] and stopIdentity(route[selected])
     generation = generation + 1
     local token = generation
-    if Path then Path.cancelWalkEstimates() end
     loading = true
     Work.start("quest-plan", function()
         for id, quest in pairs(catalog) do quest.entry = log[id] end
@@ -1621,8 +1673,51 @@ local function explainPlan()
         table.sort(ids)
         for _,id in ipairs(ids) do lines[#lines+1] = string.format("%d • %s",id,coverage[category][id]) end
     end
+    local K = ns.questCalibration
+    if K and K.describe then lines[#lines+1] = "Times used: " .. K.describe() .. "." end
     lines[#lines+1] = "Unknown future levels, inventory restrictions, flight routes and world conditions need live confirmation."
     return table.concat(lines,"\n\n")
+end
+
+-- Goal, time limit, chosen quest IDs and level scope are saved settings (Settings > Quest guide). This reads them.
+-- Returns false when the goal asks for quest IDs and none are typed; the previous goal then stays.
+readSettings = function()
+    local d = ns.db or {}
+    local mode = d.questPlannerGoal
+    if modeNames[mode] == nil then mode = "all" end
+    local ids, hint = {}, nil
+    if mode == "selected" then
+        for token in tostring(d.questPlannerSelected or ""):gmatch("%d+") do ids[tonumber(token)] = true end
+        if not next(ids) then mode, hint = goal.mode, "type quest IDs in Settings > Quest guide for the Chosen quests goal" end
+    end
+    if mode == "selected" then goal.selectedIDs = ids end
+    local minutes = tonumber(d.questPlannerBudget)
+    if finite(minutes) and minutes > 0 then goal.budgetSeconds = math.min(minutes, 1440) * 60 end
+    goal.mode = mode
+    P.levelScope = d.questPlannerScope == "green-yellow" and "green-yellow" or "all"
+    return hint == nil, hint
+end
+
+local function replan()
+    selectionLocked = false
+    previousPlan = nil
+    if sessionActive then scan() end
+end
+
+-- Settings > Quest guide changed a goal, minutes, quest IDs or level scope: read them and replan at once.
+function P.applySettings()
+    local ok, hint = readSettings()
+    if hint then ns.print(hint) end
+    replan()
+    return ok
+end
+
+-- A goal chosen by command is saved like one chosen in the settings, so both always agree.
+local function saveGoal(mode, value)
+    ns.db.questPlannerGoal = mode
+    if mode == "selected" then ns.db.questPlannerSelected = tostring(value or "")
+    elseif mode == "budget" then ns.db.questPlannerBudget = math.max(5, math.min(240, math.floor((tonumber(value) or 30) + 0.5))) end
+    if ns.refreshSettings then ns.refreshSettings() end
 end
 
 function P.setGoal(mode, value)
@@ -1638,54 +1733,55 @@ function P.setGoal(mode, value)
         goal.budgetSeconds=value*60
     end
     goal.mode=mode
+    saveGoal(mode, value)
     selectionLocked=false
     previousPlan=nil
     if sessionActive then scan() else P.open() end
     return true
 end
 
-local optionsPanel, optionsText, selectedBox, budgetBox
-function P.options()
-    if not optionsPanel then
-        optionsPanel=U.window("QuestSharingPlannerOptions",420,520,"Quest plan objective")
-        if not optionsPanel then return end
-        S.button(optionsPanel,"Complete zone",124,function() P.setGoal("all"); P.options() end):SetPoint("TOPLEFT",optionsPanel,"TOPLEFT",12,-36)
-        S.button(optionsPanel,"Quest XP/hour",124,function() P.setGoal("xp"); P.options() end):SetPoint("TOPLEFT",optionsPanel,"TOPLEFT",146,-36)
-        S.button(optionsPanel,"Level range",124,function()
-            P.levelScope=P.levelScope=="all" and "green-yellow" or "all"
-            selectionLocked=false; previousPlan=nil
-            if sessionActive then scan() end
-            P.options()
-        end):SetPoint("TOPLEFT",optionsPanel,"TOPLEFT",280,-36)
-        selectedBox=U.box(optionsPanel,"Quest IDs",12,70,252,"",150)
-        S.button(optionsPanel,"Plan selected",134,function() P.setGoal("selected",selectedBox:GetText()); P.options() end):SetPoint("TOPLEFT",optionsPanel,"TOPLEFT",274,-87)
-        budgetBox=U.box(optionsPanel,"Minutes available",12,118,252,30,5)
-        S.button(optionsPanel,"Plan within time",134,function() P.setGoal("budget",budgetBox:GetText()); P.options() end):SetPoint("TOPLEFT",optionsPanel,"TOPLEFT",274,-135)
-        S.button(optionsPanel,"Camp busy 5 min",150,function()
-            local stop=route[selected]
-            if stop and stop.kind=="objective" then
-                waitingAt[campKey(stop.point)]=GetTime()+300
-                selectionLocked=false; scan()
-            else ns.print("select an objective camp first") end
-        end):SetPoint("TOPLEFT",optionsPanel,"TOPLEFT",12,-173)
-        S.button(optionsPanel,"Clear camp wait",134,function() waitingAt={}; selectionLocked=false; if sessionActive then scan() end end):SetPoint("TOPLEFT",optionsPanel,"TOPLEFT",174,-173)
-        local _, setText = U.scrollText(optionsPanel,12,210,396,268)
-        optionsText=setText
-        S.button(optionsPanel,"Refresh report",134,function() P.options() end):SetPoint("BOTTOMLEFT",optionsPanel,"BOTTOMLEFT",12,10)
-        S.button(optionsPanel,"Copy plan debug",134,function() P.debug() end):SetPoint("BOTTOMLEFT",optionsPanel,"BOTTOMLEFT",154,10)
+-- The guide's options live in Settings > Quest guide.
+function P.options() ns.settingsTab("guide") end
+
+-- "Camp busy": the selected objective's camp is skipped for 5 minutes, then the route comes back to it.
+function P.markCampBusy()
+    local stop = route[selected]
+    if stop and stop.kind == "objective" then
+        waitingAt[campKey(stop.point)] = GetTime() + 300
+        selectionLocked = false
+        scan()
+        return true
     end
-    optionsText(explainPlan())
-    optionsPanel:Show()
+    ns.print("select an objective step (kill or collect) in the quest guide first")
+    return false
 end
+
+function P.clearCampWaits()
+    waitingAt = {}
+    siteMemory = { map = nil, sites = {} }
+    selectionLocked = false
+    if sessionActive then scan() end
+end
+
+function P.showReport()
+    if ns.reportWindow then
+        ns.reportWindow("Quest Sharing - quest guide report", {explainPlan()}, "planner", nil, nil, P.showReport)
+    else ns.print("The plan report is unavailable; try /reload.") end
+end
+
+function P.active() return sessionActive end
 
 function P.command(arg)
     arg = string.lower(arg or "")
     local mode, value = arg:match("^(%S+)%s*(.-)$")
     if mode == "all" or mode == "xp" or mode == "selected" or mode == "budget" then P.setGoal(mode,value)
-    elseif arg == "options" or arg == "why" then P.options()
+    elseif arg == "options" then P.options()
+    elseif arg == "why" or arg == "report" then P.showReport()
     elseif arg == "debug" then P.debug()
     elseif arg == "range" or arg == "unrestricted" then
         P.levelScope=arg=="range" and "green-yellow" or "all"
+        ns.db.questPlannerScope=P.levelScope
+        if ns.refreshSettings then ns.refreshSettings() end
         selectionLocked=false; previousPlan=nil
         if sessionActive then scan() else P.open() end
     elseif arg == "off" then ns.setSetting("questPlanner", false)

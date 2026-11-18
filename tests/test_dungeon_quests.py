@@ -148,6 +148,64 @@ def test_right_click_reuses_menu_and_handles_quests_not_in_log(style):
     assert not g.eval("NS.db.errors")
 
 
+def test_quest_log_update_keeps_open_menu_until_its_quest_leaves_results(style):
+    # Regression: QUEST_LOG_UPDATE -> D.refresh() -> closeQuestMenu() shut the right-click menu 0.2 s after any log change.
+    g=game(style);w=g.eval("NS.dungeonQuests._window()")
+    click(w.completed);assert 19 not in ids(g)  # "Hiding completed": finishing a quest removes it from the results
+    row=w.rows[1];qid=row.result.id;other=w.rows[2].result.id
+    row.frame.scripts.OnClick(row.frame,"RightButton")
+    menu,_=g.eval("NS._questMenu()")
+    assert menu.shown and menu.entry.questID==qid
+    g.fire("QUEST_LOG_UPDATE");g.advance(.3)
+    assert menu.shown, "an unrelated quest-log update must not close the menu"
+    g.run(f"FINISHED[{other}]=true");g.fire("QUEST_LOG_UPDATE");g.advance(.3)
+    assert other not in ids(g) and qid in ids(g) and menu.shown, "another quest leaving keeps this quest's menu"
+    g.run(f"FINISHED[{qid}]=true");g.fire("QUEST_LOG_UPDATE");g.advance(.3)
+    assert qid not in ids(g) and not menu.shown, "the menu closes once its quest leaves the results"
+    # User-driven refreshes (filters, paging) still close the menu as before.
+    g.eval("NS.dungeonQuests.menu")(w.rows[1].result.id);assert menu.shown
+    click(w.completed);assert not menu.shown
+    assert not g.eval("NS.db.errors")
+
+
+def test_quest_log_update_leaves_menus_from_other_windows_alone(style):
+    g=game(style)
+    g.run('NS.openQuestMenu(NS.compat.findEntry(100))')
+    menu,_=g.eval("NS._questMenu()");assert menu.shown
+    g.fire("QUEST_LOG_UPDATE");g.advance(.3)
+    assert menu.shown
+
+
+def test_kept_menu_acts_on_its_own_quest_after_the_log_shifts(style):
+    # Regression (classic): a menu kept open through QUEST_LOG_UPDATE kept the old quest-log index, so
+    # "Offer it to the party" pushed whichever quest had moved into that slot (here 200 instead of 2).
+    g=game(style,'table.insert(QUESTS,{id=2,title="A dungeon job",level=20,objectives={}})')
+    g.slash("auto off");g.join_party(["Anna"]);g.advance(1)  # auto off: no automatic share round of the new quest
+    g.eval("NS.dungeonQuests.menu")(2)
+    menu,lines=g.eval("NS._questMenu()")
+    assert menu.shown and menu.entry.questID==2 and menu.entry.index==7
+    def offer():
+        g.run("PUSHED={}")
+        b=next(b for b in lines.values() if b.shown and "Offer it to the party" in b.text)
+        b.scripts.OnClick(b,"LeftButton")
+        return g.pushed()
+    g.run('table.insert(QUESTS,2,{id=300,title="Inserted above",level=5,objectives={}})')
+    g.fire("QUEST_LOG_UPDATE");g.advance(.3)
+    assert menu.shown and menu.entry.index==8
+    assert offer()==[2]
+    g.advance(15)  # let the share round from the first offer end
+    g.eval("NS.dungeonQuests.menu")(2);assert menu.shown and menu.entry.index==8
+    g.run("table.remove(QUESTS,2);table.remove(QUESTS,2)")  # two quests above it leave: index 8 would be past the end
+    g.fire("QUEST_LOG_UPDATE");g.advance(.3)
+    assert menu.shown and menu.entry.index==6
+    assert offer()==[2]
+    # Abandoning it keeps the quest in the results as a catalogue quest, but the menu's log actions no longer apply.
+    g.eval("NS.dungeonQuests.menu")(2);assert menu.shown
+    g.run("table.remove(QUESTS,6)");g.fire("QUEST_LOG_UPDATE");g.advance(.3)
+    assert 2 in ids(g) and not menu.shown
+    assert not g.eval("NS.db.errors")
+
+
 def test_catalogue_actions_show_pickup_chain_objectives_without_selecting_log(style):
     g=game(style)
     g.eval("NS.dungeonQuests.menu")(2)

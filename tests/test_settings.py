@@ -259,7 +259,7 @@ def test_every_setting_is_on_exactly_one_tab(style):
     n = int(g.eval("#NS.settingRows"))
     tabs = [g.eval("NS.settingRows[%d].tab" % i) for i in range(1, n + 1)]
     ids = [g.eval("NS.settingTabs[%d].id" % i) for i in range(1, int(g.eval("#NS.settingTabs")) + 1)]
-    assert ids == ["general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "browser", "optional"]
+    assert ids == ["general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional"]
     assert all(t in ids for t in tabs)
     assert all(tabs.count(t) >= 1 for t in ids), "no empty tab"
     keys = [g.eval("NS.settingRows[%d].key" % i) for i in range(1, n + 1) if g.eval("NS.settingRows[%d].key" % i)]
@@ -275,7 +275,7 @@ def test_tabs_show_only_their_own_rows(style):
     tracker = visible_texts(W)
     assert W.tab == "tracker" and not set(general) & set(tracker)
     assert any("Automatically track nearby quests" in t for t in tracker) and any("Pause after I edit the quest list" in t for t in tracker)
-    assert W.tabs.tracker.text.text.startswith("|cffffd100") and W.tabs.general.text.text.startswith("|cff55ccff"), "the open tab is gold"
+    assert W.tabs.tracker.text.text.startswith("|cffffd100") and W.tabs.general.text.text.startswith("|cffffffff"), "the open tab is gold, the others white"
     assert W.ed.frame.shown is False, "the message editor belongs to the Quick chat tab only"
     g.eval("NS.settingsTab")("quick")
     assert W.ed.frame.shown is True
@@ -480,8 +480,208 @@ def test_browser_db_contains_all_reference_launchers_and_extra_tools_stays_focus
     assert W.rowScroll.vscroll == 0
     cards = [r for r in W.rows.values() if r.index and r.frame.shown and r.card.shown]
     assert len(cards) == 5
-    assert {r.button.text for r in cards} == {"Open plan", "Review items", "Write invite", "Update ranks", "Edit spots"}
+    assert {r.button.text for r in cards} == {"Open tab", "Review items", "Write invite", "Update ranks", "Edit spots"}
     assert all(r.button.shown for r in cards)
+
+
+# ---- the Quest guide tab ------------------------------------------------------------------------------------------------
+# The planner API (QuestPlanner.lua / QuestCalibration.lua) is stubbed: the tab only talks to it through this contract.
+GUIDE_STUB = """GUIDE_CALLS = {}
+for _, name in ipairs({ "applySettings", "markCampBusy", "clearCampWaits", "showReport", "debug", "open" }) do
+    NS.questPlanner[name] = function() GUIDE_CALLS[#GUIDE_CALLS + 1] = name end
+end
+CALIBRATION = { killSeconds = 10, interactionSeconds = 3, killSamples = 0, interactionSamples = 0,
+                killCalibrated = false, interactionCalibrated = false }
+NS.questCalibration = { get = function() return CALIBRATION end,
+                        reset = function() GUIDE_CALLS[#GUIDE_CALLS + 1] = "reset" end }"""
+
+GUIDE_ROWS = [
+    ("header", None, "Quest guide"),
+    ("bool", "questPlanner", None),
+    ("choice", "questPlannerGoal", None),
+    ("number", "questPlannerBudget", None),
+    ("text", "questPlannerSelected", None),
+    ("choice", "questPlannerScope", None),
+    ("header", None, "Camps"),
+    ("action", None, "Mark selected camp busy (5 min)"),
+    ("action", None, "Clear camp waits"),
+    ("header", None, "Learned pace"),
+    ("info", None, None),
+    ("action", None, "Reset learned pace"),
+    ("header", None, "Report"),
+    ("action", None, "Show plan report"),
+    ("action", None, "Copy plan debug"),
+]
+
+
+def guide_calls(g):
+    return list(g.eval("GUIDE_CALLS").values())
+
+
+def guide_tab(g, stub=True):
+    if stub:
+        g.run(GUIDE_STUB)
+    g.slash("settings")
+    g.eval("NS.settingsTab")("guide")
+    return window(g)
+
+
+def guide_row(g, W, label):
+    return next(r for r in visible_rows(W) if label in r.text.text)
+
+
+def test_the_quest_guide_tab_follows_map_and_holds_every_guide_option(style):
+    g = fresh(style)
+    tabs = list(g.eval("NS.settingTabs").values())
+    ids = [t.id for t in tabs]
+    assert ids.index("guide") == ids.index("maps") + 1
+    guide = tabs[ids.index("guide")]
+    assert guide.title == "Quest guide" and len(guide.intro) > 20
+    rows = [r for r in g.eval("NS.settingRows").values() if r.tab == "guide"]
+    assert [(r.kind, r.key, r.label if r.kind in ("header", "action") else None) for r in rows] == GUIDE_ROWS
+    by_key = {r.key: r for r in rows if r.key}
+    assert list(by_key["questPlannerGoal"]["values"].values()) == ["all", "xp", "selected", "budget"]
+    assert list(by_key["questPlannerScope"]["values"].values()) == ["all", "green-yellow"]
+    assert (by_key["questPlannerBudget"].min, by_key["questPlannerBudget"].max) == (5, 240)
+    assert by_key["questPlanner"].button == "Open plan"
+    assert all(r.desc for r in rows if r.kind != "header"), "every control explains its visible effect"
+    W = guide_tab(g)
+    assert W.tab == "guide" and W.heading.text == "Quest guide"
+    texts = visible_texts(W)
+    for label in ("Quest guide", "Camps", "Learned pace", "Report", "Mark selected camp busy", "Reset learned pace",
+                  "Show plan report", "Copy plan debug"):
+        assert any(label in t for t in texts), label
+
+
+def test_extra_tools_keeps_only_a_pointer_to_the_quest_guide_tab(style):
+    g = fresh(style)
+    rows = list(g.eval("NS.settingRows").values())
+    assert not [r for r in rows if r.tab == "optional" and r.key and r.key.startswith("questPlanner")]
+    assert [r.tab for r in rows if r.key == "questPlanner"] == ["guide"], "the switch lives in the guide tab only"
+    g.slash("settings")
+    g.eval("NS.settingsTab")("optional")
+    W = window(g)
+    card = next(r for r in visible_rows(W) if r.card.shown and r.button.text == "Open tab")
+    assert "Quest guide" in card.text.text and not card.toggle.shown, "a pointer card, not a switch"
+    g.eval("NS.settingsScroll")(100000)
+    press(g, card.button)
+    assert W.tab == "guide" and W.rowScroll.vscroll == 0
+
+
+def test_guide_controls_save_their_setting_and_update_the_guide(style):
+    g = fresh(style)
+    assert (g.eval("NS.db.questPlannerGoal"), g.eval("NS.db.questPlannerBudget"), g.eval("NS.db.questPlannerSelected"),
+            g.eval("NS.db.questPlannerScope")) == ("all", 30, "", "all")
+    W = guide_tab(g)
+    goal = visible_by_key(g, W, "questPlannerGoal")
+    press(g, goal.choices[4])
+    assert g.eval("NS.db.questPlannerGoal") == "budget" and guide_calls(g) == ["applySettings"]
+    assert "[x] Time limit" in goal.choices[4].text and "minutes" in goal.desc.text
+    budget = visible_by_key(g, W, "questPlannerBudget")
+    press(g, budget.more)
+    assert g.eval("NS.db.questPlannerBudget") == 35 and guide_calls(g)[-1] == "applySettings"
+    for _ in range(10):
+        press(g, budget.less)
+    assert g.eval("NS.db.questPlannerBudget") == 5, "never below 5 minutes"
+    g.run("SHIFT = true")
+    for _ in range(12):
+        press(g, budget.more)
+    g.run("SHIFT = false")
+    assert g.eval("NS.db.questPlannerBudget") == 240, "never above 240 minutes"
+    # The quest ID box saves on Enter, keeps only the numbers and shows what it kept.
+    box = visible_by_key(g, W, "questPlannerSelected").edit
+    assert box.shown and box.kind == "EditBox" and box.text == ""
+    assert box.font[2] and box.font[3] is not None, "EditBox:SetFont needs flags"
+    before = len(guide_calls(g))
+    box.SetText(box, "12, abc 345")
+    g.eval("function(b) b.scripts.OnEnterPressed(b) end")(box)
+    assert g.eval("NS.db.questPlannerSelected") == "12, 345" and box.text == "12, 345"
+    assert guide_calls(g)[before:] == ["applySettings"]
+    g.eval("function(b) b.scripts.OnEditFocusLost(b) end")(box)
+    assert len(guide_calls(g)) == before + 1, "unchanged text does not replan"
+    box.SetText(box, "999")
+    g.eval("function(b) b.scripts.OnEscapePressed(b) end")(box)
+    assert box.text == "12, 345" and g.eval("NS.db.questPlannerSelected") == "12, 345", "Escape keeps the saved IDs"
+    box.SetText(box, "77")
+    g.eval("function(b) b.scripts.OnEditFocusLost(b) end")(box)
+    assert g.eval("NS.db.questPlannerSelected") == "77", "clicking away saves too"
+    scope = visible_by_key(g, W, "questPlannerScope")
+    press(g, scope.choices[2])
+    assert g.eval("NS.db.questPlannerScope") == "green-yellow" and guide_calls(g)[-1] == "applySettings"
+    # The on/off switch keeps its own path (settingChanged), not applySettings.
+    before = len(guide_calls(g))
+    switch = visible_by_key(g, W, "questPlanner")
+    g.eval('function(r) r.toggle.scripts.OnMouseUp(r.toggle, "LeftButton") end')(switch)
+    assert g.eval("NS.db.questPlanner") is True and "applySettings" not in guide_calls(g)[before:]
+    for label, expected in (("Mark selected camp busy", ["markCampBusy"]), ("Clear camp waits", ["clearCampWaits"]),
+                            ("Reset learned pace", ["reset", "applySettings"]), ("Show plan report", ["showReport"]),
+                            ("Copy plan debug", ["debug"])):
+        before = len(guide_calls(g))
+        press(g, guide_row(g, W, label).button)
+        assert guide_calls(g)[before:] == expected, label
+    before = len(guide_calls(g))
+    press(g, switch.button)
+    assert switch.button.text == "Open plan" and guide_calls(g)[before:] == ["open"]
+
+
+def test_the_learned_pace_line_shows_default_or_calibrated_times(style):
+    g = fresh(style)
+    W = guide_tab(g)
+    pace = next(r for r in visible_rows(W) if g.eval("NS.settingRows")[r.index].kind == "info")
+    assert "10 s per kill (default)" in pace.desc.text and "3 s per quest giver (default)" in pace.desc.text
+    g.run("""CALIBRATION = { killSeconds = 7, interactionSeconds = 2.5, killSamples = 23, interactionSamples = 6,
+                             killCalibrated = true, interactionCalibrated = true }""")
+    g.eval("NS.refreshSettings")()
+    assert "7 s per kill, from 23 kills" in pace.desc.text
+    assert "2.5 s per quest giver, from 6 visits" in pace.desc.text
+    assert "7 s per kill, from 23 kills" in g.eval("NS.rowText(NS.settingRows[%d])" % pace.index)
+    assert not pace.button.shown and not pace.box.shown, "read-only: nothing to click"
+
+
+def test_the_guide_tab_works_before_the_planner_api_exists(style):
+    g = fresh(style)
+    g.run("""NS.questCalibration = nil
+        for _, name in ipairs({ "applySettings", "markCampBusy", "clearCampWaits", "showReport" }) do NS.questPlanner[name] = nil end""")
+    W = guide_tab(g, stub=False)
+    pace = next(r for r in visible_rows(W) if g.eval("NS.settingRows")[r.index].kind == "info")
+    assert "10 s per kill (default)" in pace.desc.text
+    press(g, visible_by_key(g, W, "questPlannerGoal").choices[2])
+    assert g.eval("NS.db.questPlannerGoal") == "xp"
+    g.run("PRINTED = {}")
+    for label in ("Mark selected camp busy", "Clear camp waits", "Reset learned pace", "Show plan report"):
+        press(g, guide_row(g, W, label).button)
+    assert "\n".join(g.printed()).count("quest guide") >= 4
+
+
+def test_set_setting_updates_the_guide_for_every_guide_key_but_not_the_switch(style):
+    g = fresh(style)
+    g.run(GUIDE_STUB)
+    for key, value in (("questPlannerGoal", "xp"), ("questPlannerScope", "green-yellow"), ("questPlannerBudget", 60),
+                       ("questPlannerSelected", "12")):
+        g.eval("NS.setSetting")(key, value)
+    assert guide_calls(g) == ["applySettings"] * 4
+    g.eval("NS.setSetting")("gap", 6)
+    g.eval("NS.setSetting")("questPlanner", False)
+    assert guide_calls(g) == ["applySettings"] * 4
+    g.slash("reset")
+    assert (g.eval("NS.db.questPlannerGoal"), g.eval("NS.db.questPlannerScope"), g.eval("NS.db.questPlannerBudget"),
+            g.eval("NS.db.questPlannerSelected")) == ("all", "all", 30, "")
+
+
+def test_settings_tab_guide_opens_the_window_on_that_tab(style):
+    g = fresh(style)
+    assert window(g) is None
+    g.eval("NS.settingsTab")("guide")                      # the guide's Options button and /qs plan options
+    W = window(g)
+    assert W.win.shown is True and W.tab == "guide"
+    g.eval("NS.settingsTab")("general")
+    assert W.win.shown is True and W.tab == "general"
+    assert not [r for r in visible_rows(W) if r.edit and r.edit.shown], "the quest ID box stays on its own tab"
+    g.slash("settings")
+    assert W.win.shown is False
+    g.eval("NS.settingsTab")("guide")
+    assert W.win.shown is True and W.tab == "guide"
+
 
 if __name__ == "__main__":
     import inspect

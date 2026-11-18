@@ -1,0 +1,58 @@
+flowchart LR
+  %% Fix the audited bugs: planner regressions, map search, dungeon menu — three parallel streams with reviews · 8 agents: 4 × bpmn:worker, 4 × bpmn:reviewer · up to 14 with loop rounds
+  subgraph n_lane_builder["🤖 Builder · bpmn:worker"]
+    n_start(("Fix plan approved"))
+    n_split{"+"}
+    n_build_a["⚙ Fix planner regressions · ⏱ 50 min"]
+    n_fix_a["⚙ Fix planner review issues · ⏱ 25 min"]
+    n_build_b["⚙ Fix map search typing · ⏱ 45 min"]
+    n_fix_b["⚙ Fix map search issues · ⏱ 25 min"]
+    n_build_c["⚙ Keep dungeon menu open · ⏱ 15 min"]
+    n_fix_c["⚙ Fix dungeon review issues · ⏱ 15 min"]
+    n_integrate["⚙ Integrate and run suite · ⏱ 20 min"]
+    n_review_a__merge{"✕"}
+    n_review_b__merge{"✕"}
+    n_review_c__merge{"✕"}
+  end
+  subgraph n_lane_reviewer["🤖 Reviewer · bpmn:reviewer · ⏱ 15 min"]
+    n_review_a["⚙ Review planner fixes"]
+    n_ok_a{"Planner fixes approved?"}
+    n_review_b["⚙ Review map search fix"]
+    n_ok_b{"Map search fix approved?"}
+    n_review_c["⚙ Review dungeon menu fix"]
+    n_ok_c{"Dungeon fix approved?"}
+    n_join{"+"}
+    n_final_review["⚙ Review integrated tree · ⏱ 20 min"]
+    n_done((("Fixes integrated")))
+  end
+  n_start --> n_split
+  n_split --> n_build_a
+  n_build_a --> n_review_a__merge
+  n_review_a --> n_ok_a
+  n_ok_a -- "approved or 2nd round" --> n_join
+  n_ok_a -- "changes" --> n_fix_a
+  n_fix_a --> n_review_a__merge
+  n_split --> n_build_b
+  n_build_b --> n_review_b__merge
+  n_review_b --> n_ok_b
+  n_ok_b -- "approved or 2nd round" --> n_join
+  n_ok_b -- "changes" --> n_fix_b
+  n_fix_b --> n_review_b__merge
+  n_split --> n_build_c
+  n_build_c --> n_review_c__merge
+  n_review_c --> n_ok_c
+  n_ok_c -- "approved or 2nd round" --> n_join
+  n_ok_c -- "changes" --> n_fix_c
+  n_fix_c --> n_review_c__merge
+  n_join --> n_integrate
+  n_integrate --> n_final_review
+  n_final_review --> n_done
+  n_review_a__merge --> n_review_a
+  n_review_b__merge --> n_review_b
+  n_review_c__merge --> n_review_c
+  classDef done fill:#e6f4ea,stroke:#1e8e3e,color:#0d3b1e
+  classDef running fill:#e8f0fe,stroke:#1a73e8,color:#0b2a5b
+  classDef ready fill:#fef7e0,stroke:#b06000,color:#4a3600
+  classDef failed fill:#fce8e6,stroke:#c5221f,color:#5f0d06
+  classDef cancelled fill:#f1f3f4,stroke:#80868b,color:#3c4043
+  class n_start,n_split,n_build_a,n_review_a,n_ok_a,n_fix_a,n_build_b,n_review_b,n_ok_b,n_build_c,n_review_c,n_ok_c,n_fix_c,n_join,n_integrate,n_final_review,n_done,n_review_a__merge,n_review_b__merge,n_review_c__merge done

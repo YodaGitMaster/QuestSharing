@@ -48,7 +48,7 @@ end
 def planner_game(pre=DATA, scope="green-yellow"):
     g = Game("modern", pre, fresh=True)
     g.start()
-    g.eval("NS.questPlanner").levelScope = scope
+    g.run("NS.db.questPlannerScope = %r" % scope)
     g.eval("NS.setSetting")("questPlanner", True)
     g.advance(5)
     return g

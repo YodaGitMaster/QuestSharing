@@ -17,14 +17,16 @@ function E.text(parent,value,x,y,width)
     return text
 end
 function E.surface(frame,paper)
-    local base=S.fill(frame,"BACKGROUND",paper and 0.78 or 0.105,paper and 0.67 or 0.078,paper and 0.46 or 0.052,1)
-    base:SetAllPoints(frame)
-    local grain=frame:CreateTexture(nil,"BACKGROUND")
-    grain:SetTexture(paper and "Interface\\QuestFrame\\QuestBG" or "Interface\\DialogFrame\\UI-DialogBox-Background")
-    grain:SetAllPoints(frame);grain:SetAlpha(paper and 1 or 0.28)
+    local base,grain
+    if paper then
+        base=S.fill(frame,"BACKGROUND",0.78,0.67,0.46,1);base:SetAllPoints(frame)
+        grain=frame:CreateTexture(nil,"BACKGROUND");grain:SetTexture("Interface\\QuestFrame\\QuestBG");grain:SetAllPoints(frame)
+    else
+        base=S.stone(frame);grain=frame.stone.tile
+    end
     local edges={}
     for _,side in ipairs({"TOP","BOTTOM","LEFT","RIGHT"}) do
-        local edge=S.fill(frame,"BORDER",0.48,0.35,0.16,0.9)
+        local edge=S.fill(frame,"BORDER",0.48,0.35,0.16,1)
         if side=="TOP" or side=="BOTTOM" then
             edge:SetHeight(1);edge:SetPoint(side.."LEFT",frame,side.."LEFT",0,0);edge:SetPoint(side.."RIGHT",frame,side.."RIGHT",0,0)
         else
@@ -35,30 +37,22 @@ function E.surface(frame,paper)
     frame.journalSurface={base=base,grain=grain,edges=edges,paper=paper==true}
     return base
 end
-local function buttonTexture(b,method,path)
-    local texture=b:CreateTexture(nil,"BACKGROUND")
-    texture:SetTexture(path);texture:SetTexCoord(0,0.625,0,0.6875);texture:SetAllPoints(b)
-    if method=="SetHighlightTexture" then texture:SetBlendMode("ADD") end
-    b[method](b,texture)
-    return texture
-end
 function E.button(parent,label,width,click,tip)
+    -- S.button already draws the classic red panel art; the journal only uses a taller button and larger text.
     local b=S.button(parent,label,width,click,tip)
-    b.bg:Hide();b.edge:Hide();b:SetHeight(24)
-    b.normalArt=buttonTexture(b,"SetNormalTexture","Interface\\Buttons\\UI-Panel-Button-Up")
-    buttonTexture(b,"SetPushedTexture","Interface\\Buttons\\UI-Panel-Button-Down")
-    buttonTexture(b,"SetHighlightTexture","Interface\\Buttons\\UI-Panel-Button-Highlight")
+    b:SetHeight(24)
     font(b.label,12,1,0.82,0)
     return b
 end
 function E.listButton(parent,label,width,click,tip)
     local b=S.button(parent,label,width,click,tip)
-    b.bg:Hide();b.edge:Hide();b.bg=E.surface(b);font(b.label,12,0.91,0.84,0.67)
+    -- A flat list row: keep the panel-button glow on hover, drop its red art (alpha 0: the button re-shows its textures).
+    b.bg:SetAlpha(0);b.pushedArt:SetAlpha(0);b.bg=E.surface(b);font(b.label,12,0.91,0.84,0.67)
     return b
 end
 function E.box(parent,label,x,y,width,value,max)
     local b=U.box(parent,label,x,y,width,value,max)
-    E.surface(b);font(b,12,1,0.94,0.8)
+    font(b,12,1,0.94,0.8) -- U.box already draws the recessed classic edit box
     if b.SetTextInsets then b:SetTextInsets(7,7,0,0) end
     return b
 end
@@ -547,7 +541,7 @@ function E.details(parent, x, width, title,height)
     height=height or 550
     panel:SetPoint("TOPLEFT", parent, "TOPLEFT", x, 0); panel:SetWidth(width); panel:SetHeight(height)
     E.surface(panel,true)
-    local header=S.fill(panel,"ARTWORK",0.17,0.10,0.045,0.97)
+    local header=S.fill(panel,"ARTWORK",0.17,0.10,0.045,1)
     header:SetPoint("TOPLEFT",panel,"TOPLEFT",1,-1);header:SetPoint("TOPRIGHT",panel,"TOPRIGHT",-1,-1);header:SetHeight(34)
     E.text(panel, S.GOLD .. title .. "|r", 14, 11, width-28)
     local text, write,scroll = U.scrollText(panel, 16, 48, width-32, height-110)

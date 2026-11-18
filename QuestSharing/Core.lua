@@ -39,6 +39,10 @@ ns.defaults = {
     itemSources = false, -- opt-in: QuestieDB source hints on item tooltips
     vendorSearch = false, -- opt-in: vendor search on the world map
     questPlanner = false, -- opt-in: prerequisite-aware quest route suggestions
+    questPlannerGoal = "all", -- quest guide aim: "all" (complete the zone), "xp", "selected" (questPlannerSelected) or "budget"
+    questPlannerBudget = 30, -- minutes for the "budget" goal (5-240)
+    questPlannerSelected = "", -- quest IDs for the "selected" goal, e.g. "123, 456"
+    questPlannerScope = "all", -- quest levels the guide plans: "all" or "green-yellow"
     autoAcceptQuests = false, -- opt-in: accept quests when their offer is shown
     autoCompleteQuests = false, -- opt-in: finish safe quest turn-ins without a reward decision
     bagMarks = true,    -- quest items marked in the bags: gold = a quest of this zone, blue = a quest elsewhere
@@ -382,6 +386,9 @@ function ns.setSetting(key, value)
         if (key == "itemSources" or key == "enabled") and ns.itemSources then ns.itemSources.refresh() end
         if (key == "vendorSearch" or key == "enabled") and ns.vendorMap then ns.vendorMap.refresh() end
         if key == "questPlanner" and ns.questPlanner then ns.questPlanner.settingChanged(value) end
+        -- Goal, time limit, quest IDs and level scope (Settings > Quest guide): the planner rereads them and replans.
+        if type(key) == "string" and key ~= "questPlanner" and string.sub(key, 1, 12) == "questPlanner"
+            and ns.questPlanner and type(ns.questPlanner.applySettings) == "function" then ns.questPlanner.applySettings() end
         if key == "enabled" and ns.questPlanner then ns.questPlanner.masterChanged(value) end
         if key == "enabled" and not value and ns.adventure then ns.adventure.close() end
         if key == "enabled" and not value and ns.loot then ns.loot.close() end

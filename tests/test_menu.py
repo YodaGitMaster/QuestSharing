@@ -94,6 +94,16 @@ def test_a_choice_does_it_and_closes_the_menu(style):
     assert g.pushed() == [100]
 
 
+def test_quest_menu_entry_names_the_quest_of_the_open_menu_only(style):
+    g = party(style)
+    assert g.eval("NS.questMenuEntry()") is None
+    menu, lines = open_menu(g)
+    assert g.eval("NS.questMenuEntry().title") == "Wolves Among Us"
+    assert g.eval("NS.questMenuEntry() == NS._questMenu().entry")
+    menu.Hide(menu)
+    assert g.eval("NS.questMenuEntry()") is None
+
+
 def test_lines_that_cannot_be_used_are_grey_and_say_why(style):
     g = party(style, on_quest={"party1": [100]})
     menu, lines = open_menu(g)

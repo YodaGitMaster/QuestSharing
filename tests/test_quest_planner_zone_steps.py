@@ -316,6 +316,261 @@ QUESTS={{id=9014,title="Report to Sentinel Hill",level=8,objectives={}}}
     assert "Turn in Report to Sentinel Hill" in text(g)
 
 
+TWO_CAMPS = CAMP + '''
+for _, p in ipairs({{80,80},{81,79},{79,81}}) do table.insert(QUESTIE_NPCS[610].spawns[40], p) end
+'''
+
+# Shortest Path Forever builds. The guide uses SPF only for the optional Follow arrow and never to plan, so every
+# build must leave the plan exactly as it is without SPF, and none is ever asked for walking estimates
+# (SPF_ESTIMATES stays 0). v2.3 can estimate walks: walking to the 30,30 camp costs WALK_FACTOR times the straight
+# line (a river detour). If the guide did ask, spf_tick would deliver the answer 0.4 s later (or a failed estimate
+# when SPF_FAIL is set), so a guide that used the estimates would plan differently.
+SPF_WALKS = r'''
+SPF_ESTIMATES, SPF_PENDING, SPF_FAIL = 0, nil, nil
+ShortestPathForever = { API = { version = 2, minor = 3,
+ Navigate = function() return true end,
+ EstimateWalks = function(owner, from, targets, callback)
+  SPF_ESTIMATES = SPF_ESTIMATES + 1
+  local costs = {}
+  for i, t in ipairs(targets) do
+   local dx, dy = (t.x - from.x) * 3000, (t.y - from.y) * 2000
+   costs[i] = math.sqrt(dx * dx + dy * dy)
+   if math.abs(t.x - 0.30) < 0.03 and math.abs(t.y - 0.30) < 0.03 then costs[i] = costs[i] * WALK_FACTOR end
+  end
+  local job = { callback = callback, costs = costs }
+  SPF_PENDING = job
+  return function() job.cancelled = true end
+ end } }
+function SPF_DELIVER()
+ local job = SPF_PENDING; SPF_PENDING = nil
+ if job and not job.cancelled then
+  if SPF_FAIL then job.callback(nil, SPF_FAIL) else job.callback(job.costs) end
+ end
+end
+'''
+
+# Builds that can navigate but cannot estimate walks (v1, or v2 before minor 3).
+SPF_NAVIGATE_ONLY = (
+    "SPF_ESTIMATES = 0\nShortestPathForever = { API = { version = 1, Navigate = function() return true end } }\n",
+    "SPF_ESTIMATES = 0\nShortestPathForever = { API = { version = 2, minor = 2, Navigate = function() return true end,"
+    " EstimateWalks = function() SPF_ESTIMATES = SPF_ESTIMATES + 1 end } }\n",
+)
+
+# Every build: navigate-only, estimates that would make the west camp three or one and a half times as far,
+# and estimates that always fail.
+SPF_BUILDS = SPF_NAVIGATE_ONLY + (
+    SPF_WALKS + "WALK_FACTOR=3\n",
+    SPF_WALKS + "WALK_FACTOR=1.5\n",
+    SPF_WALKS + 'WALK_FACTOR=3\nSPF_FAIL="no-path"\n',
+)
+
+# Every route the guide renders, as the camp of its objective step.
+RENDER_LOG = r'''
+CAMP_RENDERS = {}
+local G = NS.questGuidance
+local set = G.set
+G.set = function(route, index, ...)
+ for _, stop in ipairs(route) do
+  if stop.kind == "objective" then CAMP_RENDERS[#CAMP_RENDERS + 1] = string.format("%.2f,%.2f", stop.point.x, stop.point.y) end
+ end
+ return set(route, index, ...)
+end
+'''
+
+
+def spf_tick(g, seconds):
+    """Advances the clock; an SPF asked for walking estimates answers 0.4 s after the request."""
+    for _ in range(int(seconds * 10)):
+        g.advance(0.1)
+        if g.eval("SPF_PENDING") is not None:
+            g.advance(0.4)
+            g.run("SPF_DELIVER()")
+
+
+def spf_game(style, extra=""):
+    g = Game(style, WESTFALL + extra, fresh=True)
+    g.run(RENDER_LOG)
+    g.start()
+    g.eval("NS.setSetting")("questPlanner", True)
+    spf_tick(g, 5)
+    return g
+
+
+# The player walks from the middle (0.50) towards the east camp B (0.80) and back towards the west camp A (0.30).
+CAMP_WALK = (0.53, 0.56, 0.65, 0.56, 0.53, 0.44, 0.53)
+
+
+def camp_timeline(style, extra, positions=CAMP_WALK):
+    """The objective's camp and every step's text after the first plan and after each move."""
+    g = spf_game(style, extra)
+
+    def plan():
+        renders = list(g.eval("CAMP_RENDERS").values())
+        return {"0.30,0.30": "A", "0.80,0.80": "B"}[renders[-1]], text(g)
+
+    plans = [plan()]
+    for x in positions:
+        g.run(f"POS.x, POS.y = {x}, {x}")
+        spf_tick(g, 4)
+        plans.append(plan())
+    return plans, g
+
+
+def test_objective_camp_switches_only_when_clearly_cheaper_and_never_flips_back(style):
+    # The guide keeps the camp it chose until another one is cheaper by a quarter of the visit's cost and at least
+    # 20 s. At 0.56 the east camp is only about 10 s nearer; at 0.65 it is clearly cheaper. Walking back keeps it
+    # until the west camp is clearly cheaper again (0.44), so standing near the middle never flips the step.
+    plans, _ = camp_timeline(style, TWO_CAMPS)
+    assert [camp for camp, _ in plans] == ["A", "A", "A", "B", "B", "B", "A", "A"], [camp for camp, _ in plans]
+
+
+def test_spf_is_never_asked_for_walks_and_the_guide_plans_as_without_it(style):
+    expected, _ = camp_timeline(style, TWO_CAMPS)
+    for spf in SPF_BUILDS:
+        plans, g = camp_timeline(style, TWO_CAMPS + spf)
+        assert g.eval("SPF_ESTIMATES") == 0, (spf, g.eval("SPF_ESTIMATES"))
+        assert [camp for camp, _ in plans] == [camp for camp, _ in expected], (spf, plans)
+        assert plans == expected, spf
+
+
+MIXED = r'''
+QUESTIE_QUESTS[9000],QUESTIE_QUESTS[9001],QUESTIE_QUESTS[9002]=nil,nil,nil
+QUESTIE_QUESTS[9300]={name="Bog Hides",questLevel=8,zoneOrSort=40,startedBy={{600}},objectives={nil,nil,{{77}}},finishedBy={{600}}}
+QUESTIE_ITEMS[77]={name="Bog Hide",npcDrops={630,631}}
+ItemDB.Get=function(id,key) local t=QUESTIE_ITEMS[id];return t and t[key] end
+local old=QuestieLoader.ImportModule
+QuestieLoader.ImportModule=function(self,name)
+ if name=="DropDB" then return {GetItemDroprate=function() return {40,"fixture"} end} end
+ return old(self,name)
+end
+QUESTS={{id=9300,title="Bog Hides",level=8,objectives={{text="Bog Hide: 0/6",type="item",have=0,need=6}}}}
+'''
+
+
+def test_mixed_creature_camp_stays_real_when_one_creature_gathers_elsewhere(style):
+    # Two creatures share one local camp (2 + 2 spawns); one of them also has a 3-spawn camp in another zone.
+    g = game(style, MIXED + '''
+QUESTIE_NPCS[630]={name="Bog Crawler",spawns={[40]={{25,65},{26,66}},[12]={{40,40},{41,41},{40.5,42}}}}
+QUESTIE_NPCS[631]={name="Bog Stalker",spawns={[40]={{25.5,66},{26,65}}}}
+''')
+    assert "Collect Bog Hide" in text(g)
+    assert near(objective_waypoint(g), 0.255, 0.655), objective_waypoint(g)
+
+
+def test_nearby_mixed_camp_beats_a_far_single_creature_camp(style):
+    # The mixed camp is next to the player; one creature also gathers in a 3-spawn camp across the zone.
+    g = game(style, MIXED + '''
+QUESTIE_NPCS[630]={name="Bog Crawler",spawns={[40]={{48,52},{49,53},{85,15},{86,16},{85.5,14.5}}}}
+QUESTIE_NPCS[631]={name="Bog Stalker",spawns={[40]={{48.5,53},{49,52}}}}
+''')
+    assert near(objective_waypoint(g), 0.485, 0.525), objective_waypoint(g)
+
+
+# Not yet accepted: the guide walks to the giver first, and from there the east camp is the cheaper one,
+# although the west camp is nearer to the player (so it is the objective's default place).
+BUSY_CAMPS = r'''
+QUESTIE_QUESTS[9000],QUESTIE_QUESTS[9001],QUESTIE_QUESTS[9002]=nil,nil,nil
+QUESTIE_NPCS[610]={name="Harvest Watcher",spawns={[40]={
+ {30,30},{31,32},{29,31},{32,29},{30.5,28.5},{28.5,30.5},
+ {62,40},{63,41},{61,39},
+}}}
+QUESTIE_QUESTS[9100]={name="Harvest Patrol",questLevel=8,zoneOrSort=40,startedBy={{600}},objectives={{{610}}},finishedBy={{600}}}
+QUESTS={}
+POS={x=0.40,y=0.40}
+'''
+
+
+def mark_objective_camp_busy(g):
+    objective_waypoint(g)  # selects the objective step
+    g.eval("NS.questPlanner.markCampBusy")()
+    spf_tick(g, 5)
+
+
+def clear_camp_wait(g):
+    g.eval("NS.questPlanner.clearCampWaits")()
+    spf_tick(g, 5)
+
+
+def test_camp_busy_also_applies_to_an_alternative_camp(style):
+    g = game(style, BUSY_CAMPS)
+    assert near(objective_waypoint(g), 0.62, 0.40), objective_waypoint(g)
+    assert g.eval("NS.questPlanner.report")().waitSeconds == 0
+    # The chosen camp is an alternative of the objective; marking it busy sends the guide to the free camp.
+    mark_objective_camp_busy(g)
+    assert near(objective_waypoint(g), 0.30, 0.30), objective_waypoint(g)
+    assert g.eval("NS.questPlanner.report")().waitSeconds == 0
+    # Every camp busy: the guide still plans the work and waits for the camp that frees up first.
+    mark_objective_camp_busy(g)
+    assert near(objective_waypoint(g), 0.62, 0.40), objective_waypoint(g)
+    assert g.eval("NS.questPlanner.report")().waitSeconds > 0
+    clear_camp_wait(g)
+    assert near(objective_waypoint(g), 0.62, 0.40), objective_waypoint(g)
+    assert g.eval("NS.questPlanner.report")().waitSeconds == 0
+
+
+def test_marking_or_clearing_a_busy_camp_refines_the_route_again(style):
+    from test_quest_optimizer import COUNT_REFINES
+    g = Game(style, WESTFALL + BUSY_CAMPS, fresh=True)
+    g.run(COUNT_REFINES)
+    g.start()
+    g.eval("NS.setSetting")("questPlanner", True)
+    g.advance(5)
+    refines = g.eval("REFINES")
+    assert refines >= 1
+    # Busy camps are plan inputs: the local search runs again for the new set of free camps.
+    mark_objective_camp_busy(g)
+    assert g.eval("REFINES") == refines + 1, (refines, g.eval("REFINES"))
+    clear_camp_wait(g)
+    assert g.eval("REFINES") == refines + 2, (refines, g.eval("REFINES"))
+
+
+def test_busy_default_camp_gives_way_to_a_free_alternative(style):
+    for spf in ("",) + SPF_BUILDS:
+        g = spf_game(style, TWO_CAMPS + spf)
+        assert near(objective_waypoint(g), 0.30, 0.30), (spf, objective_waypoint(g))
+        mark_objective_camp_busy(g)
+        assert near(objective_waypoint(g), 0.80, 0.80), (spf, objective_waypoint(g))
+        assert g.eval("NS.questPlanner.report")().waitSeconds == 0
+        # "Clear camp wait" forgets the busy camp, and the guide goes back to the camp it chose before.
+        clear_camp_wait(g)
+        assert near(objective_waypoint(g), 0.30, 0.30), (spf, objective_waypoint(g))
+        assert g.eval("SPF_ESTIMATES or 0") == 0, spf
+
+
+def test_clear_camp_wait_chooses_the_camp_afresh_from_where_you_stand(style):
+    for spf in ("",) + SPF_BUILDS:
+        g = spf_game(style, TWO_CAMPS + spf)
+        g.run("POS.x, POS.y = 0.65, 0.65")
+        spf_tick(g, 4)
+        assert near(objective_waypoint(g), 0.80, 0.80), (spf, objective_waypoint(g))
+        mark_objective_camp_busy(g)
+        assert near(objective_waypoint(g), 0.30, 0.30), (spf, objective_waypoint(g))
+        g.run("POS.x, POS.y = 0.53, 0.53")
+        spf_tick(g, 4)
+        assert near(objective_waypoint(g), 0.30, 0.30), (spf, objective_waypoint(g))
+        # Clearing forgets the remembered camps as well: from 0.53 the west camp is nearer, so the guide does not
+        # send you back to the east camp it held before the busy mark.
+        clear_camp_wait(g)
+        assert near(objective_waypoint(g), 0.30, 0.30), (spf, objective_waypoint(g))
+        assert g.eval("SPF_ESTIMATES or 0") == 0, spf
+
+
+def test_camp_chosen_before_a_busy_mark_returns_when_the_wait_ends(style):
+    for spf in ("",) + SPF_BUILDS:
+        g = spf_game(style, TWO_CAMPS + spf)
+        assert near(objective_waypoint(g), 0.30, 0.30), (spf, objective_waypoint(g))
+        mark_objective_camp_busy(g)
+        assert near(objective_waypoint(g), 0.80, 0.80), (spf, objective_waypoint(g))
+        # The camp the busy mark forced is not remembered as the guide's choice: once the five minutes are over,
+        # the next re-plan (a small step) returns to the west camp instead of holding on to the east one.
+        g.advance(301)
+        g.run("POS.x, POS.y = 0.52, 0.52")
+        spf_tick(g, 4)
+        assert "plan origin: map 1436 (0.5200, 0.5200)" in g.eval("NS.questPlanner.debugText")()
+        assert near(objective_waypoint(g), 0.30, 0.30), (spf, objective_waypoint(g))
+        assert g.eval("SPF_ESTIMATES or 0") == 0, spf
+
+
 if __name__ == "__main__":
     failed = total = 0
     for name, test in sorted(list(globals().items())):

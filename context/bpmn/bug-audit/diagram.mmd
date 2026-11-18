@@ -1,0 +1,48 @@
+flowchart LR
+  %% Re-check every context/BUGS report against the current tree, with an independent refuter per group · 12 agents: 12 × bpmn:reviewer
+  subgraph n_lane_checker["🤖 Checker · bpmn:reviewer · ⏱ 25 min"]
+    n_start(("Audit requested"))
+    n_split{"+"}
+    n_check_g1["⚙ Check equipment/spell bugs"]
+    n_check_g2["⚙ Check UI/settings bugs"]
+    n_check_g3["⚙ Check planner bugs (Nov 16)"]
+    n_check_g4["⚙ Check planner bugs (Nov 17)"]
+    n_check_g5["⚙ Check guidance/map bugs"]
+    n_check_g6["⚙ Check data/dungeon bugs"]
+  end
+  subgraph n_lane_refuter["🤖 Refuter · bpmn:reviewer · ⏱ 20 min"]
+    n_refute_g1["⚙ Refute equipment/spell verdicts"]
+    n_refute_g2["⚙ Refute UI/settings verdicts"]
+    n_refute_g3["⚙ Refute planner verdicts (Nov 16)"]
+    n_refute_g4["⚙ Refute planner verdicts (Nov 17)"]
+    n_refute_g5["⚙ Refute guidance/map verdicts"]
+    n_refute_g6["⚙ Refute data/dungeon verdicts"]
+    n_join{"+"}
+    n_done((("Audit complete")))
+  end
+  n_start --> n_split
+  n_split --> n_check_g1
+  n_check_g1 --> n_refute_g1
+  n_refute_g1 --> n_join
+  n_split --> n_check_g2
+  n_check_g2 --> n_refute_g2
+  n_refute_g2 --> n_join
+  n_split --> n_check_g3
+  n_check_g3 --> n_refute_g3
+  n_refute_g3 --> n_join
+  n_split --> n_check_g4
+  n_check_g4 --> n_refute_g4
+  n_refute_g4 --> n_join
+  n_split --> n_check_g5
+  n_check_g5 --> n_refute_g5
+  n_refute_g5 --> n_join
+  n_split --> n_check_g6
+  n_check_g6 --> n_refute_g6
+  n_refute_g6 --> n_join
+  n_join --> n_done
+  classDef done fill:#e6f4ea,stroke:#1e8e3e,color:#0d3b1e
+  classDef running fill:#e8f0fe,stroke:#1a73e8,color:#0b2a5b
+  classDef ready fill:#fef7e0,stroke:#b06000,color:#4a3600
+  classDef failed fill:#fce8e6,stroke:#c5221f,color:#5f0d06
+  classDef cancelled fill:#f1f3f4,stroke:#80868b,color:#3c4043
+  class n_start,n_split,n_check_g1,n_refute_g1,n_check_g2,n_refute_g2,n_check_g3,n_refute_g3,n_check_g4,n_refute_g4,n_check_g5,n_refute_g5,n_check_g6,n_refute_g6,n_join,n_done done

@@ -2,6 +2,7 @@
 Last updated: 2026-11-16
 
 ## Current integration — 2026-11-17
+- **Superseded 2026-11-17 (decouple run r-20261117-234605-6ba9, decisions D5):** the planner no longer calls `EstimateWalks`; it plans with straight-line travel only, identical with or without SPF. `QuestPlannerPath.lua` offers only `available()` and `follow()` (→ `Navigate`) for the explicit Follow button. The walk-cost bullets below and "Phase 2" are history.
 - QuestOptimizer now owns schedule selection. The SPF bridge refines legal first-leg costs and queues a guarded cooperative recost, preserving action gates.
 - Whole-outing promotion remains a tested adapter helper. The live planner now uses atomic schedule costs and consecutive display grouping.
 - Current design and limits are in predictive-quest-optimizer.md.

@@ -1,161 +1,46 @@
 # Architecture
-Last updated: 2026-11-17
+Last updated: 2026-11-18
 
 ## File tree
-```text
-QuestSharing/  # Repository root
-├── .gitignore  # Exclude caches and release output
-├── CHANGELOG.md  # Release history
-├── QuestSharing/  # WoW addon runtime
-│   ├── Adventure.lua  # Direct quest-group question in current chat and optional role-play invitation editor
-│   ├── Bags.lua  # quest items marked in your bags, so you only carry what this zone needs
-│   ├── Bindings.xml  # Game key bindings
-│   ├── Compat.lua  # one place that knows the differences between the classic and the modern quest APIs
-│   ├── Core.lua  # settings, timers, events, chat helpers, master-tool lifecycle and /qs commands
-│   ├── CookingReference.lua  # Pinned MIT Forever Cooking facts: spells, ingredients and acquisition hints
-│   ├── DataWork.lua  # Shared cooperative database queue, 2ms slices (optional larger per-job foreground budget), pause/resume and combat suspension
-│   ├── Diagnostics.lua  # Readable issue overview and full snapshot; Copy all includes all retained technical records
-│   ├── Friends.lua  # add the people you group with to your friends list
-│   ├── DungeonQuests.lua  # Dungeon catalogue, separate chain/task labels, locations, hover XP/rewards and quest actions
-│   ├── EquipmentUI.lua  # Three-tab WoW-style journal skin, native buttons/slots, parchment details and scoped filters
-│   ├── Fishing.lua  # Optional world-map water notes, editor and AnglerAtlas zone summaries
-│   ├── Highlight.lua  # make quest objectives easier to find
-│   ├── ItemSources.lua  # optional Questie source hints on bag and recipe item tooltips
-│   ├── Loot.lua  # Equipment-only instance browser with AtlasLoot tables and partial QuestieDB fallback
-│   ├── Marker.lua  # showing each other where you are
-│   ├── Menu.lua  # Shared quest menu; optional catalogue pickup actions and absent-log guards
-│   ├── MinimapButton.lua  # a small button on the minimap
-│   ├── OptionalUI.lua  # Shared frames, edit boxes, scrolling, tooltips and read-only map directions
-│   ├── Panel.lua  # shows which party members share your quests
-│   ├── Ping.lua  # one key (or a click on the ring) pings the nearest creature one of your quests needs with the game's
-│   ├── Progress.lua  # notices when the objectives of one of your quests are all done, tells the party
-│   ├── ProfessionReference.lua  # Static rank requirements, faction trainers/books/quests and example fish waters
-│   ├── Professions.lua  # Recipe/farming model, own-Cooking learned-state reads and native-window lifecycle
-│   ├── ProfessionUI.lua  # Embedded scrolling recipe list, native known-recipe crafting and in-place source/Upgrades panes
-│   ├── QuestAutomation.lua  # opt-in quest offer acceptance and safe turn-ins
-│   ├── QuestCleanup.lua  # On-demand carried-bag leftovers review and freshly validated per-stack deletion
-│   ├── QuestItems.lua  # quest items you can USE (a torch to light, a flare to throw...)
-│   ├── QuestSharing.toc  # Addon metadata and module load order
-│   ├── Questie.lua  # if the Questie addon is installed, its quest database tells us where a quest starts and which quests
-│   ├── QuestGuidance.lua  # Selected-step direction/distance HUD and own numbered map-route overlay
-│   ├── QuestOptimizer.lua  # Seeded + bounded-beam schedule search, per-visit site choice among alternative camps, or-opt/2-opt local search, kill/drop expectation, four goals
-│   ├── QuestPlanner.lua  # Zone facts/actions, plan controls/report, stable replanning, guide, waypoint and SPF actions
-│   ├── QuestPlannerPath.lua  # optional SPF API detection, walk-cost requests, cancellation and outing promotion
-│   ├── Quick.lua  # a quick-chat wheel
-│   ├── Rewards.lua  # On-demand QuestieDB reward catalogue, eligibility filters and item comparisons
-│   ├── Settings.lua  # Sidebar settings; Extra tools / Browser DB cards, separate switches/actions, scrolling and key capture
-│   ├── Share.lua  # notice a new party, push the quests of the area one by one, read the game's replies
-│   ├── SpellRanks.lua  # Opt-in learned spell-rank upgrades across player action-bar pages
-│   ├── Status.lua  # what to say about a quest you click in the tracker, and the hooks that notice the click
-│   ├── Style.lua  # one look for every window of the addon (settings, Party quests, reports)
-│   ├── Sync.lua  # party members who also run Quest Sharing tell each other exactly which quests they have
-│   ├── Team.lua  # "Picked up [Wolves Among Us] - Anna has it too. Want to do it together?"
-│   ├── Track.lua  # keeps the quest tracker (the list on the right) filled with the quests closest to you
-│   ├── VendorMap.lua  # optional item/vendor map search, database availability feedback, autocomplete and own pins
-│   └── ZoneLevels.lua  # Read-only map questing ranges, outdoor zone badges and hover panel
-├── README.md  # User documentation
-├── bug.txt  # User-provided v0.4.21 diagnostic report
-├── questidea.txt  # User-provided predictive quest optimizer design requirements
-├── build_release.py  # Build install ZIP and release notes
-├── tools/  # Local UI emulation utilities, never shipped in the addon
-│   ├── build_cooking_reference.py  # Rebuild pinned factual Cooking subset with upstream MIT attribution
-│   ├── preview_professions.py  # Export actual profession model into an illustrative native-window layout preview
-│   ├── profession-preview.html  # Embedded recipe-list/source/Upgrades visual template with sample learned states
-│   ├── preview_search_journal.py  # Export real Lua search rows/details to a local journal layout emulation
-│   ├── search-journal-preview.html  # Interactive three-tab journal layout emulation; native textures approximated
-│   ├── preview_quest_planner.py  # Run actual Lua planner and embed its rows in the Westfall emulation
-│   └── quest-guide-preview.html  # Interactive compact-guide fragment template with navigation, mini mode and lock
-├── context/  # Session continuity and live architecture
-│   ├── BUGS/  # Verified bug methodology and regressions
-│   │   ├── 2026-11-17-planner-multiple-drop-confidence.md  # Label unverified overlap between separate loot streams
-│   │   ├── 2026-11-17-planner-or-parent-selection.md  # Preserve OR gate choices through routing and selected completion
-│   │   ├── 2026-11-17-profession-window-layout.md  # Standalone companion mismatch; embedded native list/detail and readable hierarchy
-│   │   ├── 2026-11-17-map-search-missing-database.md  # Missing-data feedback, standalone QuestieDB and late-provider retry
-│   │   ├── 2026-11-17-guidance-submap-rectangle.md  # Preserve four native bounds across submap projection
-│   │   ├── 2026-11-17-guidance-late-map-metrics.md  # Throttled recovery from absent initial measurements
-│   │   ├── 2026-11-17-guidance-selected-cluster-marker.md  # Keep selected number/position in grouped map markers
-│   │   ├── 2026-11-17-guidance-map-click-event-argument.md  # Core event-prefix contract for guidance map selection
-│   │   ├── 2026-11-17-optional-database-eager-loading.md  # Lazy catalogue lifecycle, shared budget and cache reuse
-│   │   ├── 2026-11-17-map-suggestions-readable-background.md  # Opaque autocomplete and explicit layering above the map
-│   │   ├── 2026-11-16-vendor-map-scope-and-missing-roles.md  # Incomplete role indexing, suggestion scope and explicit fallback
-│   │   ├── 2026-11-16-quest-recruitment-extra-editor.md  # Direct chat recruitment instead of mandatory composer
-│   │   ├── 2026-11-16-quest-planner-distant-spawns-and-next-command.md  # Distant objective camps and safe next-stop selection
-│   │   ├── 2026-11-16-quest-planner-empty-level-and-candidate-shape.md  # Missing Questie levels and direct candidate fields
-│   │   ├── 2026-11-16-quest-planner-final-batch-and-zone-scope.md  # Final scan render binding and outdoor-zone guard
-│   │   ├── 2026-11-16-quest-planner-movable-panel.md  # Session drag positioning and native frame movement
-│   │   ├── 2026-11-16-quest-planner-missing-local-pickups.md  # Local starter discovery with an empty quest log
-│   │   ├── 2026-11-16-quest-planner-scroll-row-overlap.md  # Variable-height scrolling rows and readable layout
-│   │   ├── 2026-11-15-settings-extra-tools-overflow.md  # Fixed-height settings overflow diagnosis
-│   │   ├── 2026-11-13-zone-levels-empty-native-data.md  # Standalone guide fallbacks when native ranges are empty
-│   │   ├── 2026-11-13-equipment-duplicate-rows.md  # Filtered name grouping with complete source retention
-│   │   ├── 2026-11-13-zone-levels-opt-in.md  # Once-only migration from auto-enabled map ranges
-│   │   ├── 2026-11-13-spell-rank-zero-spec.md  # Numeric-zero active specialization in Lua
-│   │   ├── 2026-11-13-spell-rank-cursor-read.md  # Preserve readability separately from an empty cursor
-│   │   ├── 2026-11-13-spell-rank-hidden-pages.md  # Native slot range differs from visible pages
-│   │   ├── 2026-11-13-dropdown-offscreen-selection.md  # Mixed wheel/keyboard dropdown navigation
-│   │   ├── 2026-11-13-debounced-filter-reapply.md  # Range commit debounce cancellation playbook
-│   │   └── 2026-11-13-instance-loot-non-equipment.md  # Equipment filtering reproduction and fix
-│   ├── architecture.md  # Live source map and runtime diagrams
-│   ├── decisions.md  # Choices and rationale
-│   ├── insights.md  # Timestamped findings
-│   ├── profession-reference-research.md  # Forever guide sources, pinned recipe-data provenance and live API boundaries
-│   ├── quest-narration-research.md  # Separate local voice-acting addon proposals and verified source limits
-│   ├── quest-optimization-research.md  # Prior art and proposed quest graph/route optimizer design
-│   ├── predictive-quest-optimizer.md  # Implemented algorithm, executed simulation and evidence limits
-│   ├── quest-planner-routing-and-validation-plan.md  # SPF integration behavior, automated coverage and pending in-game checks
-│   ├── schema.md  # Data structures and formats
-│   ├── shortest-path-source-study.md  # External router implementation trace; no runtime dependency
-│   ├── state.md  # Current task and handoff
-│   └── walkable-routing-research.md  # Terrain-routing feasibility, provider sources and proposed integration (not implemented)
-└── tests/  # Python tests and Lua API harness
-    ├── harness.py  # Mock WoW APIs and load Lua addon
-    ├── test_data_budget.py  # No catalogue preload, hidden-tool idle behavior, zone-cache reuse and shared work budget
-    ├── test_adventure.py  # Direct quest questions, invitation generation, chat routes, preview and draft preservation
-    ├── test_bags.py  # Tests for bags
-    ├── test_quest_cleanup.py  # Cleanup eligibility, protected quest items, confirmation, stale state and cursor/client refusal
-    ├── test_box.py  # Tests for box
-    ├── test_done.py  # Tests for done
-    ├── test_dungeon_quests.py  # Inside/outside dungeon chains, filters, pickup menus, cancellation and common-material exclusion
-    ├── test_equipment.py  # Shared window, type/level filters, dungeon identity and cancellation
-    ├── test_equipment_grouping.py  # Unique names, combined suppliers/routes, versions and filter boundaries
-    ├── test_emotes.py  # Tests for emotes
-    ├── test_extras.py  # Tests for extras
-    ├── test_features.py  # Tests for features
-    ├── test_friends.py  # Tests for friends
-    ├── test_highlight.py  # Tests for highlight
-    ├── test_items.py  # Tests for items
-    ├── test_instance_focus.py  # Current dungeon opening, delayed catalogue focus, manual navigation and Extra tools label
-    ├── test_log.py  # Tests for log
-    ├── test_loot.py  # Instance loot parsing, search, provider fallback and asynchronous item names
-    ├── test_look.py  # Settings viewport/layout, key capture, sounds and ring appearance
-    ├── test_menu.py  # Tests for menu
-    ├── test_optional.py  # Optional tool integration, water persistence, reward eligibility and comparisons
-    ├── test_professions.py  # Cooking reference, live learned-state guards, recipe/farming sources, rank/faction UI and cancellation
-    ├── test_ping.py  # Tests for ping
-    ├── test_questmap.py  # How-to quest text and retired map-overlay guards
-    ├── test_planner_facts.py  # Provider units/counts, character restrictions and deep zone chains
-    ├── test_quest_optimizer.py  # Predictive simulation, four goals, constraints and public guide integration
-    ├── test_quest_planner_path.py  # Optional SPF API, walk-cost ordering, cancellation and fallback
-    ├── test_quest_guidance.py  # Arrow/world-size math, grouped route selection, own map lines, lifecycle, fallbacks and idle reads
-    ├── test_quest_planner_guide.py  # Current/upcoming styling, previous/next, mini mode and session lock
-    ├── test_quest_planner_zone_steps.py  # Westfall scope, foreign projections, grouped instructions and completion dependencies
-    ├── test_quest_planner_ui.py  # Planner movement, wrapped layout, level bands, pickups and map clicks
-    ├── test_questsharing.py  # Tests for questsharing
-    ├── test_quick.py  # Tests for quick
-    ├── test_ringtest.py  # Tests for ringtest
-    ├── test_settings.py  # Settings persistence, direct controls, wrapped rows, scroll reachability and enemy markers
-    ├── test_stats.py  # Shared stat minimums, native API compatibility, live controls and cache invalidation
-    ├── test_spell_ranks.py  # Learned ranks, guarded action-slot swaps, combat/cursor deferral and API compatibility
-    ├── test_team.py  # Tests for team
-    ├── test_together.py  # Tests for together
-    ├── test_tracker.py  # Tests for tracker
-    ├── test_triggers.py  # Tests for triggers
-    ├── test_usability.py  # Direct choices, live searches, sorting, selection and navigation workflows
-    ├── test_vendor_map.py  # Local sellers/class trainers, role/item discovery, suggestions, counts and explicit remote fallback
-    ├── test_where.py  # Tests for where
-    ├── test_zone.py  # Tests for zone
-    └── test_zone_levels.py  # Native map ranges, geometry, hover, lifecycle, settings and safe read-only behavior
+<!-- bpmn:file-tree -->
 ```
+cutpdf/
+├── .gitignore                                        # Exclude caches and release output
+├── bug.txt                                           # User-provided v0.4.21 diagnostic report
+├── build_release.py                                  # Build install ZIP and release notes
+├── CHANGELOG.md                                      # Release history
+├── context/                                          # Session continuity and live architecture
+│   ├── algo-plan-2026-11-17.md                       # TODO: purpose
+│   ├── architecture.md                               # Live source map and runtime diagrams
+│   ├── bpmn/                                         # BPMN plugin run index + last run per process (process.json/.bpmn, diagram.mmd) (13 files, collapsed)
+│   ├── BUGS/                                         # Verified bug methodology and regressions (35 files, collapsed)
+│   ├── decisions.md                                  # Choices and rationale
+│   ├── diagrams/                                     # Dated Mermaid snapshots captured during BPMN runs (flowcharts, sequence diagrams) (31 files, collapsed)
+│   ├── fix-plan-2026-11-17.md                        # Audit fix plan (streams A/B/C) with per-bug results of the fix-all run
+│   ├── insights.md                                   # Timestamped findings
+│   ├── predictive-quest-optimizer.md                 # Implemented algorithm, executed simulation and evidence limits
+│   ├── profession-reference-research.md              # Forever guide sources, pinned recipe-data provenance and live API boundaries
+│   ├── quest-narration-research.md                   # Separate local voice-acting addon proposals and verified source limits
+│   ├── quest-optimization-research.md                # Prior art and proposed quest graph/route optimizer design
+│   ├── quest-planner-routing-and-validation-plan.md  # SPF integration behavior, automated coverage and pending in-game checks
+│   ├── schema.md                                     # Data structures and formats
+│   ├── shortest-path-source-study.md                 # External router implementation trace; no runtime dependency
+│   ├── state.md                                      # Current task and handoff
+│   └── walkable-routing-research.md                  # Terrain-routing feasibility, provider sources and proposed integration (not implemented)
+├── questidea.txt                                     # User-provided predictive quest optimizer design requirements
+├── QuestSharing/                                     # WoW addon runtime (46 files, collapsed)
+├── README.md                                         # User documentation
+├── tests/                                            # Python tests and Lua API harness (48 files, collapsed)
+└── tools/                                            # Local UI emulation utilities, never shipped in the addon
+    ├── build_cooking_reference.py                    # Rebuild pinned factual Cooking subset with upstream MIT attribution
+    ├── preview_professions.py                        # Export actual profession model into an illustrative native-window layout preview
+    ├── preview_quest_planner.py                      # Run actual Lua planner and embed its rows in the Westfall emulation
+    ├── preview_search_journal.py                     # Export real Lua search rows/details to a local journal layout emulation
+    ├── profession-preview.html                       # Embedded recipe-list/source/Upgrades visual template with sample learned states
+    ├── quest-guide-preview.html                      # Interactive compact-guide fragment template with navigation, mini mode and lock
+    └── search-journal-preview.html                   # Interactive three-tab journal layout emulation; native textures approximated
+```
+<!-- /bpmn:file-tree -->
 
 ## Flowchart
 
@@ -187,22 +72,24 @@ flowchart TD
     Settings --> Planner[QuestPlanner.lua: optional local quest plan]
     Core --> Planner
     Planner --> Diagnostics
-    Planner --> Guidance[QuestGuidance.lua: arrow, distance, numbered stops and straight connections]
+    Planner --> Guidance[QuestGuidance.lua: arrow, distance, numbered stops above map pins and straight connections]
     Guidance --> MapAPI
-    Planner --> DataWork
+    Planner -->|quest-plan normal, quest-improve idle priority| DataWork
     Planner --> Q
     Planner --> Compat
     Compat --> Inventory[Carried bags and live level/XP snapshot]
     Compat --> CharacterAPI[C_Reputation / GetFactionInfoByID / C_SkillInfo: referenced factions and skills]
     Planner --> Levels[GetQuestDifficultyColor: optional explicit green-yellow filter]
     Planner --> Optimizer[QuestOptimizer.lua: seeded route, bounded beam, site choice, or-opt/2-opt local search]
+    Planner --> Calib[QuestCalibration.lua: learned kill and quest giver seconds, plannerCalibration in the saved variables]
+    Settings --> GuideTab[Settings > Quest guide tab: goal, minutes, IDs, scope, camps, pace, report] --> Planner
     Optimizer --> DataWork
     Planner --> MapAPI[C_Map ancestry-validated zone projection, known place names and user waypoint]
     Planner --> Style[Style.lua: opaque compact guide, current/upcoming rows, navigation and mini mode]
     Planner --> Preview[tools/preview_quest_planner.py: real Lua rows to browser emulation]
     Preview --> PreviewTemplate[tools/quest-guide-preview.html: interactive reference-led guide]
-    Planner --> Path[QuestPlannerPath.lua: optional SPF adapter]
-    Path --> SPF[Optional ShortestPathForever.API: EstimateWalks and Navigate]
+    Planner -->|Follow button only| Path[QuestPlannerPath.lua: optional SPF Follow bridge]
+    Path --> SPF[Optional ShortestPathForever.API: Navigate only, never used for planning]
     Path -. unsupported or missing .-> Planner
     Share --> API[WoW APIs via Compat.lua]
     Sync --> API
@@ -269,6 +156,17 @@ flowchart TD
     Settings --> Adventure
     Adventure --> Compat[Compat.lua: quest log and links]
     Adventure --> Chat[Existing chat draft or ChatFrame_OpenChat]
+```
+
+Shared classic menu look (2026-11-17): every window and panel draws through `Style.lua`.
+```mermaid
+flowchart TD
+    Style[Style.lua] --> Frame[S.frame / S.window: opaque S.stone inside UI-DialogBox-Border; dialog 32px + title plate, hud 16px]
+    Style --> Button[S.button: plain-texture UI-Panel-Button Up/Down/Highlight art, gold label, white on hover]
+    Style --> Panel[S.panel = S.stone + S.rim; S.inset = recessed black box + bronze rim]
+    Frame --> Windows[Settings, OptionalUI U.window journal/fishing/cleanup/adventure, Diagnostics report, Panel, Menu, QuestPlanner guide, Fishing overview]
+    Panel --> Overlays[VendorMap search, ZoneLevels panel/labels, QuestGuidance legend, U.box / Settings edit boxes]
+    Button --> Journal[EquipmentUI E.button / E.listButton reuse S.button art]
 ```
 
 ## Sequence diagrams
@@ -364,6 +262,13 @@ sequenceDiagram
     Menu->>D: Resolve mapped pickup source
     D->>Game: Native waypoint when coordinates supported
     D-->>User: Pickup coordinates; open map manually with M
+    Game->>D: QUEST_LOG_UPDATE (debounced 0.2 s) -> D.refresh(true)
+    alt Our menu open (menu.entry == menuEntry) and its quest still listed with same log membership
+        D->>D: Keep menu, copy index/complete/title from C.findEntry into menuEntry
+    else Quest left results or was abandoned/accepted
+        D->>Menu: closeQuestMenu()
+    end
+    Note over D,Menu: D.refresh() without argument (filters, search, buttons), D.go, f.suspend, D.scan still close the menu. Other windows' menus untouched
     Note over Work: Combat and close/Esc/tab switch pause the scan (reopen resumes); master disable and Refresh data cancel it
 ```
 
@@ -429,6 +334,7 @@ sequenceDiagram
 sequenceDiagram
     participant Player
     participant Planner as QuestPlanner.lua
+    participant Work as DataWork.lua
     participant Path as QuestPlannerPath.lua
     participant SPF as Optional SPF API
     participant Maps as SPF map/minimap guidance
@@ -436,22 +342,24 @@ sequenceDiagram
     Planner->>Planner: Discover zone facts and atomic prerequisite actions
     Planner->>Planner: Preserve all OR prerequisite choices and required gate kinds
     Planner->>Planner: Snapshot referenced faction points and skill-line ranks via Compat
-    Planner->>Planner: questActions(): per-creature real camps; default = nearest, up to 3 more as stop.alternatives
-    Planner->>Planner: solve(0): cooperatively compare schedules with QuestOptimizer (no local search), render
+    Planner->>Planner: questActions(): per-creature camps, real if >= min(3, largest) or near a real pooled (mixed) camp; default = nearest, up to 3 more as stop.alternatives
+    Planner->>Planner: planOptions(): avoidBusyCamps() per objective (busy-narrowed stops -> forced), preferredIDs from previousPlan, preferredSites = siteMemory (same map)
+    Note over Planner: travelSeconds = straight line (map world size / run speed). SPF is never asked for walking costs
+    Planner->>Planner: solve(0): QuestOptimizer, no local search, then render at once
     Planner->>Planner: Keep feasible incumbent if bounded beam exhausts search checks
-    Planner->>Planner: Work "quest-improve": solve(IMPROVE_STEPS) with or-opt/2-opt local search, swap route, keep selection
-    Note over Planner: Optimizer place() picks each visit's site (travel + incremental work), so shared camps win
+    opt refineNeeded (new stops/goal/scope/busy camps, no prior order, or moved >= REFINE_MOVE 0.1)
+        Planner->>Work: Work.start("quest-improve", ..., priority "idle")
+        Note over Work: Idle job resumes only while no other job (vendor-index, vendor-search, dungeonQuests, quest-plan) can run
+        Work->>Planner: solve(IMPROVE_STEPS) or-opt/2-opt (evaluate() yields every 32 actions), then refinedPlan = inputs and render
+    end
+    Note over Planner: Optimizer place() picks each visit's site (travel + incremental work). A held preferredSites camp stays unless another is >=25% AND >=20 s cheaper
     Note over Planner,Path: Optimizer applies known reputation rewards at turn-in before checking later pickups
-    Planner->>Path: Estimate eligible first stops from player position
-    Path->>SPF: EstimateWalks (async, same map, <=256 per request; defaults + alternative camps)
-    SPF-->>Path: Yard costs or unreachable/loading/data reason
-    Path-->>Planner: Queue cooperative recost with first-leg walking costs
-    Planner->>Planner: Re-solve and group consecutive instructions
+    Planner->>Planner: Each solve writes siteMemory for objective stops not in forced, reads the locked selection at the route swap, groups consecutive instructions
     Player->>Planner: Click Follow with SPF
-    Planner->>Path: Navigate selected stop
-    Path->>SPF: Start explicit QuestSharing-owned guidance
+    Planner->>Path: Path.follow(selected stop point)
+    Path->>SPF: Navigate (QuestSharing-owned guidance)
     SPF->>Maps: Draw walk route and guide on both maps
-    Note over Planner,SPF: No provider or failed estimate keeps the map-distance plan and native waypoint
+    Note over Planner,SPF: Plan is identical with or without SPF. No provider keeps the native waypoint
 ```
 
 ```mermaid
@@ -647,11 +555,17 @@ sequenceDiagram
     else Enumerable NPC or item database
         Search-->>User: Blank-map help names QuestieDB and search scope
     end
-    User->>Search: Type a query or select a result
-    Search->>Work: Debounce then start/resume vendor-search
-    Work->>DB: Index NPC titles/flags once; item links only when needed
-    Work->>DB: Decode locations only for current matching candidates
-    Note over Work,DB: Shared soft 2ms slices; combat/hidden pauses; query change cancels
+    User->>Search: Type first character (OnTextChanged)
+    Search->>Work: startIndex(): start/resume persistent vendor-index (FOREGROUND_MS 8 after typing)
+    Work->>DB: Index NPC titles/flags once (npcCursor), item links only when a query needs them (itemCursor)
+    Note over Search,Work: Keystrokes cancel only vendor-search. vendor-index survives, only resetIndex() (disable / provider loss) cancels it
+    Search->>Search: clearResults() per keystroke, keepMatching keeps still-matching suggestions visible
+    Search->>Work: After 0.18 s debounce V.draw -> startSearch(): per-query vendor-search (8 ms if typed, else 2 ms)
+    Work->>Work: matchVendors() on in-memory index
+    Work->>DB: hydrate(): decode spawns only for uncached candidates (cache bounded at SPAWN_CACHE 2000 + current matches)
+    Work-->>Search: refreshSuggestions at first local match, then each doubling
+    Search-->>User: Status "Indexing N / M NPCs…" / "Finding locations: N / M matches…" until resolved
+    Note over Work,DB: Combat and hidden map pause both jobs. Map change, Clear and resetIndex drop cached spawns
     Search-->>User: Show suggestions with usable locations on the displayed map
     User->>Search: Choose suggestion, press Enter, or click search icon
     Search->>Search: Interpret vendor as all sellers; general vendor as matching seller roles
@@ -714,7 +628,7 @@ sequenceDiagram
         Planner->>Questie: Read readiness, prerequisites, starters, targets and turn-ins
         Planner->>Planner: Use all acceptance levels by default; optional green/yellow filter
         Planner->>Planner: Validate source-map ancestry and coordinates before planning any action
-        Planner->>Planner: targetLocation(): groupCamps() per map; nearest real camp (>= min(3, biggest group)), never a lone stray
+        Planner->>Planner: targetLocation(): groupCamps() per creature and pooled per map. Real camp = >= min(3, biggest group) or near a real pooled mixed camp. Nearest first, never a lone stray
         Planner->>Planner: Keep AND/OR gates and atomic giver/work/turn-in actions
         Planner->>Planner: Keep different prerequisite depths in separate stops at the same giver/camp
         Planner->>Planner: Compare feasible schedules and shared kill/drop work
@@ -763,6 +677,8 @@ sequenceDiagram
     end
     alt World map shown and not in combat
         Guide->>Overlay: Preserve four rectangle bounds; project verified ancestry and draw cached stop order
+        Guide->>Overlay: stack() on every drawMap (cached path too): level min(9900, canvas+2000), legend +1, markers +2 (selected +3), canvas strata, write only changed values
+        Note over Guide,Overlay: WorldMapFrame OnShow hook (installed once at overlay creation) also runs stack(). Pins: 14px OUTLINE text, bright border, dark face, min 32x26
         Overlay->>Guide: Hover then matching global left-button down/up
         Guide->>Planner: Select step; cycle colocated numbers
         Guide->>Overlay: Keep selected number visible and use its exact projected position
@@ -783,7 +699,32 @@ classDiagram
         optimize(catalog, atomicStops, options)
         place(state, action) site
         improve(incumbent) best
+        siteKey(point) string
+        SWITCH_SHARE 0.25
+        SWITCH_SECONDS 20
+        YIELD_STEPS 32
     }
+    class PlanOptions {
+        preferredIDs
+        preferredSites_stopKey_to_siteKey
+        availableAfter_busy_camps
+        maxImproveSteps
+        checkpoint
+        travelSeconds_straight_line
+    }
+    class PlannerSiteMemory {
+        map
+        sites_stopKey_to_siteKey
+    }
+    class RefinedPlanInputs {
+        map
+        origin
+        stops_joined_keys
+        goal_mode_budget_scope_selection_busy
+    }
+    QuestOptimizer --> PlanOptions
+    PlannerSiteMemory --> PlanOptions : preferredSites on the same map (busy-forced stops not recorded)
+    RefinedPlanInputs --> PlanOptions : refineNeeded gate, REFINE_MOVE 0.1
     class AtomicQuestAction {
         id
         questID
@@ -920,11 +861,18 @@ classDiagram
         questID
         title
         level
+        index_refreshed_in_place_on_log_update
+        complete
         catalogue_true_if_absent_from_log
+    }
+    class DungeonMenuState {
+        menuEntry
+        menuQuest
     }
     DungeonQuestFilters --> DungeonQuestRecord : selects unique IDs
     DungeonQuestRecord --> DungeonQuestRecord : prerequisites and explicit followups
     DungeonQuestRecord --> QuestCatalogueEntry : menu projection
+    DungeonMenuState --> QuestCatalogueEntry : same table the open menu holds
 ```
 
 The addon uses Lua tables and a shared namespace; these are data relationships, not declared classes.
@@ -1043,6 +991,21 @@ classDiagram
         roleWords
     }
     VendorRoleIndex --> VendorLocation : hydrate current query matches only
+    class VendorSearchJobs {
+        vendorIndex_persistent_indexToken
+        vendorSearch_per_query_generation
+        FOREGROUND_MS_8_after_typing
+        npcCursor_itemCursor_resumable
+    }
+    class VendorSpawnCache {
+        cached_npcID_true
+        cachedCount
+        SPAWN_CACHE_2000_plus_current
+        hydrated_current_query
+    }
+    VendorSearchJobs --> VendorRoleIndex : vendor-index builds
+    VendorSearchJobs --> VendorSpawnCache : vendor-search hydrates
+    VendorSpawnCache --> VendorLocation : spawns kept across keystrokes, cleared on map change, Clear, resetIndex
     class QuestGuidance {
         route_reference
         selectedIndex
@@ -1064,6 +1027,8 @@ classDiagram
         groupedStepIndices
         selectedStop_optional
         ownFrame_noClickScript
+        level_overlay_plus2_selected_plus3
+        text_14px_OUTLINE
     }
     QuestGuidance --> DirectionHUD : selected step
     QuestGuidance --> QuestRouteMarker : grouped projected positions
@@ -1074,7 +1039,9 @@ classDiagram
         paused
         finished
         budget
+        idle
     }
+    %% Owners: quest-plan, quest-improve (idle), vendor-index, vendor-search, dungeonQuests, dungeonQuestRewards
     class ZoneQuestCache {
         mapID
         numericQuestIDs
@@ -1228,6 +1195,9 @@ classDiagram
         zoneStepQuestCounts
         outingClusters
         questProgressSnapshot
+        waitingAt_campKey_to_expiry
+        siteMemory_per_map
+        refinedPlan_inputs
     }
     QuestPlan --> QuestCandidate : locally completable pickups and active local actions
     QuestPlan --> PlannerStop : derives and orders

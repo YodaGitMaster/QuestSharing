@@ -41,10 +41,11 @@ function W.checkpoint()
 end
 
 -- budget (ms, optional): a larger slice for a visible window the player is waiting on. Background jobs keep BUDGET_MS.
-function W.start(owner, run, valid, finished, budget)
+-- priority (optional): "idle" resumes the job only while no other job can run (queued, not paused, valid).
+function W.start(owner, run, valid, finished, budget, priority)
     W.cancel(owner)
     local job = { owner = owner, thread = coroutine.create(run), valid = valid, finished = finished,
-        budget = type(budget) == "number" and budget > BUDGET_MS and budget or nil }
+        budget = type(budget) == "number" and budget > BUDGET_MS and budget or nil, idle = priority == "idle" }
     jobs[owner] = job
     queue[#queue + 1] = job
     wake()
@@ -54,19 +55,38 @@ wake = function()
     if not timer and #queue > 0 and not fighting() then timer = ns.after(INTERVAL, pump) end
 end
 
+-- A job that is not idle and could run now: still current, not paused and valid.
+local function canRun(list)
+    for _, job in ipairs(list) do
+        if not job.idle and jobs[job.owner] == job and not job.paused and not (job.valid and not job.valid()) then
+            return true
+        end
+    end
+    return false
+end
+
+local function requeue(list)
+    for _, job in ipairs(list) do if jobs[job.owner] == job and not job.paused then queue[#queue + 1] = job end end
+end
+
 pump = function()
     timer = nil
     if fighting() then return end -- PLAYER_REGEN_ENABLED wakes work; no combat polling timer.
     local started, steps = clock(), 0
-    local deferred = {}
-    while #queue > 0 do
+    local deferred, waiting = {}, {}
+    -- Idle jobs wait while another job can run; once the others finish or pause they get the rest of the slice.
+    while #queue > 0 or (#waiting > 0 and not canRun(deferred)) do
+        if #queue == 0 then requeue(waiting); waiting = {} end
         local job = table.remove(queue, 1)
+        if not job then break end -- every waiting idle job was paused or cancelled meanwhile
         -- Each job may run only while the slice is within its own budget; a job past it waits for the next slice.
         local scale = (job.budget or BUDGET_MS) / BUDGET_MS
         local within = started and (steps < 2000 * scale and clock() - started < BUDGET_MS * scale)
             or (not started and steps < MAX_STEPS * scale)
         if not within then
             deferred[#deferred + 1] = job
+        elseif job.idle and (canRun(queue) or canRun(deferred)) then
+            waiting[#waiting + 1] = job
         elseif jobs[job.owner] == job then
             if job.valid and not job.valid() then
                 job.paused = true
@@ -88,6 +108,7 @@ pump = function()
         end
     end
     for _, job in ipairs(deferred) do queue[#queue + 1] = job end
+    requeue(waiting)
     wake()
 end
 

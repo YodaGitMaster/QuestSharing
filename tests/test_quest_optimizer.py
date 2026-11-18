@@ -2,6 +2,7 @@
 import math
 from harness import Game
 from test_quest_planner_zone_steps import WESTFALL, text, rows
+from test_data_budget import SYNTHETIC_ZONE
 
 FIXTURE = r"""
 function sample(variant)
@@ -95,7 +96,9 @@ def test_public_modes_report_and_no_login_work(style):
     g.slash("plan budget 15");g.advance(5)
     assert g.eval("NS.questPlanner.report")().mode=="budget"
     g.slash("plan options")
-    assert g.eval("QuestSharingPlannerOptions.shown")
+    assert g.eval("NS._settingsWindow().tab") == "guide" and g.eval("NS._settingsWindow().win.shown")
+    g.slash("plan why")
+    assert g.eval("QuestSharingReport.shown")
     g.slash("plan hide");g.advance(1)
     assert not g.eval('NS.dataWork.busy("quest-plan")')
     assert not g.eval("QuestSharingPlannerPanel.scripts.OnUpdate")
@@ -168,7 +171,7 @@ def test_movement_replans_without_world_rediscovery_and_close_cancels(style):
     g.run("POS={x=.1,y=.1}")
     g.advance(8)
     assert g.eval("ENUMS")==1
-    assert not g.eval('NS.dataWork.busy("quest-costs")')
+    assert not g.eval('NS.dataWork.busy("quest-improve")')
 
 def test_real_log_full_requires_handin_before_a_new_pickup(style):
     g=game(style)
@@ -461,14 +464,303 @@ end
     # same point as the kill quest's, so ten kills there also yield the cores (joint expectation).
     assert r.coverage==2 and abs(r.expectedKills-20.094718933105)<1e-6, r.expectedKills
 
+# The priority each shared-work job was started with (DataWork's sixth argument; nil is a normal job).
+JOB_PRIORITIES = r'''
+JOB_PRIORITY={}
+local start=NS.dataWork.start
+NS.dataWork.start=function(owner,run,valid,finished,budget,priority,...)
+ JOB_PRIORITY[owner]=tostring(priority)
+ return start(owner,run,valid,finished,budget,priority,...)
+end
+'''
+
 def test_planner_shows_fast_route_then_refines_it_in_the_background(style):
-    g=Game(style,WESTFALL,fresh=True);g.start();g.slash("plan");g.advance(12)
+    g=Game(style,WESTFALL,fresh=True);g.run(JOB_PRIORITIES);g.start();g.slash("plan");g.advance(12)
     r=g.eval("NS.questPlanner.report")()
     # The background refinement re-solves with local search after the first route is shown.
     assert r.improveSteps and r.improveSteps>0, r.improveSteps
+    # It is idle work: it runs only while no other data work (map search, dungeon scan, the plan itself) waits.
+    assert g.eval('JOB_PRIORITY["quest-improve"]')=="idle",g.eval('JOB_PRIORITY["quest-improve"]')
+    assert g.eval('JOB_PRIORITY["quest-plan"]')=="nil"
     assert not g.eval('NS.dataWork.busy("quest-improve")')
     g.slash("plan hide");g.advance(2)
     assert not g.eval('NS.dataWork.busy("quest-improve")')
+
+# Keeps the background refinement busy after its search, so the player can act before its route swaps in.
+PAD_REFINE = r'''
+local real=NS.questOptimizer.optimize
+NS.questOptimizer.optimize=function(catalog,stops,opts)
+ local a,b=real(catalog,stops,opts)
+ if (opts.maxImproveSteps or 0)>0 then for _=1,5000 do NS.dataWork.checkpoint() end end
+ return a,b
+end
+'''
+
+def test_step_chosen_during_background_refinement_survives_the_route_swap(style):
+    from test_quest_guidance import game as guide_game, markers, click
+    for action in ("next", "map"):
+        g=guide_game(style);g.run(PAD_REFINE)
+        g.run("WorldMapFrame:Show()");g.slash("plan");g.advance(1)
+        assert g.eval('NS.dataWork.busy("quest-improve")')
+        if action=="next":
+            g.slash("plan next");g.slash("plan next");want=3
+        else:
+            click(g,next(p for p in markers(g) if list(p.steps.values())==[2]));want=2
+        waypoint=(g.eval("WAYPOINT.x"),g.eval("WAYPOINT.y"))
+        for _ in range(300):
+            g.advance(0.1)
+            if not g.eval('NS.dataWork.busy("quest-improve")'):break
+        assert not g.eval('NS.dataWork.busy("quest-improve")')
+        assert g.eval("NS.questPlanner.report")().improveSteps>0
+        current=[r for r in rows(g) if r.current]
+        assert current
+        assert current[0].stepIndex==want,(action,current[0].stepIndex)
+        assert (g.eval("WAYPOINT.x"),g.eval("WAYPOINT.y"))==waypoint
+        assert "%.1f, %.1f"%(waypoint[0]*100,waypoint[1]*100) in current[0].title.text,(action,current[0].title.text)
+        assert [p.selectedStop for p in markers(g) if p.selectedStop]==[want]
+
+COUNT_REFINES = r'''
+REFINES=0
+local real=NS.questOptimizer.optimize
+NS.questOptimizer.optimize=function(catalog,stops,opts)
+ if (opts.maxImproveSteps or 0)>0 then REFINES=REFINES+1 end
+ return real(catalog,stops,opts)
+end
+'''
+
+def test_local_search_runs_again_only_when_the_plan_inputs_change(style):
+    g=Game(style,WESTFALL,fresh=True);g.run(COUNT_REFINES);g.start();g.slash("plan");g.advance(8)
+    assert g.eval("REFINES")==1
+    # Small moves re-plan from the new position (starting from the refined order) without a new local search.
+    for x in (0.53,0.5,0.53):
+        g.run(f"POS.x, POS.y = {x}, {x}");g.advance(4)
+        assert "plan origin: map 1436 (%.4f, %.4f)"%(x,x) in g.eval("NS.questPlanner.debugText")()
+    assert g.eval("REFINES")==1
+    assert not g.eval('NS.dataWork.busy("quest-improve")')
+    # Real movement, or another goal, refines again.
+    g.run("POS.x, POS.y = 0.6, 0.6");g.advance(4)
+    assert g.eval("REFINES")==2
+    g.slash("plan xp");g.advance(5)
+    assert g.eval("REFINES")==3
+
+def test_local_search_gate_holds_with_any_spf_build(style):
+    from test_quest_planner_zone_steps import SPF_BUILDS, spf_tick
+    # SPF is never asked for walking estimates, so every build plans and refines exactly as without SPF:
+    # one local search, and small moves re-plan without a new one.
+    for spf in SPF_BUILDS:
+        g=Game(style,WESTFALL+spf,fresh=True);g.run(COUNT_REFINES);g.start();g.slash("plan");spf_tick(g,8)
+        assert g.eval("REFINES")==1,(spf,g.eval("REFINES"))
+        for x in (0.53,0.5,0.53,0.5):
+            g.run(f"POS.x, POS.y = {x}, {x}");spf_tick(g,4)
+            assert "plan origin: map 1436 (%.4f, %.4f)"%(x,x) in g.eval("NS.questPlanner.debugText")()
+        assert g.eval("REFINES")==1,(spf,g.eval("REFINES"))
+        assert g.eval("SPF_ESTIMATES")==0,spf
+        assert not g.eval('NS.dataWork.busy("quest-improve")')
+
+SOLVE_LOG = r'''
+EVENTS={}
+local real=NS.questOptimizer.optimize
+NS.questOptimizer.optimize=function(catalog,stops,opts)
+ local a,b=real(catalog,stops,opts)
+ EVENTS[#EVENTS+1]="solve "..tostring(opts.maxImproveSteps or 0)
+ return a,b
+end
+local G=NS.questGuidance
+local set=G.set
+G.set=function(...) EVENTS[#EVENTS+1]="render";return set(...) end
+'''
+
+def test_route_shows_at_once_then_local_search_follows_with_or_without_spf(style):
+    from test_quest_planner_zone_steps import TWO_CAMPS, SPF_BUILDS, spf_tick
+    runs=[]
+    for spf in ("",)+SPF_BUILDS:
+        g=Game(style,WESTFALL+TWO_CAMPS+spf,fresh=True);g.run(SOLVE_LOG)
+        g.start();g.eval("NS.setSetting")("questPlanner",True);spf_tick(g,8)
+        runs.append(list(g.eval("EVENTS").values()))
+        assert g.eval("SPF_ESTIMATES or 0")==0,spf
+    # The straight-line schedule renders first; the background local search runs after it and swaps in.
+    assert runs[0][:2]==["solve 0","render"],runs[0]
+    assert "solve 250000" in runs[0][2:],runs[0]
+    # No extra solve waits for SPF: the sequence is the same with every build.
+    assert all(run==runs[0] for run in runs),runs
+
+# Two hand-ins either side of the player: which order is cheaper depends only on small moves of the origin.
+STABLE = r'''
+function pair(originX, scale, mode, preferred, extra)
+ local q={[1]={id=1,name="West",status="active",xp=100},[2]={id=2,name="East",status="active",xp=100}}
+ local s={{id=1,kind="turnin",point={map=1436,x=.3,y=.5},quests={[1]="West"},deps={}},
+  {id=2,kind="turnin",point={map=1436,x=.7,y=.5},quests={[2]="East"},deps={}}}
+ local opts={mode=mode,origin={map=1436,x=originX,y=.5},preferredIDs=preferred,interactionSeconds=0,
+  travelSeconds=function(a,b) return math.abs(a.x-b.x)*scale end}
+ for k,v in pairs(extra or {}) do opts[k]=v end
+ local r,rep=NS.questOptimizer.optimize(q,s,opts)
+ local ids={}
+ for i,stop in ipairs(r) do ids[i]=stop.id end
+ return ids,rep
+end
+'''
+
+def order(g, x, previous=None, scale=100, mode="all", **extra):
+    ids, rep = g.eval("pair")(x, scale, mode, g.lua.table_from(previous) if previous else None,
+                              g.lua.table_from(extra) if extra else None)
+    return list(ids.values()), rep
+
+def test_previous_route_stays_until_a_clearly_better_one_appears(style):
+    g=Game(style,WESTFALL+FIXTURE+STABLE,fresh=True)
+    route,rep=order(g,.48)
+    assert route==[1,2] and not rep.keptPrevious
+    # Each small move makes the other order 4 s cheaper; re-planning from the previous order must never flip.
+    for extra in ({}, {"stabilitySeconds":10}):
+        for x in (.52,.48,.52,.48,.52):
+            new,rep=order(g,x,route,**extra)
+            assert new==route,(extra,x,new)
+            assert bool(rep.keptPrevious)==(x==.52),(extra,x,rep.keptPrevious)
+    # 30 s better replaces the previous order.
+    new,rep=order(g,.65,route)
+    assert new==[2,1] and not rep.keptPrevious
+    # 11 s: kept with the default margin (12 s), replaced with the planner's 10 s.
+    assert order(g,.555,route)[0]==route
+    assert order(g,.555,route,stabilitySeconds=10)[0]==[2,1]
+    # Long routes: a saving under 5 % of the previous route's time is noise too (20 s of 610 s), 60 s of 630 s is not.
+    new,rep=order(g,.51,route,scale=1000)
+    assert new==route and rep.keptPrevious
+    assert order(g,.53,route,scale=1000)[0]==[2,1]
+
+def test_more_coverage_always_replaces_the_previous_route(style):
+    g=Game(style,WESTFALL+FIXTURE,fresh=True)
+    g.run('''
+q={[1]={id=1,name="Near",status="ready",xp=100,exclusiveTo={2}},[2]={id=2,name="Far",status="ready",xp=100,exclusiveTo={1}},
+ [3]={id=3,name="Follow-up",status="future",xp=100,gates={{kind="turnin",choices={2}}}}}
+local function at(id,qid,kind,x,deps) return {id=id,kind=kind,point={map=1436,x=x,y=.5},quests={[qid]=q[qid].name},deps=deps or {}} end
+s={at(1,1,"pickup",.45),at(2,1,"turnin",.45,{[1]=true}),at(3,2,"pickup",.9),at(4,2,"turnin",.9,{[3]=true}),
+ at(5,3,"pickup",.9),at(6,3,"turnin",.9,{[5]=true})}
+r,rep=NS.questOptimizer.optimize(q,s,{mode="all",origin={map=1436,x=.5,y=.5},preferredIDs={1,2},interactionSeconds=0,
+ travelSeconds=function(a,b) return math.abs(a.x-b.x)*100 end})
+''')
+    # The previous order (the near quest, 5 s) blocks two quests; the 40 s route hands in two and wins.
+    assert [stop.id for stop in g.eval("r").values()]==[3,4,5,6]
+    assert g.eval("rep.coverage")==2 and not g.eval("rep.keptPrevious")
+
+def test_xp_goal_keeps_the_previous_route_within_five_percent_xp_rate(style):
+    g=Game(style,WESTFALL+FIXTURE+STABLE,fresh=True)
+    route,_=order(g,.502,mode="xp")
+    assert route==[2]
+    # The west quest earns about 2 % more XP per second from here: noise, the previous route stays.
+    new,rep=order(g,.498,route,mode="xp")
+    assert new==route and rep.keptPrevious
+    # About 67 % more XP per second replaces it.
+    new,rep=order(g,.45,route,mode="xp")
+    assert new==[1] and not rep.keptPrevious
+
+
+# Wraps the optimizer's internal evaluate() (reached through upvalues) to see every local-search candidate.
+HORIZON_PROBE = r'''
+local function upvalue(f, name)
+ local i = 1
+ while true do
+  local n, v = debug.getupvalue(f, i)
+  if n == nil then return nil end
+  if n == name then return v, i end
+  i = i + 1
+ end
+end
+local improve, evaluate, slot -- the addon loads after this setup, so look them up on first use
+function probe(limit)
+ if not improve then
+  improve = upvalue(NS.questOptimizer.optimize, "improve")
+  evaluate, slot = upvalue(improve, "evaluate")
+ end
+ PROBE = { candidates = 0, beyond = 0, deepest = 0 }
+ local current
+ debug.setupvalue(improve, slot, function(m, path, from, saved, bound, record)
+  if record then current = path -- the incumbent, replayed to record resume states
+  else
+   local deepest = 0
+   for i = 1, math.max(#path, #current) do if path[i] ~= current[i] then deepest = i end end
+   PROBE.candidates, PROBE.deepest = PROBE.candidates + 1, math.max(PROBE.deepest, deepest)
+   if deepest > limit then PROBE.beyond = PROBE.beyond + 1 end
+  end
+  return evaluate(m, path, from, saved, bound, record)
+ end)
+end
+function bigZone(n, extra)
+ TRAVELS = 0
+ local q, s = syntheticZone(n)
+ local opts = {mode="all", origin={map=1436,x=.5,y=.5}, killSeconds=10, interactionSeconds=3, maxImproveSteps=250000,
+  travelSeconds=function(a, b) TRAVELS = TRAVELS + 1; local x, y = a.x - b.x, a.y - b.y; return math.sqrt(x*x + y*y) * 600 end}
+ for k, v in pairs(extra or {}) do opts[k] = v end
+ ROUTE, REPORT = NS.questOptimizer.optimize(q, s, opts)
+ return REPORT
+end
+'''
+
+def test_local_search_moves_only_actions_inside_the_horizon(style):
+    g=Game(style,WESTFALL+SYNTHETIC_ZONE+HORIZON_PROBE,fresh=True)
+    # 150 actions: candidates differ from the incumbent only in the first 12 (default) or 20 positions.
+    for horizon,extra in ((12,None),(20,{"horizon":20})):
+        g.eval("probe")(horizon)
+        report=g.eval("bigZone")(50,g.lua.table_from(extra) if extra else None)
+        probe=g.eval("PROBE")
+        assert report.coverage==50 and probe.candidates>0
+        assert probe.beyond==0,(horizon,probe.beyond,probe.deepest)
+        assert probe.deepest==horizon,(horizon,probe.deepest)
+    # 15 actions (<= 16): the horizon covers the whole route.
+    g.eval("probe")(12)
+    report=g.eval("bigZone")(5)
+    assert report.coverage==5 and g.eval("PROBE.deepest")==15,g.eval("PROBE.deepest")
+
+# Measured on the code before the horizon (beam search + whole-route local search), same zone and options:
+# the local search used its whole budget (250055 simulated actions) and the solve asked 286871 travel estimates.
+BEFORE_IMPROVE_STEPS, BEFORE_TRAVELS = 250055, 286871
+
+def test_horizon_cuts_the_work_on_a_fifty_quest_zone(style):
+    g=Game(style,WESTFALL+SYNTHETIC_ZONE+HORIZON_PROBE,fresh=True)
+    report=g.eval("bigZone")(50)
+    assert report.coverage==50 and report.expectedSeconds<report.nearestSeconds
+    assert not report.improveExhausted
+    assert report.improveSteps<BEFORE_IMPROVE_STEPS/2,report.improveSteps
+    assert g.eval("TRAVELS")<BEFORE_TRAVELS/2,g.eval("TRAVELS")
+
+def test_search_exhausted_reports_only_the_seed_budget(style):
+    g=game(style)
+    _,small=g.eval("solve")("all")
+    assert not small.searchExhausted
+    g=Game(style,WESTFALL+SYNTHETIC_ZONE+HORIZON_PROBE,fresh=True)
+    # The seeds of a 150-action zone use up the default 36000 checks; the report says so.
+    report=g.eval("bigZone")(50,g.lua.table_from({"maxImproveSteps":0}))
+    assert report.searchChecks>=36000 and report.searchExhausted
+
+
+def test_stability_margin_is_capped_at_sixty_seconds_on_long_routes(style):
+    g=Game(style,WESTFALL+FIXTURE+HORIZON_PROBE,fresh=True)
+    g.run(r'''
+local i, f = 1, nil
+while true do
+ local n, v = debug.getupvalue(NS.questOptimizer.optimize, i)
+ if n == nil then break end
+ if n == "keepPrevious" then f = v end
+ i = i + 1
+end
+KEEP = f
+''')
+    keep=g.eval("KEEP")
+    T=g.lua.table_from
+    def kept(prev, new, mode="all", stab=None):
+        return keep(mode, T({1:1, 2:-prev, "time":prev}), T({1:1, 2:-new, "time":new}), stab)
+    # 50 min route: 5 % would be 150 s; the cap keeps the bar at 60 s, so a 70 s saving replaces it.
+    assert not kept(3000, 2930)
+    assert kept(3000, 2950)            # 50 s: below the 60 s cap, kept
+    assert kept(610, 590)              # 20 s on a 610 s route: below max(12, 30.5), kept
+    assert not kept(630, 570)          # 60 s on a 630 s route: above 31.5, replaced
+    assert kept(100, 92) and not kept(100, 85)   # short routes: the 12 s floor
+
+def test_mid_size_zone_is_polished_over_the_whole_route(style):
+    g=Game(style,WESTFALL+SYNTHETIC_ZONE+HORIZON_PROBE,fresh=True)
+    g.eval("probe")(12)
+    report=g.eval("bigZone")(12)      # 36 actions: at most 40, so the whole route may move
+    assert report.coverage==12
+    assert g.eval("PROBE.deepest")>12,g.eval("PROBE.deepest")
+    assert report.expectedSeconds<report.nearestSeconds,(report.expectedSeconds,report.nearestSeconds)
 
 if __name__=="__main__":
     failed=total=0

@@ -1,0 +1,56 @@
+flowchart LR
+  %% Decouple the planner (no SPF costs, idle-priority refinement) and keep map step numbers readable and on top · 7 agents: 3 × bpmn:worker, 4 × bpmn:reviewer · up to 13 with loop rounds
+  subgraph n_lane_builder["🤖 Builder · bpmn:worker"]
+    n_start(("User chose both"))
+    n_split{"+"}
+    n_build_d1["⚙ Drop SPF from planning · ⏱ 40 min"]
+    n_fix_d1["⚙ Fix SPF removal issues · ⏱ 20 min"]
+    n_build_d2["⚙ Add idle job priority · ⏱ 30 min"]
+    n_fix_d2["⚙ Fix idle priority issues · ⏱ 20 min"]
+    n_build_d3["⚙ Raise map step numbers · ⏱ 25 min"]
+    n_fix_d3["⚙ Fix map number issues · ⏱ 15 min"]
+    n_review_d1__merge{"✕"}
+    n_review_d2__merge{"✕"}
+    n_review_d3__merge{"✕"}
+  end
+  subgraph n_lane_reviewer["🤖 Reviewer · bpmn:reviewer · ⏱ 15 min"]
+    n_review_d1["⚙ Review SPF removal"]
+    n_ok_d1{"SPF removal approved?"}
+    n_review_d2["⚙ Review idle priority"]
+    n_ok_d2{"Idle priority approved?"}
+    n_review_d3["⚙ Review map number fix"]
+    n_ok_d3{"Map number fix approved?"}
+    n_join{"+"}
+    n_final_check["⚙ Verify decoupled tree · ⏱ 25 min"]
+    n_done((("Planner decoupled")))
+  end
+  n_start --> n_split
+  n_split --> n_build_d1
+  n_build_d1 --> n_review_d1__merge
+  n_review_d1 --> n_ok_d1
+  n_ok_d1 -- "approved or 2nd round" --> n_join
+  n_ok_d1 -- "changes" --> n_fix_d1
+  n_fix_d1 --> n_review_d1__merge
+  n_split --> n_build_d2
+  n_build_d2 --> n_review_d2__merge
+  n_review_d2 --> n_ok_d2
+  n_ok_d2 -- "approved or 2nd round" --> n_join
+  n_ok_d2 -- "changes" --> n_fix_d2
+  n_fix_d2 --> n_review_d2__merge
+  n_join --> n_final_check
+  n_final_check --> n_done
+  n_split --> n_build_d3
+  n_build_d3 --> n_review_d3__merge
+  n_review_d3 --> n_ok_d3
+  n_ok_d3 -- "approved or 2nd round" --> n_join
+  n_ok_d3 -- "changes" --> n_fix_d3
+  n_fix_d3 --> n_review_d3__merge
+  n_review_d1__merge --> n_review_d1
+  n_review_d2__merge --> n_review_d2
+  n_review_d3__merge --> n_review_d3
+  classDef done fill:#e6f4ea,stroke:#1e8e3e,color:#0d3b1e
+  classDef running fill:#e8f0fe,stroke:#1a73e8,color:#0b2a5b
+  classDef ready fill:#fef7e0,stroke:#b06000,color:#4a3600
+  classDef failed fill:#fce8e6,stroke:#c5221f,color:#5f0d06
+  classDef cancelled fill:#f1f3f4,stroke:#80868b,color:#3c4043
+  class n_start,n_split,n_build_d1,n_review_d1,n_ok_d1,n_build_d2,n_review_d2,n_ok_d2,n_build_d3,n_review_d3,n_ok_d3,n_join,n_final_check,n_done,n_review_d1__merge,n_review_d2__merge,n_review_d3__merge done

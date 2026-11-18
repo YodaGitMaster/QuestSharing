@@ -17,7 +17,7 @@ function U.box(parent, label, x, y, width, value, max)
     local b = CreateFrame("EditBox", nil, parent)
     b:SetWidth(width); b:SetHeight(22)
     b:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -(y + 17))
-    S.fill(b, "BACKGROUND", 0, 0, 0, 0.7):SetAllPoints(b)
+    S.inset(b)
     if ChatFontNormal then b:SetFontObject(ChatFontNormal) end
     b:SetAutoFocus(false); b:SetMaxLetters(max or 100)
     if b.SetTextInsets then b:SetTextInsets(5, 5, 0, 0) end

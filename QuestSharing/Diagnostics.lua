@@ -170,12 +170,7 @@ function ns.reportWindow(title, lines, kind, overview, details, refreshAction)
         f:SetWidth(W_WIDTH)
         f:SetHeight(W_HEIGHT)
         f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-        pcall(function()
-            f:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-                            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12,
-                            insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-            f:SetBackdropColor(0, 0, 0, 0.95)
-        end)
+        ns.style.frame(f, "hud") -- opaque stone in the gold classic border, like every other Quest Sharing window
         f:SetFrameStrata("DIALOG")
         f:SetMovable(true)
         f:EnableMouse(true)
@@ -594,8 +589,9 @@ function ns.diagnosticLines(checks, overview)
     table.sort(keys)
     for _, key in ipairs(keys) do
         local value = ns.db[key]
-        local readable = type(value) == "boolean" and (value and "On" or "Off") or tostring(value)
-        add("  " .. (labels[key] or key) .. ": " .. readable .. " [" .. key .. "=" .. tostring(value) .. "]")
+        local raw = value == "" and '""' or tostring(value) -- empty text settings stay visible as ""
+        local readable = type(value) == "boolean" and (value and "On" or "Off") or (value == "" and "(empty)" or raw)
+        add("  " .. (labels[key] or key) .. ": " .. readable .. " [" .. key .. "=" .. raw .. "]")
     end
     section("ACTIVITY LOG - oldest to newest")
     for _, line in ipairs(ns.logLines()) do add(line) end

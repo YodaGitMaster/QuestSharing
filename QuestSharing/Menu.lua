@@ -234,4 +234,6 @@ function ns.questMenuPick(i)
     it.run()
 end
 
+-- The quest entry of the open right-click menu, or nil when no menu shows.
+function ns.questMenuEntry() return menu and menu:IsShown() and menu.entry or nil end
 function ns._questMenu() return menu, lines end                -- for the tests
