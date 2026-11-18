@@ -551,3 +551,12 @@
 - Chosen-quests goal with no IDs keeps the previous goal and prints a hint (no empty plan).
 - Pace: median of last 40 samples, >= 5 needed, clamped (kill 4-40 s, talk 1-15 s); kill sample = gap between two rises of the same objective (1-90 s; a rise of n = n samples of gap/n); talk sample = QUEST_DETAIL/QUEST_COMPLETE to QUEST_ACCEPTED/QUEST_TURNED_IN (<= 60 s). Chosen over the planned yard-proximity timer: no position polling, no timers. Auto-accept gives ~0 s samples (clamped to 1 s).
 - E4 (camp radius in yards) stays deferred; not needed by the tab.
+
+## 2026-11-18 — Dungeon quest chain = indented bullets; "done" propagates backwards only through required links
+- `chainPrev/chainNext` (id -> other -> required) are built in `D.scan` `link()`; required = sole prerequisite, an "all" group, or `nextQuestInChain`. An "any one of N" prerequisite is NOT required (finishing the later quest does not prove which earlier one was done).
+- A step is ticked green when `completed(id)` or any required later step is `finished()`; ticked-by-later steps say "not needed" so the player does not travel to a giver with nothing left.
+- Chain members = ancestors + descendants of the selected quest (BFS, cap 24); branches off the side (siblings) are left out. Hover tooltip (`chainLines`) unchanged.
+- Panel picture removed only on the Dungeon quests details frame (`journalSurface.grain:Hide()`); Loot/Rewards panels keep it (shared `E.details`).
+
+## 2026-11-18 — Map search pin = red X raid marker
+- Gold coin read as a random item, not a destination. Chose `UI-RaidTargetingIcon_7` (red X): built into every client, no new art file, universally read as "go here". One pin for all kinds (no per-kind icon).

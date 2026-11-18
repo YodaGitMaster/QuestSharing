@@ -489,7 +489,7 @@ local function setupNote(line)
     elseif string.find(text, "quest log markers", 1, true) == 1 then
         return "Shared-quest stars are not active in this quest log. The Party quests window still works."
     elseif string.find(text, "quick chat wheel: key not set", 1, true) == 1 then
-        return "Quick chat has no shortcut. Set one in General > Quick chat key, or type /qs key V."
+        return "Quick chat has no shortcut. Set one in Settings > Quick chat > Quick chat key, or type /qs key V."
     elseif string.find(text, "Questie:", 1, true) == 1 then
         return "Extra quest information is unavailable. /qs questie explains the optional data source."
     end

@@ -113,10 +113,10 @@ def test_shared_id_without_wing_identity_does_not_choose_arbitrarily(style):
     assert "All dungeons" in g.eval("NS.loot._window().selection.text")
 
 
-def test_extra_tools_label_fits_and_existing_tab_actions_still_work(style):
-    g=game(style);g.slash("settings");g.eval("NS.settingsTab")("optional")
+def test_tab_labels_fit_and_existing_tab_actions_still_work(style):
+    g=game(style);g.slash("settings");g.eval("NS.settingsTab")("browser")
     w=g.eval("NS._settingsWindow()")
-    assert "Extra tools" in w.tabs.optional.text.text
+    assert "Items & dungeons" in w.tabs.browser.text.text
     for tab in w.tabs.values():assert tab.frame.point[4]+tab.frame.width<=w.win.width-20
     g.run('for i,r in ipairs(NS.settingRows)do if r.label=="Search instance loot and who drops it" then NS.settingsClick(i,"LeftButton") end end')
     assert g.eval("NS.equipmentUI.visible")("dungeons")

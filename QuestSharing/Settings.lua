@@ -56,28 +56,41 @@ local function questIDs(text)
     return table.concat(ids, ", ")
 end
 
+-- Errors & logs tab: one line each saying how much has been recorded
+local function errorsText()
+    local n = ns.db and ns.db.errors and #ns.db.errors or 0
+    return n == 0 and "none recorded" or string.format("%d recorded (newest last)", n)
+end
+local function logText()
+    local n = type(QuestSharingLog) == "table" and #QuestSharingLog or 0
+    return string.format("%d line%s%s", n, n == 1 and "" or "s", ns.logging() and "" or " (recording is off)")
+end
+
 ns.settingTabs = {
-    { id = "general", group = "Basics", title = "General", intro = "Start here: turn the addon on, choose how messages are sent, or check your setup." },
+    { id = "general", group = "Basics", title = "General", intro = "Start here: turn the addon on, show its minimap button and choose how messages are sent." },
     { id = "objectives", group = "Questing", title = "Quest markers", intro = "Add ! above quest enemies and help find your next quest objective." },
     { id = "tracker", title = "Quest list", intro = "Choose which quests appear in the game's quest list on the right of your screen." },
     { id = "dialogs", title = "Accept & turn in", intro = "Let the addon accept quest offers or finish ready quests when you talk to an NPC." },
-    { id = "sharing", group = "Group play", title = "Quest sharing", intro = "Offer your quests to party members and choose which updates go to party chat." },
+    { id = "items", title = "Quest items", intro = "Find the items your quests need, use them with one key and clear out the ones you no longer need." },
+    { id = "sharing", group = "Party", title = "Quest sharing", intro = "Offer your quests to party members, choose which updates go to party chat and look for people to quest with." },
     { id = "party", title = "Party window", intro = "Show who has each quest, choose what clicks do, and manage party friends." },
-    { id = "actions", title = "Pings & quest items", intro = "Point out quest targets and use the items your quests need." },
+    { id = "actions", title = "Pings", intro = "Point out quest targets to your party with one key." },
     { id = "quick", title = "Quick chat", intro = "Send a saved message from a ring of choices. Set the key and edit messages below." },
     { id = "maps", group = "Map & route", title = "Map", intro = "Show zone level guides and party locations on the world map." },
     { id = "guide", title = "Quest guide", intro = "Turn on the quest route guide and choose what it plans. Changes reach the open guide at once." },
-    { id = "browser", group = "Look up & tools", title = "Browser DB", intro = "Find equipment, dungeon quests, recipes and item sources. Choose what you want to look up below." },
-    { id = "optional", title = "Extra tools", intro = "Plan your next quests, tidy your bags, update spells or save fishing spots. Open a tool below." },
+    { id = "browser", group = "Look up", title = "Items & dungeons", intro = "Find quest rewards, dungeon quests and loot, and see where items come from and who sells them." },
+    { id = "optional", title = "Professions & character", intro = "Recipes and profession upgrades, spell ranks and saved fishing spots." },
+    { id = "support", group = "Help", title = "Errors & logs", intro = "Check your setup, read the errors and logs the addon recorded, copy them for a bug report, or reset everything." },
 }
 
 -- Every setting explains the visible result; choices also explain the selected value.
 ns.settingRows = {
     { tab = "general", kind = "header", label = "Start here" },
     { tab = "general", kind = "bool", key = "enabled", label = "Turn on Quest Sharing",
-      desc = "Turn on to enable the addon. Each feature below still uses its own setting." },
+      desc = "Turn on to enable the addon. Each feature in the other categories still uses its own setting." },
     { tab = "general", kind = "bool", key = "minimap", label = "Show the minimap button",
       desc = "Turn on to add a button beside the minimap. Left-click: settings. Right-click: Party quests. Drag to move it." },
+    { tab = "general", kind = "header", label = "Messages and sounds" },
     { tab = "general", kind = "choice", key = "mode", label = "How to send quest progress messages", values = { "box", "send", "print" },
       names = { box = "Draft in chat", send = "Send immediately", print = "Only show me" },
       desc = "Choose what happens when you post quest progress. Quick chat has its own send setting.",
@@ -86,20 +99,6 @@ ns.settingRows = {
                print = "Only show me: prints the message for you. Nobody else receives it." } },
     { tab = "general", kind = "bool", key = "sound", label = "Play a sound when a shared quest is accepted or finished",
       desc = "Turn on for a soft sound when someone accepts your quest or a teammate finishes a shared quest. Silent during combat." },
-    { tab = "general", kind = "header", label = "Try it and check your setup" },
-    { tab = "general", kind = "key", label = "Quick chat key",
-      desc = "Click Set key, then press a key. Hold it in game to open the message ring. Escape cancels." },
-    { tab = "general", kind = "action", label = "Show the ring", button = "Preview ring",
-      desc = "Click to preview the quick chat ring. Edit its messages under Quick chat.", action = function() ns.quickOpen(true) end },
-    { tab = "general", kind = "action", label = "Check my setup", button = "Run check",
-      desc = "Start with a readable issue overview. Copy all includes setup details, every recorded error and all retained log lines.", action = function() ns.doctor() end },
-    { tab = "general", kind = "header", label = "Troubleshooting and reset" },
-    { tab = "general", kind = "bool", key = "debug", label = "Record addon actions for troubleshooting",
-      desc = "On by default: records what the addon tried and what happened, including errors. Saved when you reload or log out." },
-    { tab = "general", kind = "action", label = "Copy logs, errors and setup", button = "Open report",
-      desc = "Read the issue overview, then click Copy all and press Ctrl+C (Windows) or Cmd+C (Mac). Full technical details are included automatically.", action = function() ns.diagnostics() end },
-    { tab = "general", kind = "action", label = "Reset everything to the defaults", button = "Reset settings",
-      desc = "Click to restore default settings and quick chat messages. Your saved fishing notes are kept.", action = function() ns.resetSettings() end },
 
     { tab = "objectives", kind = "header", label = "! above quest enemies" },
     { tab = "objectives", kind = "bool", key = "markMobs", label = "Show ! above quest enemies",
@@ -133,6 +132,21 @@ ns.settingRows = {
     { tab = "dialogs", kind = "bool", key = "autoCompleteQuests", label = "Turn in completed quests automatically",
       desc = "Turn on to finish ready quests with no reward choice or one reward. Multiple rewards and quests costing money wait for your click." },
 
+    { tab = "items", kind = "header", label = "Find and use quest items" },
+    { tab = "items", kind = "bool", key = "bagMarks", label = "Mark quest items in my bags",
+      desc = "Turn on for gold marks on items needed by nearby quests. Blue marks mean the quest is elsewhere." },
+    { tab = "items", kind = "bool", key = "questItems", label = "Show usable item buttons beside tracked quests",
+      desc = "Turn on to add a clickable item icon beside a quest in the tracker. Click the icon to use the item." },
+    { tab = "items", kind = "key", which = "item", label = "Key to use my nearest quest's item",
+      desc = "Click Set key, then press a key. Use it in game to activate the item for your closest quest. Escape cancels." },
+    { tab = "items", kind = "bool", key = "itemButton", label = "Show a separate button for my nearest quest's item",
+      desc = "Turn on for a movable item button with a cooldown. Red means your target is out of range. Shift-drag to move it." },
+    { tab = "items", kind = "header", label = "Clean up my bags" },
+    { tab = "items", kind = "action", label = "Review quest items left in my bags", title = "Bag cleanup", button = "Review items",
+      desc = "Review possible leftover quest items. You confirm each stack before it is deleted.",
+      note = "Requires QuestieDB. Active quest items and quest starters are protected.",
+      action = function() ns.questCleanup.open() end },
+
     { tab = "sharing", kind = "header", label = "Offering quests to your party" },
     { tab = "sharing", kind = "bool", key = "auto", label = "Share my quests when someone joins the party",
       desc = "Turn on to offer quests when you join a party or another player joins yours. Each offer is sent once per sharing round." },
@@ -159,6 +173,10 @@ ns.settingRows = {
       desc = "Turn on to exchange quest lists and progress with party members using this addon. Needed for exact shared-quest information." },
     { tab = "sharing", kind = "bool", key = "markers", label = "Mark shared quests with a star in my quest log",
       desc = "Turn on to add a star and party members' names beside shared quests in the quest log. This does not add ! above enemies." },
+    { tab = "sharing", kind = "header", label = "Find people to quest with" },
+    { tab = "sharing", kind = "action", label = "Seek fellow adventurers", title = "Quest invitation", button = "Write invite",
+      desc = "Draft an invitation for an unfinished quest. Choose a chat, review it and press Enter to send.",
+      action = function() ns.adventure.open() end },
 
     { tab = "party", kind = "header", label = "The separate Party quests window" },
     { tab = "party", kind = "bool", key = "panel", label = "Show the Party quests window",
@@ -190,21 +208,14 @@ ns.settingRows = {
       desc = "Choose the wait between pings. Hold Shift while pressing your ping key to bypass the wait." },
     { tab = "actions", kind = "bool", key = "pingObjects", label = "Also ping quest objects I am facing",
       desc = "Turn on to ping a quest object in front of you when no quest enemy is nearby." },
-    { tab = "actions", kind = "header", label = "Find and use quest items" },
-    { tab = "actions", kind = "bool", key = "bagMarks", label = "Mark quest items in my bags",
-      desc = "Turn on for gold marks on items needed by nearby quests. Blue marks mean the quest is elsewhere." },
-    { tab = "actions", kind = "bool", key = "questItems", label = "Show usable item buttons beside tracked quests",
-      desc = "Turn on to add a clickable item icon beside a quest in the tracker. Click the icon to use the item." },
-    { tab = "actions", kind = "key", which = "item", label = "Key to use my nearest quest's item",
-      desc = "Click Set key, then press a key. Use it in game to activate the item for your closest quest. Escape cancels." },
-    { tab = "actions", kind = "bool", key = "itemButton", label = "Show a separate button for my nearest quest's item",
-      desc = "Turn on for a movable item button with a cooldown. Red means your target is out of range. Shift-drag to move it." },
 
     { tab = "quick", kind = "header", label = "Open the message ring" },
     { tab = "quick", kind = "bool", key = "quick", label = "Enable the quick chat ring",
       desc = "Turn on to use your key to open a ring of saved messages and emotes." },
-    { tab = "quick", kind = "key", label = "Key that opens the ring",
-      desc = "Click Set key, then press the key you want to use. Escape cancels." },
+    { tab = "quick", kind = "key", label = "Quick chat key",
+      desc = "Click Set key, then press a key. Hold it in game to open the message ring. Escape cancels." },
+    { tab = "quick", kind = "action", label = "Show the ring", button = "Preview ring",
+      desc = "Click to preview the quick chat ring. Edit its messages below.", action = function() ns.quickOpen(true) end },
     { tab = "quick", kind = "choice", key = "quickMode", label = "How the quick chat key works", values = { "hold", "toggle" },
       names = { hold = "Hold key", toggle = "Press key" },
       desc = "Choose how to open the ring and select a message.",
@@ -276,18 +287,16 @@ ns.settingRows = {
       desc = "Opens the full planner details. Click Copy all and press Ctrl+C (Windows) or Cmd+C (Mac) to share them in a bug report.",
       action = guide("debug") },
 
-    { tab = "optional", kind = "header", label = "Questing" },
-    { tab = "optional", kind = "action", label = "Quest guide - moved to its own tab", button = "Open tab",
-      desc = "The quest route guide, its on/off switch and all its options are now in the Quest guide tab.",
-      action = function() ns.settingsTab("guide") end },
-    { tab = "optional", kind = "action", label = "Review quest items left in my bags", title = "Bag cleanup", button = "Review items",
-      desc = "Review possible leftover quest items. You confirm each stack before it is deleted.",
-      note = "Requires QuestieDB. Active quest items and quest starters are protected.",
-      action = function() ns.questCleanup.open() end },
-    { tab = "optional", kind = "action", label = "Seek fellow adventurers", title = "Quest invitation", button = "Write invite",
-      desc = "Draft an invitation for an unfinished quest. Choose a chat, review it and press Enter to send.",
-      action = function() ns.adventure.open() end },
-    { tab = "optional", kind = "header", label = "Character & gathering" },
+    { tab = "optional", kind = "header", label = "Recipes and upgrades" },
+    { tab = "optional", kind = "bool", key = "professionGuide", label = "Cooking recipes and sources", title = "Cooking recipes", button = "Cooking recipes",
+      desc = "Browse learned and unlearned recipes, skill requirements, sources and ingredients in the game's profession window.",
+      note = "Recipe reference included. QuestieDB adds ingredient farming locations.", toggle = "Show recipe and upgrade guide in the profession window",
+      action = function() ns.professions.open("cooking") end },
+    { tab = "optional", kind = "action", label = "Where to upgrade every profession", title = "Profession upgrades", button = "Upgrades",
+      desc = "Look up rank requirements, trainers, books and quests for all 12 professions and both factions.",
+      note = "Reference included; no database addon needed.",
+      action = function() ns.professions.open("upgrades") end },
+    { tab = "optional", kind = "header", label = "Spells and fishing" },
     { tab = "optional", kind = "bool", key = "autoSpellRanks", label = "Auto-update spells to highest learned rank", title = "Spell ranks", button = "Update ranks",
       desc = "Replace old spells on your action bars with the highest rank you already know.",
       note = "Enable below before updating. Waits during combat; macros and pet bars stay unchanged.", toggle = "Automatically update spell ranks",
@@ -297,7 +306,7 @@ ns.settingRows = {
       note = "Optional: AnglerAtlas adds zone fishing information.", toggle = "Show saved spots on the world map",
       action = function() ns.fishing.open() end },
 
-    { tab = "browser", kind = "header", label = "Equipment & dungeon quests" },
+    { tab = "browser", kind = "header", label = "Quests, gear and dungeons" },
     { tab = "browser", kind = "bool", key = "rewardBrowser", label = "Quest rewards", button = "Browse rewards",
       desc = "Find quest equipment for your class, level and faction, then see how to start each quest.",
       note = "Requires QuestieDB. Hover over equipment to compare it with yours.", toggle = "Enable quest reward browser",
@@ -310,15 +319,6 @@ ns.settingRows = {
       desc = "Find quests for a dungeon, including outside pickups, prerequisites and follow-ups.",
       note = "Requires QuestieDB. Filter by faction, class and level.",
       action = function() ns.dungeonQuests.open() end },
-    { tab = "browser", kind = "header", label = "Professions & recipes" },
-    { tab = "browser", kind = "bool", key = "professionGuide", label = "Cooking recipes and sources", title = "Cooking recipes", button = "Cooking recipes",
-      desc = "Browse learned and unlearned recipes, skill requirements, sources and ingredients in the game's profession window.",
-      note = "Recipe reference included. QuestieDB adds ingredient farming locations.", toggle = "Show recipe and upgrade guide in the profession window",
-      action = function() ns.professions.open("cooking") end },
-    { tab = "browser", kind = "action", label = "Where to upgrade every profession", title = "Profession upgrades", button = "Upgrades",
-      desc = "Look up rank requirements, trainers, books and quests for all 12 professions and both factions.",
-      note = "Reference included; no database addon needed.",
-      action = function() ns.professions.open("upgrades") end },
     { tab = "browser", kind = "header", label = "Items & vendors" },
     { tab = "browser", kind = "bool", key = "vendorSearch", label = "Search items and vendors on the map", title = "Item & vendor search",
       desc = "Enable below, then open the world map and use its search box. Search an item, vendor type or trainer role.",
@@ -327,10 +327,42 @@ ns.settingRows = {
       desc = "Show known seller types and Mining sources when you hover over bag items or recipe ingredients.",
       note = "Requires QuestieDB.", toggle = "Show item sources in tooltips" },
 
+    { tab = "support", kind = "header", label = "Is something wrong?" },
+    { tab = "support", kind = "action", label = "Check my setup", button = "Run check",
+      desc = "Opens a readable overview of anything that is missing or wrong. Copy all includes setup details, every recorded error and all retained log lines.",
+      action = function() ns.doctor() end },
+    { tab = "support", kind = "header", label = "Errors" },
+    { tab = "support", kind = "info", label = "Errors recorded", info = errorsText,
+      desc = "Lua errors from this addon and actions the game blocked. The newest are kept." },
+    { tab = "support", kind = "action", label = "Show the errors", button = "Show errors",
+      desc = "Opens the full report, which lists every error stack. Click Copy all, then press Ctrl+C (Windows) or Cmd+C (Mac).",
+      action = function() ns.diagnostics(true) end },
+    { tab = "support", kind = "action", label = "Clear the errors", button = "Clear errors",
+      desc = "Click to forget the recorded errors, for example after you fixed the cause.",
+      action = function() ns.errorsCommand("clear"); ns.refreshSettings() end },
+    { tab = "support", kind = "header", label = "Logs" },
+    { tab = "support", kind = "bool", key = "debug", label = "Record addon actions for troubleshooting",
+      desc = "On by default: records what the addon tried and what happened, including errors. Saved when you reload or log out." },
+    { tab = "support", kind = "info", label = "Log lines kept", info = logText,
+      desc = "Quest events, chat the addon showed and game messages around it." },
+    { tab = "support", kind = "action", label = "Show the logs", button = "Show logs",
+      desc = "Opens the full report, which ends with every retained log line. Click Copy all and press Ctrl+C (Windows) or Cmd+C (Mac) to share it in a bug report.",
+      action = function() ns.diagnostics(true) end },
+    { tab = "support", kind = "action", label = "Clear the logs", button = "Clear logs",
+      desc = "Click to empty the debug log. Recording continues if it is on.",
+      action = function() ns.logCommand("clear"); ns.refreshSettings() end },
+    { tab = "support", kind = "header", label = "Copy everything" },
+    { tab = "support", kind = "action", label = "Copy logs, errors and setup", button = "Open report",
+      desc = "Read the issue overview, then click Copy all and press Ctrl+C (Windows) or Cmd+C (Mac). Full technical details are included automatically.",
+      action = function() ns.diagnostics() end },
+    { tab = "support", kind = "header", label = "Reset" },
+    { tab = "support", kind = "action", label = "Reset everything to the defaults", button = "Reset settings",
+      desc = "Click to restore default settings and quick chat messages. Your saved fishing notes are kept.", action = function() ns.resetSettings() end },
+
 }
 
 for _, row in ipairs(ns.settingRows) do
-    row.card = row.card == true or ((row.tab == "optional" or row.tab == "browser") and row.kind ~= "header")
+    row.card = row.card == true or ((row.tab == "optional" or row.tab == "browser" or row.title ~= nil) and row.kind ~= "header")
 end
 
 local function limit(v) if type(v) == "function" then return v() end return v end
@@ -418,7 +450,7 @@ local ROW_H, HEADER_H = 26, 32
 local MIN_ROWS = 18
 -- the category list on the left: a gold caption per group, then its categories
 local NAV_X, NAV_W = 18, 178
-local GROUP_H, GROUP_GAP, TAB_H, TAB_STEP = 20, 6, 24, 28
+local GROUP_H, GROUP_GAP, TAB_H, TAB_STEP = 20, 6, 24, 26
 
 local function shorten(s, n) if #s <= n then return s end return string.sub(s, 1, n - 3) .. "..." end
 

@@ -487,7 +487,7 @@ local function pinFor(parent)
     local p = CreateFrame("Button", nil, parent)
     p:SetWidth(20); p:SetHeight(20)
     p.icon = p:CreateTexture(nil, "OVERLAY")
-    p.icon:SetAllPoints(p); p.icon:SetTexture("Interface\\Icons\\INV_Misc_Coin_01")
+    p.icon:SetAllPoints(p); p.icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_7") -- red X: "go here"
     p:RegisterForClicks("LeftButtonUp")
     p:SetScript("OnEnter", function(self)
         local r = self.result

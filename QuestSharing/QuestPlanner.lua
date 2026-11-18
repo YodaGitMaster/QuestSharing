@@ -1375,7 +1375,7 @@ function P.follow()
 end
 
 function P.refresh()
-    if not ns.db.questPlanner then return ns.print("turn on Quest planner in Extra tools first") end
+    if not ns.db.questPlanner then return ns.print("turn on the Quest route guide in Settings > Quest guide first") end
     if not panel or not panel:IsShown() then return P.open() end
     sessionActive = true
     scan(true)

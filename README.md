@@ -7,7 +7,7 @@ A World of Warcraft addon for playing quests together.
 ## Your first party, in four steps
 1. **Install it** (see [Install](#install)) and log in. A short welcome in chat tells you it is ready. Everything is
    on, except the automatic party chat: **you** decide when to talk.
-2. **Give the quick chat ring a key:** left-click the map button > *General* > **Quick chat key**, click, press the key
+2. **Give the quick chat ring a key:** left-click the map button > *Quick chat* > **Quick chat key**, click, press the key
    (for example `V`, or `E` if you do not strafe with it).
 3. **Group up.** Your quests of this area are offered to the newcomers (once each), and the
    **Party quests** window shows your nearest quests with a check or an X for every member. **Left click** a quest to
@@ -191,7 +191,7 @@ the game's tracker still tells the party you are done, because that is your own 
      has, otherwise simply your nearest quest.
 
 8. **Pings the quest target for the party** (where the game has its ping system: `/qs doctor` says so).
-   Bind a **ping key** (*Settings > Pings & quest items > Key to target and ping a quest enemy*: click, press the key; or `/qs pingkey G`). Each press:
+   Bind a **ping key** (*Settings > Pings > Key to target and ping a quest enemy*: click, press the key; or `/qs pingkey G`). Each press:
    - **the nearest creature one of your quests needs** becomes your target and gets the game's **Attack** ping, so
      the party sees what to kill ("nearest" = within about 28 yards, then the one closest to the middle of your
      screen: the game gives addons no distance to enemies);
@@ -216,12 +216,12 @@ the game's tracker still tells the party you are done, because that is your own 
    bags (a torch to light, a flare to throw...). Click it to use the item. Which item goes with which quest: the bag's
    own quest info, an objective that names the item, or (with Questie) the item the quest gives you or needs; items
    without a "Use:" effect get nothing, and quests that already have the game's button are left to the game.
-   - **Quest item key** (*Settings > Pings & quest items*, or `/qs itemkey Q`): uses the item of your **nearest** quest that
+   - **Quest item key** (*Settings > Quest items*, or `/qs itemkey Q`): uses the item of your **nearest** quest that
      has one, also in combat (the item it had before the fight).
    - **A small button** with that item (Shift + drag to move it): cooldown, count, red when your target is out of range.
    - Using an item is protected by the game, so these are secure buttons prepared outside combat; during a fight they
      keep what they had and the tracker icons are put in place again afterwards.
-   - **Quest items marked in your bags** (*Settings > Pings & quest items > Mark quest items in my bags*, `/qs bagmarks
+   - **Quest items marked in your bags** (*Settings > Quest items > Mark quest items in my bags*, `/qs bagmarks
      on|off`, on by default): a **gold** border on items for a quest of the zone you are in, a **blue** one on items
      for one of your quests somewhere else, so the bank can keep those and you only carry what this zone needs. The
      item's tooltip says which quest and where. An item counts for a quest when an objective names it ("Wolf Pelt:
@@ -344,6 +344,7 @@ the game's tracker still tells the party you are done, because that is your own 
 
 13. **A minimap button.** Left click opens the settings window, right click shows or hides the
    quests-in-common panel, drag it around the minimap edge to move it (`/qs minimap off` hides it).
+   Two shortcut buttons sit beside it: a map icon opens the Quest guide, a key icon opens Dungeon quests.
 14. **An "Invite" action on the wheel.** A message that starts with `@invite` invites the player you target to
     your party and whispers them the rest of the text. The last default wheel slot is
     `@invite Sending you a party invite - let's quest together!`. It checks first that you have a target, are
@@ -383,19 +384,24 @@ the game's tracker still tells the party you are done, because that is your own 
 Open `/qs settings`, left-click the minimap button, click **Settings** in Party quests, or use
 *Game Menu > Options > AddOns > Quest Sharing*. Choose what you want to change from the left-hand menu:
 
-| Category | What you can change |
-|---|---|
-| **General** | Turn the addon on/off, show its minimap button, choose how progress messages are sent, preview quick chat, check your setup, view logs, reset settings |
-| **Quest markers** | **Show ! above quest enemies**, turn on the enemy health bars those marks need, follow the nearest quest with a waypoint |
-| **Quest list** | Hide the game's tracker or automatically fill it with nearby quests; choose how many and how long to pause after your own edits |
-| **Accept & turn in** | Automatically accept quest offers and turn in ready quests; each has its own switch |
-| **Quest sharing** | Offer quests to your party, require a manual Share click, announce progress, sync quest information, mark shared quests in the quest log |
-| **Party window** | Show/hide/resize the separate Party quests window, restore its position, post progress by clicking, add party friends |
-| **Pings & quest items** | Bind target-ping and quest-item keys, mark bag items, show usable item buttons |
-| **Quick chat** | Set the ring key, choose hold/press, choose where messages go, edit each message or emote |
-| **Map** | Zone level guides, party map icons and shared item-location waypoints |
-| **Browser DB** | Quest rewards, dungeon loot and quests, Cooking recipes, profession upgrades, item/vendor search and item source tooltips |
-| **Extra tools** | Quest planner, bag cleanup, spell ranks, saved fishing spots and quest invitations |
+The categories are grouped by topic:
+
+| Group | Category | What you can change |
+|---|---|---|
+| **Basics** | **General** | Turn the addon on/off, show its minimap button, choose how progress messages are sent, sound |
+| **Questing** | **Quest markers** | **Show ! above quest enemies**, turn on the enemy health bars those marks need, follow the nearest quest with a waypoint |
+| | **Quest list** | Hide the game's tracker or automatically fill it with nearby quests; choose how many and how long to pause after your own edits |
+| | **Accept & turn in** | Automatically accept quest offers and turn in ready quests; each has its own switch |
+| | **Quest items** | Mark quest items in your bags, usable item buttons, the quest-item key, and the leftover-items review (Bag cleanup) |
+| **Party** | **Quest sharing** | Offer quests to your party, require a manual Share click, announce progress, sync quest information, mark shared quests in the quest log, write a quest invitation |
+| | **Party window** | Show/hide/resize the separate Party quests window, restore its position, post progress by clicking, add party friends |
+| | **Pings** | Bind the target-ping key and choose the ping delay |
+| | **Quick chat** | Set the ring key, preview the ring, choose hold/press, choose where messages go, edit each message or emote |
+| **Map & route** | **Map** | Zone level guides, party map icons and shared item-location waypoints |
+| | **Quest guide** | The quest route guide, its goal, camps, learned pace and report |
+| **Look up** | **Items & dungeons** | Quest rewards, dungeon loot and quests, item/vendor search and item source tooltips |
+| | **Professions & character** | Cooking recipes, profession upgrades, spell ranks, saved fishing spots |
+| **Help** | **Errors & logs** | Check my setup, show or clear the recorded errors, show or clear the logs, switch log recording, copy everything for a bug report, reset all settings |
 
 Every option has a visible explanation of what turning it on does and any requirements.
 For example, **Quest markers > Show ! above quest enemies** adds a gold ! above enemies needed for your active
@@ -418,15 +424,15 @@ tracker follows you, your quick chat key (or that it is not set) and how many pr
 **Good news has a sound** (switch it off under General): a soft ping when someone accepts a quest you shared or a
 party member running Quest Sharing finishes one you share. Never during combat.
 
-## Extra tools and Browser DB
+## Tools and lookups
 
-Open `/qs settings` > **Extra tools** for the quest planner, bag cleanup, spell ranks, fishing spots and quest invitations. **Browser DB** collects all equipment, dungeon quest, profession and item/vendor lookups; **Map** contains zone levels and party locations. Quest automation stays under **Accept & turn in**.
+Open `/qs settings` > **Quest items** for bag cleanup, **Quest sharing** for quest invitations, **Professions & character** for spell ranks and fishing spots, and **Quest guide** for the quest planner. **Items & dungeons** collects the equipment, dungeon quest and item/vendor lookups; **Map** contains zone levels and party locations. Quest automation stays under **Accept & turn in**.
 
 Each tool has a card with its purpose, data requirements and a named Open action where available. Its persistent switch appears below the description. Clicking a card description does not change a setting. Database searches run when you use a tool, not when you browse settings; map search explains how to use the world map search box.
 
-**Leftover quest items.** Open **Extra tools > Bag cleanup** or type `/qs cleanup`. Questie is required. The tool checks carried bags against every quest in your log, including completed quests awaiting hand-in and quests in other zones. It keeps known active objective/source/special items and items that start quests; unknown and locked items are skipped. Review each possible leftover, then confirm **Delete stack** to permanently remove that whole stack. These are candidates, and may still have a use in a future quest. Each confirmation rechecks current quests and the exact bag slot/item/count before deletion. Bag or quest changes cancel the review; click **Refresh bags**. Cleanup waits during combat, never scans the bank, and runs only when opened/refreshed or after a confirmed deletion. If the client refuses deletion, it returns the picked-up item and explains how to delete it manually.
+**Leftover quest items.** Open **Quest items > Bag cleanup** or type `/qs cleanup`. Questie is required. The tool checks carried bags against every quest in your log, including completed quests awaiting hand-in and quests in other zones. It keeps known active objective/source/special items and items that start quests; unknown and locked items are skipped. Review each possible leftover, then confirm **Delete stack** to permanently remove that whole stack. These are candidates, and may still have a use in a future quest. Each confirmation rechecks current quests and the exact bag slot/item/count before deletion. Bag or quest changes cancel the review; click **Refresh bags**. Cleanup waits during combat, never scans the bank, and runs only when opened/refreshed or after a confirmed deletion. If the client refuses deletion, it returns the picked-up item and explains how to delete it manually.
 
-**Quest planner.** Open **Extra tools > Quest planner** or type `/qs plan`. It is off by default. Open it when you need it; saving the enabled switch does not open it or scan the database on login. While the guide is visible, it updates when you enter a different zone or your quest log changes. Closing it stops database work until you open it again. Use it outdoors in a zone: it will not scan in towns, cities, dungeons, or continent maps, and it clears or rebuilds the plan if you enter a town or change zones. Questie and a recent QuestieDB are needed for its quest catalogue, prerequisites and locations.
+**Quest planner.** Open **Quest guide** or type `/qs plan`. It is off by default. Open it when you need it; saving the enabled switch does not open it or scan the database on login. While the guide is visible, it updates when you enter a different zone or your quest log changes. Closing it stops database work until you open it again. Use it outdoors in a zone: it will not scan in towns, cities, dungeons, or continent maps, and it clears or rebuilds the plan if you enter a town or change zones. Questie and a recent QuestieDB are needed for its quest catalogue, prerequisites and locations.
 
 The planner plans the zone's own quests: the ones Questie files under the current zone or one of its sub-zone maps. Class, profession, event and other-zone quests stay out even when their giver or a mob is here; a quest from another zone appears only for its hand-in here once it is ready. Each kill or collect step goes to a real camp: a group of at least three spawns of one creature (or its biggest group, if it never gathers that many), or a spot the step's creatures share, such as 2 + 2 spawns of two creatures. Lone stray spawns are ignored and the step stays put while you walk. Up to four real camps are considered per step; the planner picks the one that suits the whole route, such as the camp beside the hand-in or one already farmed for another quest on the same creature. A step keeps the camp it chose until another one is clearly cheaper (by a quarter of the visit's travel and work and at least 20 seconds), so it does not flip between two camps as you walk. A camp the guide used only because you marked another one busy is not kept once the wait ends, and **Clear camp wait** lets every step choose its camp afresh. Your position is only where the route starts. It checks real acceptance restrictions and follows locally attainable chains without a fixed depth limit. The default goal is to complete the zone's compatible, non-repeatable quests. The **Plan** button chooses **Complete zone**, **Quest XP/hour**, **Selected quests** by quest ID, or a time budget in minutes. Goals and level scope last for the session. **Level range** switches the optional green/yellow filter. Quests requiring a future level, work elsewhere or missing facts appear in the plan report.
 
@@ -504,7 +510,7 @@ source label. Cities and Moonglade show **City** or **Sanctuary**. Native data a
 Ranges do not guarantee quest availability for your class or faction. Quest/minimap symbols remain removed.
 
 **Highest learned spell ranks on your action bars.** Enable **Auto-update spells to highest learned rank**
-in Extra tools (off by default). It upgrades existing player spell buttons across normal action-bar pages,
+in Professions & character (off by default). It upgrades existing player spell buttons across normal action-bar pages,
 including hidden/form pages and duplicate copies, to the highest rank you have learned. It checks when enabled,
 at login, after learning spells and when spell buttons change. **Check spell ranks now** runs a check and reports
 its result. This does not train or buy spells; macros, items, pet actions and unranked abilities stay unchanged.
@@ -522,7 +528,7 @@ editor opens. Select World (or another chat channel) first to ask there, review 
 An existing draft is kept, and duplicate quests or messages that exceed the chat limit are rejected.
 
 **Seek fellow adventurers (optional editor).** For a longer role-play invitation, use `/qs adventure`
-(optionally followed by a quest ID, exact title or quest link), or *Settings > Extra tools > Quest invitation*.
+(optionally followed by a quest ID, exact title or quest link), or *Settings > Quest sharing > Quest invitation*.
 It chooses an unfinished quest from your log; **Next quest** browses the others. Choose a channel, edit the text,
 and click **Prepare chat** before pressing Enter to send.
 
@@ -576,7 +582,7 @@ route skill; effective skill includes pole/lure bonuses. Catches may vary by wat
 Recipe/rank facts are checked **2026-11-17**, using the MIT-licensed [Profit Forever dataset](https://github.com/ExcEssIv3/profit)
 and [Forever profession guides](https://www.wow-professions.com/forever); some guide details remain beta-derived.
 
-The integration is on by explicit request. Disable it in **Browser DB > Cooking recipes** or `/qs professions off` to restore the native view and suppress item farming hints.
+The integration is on by explicit request. Disable it in **Professions & character > Cooking recipes** or `/qs professions off` to restore the native view and suppress item farming hints.
 Manual `/qs cooking` or `/qs professions` re-enables it. No login catalogue scan, filter toggling, automatic
 crafting or runtime downloads; live recipe reads pause in combat and stop on close or profession changes.
 
@@ -644,7 +650,7 @@ and stops if disabled or its tab/window is closed. Uncached item details update 
 Map controls give directions: open the map yourself with `M`, avoiding this client's protected-map restrictions.
 Both tools are covered by Lua mock tests; their rendering and item tooltips still need verification in the game.
 
-**All quests for a dungeon, inside and outside.** `/qs dungeons` (or **Browser DB → Dungeon quests**)
+**All quests for a dungeon, inside and outside.** `/qs dungeons` (or **Items & dungeons → Dungeon quests**)
 opens the **Dungeon quests** tab. Choose a dungeon to see its known quests, including pickups outside the entrance,
 outdoor preparation chains and explicit follow-ups. This lists quests regardless of their rewards; equipment quality,
 slot and stat filters apply only to the equipment tabs. Start with all factions, classes, levels and completed quests;
@@ -653,8 +659,9 @@ your current faction/class/level; **All quests** broadens these filters while ke
 Search by quest name, ID or dungeon; scroll or use Previous/Next. Preparation and follow-up entries are labelled.
 Each row labels **Chain quest** (prerequisite, dungeon step or follow-up) or **Standalone quest**, separately from its
 **Task**: **Talk only — speak to [NPC]**, collect items, defeat enemies, explore, deliver an item, or complete an event.
-A chain step can also be talk-only. Hover or click for its known previous/next chain quests; branching chains are not
-given misleading linear step numbers. Unknown tasks are labelled for checking the quest details.
+A chain step can also be talk-only. Hover for its known previous/next chain quests; click a row and the details panel shows the
+whole chain as an indented bullet list (first step on top, your quest marked). Done steps get a green check mark, and so does a
+step whose later step you have finished (nobody offers it any more). Branching chains are not given misleading linear step numbers. Unknown tasks are labelled for checking the quest details.
 **Pickup** and **Turn-in** giver/location lines remain visible; five taller rows fit each page.
 Hover for **base XP**, all known item rewards (including non-equipment), and full pickup/turn-in locations.
 XP is before character-level/bonus adjustments; listed items can be reward choices. Missing data stays labelled unknown.
@@ -675,7 +682,7 @@ searches and encounter choices are cleared; an explicit `/qs loot [search]` keep
 dungeon. Shared equipment and stat filters remain. Browse other dungeons normally afterward; unknown or
 ambiguous locations, raids and outdoor areas keep your browsing context.
 
-Open *Settings > Browser DB > Dungeon loot*, click
+Open *Settings > Items & dungeons > Dungeon loot*, click
 **Instance drops** tab in the equipment explorer, or type `/qs loot`. Use **Find dungeon** to narrow
 the list on the left, then click a dungeon to browse its drops. **Search item, ID, boss or dungeon** searches
 within the selected dungeon; **All dungeons** searches the dungeon catalogue. You can also start with
@@ -852,10 +859,10 @@ python tests/test_questsharing.py     # 68 tests: sharing, replies, announcement
 python tests/test_features.py         # 96 tests: sync, completion, the Party quests grid, quest-log markers
 python tests/test_triggers.py         # 34 tests: when it shares (once per join / new member / new quest), no nagging
 python tests/test_tracker.py          # 29 tests: the tracker follows you (distance and zone modes)
-python tests/test_settings.py         # 73 tests: defaults, migration, direct settings controls, scrolling and enemy ! switch
+python tests/test_settings.py         # 75 tests: defaults, migration, direct settings controls, scrolling and enemy ! switch
 python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
 python tests/test_quick.py            # 131 tests: the quick chat ring, placeholders, editing, key binding, performance
-python tests/test_extras.py           # 35 tests: error log + doctor, invite action, minimap button, release zip
+python tests/test_extras.py           # 39 tests: error log + doctor, invite action, minimap buttons, release zip
 python tests/test_highlight.py        # 23 tests: quest icons over creatures, the world pin, the game-settings helper
 python tests/test_look.py             # 44 tests: the settings window layout, the key capture, welcome, sounds, ring colours
 python tests/test_together.py         # 30 tests: several Quest Sharing users in one party, fewer messages
@@ -880,7 +887,7 @@ python tests/test_professions.py      # 56 tests: embedded native GUI, grey reci
 python tests/test_adventure.py        # 44 tests: direct quest questions, role-play invitations, channels and preserved drafts
 python tests/test_equipment.py        # 36 tests: one window, shared filters, rare+ quality, dungeon/raid identity and cancellation
 python tests/test_equipment_grouping.py # 28 tests: unique names, merged sources/routes, variants, filtering, counts and selection
-python tests/test_instance_focus.py   # 24 tests: current dungeon, batched loads, manual browsing, wing identity and Extra tools
+python tests/test_instance_focus.py   # 24 tests: current dungeon, batched loads, manual browsing, wing identity and settings tab labels
 python tests/test_stats.py            # 20 tests: combined stat minimums, native APIs, cache refresh, live inputs and reset
 python tests/test_spell_ranks.py      # 48 tests: learned rank upgrades, normal pages, cursor/combat guards and client APIs
 python tests/test_zone_levels.py      # 50 tests: native/fallback ranges, full-map missing data, hover, geometry, lifecycle and opt-in overlays

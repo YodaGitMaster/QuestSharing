@@ -304,7 +304,7 @@ local function welcome()
         ns.print(S.GOLD .. "Welcome to Quest Sharing " .. tostring(ns.version) .. "!|r Everything is on and ready for your next party.")
         ns.print("Left-click the map button (or type /qs settings) to change anything.")
         if key then ns.print("Hold " .. S.GOLD .. key .. "|r for the quick chat ring.")
-        else ns.print("Tip: give the quick chat ring a key in " .. S.GOLD .. "Settings > General > Quick chat key|r.") end
+        else ns.print("Tip: give the quick chat ring a key in " .. S.GOLD .. "Settings > Quick chat > Quick chat key|r.") end
     else
         ns.print(S.GOLD .. "Quest Sharing updated to " .. tostring(ns.version) .. "|r: " .. WHATS_NEW .. ". /qs settings")
     end

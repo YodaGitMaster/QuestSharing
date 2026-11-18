@@ -259,7 +259,7 @@ def test_every_setting_is_on_exactly_one_tab(style):
     n = int(g.eval("#NS.settingRows"))
     tabs = [g.eval("NS.settingRows[%d].tab" % i) for i in range(1, n + 1)]
     ids = [g.eval("NS.settingTabs[%d].id" % i) for i in range(1, int(g.eval("#NS.settingTabs")) + 1)]
-    assert ids == ["general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional"]
+    assert ids == ["general", "objectives", "tracker", "dialogs", "items", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional", "support"]
     assert all(t in ids for t in tabs)
     assert all(tabs.count(t) >= 1 for t in ids), "no empty tab"
     keys = [g.eval("NS.settingRows[%d].key" % i) for i in range(1, n + 1) if g.eval("NS.settingRows[%d].key" % i)]
@@ -360,11 +360,12 @@ def test_named_choices_select_exact_value_and_explain_the_result(style):
 def test_scrolling_keeps_position_on_changes_and_category_switch_resets_it(style):
     g = fresh(style)
     g.slash("settings")
+    g.eval("NS.settingsTab")("sharing")
     W = window(g)
     press(g, W.scrollDown)
     offset = W.rowScroll.vscroll
     assert offset > 0
-    press(g, visible_by_key(g, W, "mode").choices[2])
+    press(g, visible_by_key(g, W, "area").choices[2])
     assert W.rowScroll.vscroll == offset
     g.eval("NS.settingsTab")("objectives")
     assert W.rowScroll.vscroll == 0 and not W.scrollDown.shown
@@ -459,10 +460,10 @@ def test_browser_db_contains_all_reference_launchers_and_extra_tools_stays_focus
     g.slash("settings")
     g.eval("NS.settingsTab")("browser")
     W = window(g)
-    assert "Browser DB" in W.heading.text
+    assert "Items & dungeons" in W.heading.text
     cards = [r for r in W.rows.values() if r.index and r.frame.shown and r.card.shown]
-    assert len(cards) == 7
-    expected = {"Browse rewards", "Browse drops", "Dungeon quests", "Cooking recipes", "Upgrades"}
+    assert len(cards) == 5
+    expected = {"Browse rewards", "Browse drops", "Dungeon quests"}
     assert {r.button.text for r in cards if r.button.shown} == expected
     assert all(r.desc.text and r.note.shown for r in cards)
     # Exercise the actual shared button dispatcher for every reference launcher.
@@ -473,15 +474,49 @@ def test_browser_db_contains_all_reference_launchers_and_extra_tools_stays_focus
     for r in cards:
         if r.button.shown:
             press(g, r.button)
-    assert list(g.eval("OPENED_TOOLS").values()) == ["rewards", "loot", "dungeons", "cooking", "upgrades"]
+    assert list(g.eval("OPENED_TOOLS").values()) == ["rewards", "loot", "dungeons"]
     g.eval("NS.settingsScroll")(100000)
     assert W.rowScroll.vscroll == W.contentHeight - W.rowScroll.height
     g.eval("NS.settingsTab")("optional")
     assert W.rowScroll.vscroll == 0
     cards = [r for r in W.rows.values() if r.index and r.frame.shown and r.card.shown]
-    assert len(cards) == 5
-    assert {r.button.text for r in cards} == {"Open tab", "Review items", "Write invite", "Update ranks", "Edit spots"}
+    assert "Professions & character" in W.heading.text
+    assert len(cards) == 4
+    assert {r.button.text for r in cards} == {"Cooking recipes", "Upgrades", "Update ranks", "Edit spots"}
     assert all(r.button.shown for r in cards)
+    for r in cards:
+        if r.button.text in ("Cooking recipes", "Upgrades"):
+            press(g, r.button)
+    assert list(g.eval("OPENED_TOOLS").values()) == ["rewards", "loot", "dungeons", "cooking", "upgrades"]
+    # the leftover-items review lives with the other quest item settings, the invitation with quest sharing
+    by_label = {r.label: r.tab for r in g.eval("NS.settingRows").values() if r.kind == "action"}
+    assert by_label["Review quest items left in my bags"] == "items"
+    assert by_label["Seek fellow adventurers"] == "sharing"
+
+
+def test_errors_and_logs_have_their_own_tab_with_check_errors_logs_and_reset(style):
+    g = fresh(style)
+    tabs = list(g.eval("NS.settingTabs").values())
+    ids = [t.id for t in tabs]
+    assert ids[-1] == "support" and tabs[-1].group == "Help" and tabs[-1].title == "Errors & logs"
+    g.run("NS.db.errors = { { at = '10:00', msg = 'boom', count = 1 } }")
+    g.slash("settings")
+    g.eval("NS.settingsTab")("support")
+    W = window(g)
+    buttons = {r.button.text: r for r in visible_rows(W) if r.button.shown}
+    assert set(buttons) >= {"Run check", "Show errors", "Clear errors", "Show logs", "Clear logs", "Open report", "Reset settings"}
+    info = next(r for r in visible_rows(W) if "Errors recorded" in r.text.text)
+    assert "1 recorded" in info.desc.text or "1 recorded" in info.text.text
+    press(g, buttons["Show errors"].button)
+    assert g.eval("NS._reportWindow()")[0].shown is True, "the report with the errors opened"
+    press(g, buttons["Clear errors"].button)
+    assert g.eval("#NS.db.errors") == 0
+    press(g, buttons["Clear logs"].button)
+    assert "debug log cleared" in "\n".join(g.printed())
+    assert [r.tab for r in g.eval("NS.settingRows").values() if r.key == "debug"] == ["support"], "the recording switch is with the logs"
+    g.run("NS.db.sound = false")
+    press(g, buttons["Reset settings"].button)
+    assert g.eval("NS.db.sound") is True, "reset restores the defaults"
 
 
 # ---- the Quest guide tab ------------------------------------------------------------------------------------------------
@@ -553,19 +588,12 @@ def test_the_quest_guide_tab_follows_map_and_holds_every_guide_option(style):
         assert any(label in t for t in texts), label
 
 
-def test_extra_tools_keeps_only_a_pointer_to_the_quest_guide_tab(style):
+def test_the_quest_guide_switch_lives_in_the_guide_tab_only(style):
     g = fresh(style)
     rows = list(g.eval("NS.settingRows").values())
     assert not [r for r in rows if r.tab == "optional" and r.key and r.key.startswith("questPlanner")]
     assert [r.tab for r in rows if r.key == "questPlanner"] == ["guide"], "the switch lives in the guide tab only"
-    g.slash("settings")
-    g.eval("NS.settingsTab")("optional")
-    W = window(g)
-    card = next(r for r in visible_rows(W) if r.card.shown and r.button.text == "Open tab")
-    assert "Quest guide" in card.text.text and not card.toggle.shown, "a pointer card, not a switch"
-    g.eval("NS.settingsScroll")(100000)
-    press(g, card.button)
-    assert W.tab == "guide" and W.rowScroll.vscroll == 0
+    assert not [r for r in rows if r.label and "moved to its own tab" in r.label], "no pointer card is left behind"
 
 
 def test_guide_controls_save_their_setting_and_update_the_guide(style):

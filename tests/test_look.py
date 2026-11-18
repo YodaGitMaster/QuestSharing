@@ -47,16 +47,18 @@ def printed(g):
 def test_every_tab_has_a_short_intro_and_sections(style):
     g = game(style)
     W = window(g)
-    for t in ("general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional"):
+    for t in ("general", "objectives", "tracker", "dialogs", "items", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional", "support"):
         g.eval("NS.settingsTab")(t)
         assert len(plain(W.intro.text)) > 20, t
     g.eval("NS.settingsTab")("sharing")
     headers = [plain(r.text.text) for r in rows(W) if r.line.shown]
-    assert headers == ["Offering quests to your party", "Messages in party chat", "Quest information between addon users"]
+    assert headers == ["Offering quests to your party", "Messages in party chat", "Quest information between addon users", "Find people to quest with"]
     g.eval("NS.settingsTab")("party")
     assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["The separate Party quests window", "Posting progress by clicking", "Adding party members as friends"]
     g.eval("NS.settingsTab")("general")
-    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Start here", "Try it and check your setup", "Troubleshooting and reset"]
+    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Start here", "Messages and sounds"]
+    g.eval("NS.settingsTab")("support")
+    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Is something wrong?", "Errors", "Logs", "Copy everything", "Reset"]
     g.eval("NS.settingsTab")("guide")
     assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Quest guide", "Camps", "Learned pace", "Report"]
 
@@ -64,7 +66,7 @@ def test_every_tab_has_a_short_intro_and_sections(style):
 def test_rows_are_laid_out_top_to_bottom_without_overlapping_and_fit_in_the_window(style):
     g = game(style)
     W = window(g)
-    for t in ("general", "objectives", "tracker", "dialogs", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional"):
+    for t in ("general", "objectives", "tracker", "dialogs", "items", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional", "support"):
         g.eval("NS.settingsTab")(t)
         tops = [-r.frame.point[5] for r in rows(W)]
         heights = [r.frame.height for r in rows(W)]
@@ -85,14 +87,14 @@ def test_rows_are_laid_out_top_to_bottom_without_overlapping_and_fit_in_the_wind
 def test_the_quest_guide_tab_fits_the_sidebar_and_its_quest_id_box_sits_inside_its_row(style):
     g = game(style)
     W = window(g, "guide")
-    # Twelve categories still sit above the "Changes save automatically." note at the bottom of the sidebar.
+    # Fourteen categories still sit above the "Changes save automatically." note at the bottom of the sidebar.
     last = W.tabs.guide.frame
     for tab in W.tabs.values():
         last = tab.frame if -tab.frame.point[5] > -last.point[5] else last
     note = W.savedNote
     note_top = W.win.height - note.point[5] - note.GetStringHeight(note)
     assert -last.point[5] + last.height <= note_top
-    assert -W.tabs.guide.frame.point[5] == -W.tabs.maps.frame.point[5] + 28, "right after Map, same group"
+    assert -W.tabs.guide.frame.point[5] == -W.tabs.maps.frame.point[5] + 26, "right after Map, same group"
     box_row = next(r for r in rows(W) if r.edit and r.edit.shown)
     box = box_row.edit
     assert "Quest IDs" in plain(box_row.text.text)
@@ -152,11 +154,12 @@ def test_the_size_setting_moves_in_steps_of_ten(style):
 
 def test_action_lines_have_a_button(style):
     g = game(style)
-    W = window(g)
+    W = window(g, "support")
     check = row(W, "Check my setup")
     assert check.button.shown and check.button.text == "Run check"
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(check.button)
     assert g.eval("NS._reportWindow()")[0].shown is True, "the setup report opened"
+    W = window(g, "quick")
     ring = row(W, "Show the ring")
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(ring.button)
     assert g.wheel()[0].shown is True
@@ -180,7 +183,7 @@ def capture_and_press(g, W, key):
 
 def test_click_then_press_a_key_binds_it(style):
     g = game(style)
-    W = window(g)
+    W = window(g, "quick")
     r = row(W, "Quick chat key")
     assert r.button.text == "Set key"
     capture_and_press(g, W, "E")
@@ -190,7 +193,7 @@ def test_click_then_press_a_key_binds_it(style):
 
 def test_modifiers_wait_for_the_real_key_and_are_part_of_it(style):
     g = game(style)
-    W = window(g)
+    W = window(g, "quick")
     r = row(W, "Quick chat key")
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(r.button)
     g.eval("NS.captureKeyPressed")("LALT")                     # only the modifier so far: still waiting
@@ -203,14 +206,14 @@ def test_modifiers_wait_for_the_real_key_and_are_part_of_it(style):
 
 def test_escape_cancels_and_changes_nothing(style):
     g = game(style)
-    W = window(g)
+    W = window(g, "quick")
     capture_and_press(g, W, "ESCAPE")
     assert g.eval("BINDINGS.ESCAPE") is None and g.eval("NS._settingsWindow().capturing") is False
 
 
 def test_no_key_changes_in_combat_and_closing_the_window_stops_listening(style):
     g = game(style)
-    W = window(g)
+    W = window(g, "quick")
     g.run("IN_COMBAT = true")
     r = row(W, "Quick chat key")
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(r.button)
@@ -222,10 +225,12 @@ def test_no_key_changes_in_combat_and_closing_the_window_stops_listening(style):
     assert g.eval("NS._settingsWindow().capturing") is False, "the keyboard is never left captured"
 
 
-def test_the_quick_chat_tab_has_the_key_too(style):
+def test_the_quick_chat_key_is_only_on_the_quick_chat_tab(style):
     g = game(style)
+    W = window(g)
+    assert not [r for r in rows(W) if "Quick chat key" in plain(r.text.text)], "not repeated on General"
     W = window(g, "quick")
-    r = row(W, "Key that opens the ring")
+    r = row(W, "Quick chat key")
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(r.button)
     g.eval("NS.captureKeyPressed")("V")
     assert g.eval("BINDINGS.V") == "QUESTSHARING_QUICKCHAT" and r.button.text == "V"

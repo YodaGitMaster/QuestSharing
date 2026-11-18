@@ -1,5 +1,6 @@
 """Dungeon membership, outside chains, independent filters and real quest-menu actions on both clients."""
 import pathlib
+import re
 import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from test_optional import game as optional_game
@@ -54,6 +55,10 @@ def game(style, extra="", open_tab=True):
         g.slash("dungeons");g.advance(90)
         assert g.eval("NS.dungeonQuests._state()")[0], g.printed()
     return g
+
+
+def plain(text):  # the text without |cAARRGGBB ... |r colour codes
+    return re.sub(r"\|c%s|\|r" % ("[0-9a-fA-F]"*8), "", text)
 
 
 def ids(g):
@@ -400,7 +405,7 @@ def test_expanded_location_rows_fit_page_and_page_navigation_still_works(style):
     assert len(w.rows)==5
     for row in w.rows.values():assert row.frame.height==102 and row.edge.height==102
     assert g.eval("NS.dungeonQuests.go")(1)
-    assert w.rows[1].result and w.rows[1].pickup.text.startswith("Pickup:")
+    assert w.rows[1].result and plain(w.rows[1].pickup.text).startswith("Pickup:")
 
 
 def test_legacy_xp_module_fallback_and_multiple_locations_remain_visible(style):
@@ -489,6 +494,70 @@ def test_journal_text_boxes_pass_font_flags_so_the_whole_window_builds(style):
     assert len(list(w.rows.values()))==5 and w.rows[1].frame.shown
     host,c,p,t=g.eval("NS.equipmentUI._window()")
     assert c.min.font[3]=="" and c.stats[3].stat is not None
+
+
+
+CHECK="ReadyCheck-Ready"
+
+
+def chain_text(g, qid):
+    row=hover(g,qid);row.frame.scripts.OnClick(row.frame,"LeftButton")
+    return g.eval("NS.dungeonQuests._window().detailsText.text")
+
+
+def line_of(text, name):  # the chain bullet for a quest, not other lines that mention its name
+    return next(l for l in text.split("\n") if name in l and ("•" in l or CHECK in l))
+
+
+def test_names_and_locations_have_their_own_colours_in_rows_and_panel(style):
+    g=game(style,HOVER_DATA);text=chain_text(g,2);w=g.eval("NS.dungeonQuests._window()")
+    # panel: crimson name, deep-blue pickup, purple turn-in, each on its own coloured line
+    assert "|cff7a0c0cA dungeon job|r" in text
+    assert "|cff0a2a8aMarshal McBride" in text and "|cff5a1a7aKobold Miner" in text
+    row=next(r for r in w.rows.values() if r.result and r.result.id==2)
+    assert row.item.text.startswith("|cffffd100A dungeon job|r")
+    assert row.pickup.text.startswith("|cff9fe6ffPickup:") and row.turnIn.text.startswith("|cffe6b3ffTurn-in:")
+    assert not g.eval("NS.db.errors")
+
+
+def test_detail_panel_keeps_the_yellow_but_drops_the_picture(style):
+    g=game(style)
+    surface=g.eval("NS.dungeonQuests._window().detailFrame.journalSurface")
+    assert not surface.grain.shown and surface.base.shown
+
+
+def test_chain_is_an_indented_bullet_list_with_pending_steps_and_where_to_go(style):
+    g=game(style,HOVER_DATA)
+    text=chain_text(g,2)
+    a,b,c=(line_of(text,n) for n in ("Outdoor preparation","A dungeon job","Return outside"))
+    indent=lambda l:len(l)-len(l.lstrip(" "))
+    assert indent(a)<indent(b)<indent(c), "each next step is one tab deeper"
+    assert all("•" in l and CHECK not in l for l in (a,b,c))
+    assert "< this quest" in b and "< this quest" not in a
+    assert "Go speak to Marshal McBride" in text, "a talk-only step says who to go and speak to"
+    assert not g.eval("NS.db.errors")
+
+
+def test_done_steps_get_a_green_tick_and_a_finished_later_step_ticks_the_ones_before_it(style):
+    g=game(style,HOVER_DATA)
+    g.run("FINISHED[1]=true");text=chain_text(g,2)
+    assert CHECK in line_of(text,"Outdoor preparation") and "(done)" in line_of(text,"Outdoor preparation")
+    assert CHECK not in line_of(text,"Return outside")
+    # Finishing the last step means the first two have nothing to offer any more, even if never flagged themselves.
+    g.run("FINISHED[1]=nil;FINISHED[3]=true");text=chain_text(g,2)
+    for name in ("Outdoor preparation","A dungeon job","Return outside"):
+        assert CHECK in line_of(text,name), name
+    assert "not needed" in line_of(text,"Outdoor preparation")
+    assert "(done)" in line_of(text,"Return outside")
+    assert not g.eval("NS.db.errors")
+
+
+def test_finished_later_step_does_not_tick_when_any_one_of_several_prerequisites_would_do(style):
+    # Quest 4 can be reached through 1 or 2: finishing it does not prove which one was done.
+    g=game(style,HOVER_DATA+"QUESTIE_QUESTS[4].preQuestSingle={1,2};QUESTIE_QUESTS[2].nextQuestInChain=nil;FINISHED[4]=true")
+    text=chain_text(g,2)
+    assert CHECK not in line_of(text,"A dungeon job")
+
 
 if __name__=="__main__":
     failed=total=0

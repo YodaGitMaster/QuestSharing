@@ -224,7 +224,7 @@ def test_the_window_scrolls_and_has_select_all_refresh_clear_and_close(style):
 def test_the_settings_have_one_combined_report_button(style):
     g = quick_game(style)
     labels = [g.eval(f"NS.settingRows[{i}].label") for i in range(1, int(g.eval("#NS.settingRows")) + 1)]
-    assert "Copy logs, errors and setup" in labels and "Show the errors" not in labels
+    assert "Copy logs, errors and setup" in labels and "Show the errors" in labels and "Show the logs" in labels
     row = next(i for i in range(1, len(labels) + 1) if labels[i - 1] == "Copy logs, errors and setup")
     g.eval(f"NS.settingRows[{row}].action")()
     win, box = g.eval("NS._reportWindow()")

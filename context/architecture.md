@@ -33,6 +33,7 @@ cutpdf/
 ├── tests/                                            # Python tests and Lua API harness (48 files, collapsed)
 └── tools/                                            # Local UI emulation utilities, never shipped in the addon
     ├── build_cooking_reference.py                    # Rebuild pinned factual Cooking subset with upstream MIT attribution
+    ├── lua-syntax-review-prompt.md                   # Reusable Lua 5.1 syntax/bug review prompt (parse, 5.2+ leaks, globals, nil traps)
     ├── preview_professions.py                        # Export actual profession model into an illustrative native-window layout preview
     ├── preview_quest_planner.py                      # Run actual Lua planner and embed its rows in the Westfall emulation
     ├── preview_search_journal.py                     # Export real Lua search rows/details to a local journal layout emulation

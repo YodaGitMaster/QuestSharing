@@ -6,6 +6,9 @@ local window, filters, records, results, places = nil, nil, {}, {}, {}
 local ready, loading, page, progress, total = false, false, 1, 0, 0
 local selected, message, generation = nil, "Open to read dungeon quests.", 0
 local filterError
+-- Whole-catalogue quest links from the last scan: chainPrev[id][before]=required, chainNext[id][after]=required.
+-- "required" = the later quest cannot be taken without the earlier one (so finishing it proves the earlier one is done).
+local chainPrev, chainNext = {}, {}
 local refreshPending=false
 local menuEntry, menuQuest -- what D.menu last opened, to tell our right-click menu from other windows' menus
 local PAGE, OWNER, REWARDS_OWNER = 5, "dungeonQuests", "dungeonQuestRewards"
@@ -153,6 +156,7 @@ function D.scan()
     generation=generation+1
     local token=generation
     records,results,places={}, {}, {}
+    chainPrev,chainNext={}, {}
     ready,loading,progress,total,filterError=false,true,0,0,nil
     message="Needs a recent QuestieDB with an enumerable quest catalogue."
     ns.dataWork.start(OWNER,function()
@@ -177,9 +181,11 @@ function D.scan()
             ns.dataWork.yield()
         end
         -- Chain membership is separate from what a step asks the player to do (a chain can include talk-only steps).
-        local function link(before,after)
+        local function link(before,after,required)
             before,after=math.abs(number(before)),math.abs(number(after))
             if before==0 or after==0 or before==after then return end
+            chainNext[before]=chainNext[before] or {};chainPrev[after]=chainPrev[after] or {}
+            if required or chainNext[before][after]==nil then chainNext[before][after]=required==true;chainPrev[after][before]=required==true end
             if all[before] then
                 all[before].chainAfter=all[before].chainAfter or {}
                 all[before].chainAfter[after]=all[after] and all[after].name or ("Quest "..after)
@@ -190,10 +196,12 @@ function D.scan()
             end
         end
         for _,r in pairs(all) do
-            for _,list in ipairs({r.beforeAny or {},r.beforeAll or {}}) do
-                for _,before in ipairs(type(list)=="table" and list or {}) do link(before,r.id) end
+            for index,list in ipairs({r.beforeAny or {},r.beforeAll or {}}) do
+                list=type(list)=="table" and list or {}
+                -- "any one of" several prerequisites does not prove which one was done; a single or an "all" list does.
+                for _,before in ipairs(list) do link(before,r.id,index==2 or #list==1) end
             end
-            if number(r.next)>0 then link(r.id,r.next) end
+            if number(r.next)>0 then link(r.id,r.next,true) end
             ns.dataWork.yield()
         end
         -- Include outdoor preparation quests and explicit follow-ups, with cycle guards per dungeon.
@@ -325,6 +333,77 @@ local function chainLines(r)
     return lines
 end
 
+-- The chain as an indented bullet list, first step on top. A step is ticked green when it is done, and also when a later
+-- step that needs it is done: the giver then has nothing left to offer, so there is no point travelling there.
+local DONE_ICON,GREEN,INK,DIM,HERE="|TInterface\\RaidFrame\\ReadyCheck-Ready:14|t","|cff0d6e0d","|cff4b2a11","|cff6b4a26","|cff8b1a1a"
+local NAME,PICK,TURN="|cff7a0c0c","|cff0a2a8a","|cff5a1a7a" -- panel: quest name crimson, pickup deep blue, turn-in purple
+local ROW_PICK,ROW_TURN,ROW_TASK="|cff9fe6ff","|cffe6b3ff","|cffe0e0e0" -- the same roles, bright for the dark list
+local TAB,MAX_CHAIN_NODES="     ",24
+local function finished(id,seen)
+    if completed(id) then return true,false end
+    seen=seen or {}
+    if seen[id] then return false end
+    seen[id]=true
+    for after,required in pairs(chainNext[id] or {}) do
+        if required and finished(after,seen) then return true,true end
+    end
+    return false
+end
+local function sortedKeys(map,keep)
+    local list={}
+    for id in pairs(map or {}) do if not keep or keep[id] then list[#list+1]=id end end
+    table.sort(list);return list
+end
+local function chainMembers(id)
+    local set,count={[id]=true},1
+    for _,index in ipairs({chainPrev,chainNext}) do
+        local queue,head={id},1
+        while queue[head] do
+            local current=queue[head];head=head+1
+            for _,other in ipairs(sortedKeys(index[current])) do
+                if not set[other] and count<MAX_CHAIN_NODES then set[other]=true;count=count+1;queue[#queue+1]=other end
+            end
+        end
+    end
+    return set,count
+end
+local function chainNode(id,depth,hereID,out)
+    local rec=records[id] or {id=id,name=Q.get("quest",id,"name") or ("Quest "..id)}
+    local done,implied=finished(id)
+    local pad=string.rep(TAB,depth)
+    local level=number(Q.get("quest",id,"questLevel"))
+    out[#out+1]=pad..(done and DONE_ICON or "•").." "..(done and GREEN or id==hereID and HERE or INK)..rec.name.."|r"
+        ..(level>0 and (DIM.." (level "..level..")|r") or "")
+        ..(id==hereID and (HERE.."  < this quest|r") or "")
+        ..(implied and (GREEN.."  (not needed: a later step is already done)|r") or done and (GREEN.."  (done)|r") or "")
+    if done or id==hereID then return end
+    local task,talk=taskLabel(rec)
+    local list=locations(rec)
+    if talk then out[#out+1]=pad.."   "..TURN.."Go speak to "..pickupText(list.turnIns[1]).."|r"
+    else
+        out[#out+1]=pad.."   "..DIM..(string.find(task,"^Task unknown") and task or ("Task: "..task)).."|r"
+        out[#out+1]=pad.."   "..PICK.."Pick up: "..locationSummary(list.pickups).."|r"
+    end
+end
+local function chainTree(r)
+    local set,count=chainMembers(r.id)
+    if count<2 then return nil end
+    local out,seen={},{}
+    local function walk(id,depth)
+        if seen[id] then return end
+        seen[id]=true;chainNode(id,depth,r.id,out)
+        for _,after in ipairs(sortedKeys(chainNext[id],set)) do walk(after,depth+1) end
+    end
+    for _,id in ipairs(sortedKeys(set)) do
+        local top=true
+        for before in pairs(chainPrev[id] or {}) do if set[before] then top=false;break end end
+        if top then walk(id,0) end
+    end
+    for _,id in ipairs(sortedKeys(set)) do walk(id,0) end -- anything a loop left out
+    if count>=MAX_CHAIN_NODES then out[#out+1]=DIM.."(longer chain: showing the "..MAX_CHAIN_NODES.." steps closest to this quest)|r" end
+    return out
+end
+
 local function baseXP(id)
     local support=type(LibQuestieDB)=="table" and LibQuestieDB.Support
     local xp=support and U.call(support.Get,"QuestXP")
@@ -433,8 +512,8 @@ function D.menu(id)
     ns.openQuestMenu(e,items)
 end
 function D.detail(r)
-    local lines={r.name.." (quest "..r.id..")",r.dungeonText,
-        "Quest level "..r.level.." • requires level "..r.required..(r.max>0 and ("–"..r.max) or "+"),"", "Pick up:"}
+    local lines={NAME..r.name.."|r"..DIM.." (quest "..r.id..")|r",r.dungeonText,
+        "Quest level "..r.level.." • requires level "..r.required..(r.max>0 and ("–"..r.max) or "+"),"", PICK.."Pick up:|r"}
     local factionNames={}
     for _,faction in ipairs({"Alliance","Horde"}) do
         local mask=enums().factionRaceMasks and enums().factionRaceMasks[faction]
@@ -452,17 +531,23 @@ function D.detail(r)
     table.insert(lines,5,"Class: "..(#classNames>0 and table.concat(classNames,", ") or "Unknown"))
     table.insert(lines,6,chainLabel(r));table.insert(lines,7,"Task: "..taskLabel(r))
     local list=pickups(r)
-    for _,p in ipairs(list) do lines[#lines+1]=pickupText(p) end
-    if #list==0 then lines[#lines+1]=Q.whereText(r.id) or "Unknown pickup location in QuestieDB." end
+    for _,p in ipairs(list) do lines[#lines+1]=PICK..pickupText(p).."|r" end
+    if #list==0 then lines[#lines+1]=PICK..(Q.whereText(r.id) or "Unknown pickup location in QuestieDB.").."|r" end
     local turnIns=locations(r).turnIns
-    lines[#lines+1]="\nTurn in:"
-    if #turnIns==0 then lines[#lines+1]="Unknown turn-in location in quest data." end
-    for _,p in ipairs(turnIns) do lines[#lines+1]=pickupText(p) end
+    lines[#lines+1]="\n"..TURN.."Turn in:|r"
+    if #turnIns==0 then lines[#lines+1]=TURN.."Unknown turn-in location in quest data.|r" end
+    for _,p in ipairs(turnIns) do lines[#lines+1]=TURN..pickupText(p).."|r" end
     local before,any=Q.before(r.id)
     if #before>0 then lines[#lines+1]="\nPrerequisites ("..(any and "any" or "all").."): "..table.concat(before,", ") end
-    for i,line in ipairs(chainLines(r)) do if i>1 then lines[#lines+1]=line end end
-    local chain=Q.chainText(r.id,C.link(entry(r)))
-    if chain then lines[#lines+1]="\n"..chain end
+    local tree=chainTree(r)
+    if tree then
+        lines[#lines+1]="\nQuest chain (first step on top, each next step indented):"
+        for _,line in ipairs(tree) do lines[#lines+1]=line end
+        lines[#lines+1]=DIM.."Green tick = done, or a later step is done so nobody will offer it any more.|r"
+    else
+        local chain=Q.chainText(r.id,C.link(entry(r)))
+        if chain then lines[#lines+1]="\n"..chain end
+    end
     local how=Q.howText(r.id,r.name)
     if how then lines[#lines+1]="\n"..how end
     lines[#lines+1]="\nFaction/class/level filters do not check reputation, professions, events or every acceptance condition."
@@ -511,11 +596,12 @@ paint=function()
         if r then
             E.paintRow(row,nil,r.name.." · level "..r.level.." · req "..r.required.."+",
                 chainLabel(r).." · "..r.dungeonText..(completed(r.id) and " · Completed" or ""))
+            row.item:SetText(S.GOLD..r.name.."|r"..S.GREY.." · level "..r.level.." · req "..r.required.."+|r")
             local task,talk=taskLabel(r)
-            row.task:SetText((talk and "|cff80e0ff" or S.GOLD).."Task: "..task.."|r")
+            row.task:SetText((talk and "|cff80e0ff" or ROW_TASK).."Task: "..task.."|r")
             local list=locations(r)
-            row.pickup:SetText("Pickup: "..locationSummary(list.pickups))
-            row.turnIn:SetText("Turn-in: "..locationSummary(list.turnIns))
+            row.pickup:SetText(ROW_PICK.."Pickup: "..locationSummary(list.pickups).."|r")
+            row.turnIn:SetText(ROW_TURN.."Turn-in: "..locationSummary(list.turnIns).."|r")
             row.icon:SetTexture("Interface\\Icons\\INV_Misc_Note_01");row.rarity:Hide();row.frame:Show()
         else row.frame:Hide() end
     end
@@ -569,6 +655,7 @@ local function build()
     E.wheel(window.list,D.go)
     window.detailFrame,window.detailsText,window.setDetails=E.details(f,674,358,"Quest pickup and chain",690)
     window.detailFrame:SetHeight(690)
+    window.detailFrame.journalSurface.grain:Hide() -- plain parchment yellow, no picture behind the text
     window.pickup=E.button(window.detailFrame,"Show pickup on map (open M)",320,function() if selected then D.showPickup(selected) end end)
     window.pickup:SetPoint("BOTTOMLEFT",window.detailFrame,"BOTTOMLEFT",14,18)
     for i=1,PAGE do

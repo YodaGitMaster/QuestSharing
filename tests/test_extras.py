@@ -251,6 +251,37 @@ def test_the_minimap_button_can_be_hidden_and_shown_again(style):
     assert b.shown is True
 
 
+def test_shortcut_buttons_open_the_quest_guide_and_dungeon_quests(style):
+    g = game(style)
+    guide, dungeon = g.eval("NS._minimapShortcuts()").values()
+    main = g.eval("NS._minimapButton()")
+    assert guide.shown is True and dungeon.shown is True
+    pts = [main.point, guide.point, dungeon.point]
+    assert len({(round(p[4]), round(p[5])) for p in pts}) == 3, "three separate buttons"
+    g.eval("function() NS.questPlanner.open = function() CALLED_GUIDE = true end end")()
+    g.eval("function() NS.dungeonQuests.open = function() CALLED_DUNGEON = true end end")()
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(guide)
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(dungeon)
+    assert g.eval("CALLED_GUIDE") is True and g.eval("CALLED_DUNGEON") is True
+    g.eval("function(b) b.scripts.OnEnter(b) end")(dungeon)
+    assert g.eval("TOOLTIP.text") == "Dungeon quests"
+
+
+def test_shortcut_buttons_follow_the_main_button_and_hide_with_it(style):
+    g = game(style)
+    main = g.eval("NS._minimapButton()")
+    guide = list(g.eval("NS._minimapShortcuts()").values())[0]
+    g.eval("function(b) b.scripts.OnDragStart(b) end")(guide)
+    g.cursor(800 + 100, 400)
+    g.eval("function(b) b.scripts.OnUpdate(b, 0.03) end")(guide)
+    assert round(g.eval("NS.db.minimapAngle")) == 334, "the guide button sits one step past the main one"
+    g.eval("function(b) b.scripts.OnDragStop(b) end")(guide)
+    g.slash("minimap off")
+    assert main.shown is False and all(not b.shown for b in g.eval("NS._minimapShortcuts()").values())
+    g.slash("minimap on")
+    assert all(b.shown for b in g.eval("NS._minimapShortcuts()").values())
+
+
 def test_the_minimap_tooltip(style):
     g = game(style)
     b = g.eval("NS._minimapButton()")
