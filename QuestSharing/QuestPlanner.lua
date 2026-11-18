@@ -9,7 +9,8 @@ ns.questPlanner = P
 P.levelScope = "all"
 
 local function emptyCoverage()
-    return { external = {}, unknown = {}, blocked = {}, repeatable = {}, completed = {}, filtered = {} }
+    -- skipped is a count per reason, not a list: those quests were ruled out by one cheap read each (see scopeSkip)
+    return { external = {}, unknown = {}, blocked = {}, repeatable = {}, completed = {}, filtered = {}, skipped = {} }
 end
 local coverage = emptyCoverage()
 function P.coverage() return coverage end
@@ -20,6 +21,7 @@ local panel, message, planScroll, planRows, planContent, emptyText, followButton
 local previousButton, nextButton, stepCounter, modeButton, lockButton, waypointButton, guidePosition
 local guideExpanded, guideLocked = true, false
 local sessionActive, zoneQuestIDs, zoneOrder = false, {}, {}
+local zoneScope = {}  -- per cached id list: the level it was scoped for (a level-up makes new quests reachable) and what it skipped
 local buildGraph, buildRoute, render, selectStop, showPlanRows, stopIdentity, objectiveIsDone, scheduleRefresh, rebuildProgress
 local targetLocation
 local nextStopID = 0
@@ -205,6 +207,47 @@ local function zoneMembership(id, cache)
     return result, reason
 end
 
+local SKIP_TEXT = { character = "other race, faction or class", level = "needs a higher level than the next one",
+    overlevel = "past its maximum level", continent = "filed under a zone on another continent" }
+
+local function continentOf(map, cache)
+    if cache[map] ~= nil then return cache[map] or nil end
+    local continentType = Enum and Enum.UIMapType and Enum.UIMapType.Continent or 2
+    local found, id = false, map
+    for _ = 1, 12 do
+        local info = U.call(C_Map and C_Map.GetMapInfo, id)
+        if type(info) ~= "table" then break end
+        if info.mapType == continentType then found = id; break end
+        id = info.parentMapID
+        if not id or id == 0 then break end
+    end
+    cache[map] = found
+    return found or nil
+end
+
+-- One cheap read per quest, before any starter or spawn is read: ids this character, level or continent can't use
+-- never get their big tables loaded. Unknown data keeps the quest. Quests in the log are never skipped.
+local function scopeSkip(id, me, continents)
+    local why = questie().questGate(id, { raceMask = me.raceMask, classMask = me.classMask, level = me.level, slack = 1 })
+    if why then return why end
+    local area = tonumber((questie().get("quest", id, "zoneOrSort")))
+    if area and area > 0 then
+        local map = questie().uiMapOf(area)
+        local here, there = continentOf(frameMap, continents), map and continentOf(map, continents)
+        if here and there and here ~= there then return "continent" end
+    end
+end
+
+-- "412 other race, faction or class, 230 needs a higher level ...", or nil when nothing was skipped
+local function skippedText()
+    local parts = {}
+    for _, reason in ipairs({ "character", "level", "overlevel", "continent" }) do
+        local n = coverage.skipped[reason]
+        if n and n > 0 then parts[#parts + 1] = n .. " " .. SKIP_TEXT[reason] end
+    end
+    if #parts > 0 then return "Not read (one cheap check each): " .. table.concat(parts, ", ") end
+end
+
 -- The game flags a finished quest complete; one with no objectives at all (a breadcrumb or delivery)
 -- is ready as soon as it is in the log.
 local function readyToHandIn(entry, data)
@@ -330,8 +373,10 @@ local function scan(rediscover)
     local oldSelected = selected
     local oldSelectedKey = keepSelection and route[selected] and stopIdentity(route[selected]) or nil
     local inZone, index = {}, 1
-    if rediscover then zoneQuestIDs[zoneMap] = nil end
+    local me, continents = q.me(), {}
+    if rediscover or not (zoneScope[zoneMap] and zoneScope[zoneMap].level == me.level) then zoneQuestIDs[zoneMap] = nil end
     local discovered = zoneQuestIDs[zoneMap]
+    if discovered then coverage.skipped = zoneScope[zoneMap].skipped end
     local discoveredIDs, sourceCache, zoneCache = {}, {}, {}
     local levelStats = { localCount = 0, below = 0, above = 0, eligible = 0, unknown = 0 }
     lastLevelStats = levelStats
@@ -358,47 +403,52 @@ local function scan(rediscover)
             end
             local id = ids[index]; index = index + 1
             local active = log[id] ~= nil
-            local membership, zoneReason = zoneMembership(id, zoneCache)
-            local starters, startPoint, zoneAssociated
-            if not discovered or not active then
-                starters = q.plannerStarters(id, sourceCache)
-                startPoint = nearestSource(starters)
-                if not startPoint then zoneAssociated = membership == "here" end
-                if not discovered and (startPoint or zoneAssociated) then discoveredIDs[#discoveredIDs + 1] = id end
-            end
-            if startPoint and not active and membership == "other" then
-                coverage.external[id] = zoneReason
-            elseif active or startPoint then
-                local data = q.plannerQuest(id, sourceCache)
-                local band = data and questLevelBand(data.level) or "unknown"
-                if not active then
-                    levelStats.localCount = levelStats.localCount + 1
-                    if band == "below" then levelStats.below = levelStats.below + 1
-                    elseif band == "above" then levelStats.above = levelStats.above + 1
-                    elseif isInLevelRange(band) then levelStats.eligible = levelStats.eligible + 1
-                    else levelStats.unknown = levelStats.unknown + 1 end
+            local skip = not active and not discovered and scopeSkip(id, me, continents)
+            if skip then
+                coverage.skipped[skip] = (coverage.skipped[skip] or 0) + 1
+            else
+                local membership, zoneReason = zoneMembership(id, zoneCache)
+                local starters, startPoint, zoneAssociated
+                if not discovered or not active then
+                    starters = q.plannerStarters(id, sourceCache)
+                    startPoint = nearestSource(starters)
+                    if not startPoint then zoneAssociated = membership == "here" end
+                    if not discovered and (startPoint or zoneAssociated) then discoveredIDs[#discoveredIDs + 1] = id end
                 end
-                if not data then coverage.unknown[id] = "Quest data missing"
-                elseif P.levelScope == "green-yellow" and not isInLevelRange(band) then
-                    coverage.filtered[id] = "Outside the green/yellow level filter"
-                else
-                    data.band = band
-                    local candidate = newCandidate(id, starters or {}, log, data, membership, zoneReason)
-                    if candidate then inZone[id] = candidate end
-                end
-            elseif zoneAssociated then
-                if q.questComplete(id) == true then coverage.completed[id] = "Already turned in"
-                else
-                    local mapped = false
-                    for _,source in ipairs(starters or {}) do if #(source.spawns or {}) > 0 then mapped=true end end
-                    if mapped then coverage.external[id] = "Quest starts outside this zone"
-                    else coverage.unknown[id] = "Quest starter location unknown" end
+                if startPoint and not active and membership == "other" then
+                    coverage.external[id] = zoneReason
+                elseif active or startPoint then
+                    local data = q.plannerQuest(id, sourceCache)
+                    local band = data and questLevelBand(data.level) or "unknown"
+                    if not active then
+                        levelStats.localCount = levelStats.localCount + 1
+                        if band == "below" then levelStats.below = levelStats.below + 1
+                        elseif band == "above" then levelStats.above = levelStats.above + 1
+                        elseif isInLevelRange(band) then levelStats.eligible = levelStats.eligible + 1
+                        else levelStats.unknown = levelStats.unknown + 1 end
+                    end
+                    if not data then coverage.unknown[id] = "Quest data missing"
+                    elseif P.levelScope == "green-yellow" and not isInLevelRange(band) then
+                        coverage.filtered[id] = "Outside the green/yellow level filter"
+                    else
+                        data.band = band
+                        local candidate = newCandidate(id, starters or {}, log, data, membership, zoneReason)
+                        if candidate then inZone[id] = candidate end
+                    end
+                elseif zoneAssociated then
+                    if q.questComplete(id) == true then coverage.completed[id] = "Already turned in"
+                    else
+                        local mapped = false
+                        for _,source in ipairs(starters or {}) do if #(source.spawns or {}) > 0 then mapped=true end end
+                        if mapped then coverage.external[id] = "Quest starts outside this zone"
+                        else coverage.unknown[id] = "Quest starter location unknown" end
+                    end
                 end
             end
             Work.yield()
         end
         if not discovered then
-            zoneQuestIDs[zoneMap] = discoveredIDs
+            zoneQuestIDs[zoneMap], zoneScope[zoneMap] = discoveredIDs, { level = me.level, skipped = coverage.skipped }
             for i = #zoneOrder, 1, -1 do if zoneOrder[i] == zoneMap then table.remove(zoneOrder, i) end end
             zoneOrder[#zoneOrder + 1] = zoneMap
             while #zoneOrder > 2 do zoneQuestIDs[table.remove(zoneOrder, 1)] = nil end
@@ -1414,7 +1464,7 @@ function P.settingChanged(enabled)
     else
         panelDismissed = true
         sessionActive = false
-        zoneQuestIDs, zoneOrder = {}, {}
+        zoneQuestIDs, zoneOrder, zoneScope = {}, {}, {}
         generation = generation + 1
         loading = false
         clearPlan("Quest planner is off.")
@@ -1634,6 +1684,7 @@ function P.debugText()
     end
     add("")
     add("EXCLUDED OR UNVERIFIED QUESTS")
+    if skippedText() then add(skippedText()) end
     for _, category in ipairs({"external", "unknown", "blocked", "filtered", "repeatable", "completed"}) do
         local excluded = {}
         for id in pairs(coverage[category]) do excluded[#excluded + 1] = id end
@@ -1673,6 +1724,7 @@ local function explainPlan()
         table.sort(ids)
         for _,id in ipairs(ids) do lines[#lines+1] = string.format("%d • %s",id,coverage[category][id]) end
     end
+    if skippedText() then lines[#lines+1] = skippedText() end
     local K = ns.questCalibration
     if K and K.describe then lines[#lines+1] = "Times used: " .. K.describe() .. "." end
     lines[#lines+1] = "Unknown future levels, inventory restrictions, flight routes and world conditions need live confirmation."

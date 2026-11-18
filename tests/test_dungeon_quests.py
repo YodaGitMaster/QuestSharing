@@ -49,11 +49,14 @@ end
 '''
 
 
-def game(style, extra="", open_tab=True):
+def game(style, extra="", open_tab=True, everything=True):
     g=optional_game(style,DATA+extra)
     if open_tab:
         g.slash("dungeons");g.advance(90)
         assert g.eval("NS.dungeonQuests._state()")[0], g.printed()
+        if everything:  # the tab opens scoped to your character; most checks here want the whole catalogue
+            click(g.eval("NS.dungeonQuests._window()").reset);g.advance(90)
+            assert g.eval("NS.dungeonQuests._state()")[0], g.printed()
     return g
 
 
@@ -111,7 +114,7 @@ def test_all_quests_button_keeps_selected_dungeon_and_broadens_character_filters
     g=game(style);filters(g,dungeon=1581)
     w=g.eval("NS.dungeonQuests._window()");click(w.mine)
     assert 17 not in ids(g) and 5 not in ids(g) and 7 not in ids(g)
-    click(w.reset)
+    click(w.reset);g.advance(90)
     assert {5,7,17,18,19}<=ids(g) and 8 not in ids(g)
     assert w.dungeon.readValue()==1581
 
@@ -306,7 +309,7 @@ def test_unavailable_filter_metadata_is_explained_and_all_quests_remains_usable(
     assert ids(g)
     w=g.eval("NS.dungeonQuests._window()");click(w.mine)
     assert not ids(g) and "mappings are unavailable" in w.status.text
-    click(w.reset);assert ids(g)
+    click(w.reset);g.advance(90);assert ids(g)
 
 
 def test_closed_events_stay_idle_and_hidden_pending_search_is_applied_on_reopen(style):
@@ -526,37 +529,71 @@ def test_detail_panel_keeps_the_yellow_but_drops_the_picture(style):
     assert not surface.grain.shown and surface.base.shown
 
 
-def test_chain_is_an_indented_bullet_list_with_pending_steps_and_where_to_go(style):
-    g=game(style,HOVER_DATA)
+def rows_by_id(g):
+    w=g.eval("NS.dungeonQuests._window()")
+    return {r.result.id:r for r in w.rows.values() if r.result and r.frame.shown}
+
+
+def test_chain_is_nested_in_the_list_and_the_panel_describes_only_the_clicked_step(style):
+    g=game(style,HOVER_DATA);filters(g,dungeon=1581)
+    order=[r.id for r in g.eval("NS.dungeonQuests._results()").values()]
+    assert order.index(1)+1==order.index(2) and order.index(2)+1==order.index(3), order
+    rows=rows_by_id(g)
+    assert rows[1].item.text.count("»")==0 and "»" in rows[2].item.text and "»" in rows[3].item.text
+    assert rows[1].frame.width>rows[2].frame.width>rows[3].frame.width, "each next step is indented"
     text=chain_text(g,2)
-    a,b,c=(line_of(text,n) for n in ("Outdoor preparation","A dungeon job","Return outside"))
-    indent=lambda l:len(l)-len(l.lstrip(" "))
-    assert indent(a)<indent(b)<indent(c), "each next step is one tab deeper"
-    assert all("•" in l and CHECK not in l for l in (a,b,c))
-    assert "< this quest" in b and "< this quest" not in a
-    assert "Go speak to Marshal McBride" in text, "a talk-only step says who to go and speak to"
+    assert "A dungeon job (quest 2)" in plain(text) and "Return outside" in plain(text)  # neighbours named...
+    assert "Quest chain (" not in text and "Previous chain quests" in text, "...but no whole-chain tree in the description"
     assert not g.eval("NS.db.errors")
 
 
-def test_done_steps_get_a_green_tick_and_a_finished_later_step_ticks_the_ones_before_it(style):
-    g=game(style,HOVER_DATA)
-    g.run("FINISHED[1]=true");text=chain_text(g,2)
-    assert CHECK in line_of(text,"Outdoor preparation") and "(done)" in line_of(text,"Outdoor preparation")
-    assert CHECK not in line_of(text,"Return outside")
-    # Finishing the last step means the first two have nothing to offer any more, even if never flagged themselves.
-    g.run("FINISHED[1]=nil;FINISHED[3]=true");text=chain_text(g,2)
-    for name in ("Outdoor preparation","A dungeon job","Return outside"):
-        assert CHECK in line_of(text,name), name
-    assert "not needed" in line_of(text,"Outdoor preparation")
-    assert "(done)" in line_of(text,"Return outside")
+def test_done_steps_are_ticked_and_greyed_and_a_finished_later_step_ticks_the_ones_before_it(style):
+    g=game(style,HOVER_DATA);filters(g,dungeon=1581)
+    ready=lambda q:"ReadyCheck-Ready" in (rows_by_id(g)[q].icon.texture or "")
+    assert not any(ready(q) for q in (1,2,3))
+    g.run("FINISHED[1]=true");g.eval("NS.dungeonQuests.refresh")();g.advance(.3)
+    assert ready(1) and not ready(2) and not ready(3)
+    # Finishing the last step: the first two will never be offered again, so they are ticked and greyed too.
+    g.run("FINISHED[1]=nil;FINISHED[3]=true");g.eval("NS.dungeonQuests.refresh")();g.advance(.3)
+    rows=rows_by_id(g)
+    for q in (1,2,3):
+        assert ready(q) and "|cff7d7d7d" in rows[q].item.text and "|cff7d7d7d" in rows[q].pickup.text, q
+    assert "Not needed" in rows[1]["from"].text
+    assert "Not needed" not in rows[3]["from"].text
+    assert "Done" in chain_text(g,2)
     assert not g.eval("NS.db.errors")
 
 
 def test_finished_later_step_does_not_tick_when_any_one_of_several_prerequisites_would_do(style):
-    # Quest 4 can be reached through 1 or 2: finishing it does not prove which one was done.
     g=game(style,HOVER_DATA+"QUESTIE_QUESTS[4].preQuestSingle={1,2};QUESTIE_QUESTS[2].nextQuestInChain=nil;FINISHED[4]=true")
-    text=chain_text(g,2)
-    assert CHECK not in line_of(text,"A dungeon job")
+    filters(g,dungeon=1581)
+    assert "ReadyCheck-Ready" not in (rows_by_id(g)[2].icon.texture or "")
+
+
+def test_opens_for_your_character_and_reads_big_tables_only_for_quests_that_pass(style):
+    g=game(style,r'''
+    BIG={}
+    local get=QuestDB.Get
+    QuestDB.Get=function(id,key) if key=="startedBy" or key=="objectives" then BIG[id]=true end;return get(id,key) end
+    ''',everything=False)
+    seen=g.eval("BIG")
+    # level 20 Alliance Druid: Horde-only (5), Mage-only (7) and level-40 (17) quests are never opened
+    for qid in (5,7,17): assert seen[qid] is None, qid
+    assert seen[2] and seen[1] and seen[4]
+    assert {5,7,17}.isdisjoint(ids(g))
+    assert g.eval("QUEST_ENUMS")==1
+
+
+def test_narrowing_keeps_the_scan_and_widening_scans_again(style):
+    g=game(style,everything=False);w=g.eval("NS.dungeonQuests._window()")
+    edit(w.level,"10");g.advance(.3)
+    assert g.eval("QUEST_ENUMS")==1                       # a lower level only filters what was read
+    edit(w.level,"45");g.advance(90)
+    assert g.eval("QUEST_ENUMS")==2 and 17 in ids(g)      # a higher level needs the quests the first scan skipped
+    click(w.reset);g.advance(90)
+    assert g.eval("QUEST_ENUMS")==3 and {5,7,17}<=ids(g)  # all factions and classes
+    click(w.mine);g.advance(.3)
+    assert g.eval("QUEST_ENUMS")==3 and 5 not in ids(g)   # back to one character: no new scan
 
 
 if __name__=="__main__":

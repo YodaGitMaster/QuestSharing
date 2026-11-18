@@ -28,9 +28,9 @@ cutpdf/
 │   ├── state.md                                      # Current task and handoff
 │   └── walkable-routing-research.md                  # Terrain-routing feasibility, provider sources and proposed integration (not implemented)
 ├── questidea.txt                                     # User-provided predictive quest optimizer design requirements
-├── QuestSharing/                                     # WoW addon runtime (46 files, collapsed)
+├── QuestSharing/                                     # WoW addon runtime (49 files, collapsed)
 ├── README.md                                         # User documentation
-├── tests/                                            # Python tests and Lua API harness (48 files, collapsed)
+├── tests/                                            # Python tests and Lua API harness (49 files, collapsed)
 └── tools/                                            # Local UI emulation utilities, never shipped in the addon
     ├── build_cooking_reference.py                    # Rebuild pinned factual Cooking subset with upstream MIT attribution
     ├── lua-syntax-review-prompt.md                   # Reusable Lua 5.1 syntax/bug review prompt (parse, 5.2+ leaks, globals, nil traps)
@@ -70,6 +70,7 @@ flowchart TD
     Core --> DataWork[DataWork.lua: shared optional database work budget]
     Core --> Sync[Sync.lua: party addon messages]
     DB[Optional QuestieDB] --> Q[Questie.lua: ns.questie]
+    Q -->|Q.me, Q.questGate, Q.npcFriendly: one cheap read per id before any big table| Gate[Scoped reads: planner, Dungeon quests, map search]
     Settings --> Planner[QuestPlanner.lua: optional local quest plan]
     Core --> Planner
     Planner --> Diagnostics
@@ -104,6 +105,12 @@ flowchart TD
     Cleanup --> BagAPI[Carried bags and explicit cursor item deletion]
     Browser --> ItemSources[ItemSources.lua: item tooltip source hints]
     Browser --> VendorMap[VendorMap.lua: item/vendor search and map pins]
+    VendorMap -->|pointOnMap, continentPoint| TravelMap[TravelMap.lua: dungeon, boat, zeppelin pins + hover lines + nearest town per faction]
+    TravelData[TravelData.lua: static entrances, stops, routes, towns] --> TravelMap
+    TrainerIndex[TrainerIndex.lua: background scan of Questie trainers; known professions + class] --> TravelMap
+    TrainerIndex --> Q
+    TrainerIndex --> DataWork
+    TravelMap --> ExistingMap
     Browser --> Rewards[Rewards.lua: reward browser]
     OptionalUI[OptionalUI.lua] --> Equipment[EquipmentUI.lua: shared WoW-style journal; equipment tabs Rare+ only]
     Equipment --> NativeJournalArt[Built-in dialog, QuestBG, Quickslot2 and red button textures]
@@ -558,7 +565,7 @@ sequenceDiagram
     end
     User->>Search: Type first character (OnTextChanged)
     Search->>Work: startIndex(): start/resume persistent vendor-index (FOREGROUND_MS 8 after typing)
-    Work->>DB: Index NPC titles/flags once (npcCursor), item links only when a query needs them (itemCursor)
+    Work->>DB: Index NPC titles/flags once for NPCs friendly to my faction (npcCursor); items only when a query needs them: read each name, read vendor links only for names with the typed words (itemWords, itemRows). A seller query skips items when the provider has the vendor flag
     Note over Search,Work: Keystrokes cancel only vendor-search. vendor-index survives, only resetIndex() (disable / provider loss) cancels it
     Search->>Search: clearResults() per keystroke, keepMatching keeps still-matching suggestions visible
     Search->>Work: After 0.18 s debounce V.draw -> startSearch(): per-query vendor-search (8 ms if typed, else 2 ms)

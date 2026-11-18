@@ -81,6 +81,23 @@ def test_role_search_includes_unlinked_npcs_and_all_spawns(style):
     assert sorted(p.result.vendor.id for p in pins(g)) == [1, 1, 2]
 
 
+def test_pins_use_an_icon_for_the_kind_of_npc(style):
+    g = game(style, "CLASS_ICON_TCOORDS = { DRUID = { 0.5, 0.75, 0.5, 0.75 } }")
+    icon = g.eval("function(t) local tex, c = NS.vendorMap.iconFor(t); return tex .. '|' .. (c and c[1] or '') end")
+    assert icon("Druid Trainer") == "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES|0.5"
+    assert icon("Mining Trainer").endswith("Trade_Mining|") and icon("Alchemy Trainer").endswith("Trade_Alchemy|")
+    assert icon("Innkeeper").endswith("INV_Misc_Rune_01|") and icon("Flight Master").endswith("INV_Misc_Map_01|")
+    assert icon("Banker").endswith("INV_Misc_Coin_01|") and icon("Weapon Master").endswith("INV_Sword_04|")
+    assert icon("Warrior Trainer").endswith("INV_Misc_Book_09|"), "no class art on this client: the generic trainer book"
+    assert icon("Fishing Trainer").endswith("Trade_Fishing|") and icon("Cooking Trainer").endswith("INV_Misc_Food_15|")
+    assert icon("First Aid Trainer").endswith("INV_Misc_Bandage_15|")
+    assert icon("Food & Drink").endswith("INV_Misc_Bag_10|"), "a food vendor must not look like the cooking trainer"
+    assert icon("General Goods").endswith("INV_Misc_Bag_10|") and icon("").endswith("INV_Misc_Bag_10|")
+    g.eval("NS.vendorMap.search")("General Goods", True, "vendor")
+    g.advance(3)
+    assert {p.icon.texture for p in pins(g)} == {"Interface\\Icons\\INV_Misc_Bag_10"}
+
+
 def test_suggestions_only_offer_results_on_the_shown_map(style):
     g = game(style)
     type_query(g, "ta")
@@ -242,6 +259,7 @@ LibQuestieDB.RequireContract=function(version) assert(version==4); return true e
 LibQuestieDB.Enum={npcFlags={VENDOR=1024}}
 QUESTIE_NPCS[5]={npcFlags=1030,spawns={[12]={{80,90}}}}
 QUESTIE_NPCS[6]={subName="Captain",npcFlags=2,spawns={[12]={{10,10}}}}
+QUESTIE_NPCS[3].npcFlags=1024
 QUESTIE_NPCS[7]={subName="General Store",npcFlags=1024,spawns={[40]={{50,60}}}}
 QUESTIE_NPCS[8]={subName="Tailoring Trainer",npcFlags=16,spawns={[12]={{15,15}}}}
 NpcDB.GetAllIds=function() return {1,2,3,4,5,6,7,8} end
@@ -726,6 +744,43 @@ def test_libquestiedb_only_provider_is_supported(style):
     type_query(g, "vendor")
     assert len(pins(g)) >= 3
     assert "requires QuestieDB" not in " ".join(labels(g))
+
+
+def test_item_search_reads_vendor_links_only_for_items_with_the_typed_words(style):
+    g = game(style, r'''
+VENDOR_READS, ITEM_SCANS = {}, 0
+local get, ids = ItemDB.Get, ItemDB.GetAllIds
+ItemDB.Get = function(id, key) if key == "vendors" then VENDOR_READS[id] = (VENDOR_READS[id] or 0) + 1 end; return get(id, key) end
+ItemDB.GetAllIds = function() ITEM_SCANS = ITEM_SCANS + 1; return ids() end
+''')
+    type_query(g, "silk")
+    reads = g.eval("VENDOR_READS")
+    assert reads[11] == 1 and reads[10] is None and reads[12] is None
+    assert g.eval("ITEM_SCANS") == 1
+    type_query(g, "silken")                       # the scan for "silk" already holds every match
+    assert g.eval("ITEM_SCANS") == 1
+    type_query(g, "thread")                       # other words: a new scan, the links already read are kept
+    assert g.eval("ITEM_SCANS") == 2 and g.eval("VENDOR_READS")[11] == 1
+    type_query(g, "")
+    assert g.eval("ITEM_SCANS") == 2
+
+
+def test_seller_search_does_not_scan_items_when_the_provider_flags_vendors(style):
+    g = game(style, SELLERS + "\nITEM_SCANS=0\nlocal ids=ItemDB.GetAllIds\nItemDB.GetAllIds=function() ITEM_SCANS=ITEM_SCANS+1; return ids() end")
+    type_query(g, "vendor")
+    assert g.eval("ITEM_SCANS") == 0
+    assert sorted(p.result.vendor.id for p in pins(g)) == [1, 1, 2, 4, 5]
+
+
+def test_npcs_friendly_only_to_the_other_faction_get_no_row(style):
+    g = game(style, SELLERS + '''
+UnitFactionGroup = function() return "Alliance" end
+QUESTIE_NPCS[1].friendlyToFaction = "H"
+QUESTIE_NPCS[2].friendlyToFaction = "AH"
+QUESTIE_NPCS[4].friendlyToFaction = "A"
+''')
+    type_query(g, "vendor")
+    assert sorted(p.result.vendor.id for p in pins(g)) == [2, 4, 5]
 
 
 if __name__ == "__main__":

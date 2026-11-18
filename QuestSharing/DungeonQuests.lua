@@ -9,7 +9,11 @@ local filterError
 -- Whole-catalogue quest links from the last scan: chainPrev[id][before]=required, chainNext[id][after]=required.
 -- "required" = the later quest cannot be taken without the earlier one (so finishing it proves the earlier one is done).
 local chainPrev, chainNext = {}, {}
+local depthOf = {} -- result id -> nesting level in the list
 local refreshPending=false
+-- What the last scan read: its faction, class and level filters. Quests outside them were skipped by one cheap read each,
+-- so a filter that widens past this needs a new scan (D.refresh), and one that narrows does not.
+local scope
 local menuEntry, menuQuest -- what D.menu last opened, to tell our right-click menu from other windows' menus
 local PAGE, OWNER, REWARDS_OWNER = 5, "dungeonQuests", "dungeonQuestRewards"
 local FOREGROUND_MS = 8 -- the player is waiting on this visible list; it reads ~18 fields per quest
@@ -51,6 +55,12 @@ local function dungeonChoices()
     return list
 end
 
+local function covers(done,f)
+    if done.faction~="All factions" and f.faction~=done.faction then return false end
+    if done.class~="All classes" and f.class~=done.class then return false end
+    return done.allLevels or (not f.allLevels and f.level<=done.level)
+end
+
 function D.search(f)
     filters=f or filters or defaults()
     results={}
@@ -78,6 +88,25 @@ function D.search(f)
         if a.name~=b.name then return a.name<b.name end
         return a.id<b.id
     end)
+    -- Nest chains: a step directly follows the earlier step it needs, one level deeper (only steps that are listed).
+    local inList={};for _,r in ipairs(results) do inList[r.id]=r end
+    local ordered,placed={},{}
+    depthOf={}
+    local function place(r,depth)
+        if placed[r.id] then return end
+        placed[r.id]=true;depthOf[r.id]=depth;ordered[#ordered+1]=r
+        local kids={}
+        for after in pairs(chainNext[r.id] or {}) do if inList[after] then kids[#kids+1]=inList[after] end end
+        table.sort(kids,function(a,b) if a.level~=b.level then return a.level<b.level end;return a.id<b.id end)
+        for _,kid in ipairs(kids) do place(kid,depth+1) end
+    end
+    for _,r in ipairs(results) do
+        local top=true
+        for before in pairs(chainPrev[r.id] or {}) do if inList[before] then top=false;break end end
+        if top then place(r,0) end
+    end
+    for _,r in ipairs(results) do place(r,0) end -- anything a loop left out
+    results=ordered
     return results
 end
 
@@ -152,11 +181,16 @@ function D.scan()
     if not shown() then return false end
     ns.closeQuestMenu();E.dismissMenu();ns.dataWork.cancel(OWNER)
     ns.dataWork.cancel(REWARDS_OWNER)
+    filters=filters or defaults(true)
+    scope={faction=filters.faction,class=filters.class,level=filters.level,allLevels=filters.allLevels}
+    local gate={level=not filters.allLevels and filters.level or nil,noMax=true}
+    if filters.faction~="All factions" then gate.raceMask=enums().factionRaceMasks and enums().factionRaceMasks[filters.faction] end
+    if filters.class~="All classes" then gate.classMask=enums().classKeys and enums().classKeys[filters.class] end
     rewardIndex,rewardsReady,rewardsLoading={},false,false
     generation=generation+1
     local token=generation
     records,results,places={}, {}, {}
-    chainPrev,chainNext={}, {}
+    chainPrev,chainNext,depthOf={}, {}, {}
     ready,loading,progress,total,filterError=false,true,0,0,nil
     message="Needs a recent QuestieDB with an enumerable quest catalogue."
     ns.dataWork.start(OWNER,function()
@@ -166,7 +200,8 @@ function D.scan()
         local cache,all,seeds={},{},{}
         local function read(kind,id,key) local value=Q.get(kind,id,key);ns.dataWork.checkpoint();return value end
         for _,id in ipairs(ids) do
-            local name=read("quest",id,"name")
+            -- Only single numbers are read until a quest passes the filters; its spawns and objectives wait for that.
+            local name=not Q.questGate(id,gate) and read("quest",id,"name")
             if type(name)=="string" and name~="" then
                 local r={id=id,name=name,level=number(read("quest",id,"questLevel")),
                     required=number(read("quest",id,"requiredLevel")),max=number(read("quest",id,"requiredMaxLevel")),
@@ -333,12 +368,12 @@ local function chainLines(r)
     return lines
 end
 
--- The chain as an indented bullet list, first step on top. A step is ticked green when it is done, and also when a later
--- step that needs it is done: the giver then has nothing left to offer, so there is no point travelling there.
-local DONE_ICON,GREEN,INK,DIM,HERE="|TInterface\\RaidFrame\\ReadyCheck-Ready:14|t","|cff0d6e0d","|cff4b2a11","|cff6b4a26","|cff8b1a1a"
+-- A step counts as done when it is, and also when a later step that needs it is done: the giver then has nothing
+-- left to offer, so there is no point travelling there. The list shows such steps ticked green and greyed out.
+local GREEN,DIM="|cff0d6e0d","|cff6b4a26"
 local NAME,PICK,TURN="|cff7a0c0c","|cff0a2a8a","|cff5a1a7a" -- panel: quest name crimson, pickup deep blue, turn-in purple
+local GREYED="|cff7d7d7d"
 local ROW_PICK,ROW_TURN,ROW_TASK="|cff9fe6ff","|cffe6b3ff","|cffe0e0e0" -- the same roles, bright for the dark list
-local TAB,MAX_CHAIN_NODES="     ",24
 local function finished(id,seen)
     if completed(id) then return true,false end
     seen=seen or {}
@@ -354,56 +389,6 @@ local function sortedKeys(map,keep)
     for id in pairs(map or {}) do if not keep or keep[id] then list[#list+1]=id end end
     table.sort(list);return list
 end
-local function chainMembers(id)
-    local set,count={[id]=true},1
-    for _,index in ipairs({chainPrev,chainNext}) do
-        local queue,head={id},1
-        while queue[head] do
-            local current=queue[head];head=head+1
-            for _,other in ipairs(sortedKeys(index[current])) do
-                if not set[other] and count<MAX_CHAIN_NODES then set[other]=true;count=count+1;queue[#queue+1]=other end
-            end
-        end
-    end
-    return set,count
-end
-local function chainNode(id,depth,hereID,out)
-    local rec=records[id] or {id=id,name=Q.get("quest",id,"name") or ("Quest "..id)}
-    local done,implied=finished(id)
-    local pad=string.rep(TAB,depth)
-    local level=number(Q.get("quest",id,"questLevel"))
-    out[#out+1]=pad..(done and DONE_ICON or "•").." "..(done and GREEN or id==hereID and HERE or INK)..rec.name.."|r"
-        ..(level>0 and (DIM.." (level "..level..")|r") or "")
-        ..(id==hereID and (HERE.."  < this quest|r") or "")
-        ..(implied and (GREEN.."  (not needed: a later step is already done)|r") or done and (GREEN.."  (done)|r") or "")
-    if done or id==hereID then return end
-    local task,talk=taskLabel(rec)
-    local list=locations(rec)
-    if talk then out[#out+1]=pad.."   "..TURN.."Go speak to "..pickupText(list.turnIns[1]).."|r"
-    else
-        out[#out+1]=pad.."   "..DIM..(string.find(task,"^Task unknown") and task or ("Task: "..task)).."|r"
-        out[#out+1]=pad.."   "..PICK.."Pick up: "..locationSummary(list.pickups).."|r"
-    end
-end
-local function chainTree(r)
-    local set,count=chainMembers(r.id)
-    if count<2 then return nil end
-    local out,seen={},{}
-    local function walk(id,depth)
-        if seen[id] then return end
-        seen[id]=true;chainNode(id,depth,r.id,out)
-        for _,after in ipairs(sortedKeys(chainNext[id],set)) do walk(after,depth+1) end
-    end
-    for _,id in ipairs(sortedKeys(set)) do
-        local top=true
-        for before in pairs(chainPrev[id] or {}) do if set[before] then top=false;break end end
-        if top then walk(id,0) end
-    end
-    for _,id in ipairs(sortedKeys(set)) do walk(id,0) end -- anything a loop left out
-    if count>=MAX_CHAIN_NODES then out[#out+1]=DIM.."(longer chain: showing the "..MAX_CHAIN_NODES.." steps closest to this quest)|r" end
-    return out
-end
-
 local function baseXP(id)
     local support=type(LibQuestieDB)=="table" and LibQuestieDB.Support
     local xp=support and U.call(support.Get,"QuestXP")
@@ -539,15 +524,9 @@ function D.detail(r)
     for _,p in ipairs(turnIns) do lines[#lines+1]=TURN..pickupText(p).."|r" end
     local before,any=Q.before(r.id)
     if #before>0 then lines[#lines+1]="\nPrerequisites ("..(any and "any" or "all").."): "..table.concat(before,", ") end
-    local tree=chainTree(r)
-    if tree then
-        lines[#lines+1]="\nQuest chain (first step on top, each next step indented):"
-        for _,line in ipairs(tree) do lines[#lines+1]=line end
-        lines[#lines+1]=DIM.."Green tick = done, or a later step is done so nobody will offer it any more.|r"
-    else
-        local chain=Q.chainText(r.id,C.link(entry(r)))
-        if chain then lines[#lines+1]="\n"..chain end
-    end
+    local done,implied=finished(r.id)
+    if done then lines[#lines+1]="\n"..GREEN.."Done"..(implied and ": a later step of this chain is already done, so you will not be offered this one." or ".").."|r" end
+    for i,line in ipairs(chainLines(r)) do if i>1 then lines[#lines+1]=line end end
     local how=Q.howText(r.id,r.name)
     if how then lines[#lines+1]="\n"..how end
     lines[#lines+1]="\nFaction/class/level filters do not check reputation, professions, events or every acceptance condition."
@@ -564,6 +543,7 @@ function D.refresh(keepMenu)
     if not shown() then return end
     local open=keepMenu and menuEntry and ns.questMenuEntry()==menuEntry and menuQuest
     if not keepMenu then ns.closeQuestMenu() end
+    if ready and scope and not covers(scope,filters) then D.scan();return end
     D.search()
     if open then
         local kept=false
@@ -594,15 +574,25 @@ paint=function()
     for i,row in ipairs(window.rows) do
         local r=results[(page-1)*PAGE+i];row.result=r
         if r then
+            local done,implied=finished(r.id)
+            local depth=math.min(depthOf[r.id] or 0,4);local indent=depth*22
+            row.frame:ClearAllPoints();row.frame:SetPoint("TOPLEFT",window.list,"TOPLEFT",indent,-(i-1)*106)
+            row.frame:SetWidth(650-indent)
+            for _,fs in ipairs({row.item,row.from}) do fs:SetWidth(650-indent-60) end
+            for _,fs in ipairs({row.task,row.pickup,row.turnIn}) do fs:SetWidth(590-indent) end
             E.paintRow(row,nil,r.name.." · level "..r.level.." · req "..r.required.."+",
-                chainLabel(r).." · "..r.dungeonText..(completed(r.id) and " · Completed" or ""))
-            row.item:SetText(S.GOLD..r.name.."|r"..S.GREY.." · level "..r.level.." · req "..r.required.."+|r")
+                chainLabel(r).." · "..r.dungeonText..(completed(r.id) and " · Completed" or implied and " · Not needed: a later step is done" or ""))
+            row.item:SetText((depth>0 and (S.GREY.."» |r") or "")..(done and (GREYED..r.name.."|r") or (S.GOLD..r.name.."|r"))
+                ..S.GREY.." · level "..r.level.." · req "..r.required.."+|r")
             local task,talk=taskLabel(r)
-            row.task:SetText((talk and "|cff80e0ff" or ROW_TASK).."Task: "..task.."|r")
             local list=locations(r)
-            row.pickup:SetText(ROW_PICK.."Pickup: "..locationSummary(list.pickups).."|r")
-            row.turnIn:SetText(ROW_TURN.."Turn-in: "..locationSummary(list.turnIns).."|r")
-            row.icon:SetTexture("Interface\\Icons\\INV_Misc_Note_01");row.rarity:Hide();row.frame:Show()
+            row.task:SetText((done and GREYED or talk and "|cff80e0ff" or ROW_TASK).."Task: "..task.."|r")
+            row.pickup:SetText((done and GREYED or ROW_PICK).."Pickup: "..locationSummary(list.pickups).."|r")
+            row.turnIn:SetText((done and GREYED or ROW_TURN).."Turn-in: "..locationSummary(list.turnIns).."|r")
+            -- done (or made pointless by a later done step): green tick and grey text, so you do not travel for it
+            row.icon:SetTexture(done and "Interface\\RaidFrame\\ReadyCheck-Ready" or "Interface\\Icons\\INV_Misc_Note_01")
+            row.icon:SetTexCoord(done and 0 or 0.06,done and 1 or 0.94,done and 0 or 0.06,done and 1 or 0.94)
+            row.rarity:Hide();row.frame:Show()
         else row.frame:Hide() end
     end
     if not E.focusRows(window.rows,selected,function(r) return r.id end) then
@@ -696,7 +686,7 @@ local function stop()
 end
 function D.open(text)
     if not ns.db.enabled then ns.print("switch Quest Sharing on first (/qs on)");return end
-    filters=filters or defaults()
+    filters=filters or defaults(true)
     if not build() then return end
     E.show(OWNER)
     if text and text~="" then filters.text=text;window.search:SetText(text);window.search.cancel() end

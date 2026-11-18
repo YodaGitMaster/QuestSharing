@@ -38,6 +38,8 @@ ns.defaults = {
     zoneLevels = false, -- opt-in: questing level ranges on the world map
     itemSources = false, -- opt-in: QuestieDB source hints on item tooltips
     vendorSearch = false, -- opt-in: vendor search on the world map
+    myTrainers = true, -- your class and profession trainers on zone and continent maps (needs QuestieDB)
+    travelMap = true, -- dungeon entrances, boats, zeppelins and nearest towns on the world map
     questPlanner = false, -- opt-in: prerequisite-aware quest route suggestions
     questPlannerGoal = "all", -- quest guide aim: "all" (complete the zone), "xp", "selected" (questPlannerSelected) or "budget"
     questPlannerBudget = 30, -- minutes for the "budget" goal (5-240)
@@ -385,6 +387,7 @@ function ns.setSetting(key, value)
         if (key == "zoneLevels" or key == "enabled") and ns.zoneLevels then ns.zoneLevels.refresh() end
         if (key == "itemSources" or key == "enabled") and ns.itemSources then ns.itemSources.refresh() end
         if (key == "vendorSearch" or key == "enabled") and ns.vendorMap then ns.vendorMap.refresh() end
+        if (key == "travelMap" or key == "myTrainers" or key == "enabled") and ns.travelMap then ns.travelMap.refresh() end
         if key == "questPlanner" and ns.questPlanner then ns.questPlanner.settingChanged(value) end
         -- Goal, time limit, quest IDs and level scope (Settings > Quest guide): the planner rereads them and replans.
         if type(key) == "string" and key ~= "questPlanner" and string.sub(key, 1, 12) == "questPlanner"

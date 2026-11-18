@@ -392,6 +392,17 @@ def test_all_controls_have_visible_plain_language_help_and_correct_categories(st
     assert "Multiple rewards" in by_key["autoCompleteQuests"].desc
 
 
+def test_map_overlays_have_switches_in_the_map_tab_that_work(style):
+    g = fresh(style)
+    for key in ("travelMap", "myTrainers"):
+        assert g.eval(f"NS.settingRows[{idx(g, key)}].tab") == "maps" and g.eval(f"NS.settingRows[{idx(g, key)}].kind") == "bool"
+        assert g.eval(f"NS.db.{key}") is True, "on by default"
+        click(g, key)
+        assert g.eval(f"NS.db.{key}") is False, f"{key} turns off from the window"
+        click(g, key)
+        assert g.eval(f"NS.db.{key}") is True, f"{key} turns back on"
+
+
 def test_settings_does_not_drop_rows_after_eighteen_and_last_row_is_reachable(style):
     g = fresh(style)
     g.run("""for i = 1, 25 do table.insert(NS.settingRows, {

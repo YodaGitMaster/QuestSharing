@@ -390,6 +390,46 @@ function Q.ids(kind)
     end
 end
 
+-- Scoped reads. QuestieDB keeps every (id, field) it reads for the whole session, so a scan that reads the big
+-- tables (startedBy, spawns, vendors) of every id pays memory for data nobody asked about. These gates read only
+-- single numbers and strings; a scan reads the big tables for the ids that pass. Unknown data never skips.
+function Q.me()
+    local ui, enums = ns.optionalUI, type(LibQuestieDB) == "table" and LibQuestieDB.Enum or {}
+    local _, token = ui.call(UnitClass, "player")
+    local _, _, raceID = ui.call(UnitRace, "player")
+    local group = ui.call(UnitFactionGroup, "player")
+    local level = tonumber(ui.call(UnitLevel, "player"))
+    return { level = level and level >= 1 and level or nil,
+        classMask = enums.classKeys and enums.classKeys[token], raceMask = enums.raceMaskById and enums.raceMaskById[raceID],
+        faction = (group == "Alliance" and "A") or (group == "Horde" and "H") or nil }
+end
+
+-- scope = { raceMask, classMask, level, slack, noMax }: a nil member is not checked. Returns nil (keep) or why it is skipped:
+-- "character" (other race, faction or class), "level" (needs more than level + slack), "overlevel" (past its maximum).
+function Q.questGate(id, scope)
+    if scope.raceMask then
+        local races = tonumber((field("quest", id, "requiredRaces"))) or 0
+        if races > 0 and not ns.rewards.overlaps(races, scope.raceMask) then return "character" end
+    end
+    if scope.classMask then
+        local classes = tonumber((field("quest", id, "requiredClasses"))) or 0
+        if classes > 0 and not ns.rewards.overlaps(classes, scope.classMask) then return "character" end
+    end
+    if scope.level then
+        if (tonumber((field("quest", id, "requiredLevel"))) or 0) > scope.level + (scope.slack or 0) then return "level" end
+        if scope.noMax then return nil end             -- a scan that a lower level filter must still be able to use
+        local max = tonumber((field("quest", id, "requiredMaxLevel"))) or 0
+        if max > 0 and scope.level > max then return "overlevel" end
+    end
+end
+
+-- false only for an NPC that is friendly to the other faction alone ("A", "H" or "AH"; nil is unknown or hostile to both).
+function Q.npcFriendly(id, faction)
+    if not faction then return true end
+    local friendly = field("npc", id, "friendlyToFaction")
+    return type(friendly) ~= "string" or friendly == "" or string.find(friendly, faction, 1, true) ~= nil
+end
+
 -- Quest planner reads a complete, uncapped projection. Q.targets() is intentionally a short chat/display summary;
 -- using it for optimization would silently lose alternate mobs and item sources.
 local function plannerField(kind, id, key, cache)

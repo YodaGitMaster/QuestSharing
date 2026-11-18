@@ -314,6 +314,22 @@ def test_modern_item_tooltips_are_bounded_and_dont_decorate_recipe_books(style):
     g.run('GameTooltip:SetOwner(UIParent);FARM_CALLBACK(GameTooltip,{id=6325})');assert len(g.eval('TOOLTIP.lines'))==0
 
 
+def test_item_source_hint_uses_tooltip_data_so_professions_items_get_it(style):
+    g=game(style,r"""
+      Enum=Enum or {};Enum.TooltipDataType={Item=0}
+      POST={}
+      TooltipDataProcessor={AddTooltipPostCall=function(kind,fn)POST[#POST+1]=fn end}
+      QUESTIE_NPCS[9901]={name="Test Trader",subName="Cook Supplies"}
+      QUESTIE_ITEMS[9900]={name="Test Herb",vendors={9901}}
+    """)
+    g.run('NS.db.itemSources=true;NS.itemSources.refresh()')
+    # The Professions window hands the tooltip data only (no GetItem link); the hint must still appear.
+    g.run('GameTooltip:SetOwner(UIParent);for _,fn in ipairs(POST) do fn(GameTooltip,{id=9900}) end')
+    assert "Questie sources: Cook Supplies" in joined(g.eval('TOOLTIP.lines'))
+    count=len(g.eval('TOOLTIP.lines'));g.run('for _,fn in ipairs(POST) do fn(GameTooltip,{id=9900}) end')
+    assert len(g.eval('TOOLTIP.lines'))==count
+
+
 def test_long_sources_and_ingredients_flow_vertically_in_scroll_content(style):
     g=game(style);w=open_cooking(g)
     g.run('NS.professions.acquisition=function()return {string.rep("Long source name ",100)}end')

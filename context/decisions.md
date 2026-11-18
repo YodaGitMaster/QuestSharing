@@ -555,8 +555,32 @@
 ## 2026-11-18 — Dungeon quest chain = indented bullets; "done" propagates backwards only through required links
 - `chainPrev/chainNext` (id -> other -> required) are built in `D.scan` `link()`; required = sole prerequisite, an "all" group, or `nextQuestInChain`. An "any one of N" prerequisite is NOT required (finishing the later quest does not prove which earlier one was done).
 - A step is ticked green when `completed(id)` or any required later step is `finished()`; ticked-by-later steps say "not needed" so the player does not travel to a giver with nothing left.
-- Chain members = ancestors + descendants of the selected quest (BFS, cap 24); branches off the side (siblings) are left out. Hover tooltip (`chainLines`) unchanged.
+- SUPERSEDED same day (user: nesting belongs in the LEFT list, description only for the clicked step): `D.search` now reorders results parent-first with `depthOf[id]` (indent 22 px/level, max 4); rows of finished steps get the ReadyCheck icon + grey text; the right panel shows only Done status + previous/next chain quests. The right-panel chain tree was removed.
 - Panel picture removed only on the Dungeon quests details frame (`journalSurface.grain:Hide()`); Loot/Rewards panels keep it (shared `E.details`).
 
 ## 2026-11-18 — Map search pin = red X raid marker
 - Gold coin read as a random item, not a destination. Chose `UI-RaidTargetingIcon_7` (red X): built into every client, no new art file, universally read as "go here". One pin for all kinds (no per-kind icon).
+
+## 2026-11-18 — Travel map: static data, own module, towns = flight-master towns
+- No dungeon-entrance or transport data existed; Questie's ZoneDB entrance format could not be verified offline (data lives in LibQuestieDB) -> typed static tables in `TravelData.lua`, so the overlay works without Questie and is testable. Cost: coordinates are from memory (~1-3 % off); flagged in README/tooltips/settings note.
+- One pin per entrance building (Blackrock Mountain lists BRD/LBRS/UBRS/MC/BWL; Scarlet Monastery 4 wings; Ahn'Qiraj 2).
+- "Closest waypoint (town)" read as: town with a flight master usable by the faction (neutral towns count for both), straight-line on the entrance's continent (vertical scaled 2/3). Boat/zeppelin hops are not factored in.
+- Lines only on hover, only when both ends project onto the shown map (so overseas boat lines need the Azeroth map); tooltip says so otherwise.
+- Default ON (user asked for it visible), unlike the other opt-in map tools.
+
+## 2026-11-18 — Map search pins: icon by NPC kind (replaces the single red X)
+- Pin icon derives from the NPC's Questie `subName` title via ordered substring rules (class > profession > service > generic trainer > bag). Substring rules, not Questie flags, because the title is what the user searched and is already indexed. Class trainers use the in-game class sheet (`CLASS_ICON_TCOORDS`) with a book fallback.
+- Not done: item icon for item searches (pin has no item reference); legend.
+
+## 2026-11-18 — My trainers layer lives in TravelMap, index in TrainerIndex
+- Auto trainers are a separate lifecycle from the search (which is gated on a typed query and opt-in), so a new `TrainerIndex.lua` scans once (idle priority, only with a zone/continent map open) and `TravelMap.lua` draws; pins hide while a search is active to avoid duplicates.
+- Index everything once (all professions + classes), filter by what the player knows at draw time, so learning a profession needs no rescan.
+- "Profession and faction trainers" read as: my professions + my class, only NPCs friendly to my faction. Zone/continent maps only (Azeroth overview skipped: too crowded).
+- Food vendors lost the cooking icon so Cooking trainers are distinct from them.
+
+## 2026-11-18 — Scoped QuestieDB reads: cheap checks first, big tables only for what passes
+- QuestieDB caches every `(id, field)` read for the session (`docs/read-performance.md`), and has no zone/level index. So the saving is not enumerating less but reading less per id: single numbers/strings first (`Q.questGate`, `Q.npcFriendly`, item `name`), tables (`startedBy`, `spawns`, `vendors`) only for ids that pass. `Q.me()` snapshots level/race/class/faction once per scan.
+- Planner: gate (race/class, level > player+1, past max level, quest filed on another continent) before `plannerStarters`; counted in `coverage.skipped`, shown in `/qs plan why` and the debug text. Active log quests bypass. Id list cache (`zoneScope`) stores the level it was built for: a level-up rescans. Cost: skipped quests are no longer listed individually under `blocked`. Slack of 1 level keeps the "XP can unlock it" path.
+- Dungeon quests: opens as `defaults(true)` (my character). Scan scope = filters at scan start (`scope`); `D.refresh` rescans when a filter widens past it (`covers`). The gate ignores `requiredMaxLevel` (`noMax`) so a lower level filter still works on the same scan. Reward scan on hover (all items, `questRewards`) NOT changed: no quest->reward link in QuestieDB.
+- Map search: item scan is per typed words (`itemWords`, `wordsCover`): name read per item, `vendors` read only for matches, rows memoised in `itemRows`. Seller queries ("vendor") need no item scan when the provider has the vendor flag (`mask`); without the flag they scan all items to link sellers (old behaviour). Trusting the flag means an unflagged NPC that only appears in some item's `vendors` is no longer a "vendor" result (fixture NPC 3 got the flag). NPCs friendly only to the other faction (`friendlyToFaction`) get no row. Not done: NPC `zoneID` as a location gate (best-guess zone, would drop multi-zone NPCs).
+- Not touched: `TrainerIndex.lua` (another session's in-flight work) still reads `subName` of every NPC and `spawnList` for each trainer; it already stores `friendlyToFaction` and could use `Q.npcFriendly` before `spawnList`.

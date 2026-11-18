@@ -456,19 +456,24 @@ def test_map_switch_during_pin_batches_cannot_leave_old_zone_pins():
     assert not pins(g)
 
 
-def test_item_fallback_reads_names_only_for_buyable_items_and_locations_only_for_matches():
+def test_item_fallback_reads_vendor_links_only_for_matching_names_and_locations_only_for_matches():
     from test_vendor_map import pins
     g = game(VENDOR_DATA + r'''
-local ids={}; ITEM_NAME_READS=0
+local ids={}; ITEM_NAME_READS, ITEM_VENDOR_READS=0,0
 for id=20,1019 do ids[#ids+1]=id;QUESTIE_ITEMS[id]={name="Non vendor item"} end
 QUESTIE_ITEMS[20]={name="Copper Rivet",vendors={4}}
 ItemDB.GetAllIds=function() return ids end
 local get=ItemDB.Get
-ItemDB.Get=function(id,key) if key=="name" then ITEM_NAME_READS=ITEM_NAME_READS+1 end;return get(id,key) end
+ItemDB.Get=function(id,key)
+ if key=="name" then ITEM_NAME_READS=ITEM_NAME_READS+1 elseif key=="vendors" then ITEM_VENDOR_READS=ITEM_VENDOR_READS+1 end
+ return get(id,key)
+end
 ''')
     show_search(g, "Copper Rivet")
     g.advance(20)
-    assert g.eval("ITEM_NAME_READS") == 1
+    # one cheap name read per item, but the vendor table is read only for the one item whose name matches
+    assert g.eval("ITEM_NAME_READS") == 1000
+    assert g.eval("ITEM_VENDOR_READS") == 1
     assert g.eval("SPAWN_READS") == 1
     assert [p.result.vendor.id for p in pins(g)] == [4]
 

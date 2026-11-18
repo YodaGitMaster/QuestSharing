@@ -162,7 +162,8 @@ QUESTIE_QUESTS[9011]={name="Out of zone",questLevel=8,startedBy={{600}},finished
 QUESTIE_QUESTS[9012]={name="Level gated",questLevel=15,requiredLevel=12,startedBy={{600}},finishedBy={{600}}}
 ''')
     c=g.eval("NS.questPlanner.coverage")()
-    assert c.repeatable[9010] and c.external[9011] and "12" in c.blocked[9012]
+    # 9012 needs level 12 at level 10: one cheap read rules it out, so it is counted, not listed as blocked
+    assert c.repeatable[9010] and c.external[9011] and c.blocked[9012] is None and c.skipped.level==1
     g.run('MAP_ID=100');g.fire('ZONE_CHANGED_NEW_AREA');g.advance(2)
     assert g.eval("NS.questPlanner.coverage")().external[9011] is None
 
@@ -181,7 +182,8 @@ QuestieLoader.ImportModule=function(_,name)if name=="QuestieDB" then return {
  IsDoableVerbose=function()return "chain",true,1 end,
  DoableStates={NO_PREQUESTSINGLE=1}} end end''')
     c=g.eval("NS.questPlanner.coverage")()
-    assert "class" in c.blocked[9011]
+    # a Paladin-only quest is never a candidate for a Warrior: skipped before its starters are read
+    assert c.blocked[9011] is None and c.skipped.character==1
     assert "reputation" in c.unknown[9012]
 
 
@@ -224,6 +226,45 @@ QuestieLoader.ImportModule=function(_,name)if name=="QuestieDB" then return {
     c=g.eval("NS.questPlanner.coverage")()
     assert "Alternative 9020" in text(g) and c.blocked[9020] is None
     assert "Alternative 9021" not in text(g) and c.blocked[9021]
+
+
+def test_cheap_checks_run_before_the_big_tables_are_read(style):
+    g=game(style, '''
+UnitLevel=function()return 10 end
+UnitClass=function()return "Warrior","WARRIOR" end
+UnitRace=function()return "Human","Human",1 end
+UnitFactionGroup=function()return "Alliance" end
+LibQuestieDB.Enum={classKeys={WARRIOR=1,PALADIN=2},raceMaskById={[1]=1,[2]=2}}
+C_Map.GetMapInfo=function(id)
+ return ({[1436]={name="Westfall",mapType=3,parentMapID=100},[1429]={name="Far Zone",mapType=3,parentMapID=200},
+          [100]={name="Eastern Kingdoms",mapType=2,parentMapID=0},[200]={name="Kalimdor",mapType=2,parentMapID=0}})[id]
+end
+QUESTIE_QUESTS[9010]={name="Too high",questLevel=20,requiredLevel=15,startedBy={{600}},finishedBy={{600}}}
+QUESTIE_QUESTS[9011]={name="Paladin only",questLevel=8,requiredClasses=2,startedBy={{600}},finishedBy={{600}}}
+QUESTIE_QUESTS[9012]={name="Orc only",questLevel=8,requiredRaces=2,startedBy={{600}},finishedBy={{600}}}
+QUESTIE_QUESTS[9013]={name="Kalimdor quest",questLevel=8,zoneOrSort=12,startedBy={{600}},finishedBy={{600}}}
+QUESTIE_QUESTS[9014]={name="Next level",questLevel=11,requiredLevel=11,startedBy={{600}},finishedBy={{600}}}
+BIG_READS={}
+local get=QuestDB.Get
+QuestDB.Get=function(id,key) if key=="startedBy" then BIG_READS[id]=true end;return get(id,key) end''')
+    reads=g.eval("BIG_READS")
+    c=g.eval("NS.questPlanner.coverage")()
+    for id in (9010,9011,9012,9013):
+        assert reads[id] is None, id
+    assert reads[9000] and reads[9014]            # one level above you stays: XP can unlock it
+    s=c.skipped
+    assert (s.level,s.character,s.continent)==(1,2,1)
+    assert "Not read" in g.eval("NS.questPlanner.debugText")()
+
+
+def test_level_up_rescans_what_the_old_level_skipped(style):
+    g=game(style, '''
+LEVEL=10;UnitLevel=function()return LEVEL end
+QUESTIE_QUESTS[9010]={name="Needs twelve",questLevel=12,requiredLevel=12,startedBy={{600}},finishedBy={{600}}}''')
+    assert g.eval("NS.questPlanner.coverage")().skipped.level==1
+    g.run("LEVEL=12");g.fire("PLAYER_LEVEL_UP");g.advance(5)
+    c=g.eval("NS.questPlanner.coverage")()
+    assert c.skipped.level is None and "Needs twelve" in text(g)
 
 
 if __name__=="__main__":

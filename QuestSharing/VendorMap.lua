@@ -6,6 +6,9 @@ ns.vendorMap = V
 
 local items, vendors, ready, loading = {}, {}, false, false
 local itemIDs, npcIDs, itemCursor, npcCursor, itemsReady, mask = nil, nil, 1, 1, false, nil
+-- Items are searched, not catalogued: itemWords are the typed words the item scan was made for, items holds only the
+-- sellable items whose name has them, and itemRows remembers the vendor links already read (false = none that matter).
+local itemWords, itemRows, playerFaction = nil, {}, nil
 local wordsByTitle, resolved, hydrated, searchTimer = {}, nil, {}, nil
 local generation, currentQuery, currentOnly, currentKind = 0, "", true, nil
 local mapUI, hookedScroll, pins, lastRender = nil, nil, {}, nil
@@ -127,6 +130,7 @@ end
 local function metadata(id, linked)
     local row = vendors[id]
     if not row then
+        if not Q.npcFriendly(id, playerFaction) then return end -- the other faction's NPCs never get a row
         local title = Q.get("npc", id, "subName")
         local flags = mask and Q.get("npc", id, "npcFlags")
         local flagged = mask and finite(flags) and flags % (2 * mask) >= mask
@@ -136,7 +140,7 @@ local function metadata(id, linked)
         row = { id = id, title = title, roleWords = wordsByTitle[title], isSeller = flagged or sellerTitle(title) }
         vendors[id] = row
     end
-    if linked then row.isSeller = true end
+    if row and linked then row.isSeller = true end
 end
 
 -- Keep only role/name/link metadata; a query reads locations for its matching NPCs later.
@@ -145,6 +149,7 @@ local function indexRoles()
     if not npcIDs then
         npcIDs = Q and Q.ids and Q.ids("npc") or {}
         mask = vendorMask()
+        playerFaction = Q.me().faction
     end
     while npcIDs[npcCursor] do
         metadata(npcIDs[npcCursor])
@@ -155,26 +160,84 @@ local function indexRoles()
     ready, npcIDs = true, nil
 end
 
+local function wordsOf(query)
+    local out = {}
+    for word in string.gmatch(lower(query), "%S+") do out[#out + 1] = word end
+    return out
+end
+
+-- An item matches when every word is inside its name, so an item scan made for the words `have` holds every item that
+-- a scan for `want` would (each have-word sits inside some want-word: typing on). No words = every item.
+local function wordsCover(have, want)
+    if not have then return false end
+    for _, word in ipairs(have) do
+        local found = false
+        for _, other in ipairs(want) do
+            if string.find(other, word, 1, true) then found = true; break end
+        end
+        if not found then return false end
+    end
+    return true
+end
+
+-- The words the item scan needs for this query, or nil when it needs none. A seller query ("vendor", "general
+-- vendor") is answered by the vendor flag and the NPC titles; items matter only for the rest of its words, and for
+-- linking every seller when the provider has no vendor flag.
+local function scanWords(query)
+    local sellers, rest = sellerQuery(query)
+    if (sellers or currentKind == "seller") and currentKind ~= "item" then
+        local words = wordsOf(rest)
+        if #words == 0 and mask then return nil end
+        return words
+    end
+    return wordsOf(query)
+end
+
+local function itemsCover(query)
+    local want = scanWords(query)
+    return want == nil or (itemsReady and wordsCover(itemWords, want))
+end
+
+local function beginItemScan(words)
+    indexToken = indexToken + 1 -- the job being replaced must not report its stop as a failure
+    Work.cancel("vendor-index")
+    itemWords, items, itemIDs, itemCursor, itemsReady = words, {}, nil, 1, false
+end
+
+local function dropItems()
+    indexToken = indexToken + 1
+    Work.cancel("vendor-index")
+    itemWords, items, itemRows, itemIDs, itemCursor, itemsReady, wantItems, loading = nil, {}, {}, nil, 1, false, false, false
+end
+
+-- Names are single reads; the vendor links (a table per item) are read only for the items whose name has the typed words.
 local function indexItems()
     if itemsReady then return end
     if not itemIDs then itemIDs = Q and Q.ids and Q.ids("item") or {} end
+    local text = table.concat(itemWords, " ")
     while itemIDs[itemCursor] do
         local id = itemIDs[itemCursor]
-        local list = Q.get("item", id, "vendors")
-        if type(list) == "table" and #list > 0 then
-            local name = Q.get("item", id, "name")
-            if type(name) == "string" then
-                local row, seen = { id = id, name = name, key = lower(name), vendorIDs = {} }, {}
-                for _, vendorID in ipairs(list) do
-                    if finite(vendorID) and not seen[vendorID] then
-                        seen[vendorID] = true
-                        row.vendorIDs[#row.vendorIDs + 1] = vendorID
-                        metadata(vendorID, true)
-                        Work.checkpoint()
+        local name = Q.get("item", id, "name")
+        if type(name) == "string" and (text == "" or matchesWords(name, text)) then
+            local row = itemRows[id]
+            if row == nil then
+                row = false
+                local list = Q.get("item", id, "vendors")
+                if type(list) == "table" and #list > 0 then
+                    local found, seen = { id = id, name = name, key = lower(name), vendorIDs = {} }, {}
+                    for _, vendorID in ipairs(list) do
+                        if finite(vendorID) and not seen[vendorID] and Q.npcFriendly(vendorID, playerFaction) then
+                            seen[vendorID] = true
+                            found.vendorIDs[#found.vendorIDs + 1] = vendorID
+                            metadata(vendorID, true)
+                            Work.checkpoint()
+                        end
                     end
+                    if #found.vendorIDs > 0 then row = found end
                 end
-                if #row.vendorIDs > 0 then items[#items + 1] = row end
+                itemRows[id] = row
             end
+            if row then items[#items + 1] = row end
         end
         itemCursor = itemCursor + 1
         if itemCursor % 500 == 1 then progress() end
@@ -217,7 +280,7 @@ local function resetIndex()
     Work.cancel("vendor-search"); Work.cancel("vendor-index")
     clearLocations()
     loading, ready, itemsReady, wantItems, typed, failed, indexBudget = false, false, false, false, false, nil, nil
-    items, vendors, wordsByTitle = {}, {}, {}
+    items, vendors, wordsByTitle, itemWords, itemRows, playerFaction = {}, {}, {}, nil, {}, nil
     npcIDs, itemIDs, npcCursor, itemCursor = nil, nil, 1, 1
 end
 
@@ -233,8 +296,8 @@ local function progressText()
         line = npcIDs and ("Indexing " .. thousands(npcCursor - 1) .. " / " .. thousands(#npcIDs) .. " NPCs…")
             or "Indexing QuestieDB NPCs…"
     elseif waiting == generation and not itemsReady then
-        line = itemIDs and ("Indexing " .. thousands(itemCursor - 1) .. " / " .. thousands(#itemIDs) .. " items…")
-            or "Indexing QuestieDB items…"
+        line = itemIDs and ("Searching " .. thousands(itemCursor - 1) .. " / " .. thousands(#itemIDs) .. " items…")
+            or "Searching QuestieDB items…"
     elseif scan then
         line = "Finding locations: " .. thousands(scan.done) .. " / " .. thousands(scan.total) .. " matches…"
     else
@@ -253,7 +316,9 @@ end
 -- starts on the first typed character (never on login or a blank map) and runs only while the map shows a query.
 local function startIndex(withItems)
     if withItems then wantItems = true end
-    if ready and (itemsReady or not wantItems) then return end
+    local want = wantItems and scanWords(currentQuery) or nil
+    if want and not wordsCover(itemWords, want) then beginItemScan(want) end
+    if ready and not (want and not itemsReady) then return end
     loading = true
     local budget = typed and FOREGROUND_MS or nil
     if Work.busy("vendor-index") and (indexBudget == budget or not budget) then Work.resume("vendor-index"); return end
@@ -262,7 +327,7 @@ local function startIndex(withItems)
     local token = indexToken
     Work.start("vendor-index", function()
         indexRoles()
-        if wantItems then indexItems() end
+        if wantItems and itemWords then indexItems() end
     end, function()
         return token == indexToken and ns.db.enabled and ns.db.vendorSearch and currentQuery ~= ""
             and WorldMapFrame and call(WorldMapFrame.IsShown, WorldMapFrame)
@@ -314,6 +379,8 @@ local function continentPoint(map, x, y)
     end
 end
 
+V.pointOnMap, V.continentPoint = pointOnMap, continentPoint -- shared with TravelMap.lua
+
 local function zoneName(area)
     local name = call(C_Map and C_Map.GetAreaInfo, area) or (GetAreaInfo and call(GetAreaInfo, area))
     return type(name) == "string" and name or "Unknown zone"
@@ -321,6 +388,43 @@ end
 
 local function category(v)
     return type(v.title) == "string" and trim(v.title) ~= "" and trim(v.title) or "Vendor"
+end
+
+-- One icon per kind of NPC, chosen from its title ("Druid Trainer", "Mining Trainer", "Innkeeper"...). The first
+-- matching rule wins: a class trainer shows its class, a profession NPC its tool, the rest a shared look.
+local CLASS_WORDS = { druid = "DRUID", hunter = "HUNTER", mage = "MAGE", paladin = "PALADIN", priest = "PRIEST",
+    rogue = "ROGUE", shaman = "SHAMAN", warlock = "WARLOCK", warrior = "WARRIOR" }
+local ICON_RULES = {
+    { "alchem", "Trade_Alchemy" }, { "blacksmith", "Trade_BlackSmithing" }, { "enchant", "Trade_Engraving" },
+    { "engineer", "Trade_Engineering" }, { "herbal", "Trade_Herbalism" }, { "leatherwork", "Trade_LeatherWorking" },
+    { "mining", "Trade_Mining" }, { "miner", "Trade_Mining" }, { "skinn", "INV_Misc_Pelt_Wolf_01" },
+    { "tailor", "Trade_Tailoring" }, { "first aid", "INV_Misc_Bandage_15" }, { "fish", "Trade_Fishing" },
+    { "cook", "INV_Misc_Food_15" }, { "chef", "INV_Misc_Food_15" }, -- food and drink vendors keep the bag, so cooking stands out
+    { "innkeeper", "INV_Misc_Rune_01" }, { "stable", "Ability_Hunter_BeastCall" }, { "flight", "INV_Misc_Map_01" },
+    { "bank", "INV_Misc_Coin_01" }, { "auction", "INV_Misc_Coin_01" }, { "weapon", "INV_Sword_04" },
+    { "armor", "INV_Shield_06" }, { "trainer", "INV_Misc_Book_09" },
+}
+local CLASS_SHEET = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
+local iconCache = {}
+-- texture path, texcoord table or nil (whole texture)
+function V.querying() return currentQuery ~= "" end
+function V.iconFor(title)
+    local key = lower(title)
+    local hit = iconCache[key]
+    if not hit then
+        hit = { "Interface\\Icons\\INV_Misc_Bag_10" }
+        for word, class in pairs(CLASS_WORDS) do
+            local coords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
+            if string.find(key, word, 1, true) and coords then hit = { CLASS_SHEET, coords }; break end
+        end
+        if hit[1] ~= CLASS_SHEET then
+            for _, rule in ipairs(ICON_RULES) do
+                if string.find(key, rule[1], 1, true) then hit = { "Interface\\Icons\\" .. rule[2] }; break end
+            end
+        end
+        iconCache[key] = hit
+    end
+    return hit[1], hit[2]
 end
 
 local function mappedPoint(spawn, map)
@@ -431,10 +535,10 @@ local function startSearch(query)
         local selected, fuzzy, candidates = matchVendors(query)
         local sellers = sellerQuery(query) or kind == "seller"
         -- Explicit roles never need the item catalogue. Otherwise try roles before item fallback.
-        local needItems = not itemsReady and (kind == "item" or (kind ~= "vendor" and (next(selected) == nil or sellers)))
+        local needItems = not itemsCover(query) and (kind == "item" or (kind ~= "vendor" and (next(selected) == nil or sellers)))
         hydrate(candidates, query)
         if needItems then
-            if not itemsReady then
+            if not itemsCover(query) then
                 -- Role matches are suggested already; V.draw searches again when the item index is complete.
                 waiting = token
                 startIndex(true)
@@ -487,7 +591,7 @@ local function pinFor(parent)
     local p = CreateFrame("Button", nil, parent)
     p:SetWidth(20); p:SetHeight(20)
     p.icon = p:CreateTexture(nil, "OVERLAY")
-    p.icon:SetAllPoints(p); p.icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_7") -- red X: "go here"
+    p.icon:SetAllPoints(p)
     p:RegisterForClicks("LeftButtonUp")
     p:SetScript("OnEnter", function(self)
         local r = self.result
@@ -688,7 +792,7 @@ local function ensureUI(wm)
         Work.cancel("vendor-search"); loading = false
         currentQuery, currentOnly, currentKind = trim(self:GetText()), true, nil
         mapUI.suggesting = true
-        if currentQuery == "" then typed = false; clearLocations(); V.draw(); return end
+        if currentQuery == "" then typed = false; dropItems(); clearLocations(); V.draw(); return end
         -- Keystrokes keep the catalogue index and cached locations; the first typed character starts the index.
         clearResults()
         keepMatching(currentQuery)
@@ -790,7 +894,7 @@ function V.draw()
     if not resolved then
         ui.closest = nil; ui.waypoint:Hide()
         if failed == generation then return end
-        if not ready or (waiting == generation and not itemsReady) then startIndex(waiting == generation)
+        if not ready or (waiting == generation and not itemsCover(query)) then startIndex(waiting == generation)
         else startSearch(query) end
         progress()
         return
@@ -835,6 +939,9 @@ function V.draw()
         n = n + 1
         local p = pins[n] or pinFor(canvas)
         pins[n], p.result = p, result
+        local texture, coords = V.iconFor(category(result.vendor))
+        p.icon:SetTexture(texture)
+        if coords then p.icon:SetTexCoord(coords[1], coords[2], coords[3], coords[4]) else p.icon:SetTexCoord(0, 1, 0, 1) end
         p:ClearAllPoints(); p:SetScale(1 / scale)
         p:SetPoint("CENTER", canvas, "TOPLEFT", result.x * canvas:GetWidth() * scale, -result.y * canvas:GetHeight() * scale)
         p:Show()

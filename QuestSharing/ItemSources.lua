@@ -41,10 +41,11 @@ local function itemID(link)
     return tonumber(string.match(link, "|Hitem:(%d+)"))
 end
 
-local function update(tooltip)
+local function update(tooltip, data)
     if not (ns.db.enabled and ns.db.itemSources and not ns.isBlocked("itemsources")) then return end
     local name, link = U.call(tooltip.GetItem, tooltip)
-    local id = itemID(link)
+    -- Tooltips built from tooltip data (Professions recipe/reagent items) may not expose GetItem; data.id is the item then.
+    local id = itemID(link) or (type(data) == "table" and tonumber(data.id)) or nil
     if not id or tooltip.questSharingSourceID == id then return end
     tooltip.questSharingSourceID = id
     local sources = I.sources(id)
@@ -57,7 +58,15 @@ local hooked
 local function install()
     if hooked or not GameTooltip then return end
     hooked = true
-    GameTooltip:HookScript("OnTooltipSetItem", update)
+    -- Modern clients no longer fire OnTooltipSetItem for every item tooltip (e.g. the Professions window), so
+    -- prefer the tooltip-data post-call, exactly as Professions.lua does, and keep the script hook as fallback.
+    if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
+        TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data)
+            if tooltip == GameTooltip then update(tooltip, data) end
+        end)
+    else
+        GameTooltip:HookScript("OnTooltipSetItem", update)
+    end
     GameTooltip:HookScript("OnTooltipCleared", function(self) self.questSharingSourceID = nil end)
 end
 

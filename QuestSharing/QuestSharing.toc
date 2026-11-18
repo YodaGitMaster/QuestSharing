@@ -30,6 +30,9 @@ QuestCalibration.lua
 QuestPlanner.lua
 ItemSources.lua
 VendorMap.lua
+TravelData.lua
+TrainerIndex.lua
+TravelMap.lua
 Menu.lua
 ZoneLevels.lua
 EquipmentUI.lua
