@@ -107,6 +107,11 @@ flowchart TD
     Browser --> VendorMap[VendorMap.lua: item/vendor search and map pins]
     VendorMap -->|pointOnMap, continentPoint| TravelMap[TravelMap.lua: dungeon, boat, zeppelin pins + hover lines + nearest town per faction]
     TravelData[TravelData.lua: static entrances, stops, routes, towns] --> TravelMap
+    VendorMap -->|pointOnMap| GatherSources[GatherSources.lua: gathering-item tooltip top-3 zones + Ctrl+right-click map marks]
+    GatherSources --> DataWork
+    GatherSources --> Q
+    GatherSources --> Waypoint
+    GatherSources --> ExistingMap
     TrainerIndex[TrainerIndex.lua: background scan of Questie trainers; known professions + class] --> TravelMap
     TrainerIndex --> Q
     TrainerIndex --> DataWork
@@ -697,6 +702,25 @@ sequenceDiagram
     Planner->>Guide: clear on scan, close, zone invalidation or disable
     Guide->>HUD: Hide and remove OnUpdate
     Guide->>Overlay: Hide and drop route/hover references
+```
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Tip as GameTooltip (TooltipDataProcessor post-call)
+    participant G as GatherSources.lua
+    participant Work as DataWork job gather-sources:<id>
+    participant DB as QuestieDB
+    participant Map as WorldMapFrame canvas
+    User->>Tip: hover hide / herb / ore (bags, Professions)
+    Tip->>G: onTooltip(item id)
+    G->>Work: load(id) once, cached
+    Work->>DB: npcDrops/objectDrops, spawnList per source (checkpointed)
+    Work-->>G: best creature per zone, top 3 by spawn count
+    G-->>Tip: add "Where to gather" lines
+    User->>G: Ctrl+right-click (GLOBAL_MOUSE_DOWN, tooltip item)
+    G->>Map: item-icon pins on the shown map via pointOnMap + game waypoint
+    Note over G,Map: never opens the map itself (taint); user presses M
 ```
 
 ## Class diagram

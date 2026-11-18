@@ -332,7 +332,7 @@ ns.settingRows = {
       desc = "Enable below, then open the world map and use its search box. Search an item, vendor type or trainer role.",
       note = "Requires QuestieDB; Questie itself is optional. Check loaded data with /qs questie.", toggle = "Show the search box on the world map" },
     { tab = "browser", kind = "bool", key = "itemSources", label = "Show where items come from when I hover over them", title = "Item source tooltips",
-      desc = "Show known seller types and Mining sources when you hover over bag items or recipe ingredients.",
+      desc = "Show known seller types and Mining sources when you hover over bag items or recipe ingredients. Hides, leather, cloth, meat, herbs and ore also list the three places with the most spawns of what drops them (Ctrl+right-click the item to mark them on the map).",
       note = "Requires QuestieDB.", toggle = "Show item sources in tooltips" },
 
     { tab = "support", kind = "header", label = "Is something wrong?" },

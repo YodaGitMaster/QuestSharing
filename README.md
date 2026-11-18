@@ -455,6 +455,8 @@ Open the world map normally to see numbered quest stops and connecting lines; th
 **Item source hints and map search.** Turn on **Show where items come from when I hover over them** to add vendor types such as
 **General Goods** to bag and recipe item tooltips. Known mining nodes are labelled **Mining**. Questie stores vendor links
 and object names, but does not mark every gathering profession or craft recipe, so unrecognized source types are not guessed.
+**Where to gather.** With the same setting on, hover a hide, leather, cloth, meat, herb or ore item (in your bags, the bank or the Professions window) to see the three zones with the most known spawn points of what drops it, for example "1. Senior Raptor (level 38-41) · Arathi Highlands · 7 known spawns". Only one creature is listed per zone, friendly creatures are skipped, and the drop chance is added when QuestieDB has it. **Ctrl+right-click** the item to mark every one of those spawn points on the world map with the item's own icon and to set the game's waypoint on the first zone; Ctrl+right-click it again to remove the marks. The addon never opens the map itself: press `M` and zoom out to see zones elsewhere. Needs QuestieDB; the first hover of a common hide reads many creatures in the background, so the lines may appear a moment later, and not during combat.
+
 **Map search requires a recent QuestieDB database; it cannot search on its own. QuestieDB can run without the full Questie addon.**
 Install/enable QuestieDB and `/reload`, then run `/qs questie` to check that its data is available.
 The map panel explains when the database is missing or too old, instead of reporting a misleading empty search.

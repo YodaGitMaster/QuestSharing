@@ -386,6 +386,7 @@ function ns.setSetting(key, value)
         if (key == "autoSpellRanks" or key == "enabled") and ns.spellRanks then ns.spellRanks.settingChanged() end
         if (key == "zoneLevels" or key == "enabled") and ns.zoneLevels then ns.zoneLevels.refresh() end
         if (key == "itemSources" or key == "enabled") and ns.itemSources then ns.itemSources.refresh() end
+        if (key == "itemSources" or key == "enabled") and ns.gatherSources then ns.gatherSources.refresh() end
         if (key == "vendorSearch" or key == "enabled") and ns.vendorMap then ns.vendorMap.refresh() end
         if (key == "travelMap" or key == "myTrainers" or key == "enabled") and ns.travelMap then ns.travelMap.refresh() end
         if key == "questPlanner" and ns.questPlanner then ns.questPlanner.settingChanged(value) end

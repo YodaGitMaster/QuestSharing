@@ -33,6 +33,7 @@ VendorMap.lua
 TravelData.lua
 TrainerIndex.lua
 TravelMap.lua
+GatherSources.lua
 Menu.lua
 ZoneLevels.lua
 EquipmentUI.lua

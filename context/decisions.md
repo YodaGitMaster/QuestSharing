@@ -1,5 +1,13 @@
 # Decisions
 
+## 2026-11-18 — Gathering-item sources in tooltips + Ctrl+right-click map marks
+- New `GatherSources.lua`, gated by the existing `itemSources` setting (no new switch). Gathering = `GetItemInfoInstant` class 7 (Trade Goods), subclass 5-10 (cloth, leather, metal & stone, meat, herb, elemental).
+- "Concentration" = number of known spawn points of one creature name in one zone (Questie has no density or drop-rate-ranked list); best creature per zone, top 3 zones. Drop % shown only when `Q.itemDropRate` has it. Friendly creatures (friendlyToFaction has my faction) skipped; dungeon spawns skipped (no map).
+- Computation is a DataWork job (`gather-sources:<id>`, 6 ms budget), cached per item: common hides have hundreds of droppers. Cap 400 sources, 40 pins per zone.
+- Ctrl+right-click via `GLOBAL_MOUSE_DOWN` + the item GameTooltip currently shown, so it works in bags and the Professions window alike (`HandleModifiedItemClick` would miss custom frames). Deduped within 0.3 s.
+- Abandoned: opening the map/jumping to the zone from code (`ToggleWorldMap`, `WorldMapFrame:SetMapID`): taint risk, `test_box` forbids it. We print "open your world map (M)" and set the game waypoint instead.
+- ItemSources.lua itself moved to the `TooltipDataProcessor` post-call (the old `OnTooltipSetItem` script is not fired for Professions window tooltips on Interface 16001).
+
 ## 2026-11-17 — Foreground budget for the Dungeon quests scan (user choice)
 - User chose "Faster + keep progress" over "keep progress only" and "stream results".
 - `DataWork.start(owner, run, valid, finished, budget)`: optional per-job budget in ms; jobs without one keep the shared 2 ms / 80-step slice even when a foreground job runs. Only DungeonQuests uses it (8 ms), and only while its page is visible (valid() pauses otherwise).
