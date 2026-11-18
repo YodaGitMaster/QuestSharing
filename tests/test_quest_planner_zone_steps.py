@@ -263,6 +263,43 @@ for _, p in ipairs({{80,80},{81,79},{79,81}}) do table.insert(QUESTIE_NPCS[610].
     assert near(objective_waypoint(g), 0.80, 0.80)
 
 
+PICKUP = r'''
+QUESTIE_QUESTS[9000]=nil
+QUESTIE_OBJECTS[900]={name="Heavenly Bloom",spawns={[40]={{52,52},{90,90},{91,91}}}}
+QUESTIE_ITEMS[900]={name="Heavenly Bloom",objectDrops={900}}
+QUESTIE_QUESTS[9300]={name="Bloom of the Heavens",questLevel=8,startedBy={{600}},finishedBy={{600}},
+ objectives={nil,nil,{{900}}},objectivesText={"Bring %d Heavenly Bloom to the Sentinel Hill giver."}}
+QUESTS={{id=9300,title="Bloom of the Heavens",level=8,objectives={{text="Heavenly Bloom: 0/%d",type="item",have=0,need=%d}}}}
+'''
+
+
+def pickup_game(style, count=1):
+    return game(style, PICKUP % (count, count, count))
+
+
+def test_item_picked_up_from_a_world_object_goes_to_the_nearest_object_not_a_far_camp(style):
+    g = pickup_game(style)
+    # One flower stands next to the player; two more stand together far away. One pickup needs only the nearest.
+    point = objective_waypoint(g)
+    assert near(point, 0.52, 0.52), point
+
+
+def test_item_picked_up_from_a_world_object_costs_seconds_not_a_guessed_minute(style):
+    for count in (1, 3):
+        g = pickup_game(style, count)
+        report = g.eval("NS.questPlanner.report")()
+        # Pickups of the item plus the hand-in: a few seconds each, never the 60 s "unknown work" estimate.
+        assert report.workSeconds <= 3 * count + 3 + 1e-9, (count, report.workSeconds)
+        assert not report.uncertain
+        assert "Work time estimated" not in text(g)
+
+
+def test_object_pickup_step_reads_pick_up_without_repeating_the_name(style):
+    g = pickup_game(style)
+    assert "Pick up Heavenly Bloom" in text(g), text(g)
+    assert "from Heavenly Bloom" not in text(g)
+
+
 FOREIGN_STRAY = r'''
 QUESTIE_QUESTS[9000],QUESTIE_QUESTS[9001],QUESTIE_QUESTS[9002]=nil,nil,nil
 QUESTIE_NPCS[702]={name="Prowler",spawns={[12]={{40,40},{41,42},{43,41}},[40]={{52,49}}}}

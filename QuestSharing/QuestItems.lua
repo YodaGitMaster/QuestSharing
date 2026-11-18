@@ -263,6 +263,14 @@ local function buildKeyButton()
     return keyBtn
 end
 ns.questItemButton = function() return keyBtn end
+function ns.resetItemButtonPosition(quiet)
+    ns.db.itemButtonPos = nil
+    if keyBtn and not inCombat() then
+        keyBtn:ClearAllPoints()
+        keyBtn:SetPoint("CENTER", UIParent, "CENTER", 0, -180)
+    end
+    if not quiet then ns.print("the quest item button is back below the middle of the screen") end
+end
 
 function ns.refreshItemKey()
     if inCombat() or ns.isBlocked("items") then return end

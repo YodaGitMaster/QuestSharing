@@ -184,6 +184,19 @@ def test_selling_is_off_by_default_and_needs_an_open_vendor(style):
     assert not list(g.eval("SOLD").values())
 
 
+def test_with_selling_off_a_vendor_says_once_that_gray_items_could_go(style):
+    g = game(style)
+    g.fire("MERCHANT_SHOW")
+    g.advance(1)
+    hints = [p for p in g.printed() if "could be sold here" in p]
+    assert len(hints) == 1 and "2 gray items" in hints[0] and "/qs sellgray on" in hints[0], g.printed()
+    assert not list(g.eval("SOLD").values()), "the hint sells nothing"
+    g.fire("MERCHANT_CLOSED")
+    g.fire("MERCHANT_SHOW")
+    g.advance(1)
+    assert len([p for p in g.printed() if "could be sold here" in p]) == 1, "once per session"
+
+
 def test_closing_the_vendor_stops_the_selling(style):
     g = game(style)
     g.run("for s = 1, 4 do BAGS[1][s] = { id = 1 } end; BAGS[1][4] = { id = 1 }")
@@ -403,14 +416,94 @@ def test_the_master_switch_turns_the_chat_lock_off(style):
     assert g.eval("ChatFrame1EditBox.shown") is True
 
 
+# ---- how and what to arrange ----------------------------------------------------------------------------------------
+
+def test_the_sort_options_default_to_topic_all_bags_from_the_start(style):
+    g = game(style)
+    assert g.eval("NS.db.sortBy") == "topic" and g.eval("NS.db.sortBags") == "all"
+    assert g.eval("NS.db.sortFrom") == "start" and g.eval("NS.db.sortKeepBookmarked") is False
+
+
+def test_arranging_by_quality_puts_the_best_items_first(style):
+    g = game(style)
+    g.slash("sort by quality")
+    g.slash("sort")
+    g.advance(10)
+    q = {1: 0, 2: 1, 3: 1, 4: 2, 5: 0, 6: 0, 7: 1, 8: 1, 9: 0, 10: 1}
+    ids = [i for i in flat(g) if i]
+    assert ids[0] == 4, "the green sword first"
+    assert [q[i] for i in ids] == sorted((q[i] for i in ids), reverse=True), ids
+    assert flat(g)[-2:] == [0, 0]
+    assert any("bags arranged by quality" in p for p in g.printed()), g.printed()
+
+
+def test_arranging_by_name_is_alphabetical(style):
+    g = game(style)
+    g.slash("sort by name")
+    g.slash("sort")
+    g.advance(10)
+    names = [g.eval(f"ITEMS[{i}].name") for i in flat(g) if i]
+    assert names == sorted(names, key=str.lower), names
+
+
+def test_only_the_chosen_bags_are_arranged(style):
+    g = game(style)
+    before = contents(g)
+    g.slash("sort bags backpack")
+    g.slash("sort")
+    g.advance(10)
+    assert contents(g)[1] == before[1], "bag 1 is left alone"
+    assert contents(g)[0] == [3, 4, 2, 1, 5, 0], "the backpack alone is arranged by topic"
+    g = game(style)
+    before = contents(g)
+    g.slash("sort bags bags")
+    g.slash("sort")
+    g.advance(10)
+    assert contents(g)[0] == before[0], "the backpack is left alone"
+    assert contents(g)[1] == [10, 6, 8, 7, 9, 0], contents(g)[1]
+
+
+def test_items_can_gather_at_the_end_of_the_bags(style):
+    g = game(style)
+    g.slash("sort from end")
+    g.slash("sort")
+    g.advance(10)
+    assert flat(g) == list(reversed(EXPECTED)), flat(g)
+
+
+def test_bookmarked_items_can_stay_in_their_slot(style):
+    g = game(style)
+    g.eval("NS.bagTools.toggleBookmark")(0, 1)               # the Gray Fang in the first backpack slot
+    g.slash("sort keep on")
+    g.slash("sort")
+    g.advance(10)
+    c = flat(g)
+    assert c[0] == 1, "the bookmarked item did not move"
+    rest = [i for i in EXPECTED if i != 1]
+    assert c[1:] == rest, c
+    g.slash("sort keep off")
+    g.slash("sort")
+    g.advance(10)
+    assert flat(g) == EXPECTED, "off: bookmarked items are arranged too"
+
+
+def test_a_wrong_sort_option_says_how_to_use_it(style):
+    g = game(style)
+    g.slash("sort by colour")
+    assert g.eval("NS.db.sortBy") == "topic"
+    assert any("usage: /qs sort by" in p for p in g.printed()), g.printed()
+
+
 # ---- the settings window ------------------------------------------------------------------------------------------
 
 def test_every_helper_has_a_row_in_the_settings(style):
     g = game(style)
     rows = {r.key: r for r in g.eval("NS.settingRows").values() if r.key}
-    for key, tab in (("bagBookmarks", "items"), ("autoSellGray", "items"), ("autoSortBags", "items"), ("chatLock", "general")):
+    for key, tab in (("bagBookmarks", "bags"), ("autoSellGray", "bags"), ("autoSortBags", "bags"), ("sortKeepBookmarked", "bags"), ("chatLock", "general")):
         assert key in rows and rows[key].kind == "bool" and rows[key].tab == tab, key
     assert any(r.kind == "action" and r.label == "Arrange my bags now" for r in g.eval("NS.settingRows").values())
+    for key in ("sortBy", "sortBags", "sortFrom"):
+        assert rows[key].kind == "choice" and rows[key].tab == "bags", key
 
 
 def test_every_helper_shows_in_the_open_settings_window_and_switches_there(style):
@@ -418,7 +511,8 @@ def test_every_helper_shows_in_the_open_settings_window_and_switches_there(style
     g.slash("settings")
     W = g.eval("NS._settingsWindow()")
     shown = {"general": ["Block the chat box during combat"],
-             "items": ["Bookmark bag items with the Space bar", "Sell gray items when I open a vendor",
+             "bags": ["Order items by", "Bags to arrange", "Where items gather", "Leave bookmarked items where they are",
+                      "Bookmark bag items with the Space bar", "Sell gray items when I open a vendor",
                        "Arrange my bags by topic automatically", "Arrange my bags now", "Remove all my bookmarks"]}
     for tab, labels in shown.items():
         g.eval("NS.settingsTab")(tab)

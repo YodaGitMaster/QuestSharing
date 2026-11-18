@@ -32,7 +32,7 @@ def window(g, tab="general"):
 
 
 def rows(W):
-    return [W.rows[n] for n in range(1, 19) if W.rows[n].frame.shown]
+    return [W.rows[n] for n in range(1, len(W.rows) + 1) if W.rows[n].frame.shown]
 
 
 def row(W, label):
@@ -47,14 +47,16 @@ def printed(g):
 def test_every_tab_has_a_short_intro_and_sections(style):
     g = game(style)
     W = window(g)
-    for t in ("general", "objectives", "tracker", "dialogs", "items", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional", "support"):
+    for t in ("general", "objectives", "tracker", "dialogs", "items", "bags", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional", "support"):
         g.eval("NS.settingsTab")(t)
         assert len(plain(W.intro.text)) > 20, t
     g.eval("NS.settingsTab")("sharing")
     headers = [plain(r.text.text) for r in rows(W) if r.line.shown]
     assert headers == ["Offering quests to your party", "Messages in party chat", "Quest information between addon users", "Find people to quest with"]
     g.eval("NS.settingsTab")("party")
-    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["The separate Party quests window", "Posting progress by clicking", "Adding party members as friends"]
+    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["The separate Party quests window", "Posting progress by clicking", "Adding party members as friends",
+                                                                         "Party finder: invite players who list themselves",
+                                                                         "Item levels of other players"]
     g.eval("NS.settingsTab")("general")
     assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Start here", "Messages and sounds", "During a fight"]
     g.eval("NS.settingsTab")("support")
@@ -66,7 +68,7 @@ def test_every_tab_has_a_short_intro_and_sections(style):
 def test_rows_are_laid_out_top_to_bottom_without_overlapping_and_fit_in_the_window(style):
     g = game(style)
     W = window(g)
-    for t in ("general", "objectives", "tracker", "dialogs", "items", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional", "support"):
+    for t in ("general", "objectives", "tracker", "dialogs", "items", "bags", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional", "support"):
         g.eval("NS.settingsTab")(t)
         tops = [-r.frame.point[5] for r in rows(W)]
         heights = [r.frame.height for r in rows(W)]

@@ -255,7 +255,7 @@ def test_every_setting_is_on_exactly_one_tab(style):
     n = int(g.eval("#NS.settingRows"))
     tabs = [g.eval("NS.settingRows[%d].tab" % i) for i in range(1, n + 1)]
     ids = [g.eval("NS.settingTabs[%d].id" % i) for i in range(1, int(g.eval("#NS.settingTabs")) + 1)]
-    assert ids == ["general", "objectives", "tracker", "dialogs", "items", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional", "support"]
+    assert ids == ["general", "objectives", "tracker", "dialogs", "items", "bags", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional", "support"]
     assert all(t in ids for t in tabs)
     assert all(tabs.count(t) >= 1 for t in ids), "no empty tab"
     keys = [g.eval("NS.settingRows[%d].key" % i) for i in range(1, n + 1) if g.eval("NS.settingRows[%d].key" % i)]
@@ -727,6 +727,20 @@ def test_settings_tab_guide_opens_the_window_on_that_tab(style):
     g.eval("NS.settingsTab")("guide")
     assert W.win.shown is True and W.tab == "guide"
 
+
+
+def test_every_saved_option_has_a_row_in_the_window(style):
+    g = fresh(style)
+    keys = set(g.eval("(function() local t = {} for k in pairs(NS.defaults) do if k ~= 'dbVersion' then t[#t + 1] = k end end table.sort(t) return table.concat(t, ',') end)()").split(","))
+    rows = {g.eval(f"NS.settingRows[{i}].key") for i in range(1, int(g.eval("#NS.settingRows")) + 1)}
+    assert not keys - rows, "options without a Settings row: %s" % sorted(keys - rows)
+
+
+def test_the_item_button_move_back_row_clears_its_saved_position(style):
+    g = fresh(style)
+    g.eval("(function() NS.db.itemButtonPos = { 'TOPLEFT', 10, -10 } end)()")
+    g.eval("NS.settingRows[%d].action" % idx(g, label="Move the item button back"))()
+    assert g.eval("NS.db.itemButtonPos") is None
 
 if __name__ == "__main__":
     import inspect

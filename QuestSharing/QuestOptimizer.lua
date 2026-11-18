@@ -48,11 +48,13 @@ function O.siteKey(point)
     return string.format("%s/%.5f/%.5f", tostring(point.map), point.x, point.y)
 end
 
-local function farmAt(stop, point, npc)
+local function farmAt(stop, point, npc, kind)
     local rows = stop.objectives
     if stop.kind ~= "objective" or not rows or #rows ~= 1 then return end
     local row, target = rows[1], rows[1].target or {}
     if target.kind ~= "kill" and target.kind ~= "loot" then return end
+    -- An item taken from a world object is a pickup, not a farm: service() prices it as a short interaction.
+    if target.kind == "loot" and kind == "object" then return end
     local remaining = row.remaining
     if remaining == nil then
         local required = target.required or target.count or target.need
@@ -77,17 +79,20 @@ end
 local MAX_SITES = 6
 local function sitesFor(stop)
     local row = stop.objectives and stop.objectives[1]
-    local sites, usable = { { point = stop.point, sourceID = row and row.sourceID } }, {}
+    local sites, usable = { { point = stop.point, sourceID = row and row.sourceID, sourceKind = row and row.sourceKind } }, {}
     for _, alt in ipairs(stop.alternatives or {}) do
         local p = alt.point
         if #sites >= MAX_SITES then break end
         if type(p) == "table" and finite(p.x) and finite(p.y) and not (stop.point and p.map == stop.point.map and p.x == stop.point.x and p.y == stop.point.y) then
-            sites[#sites + 1] = { point = p, sourceID = alt.sourceID, tasks = alt.tasks, questTasks = alt.questTasks,
-                destination = alt.destination }
+            sites[#sites + 1] = { point = p, sourceID = alt.sourceID, sourceKind = alt.sourceKind, tasks = alt.tasks,
+                questTasks = alt.questTasks, destination = alt.destination }
         end
     end
     for _, site in ipairs(sites) do
-        site.farm = farmAt(stop, site.point, site.sourceID)
+        site.farm = farmAt(stop, site.point, site.sourceID, site.sourceKind)
+        if row and row.target and row.target.kind == "loot" and site.sourceKind == "object" then
+            site.pickup = math.max(1, number(row.remaining, 1)) -- items to take from world objects at this site
+        end
         if not (site.farm and site.farm.unavailable) then usable[#usable + 1] = site end
     end
     return #usable > 0 and usable or { sites[1] }
@@ -187,7 +192,9 @@ local function travel(m, a, b)
 end
 
 local function service(m, d, s, site)
-    local opts, f = m.options, (site or d.sites[1]).farm
+    local opts, at = m.options, site or d.sites[1]
+    local f = at.farm
+    if at.pickup then return number(opts.interactionSeconds, 2) * at.pickup, 0, nil, false, 0, nil end
     if not f or f.unknown then
         local rows = d.s.objectives
         local explicit = number(d.s.serviceSeconds, rows and rows[1] and rows[1].seconds)
@@ -364,6 +371,10 @@ local function advance(m, s, d, travelTime, approx, detail, site)
             s.inventory[itemID] = owned + d.farm.items
             if owned == 0 and s.freeSlots then s.freeSlots = s.freeSlots - 1 end
         end
+    end
+    if site.pickup then
+        local itemID = d.s.objectives and d.s.objectives[1].target.itemID
+        if itemID then s.inventory[itemID] = (s.inventory[itemID] or 0) + site.pickup end
     end
     s.at, s.done[d.id] = site.point, #s.order + 1
     s.order[#s.order + 1] = d
@@ -662,7 +673,7 @@ local function located(stop, site)
             for key, value in pairs(row) do clone[key] = value end
             copy.objectives[i] = clone
         end
-        if copy.objectives[1] then copy.objectives[1].sourceID = site.sourceID end
+        if copy.objectives[1] then copy.objectives[1].sourceID, copy.objectives[1].sourceKind = site.sourceID, site.sourceKind end
     end
     if site.tasks then copy.tasks = site.tasks end
     if site.questTasks then copy.questTasks = site.questTasks end

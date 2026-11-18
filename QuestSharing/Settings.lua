@@ -72,6 +72,7 @@ ns.settingTabs = {
     { id = "tracker", title = "Quest list", intro = "Choose which quests appear in the game's quest list on the right of your screen." },
     { id = "dialogs", title = "Accept & turn in", intro = "Let the addon accept quest offers or finish ready quests when you talk to an NPC." },
     { id = "items", title = "Quest items", intro = "Find the items your quests need, use them with one key and clear out the ones you no longer need." },
+    { id = "bags", title = "Bags", intro = "Bookmark items with the Space bar, sell gray items at a vendor and arrange your bags by topic." },
     { id = "sharing", group = "Party", title = "Quest sharing", intro = "Offer your quests to party members, choose which updates go to party chat and look for people to quest with." },
     { id = "party", title = "Party window", intro = "Show who has each quest, choose what clicks do, and manage party friends." },
     { id = "actions", title = "Pings", intro = "Point out quest targets to your party with one key." },
@@ -145,26 +146,41 @@ ns.settingRows = {
       desc = "Click Set key, then press a key. Use it in game to activate the item for your closest quest. Escape cancels." },
     { tab = "items", kind = "bool", key = "itemButton", label = "Show a separate button for my nearest quest's item",
       desc = "Turn on for a movable item button with a cooldown. Red means your target is out of range. Shift-drag to move it." },
-    { tab = "items", kind = "header", label = "Keep my bags tidy" },
-    { tab = "items", kind = "bool", key = "bagBookmarks", label = "Bookmark bag items with the Space bar",
-      desc = "Turn on, then point at an item in your bags and press Space to bookmark it (again to remove). A bookmarked item shows a note icon and is never sold by this addon.",
-      note = "Existing bookmarks keep protecting items even when this is off. /qs bookmarks list shows them." },
-    { tab = "items", kind = "bool", key = "autoSellGray", label = "Sell gray items when I open a vendor",
-      desc = "Turn on to sell every gray (poor quality) item as soon as a vendor window opens. Bookmarked items and items a quest still needs are kept.",
-      note = "The game's Buyback tab keeps the last 12 items you sold." },
-    { tab = "items", kind = "bool", key = "autoSortBags", label = "Arrange my bags by topic automatically",
-      desc = "Turn on to order all your bags, the backpack included, as one bag a few seconds after they change: quest items, consumables, equipment, materials, recipes, other, then gray items. Never during a fight." },
-    { tab = "items", kind = "action", label = "Arrange my bags now", title = "Arrange bags", button = "Arrange",
-      desc = "Order all your bags by topic once, right now.",
-      action = function() ns.bagTools.sort(true) end },
-    { tab = "items", kind = "action", label = "Remove all my bookmarks", title = "Bookmarks", button = "Remove all",
-      desc = "Take the bookmark off every item, so gray ones can be sold again.",
-      action = function() ns.print(string.format("%d bookmark(s) removed", ns.bagTools.clearBookmarks())) end },
+    { tab = "items", kind = "action", label = "Move the item button back to its starting position", button = "Move back",
+      desc = "Click if you shift-dragged the item button somewhere hard to find.", action = function() if ns.resetItemButtonPosition then ns.resetItemButtonPosition() end end },
     { tab = "items", kind = "header", label = "Clean up my bags" },
     { tab = "items", kind = "action", label = "Review quest items left in my bags", title = "Bag cleanup", button = "Review items",
       desc = "Review possible leftover quest items. You confirm each stack before it is deleted.",
       note = "Requires QuestieDB. Active quest items and quest starters are protected.",
       action = function() ns.questCleanup.open() end },
+
+    { tab = "bags", kind = "header", label = "Keep my bags tidy" },
+    { tab = "bags", kind = "bool", key = "bagBookmarks", label = "Bookmark bag items with the Space bar",
+      desc = "Turn on, then point at an item in your bags and press Space to bookmark it (again to remove). A bookmarked item shows a note icon and is never sold by this addon.",
+      note = "Existing bookmarks keep protecting items even when this is off. /qs bookmarks list shows them." },
+    { tab = "bags", kind = "bool", key = "autoSellGray", label = "Sell gray items when I open a vendor",
+      desc = "Turn on to sell every gray (poor quality) item as soon as a vendor window opens. Bookmarked items and items a quest still needs are kept.",
+      note = "The game's Buyback tab keeps the last 12 items you sold." },
+    { tab = "bags", kind = "bool", key = "autoSortBags", label = "Arrange my bags by topic automatically",
+      desc = "Turn on to order all your bags, the backpack included, as one bag a few seconds after they change: quest items, consumables, equipment, materials, recipes, other, then gray items. Never during a fight." },
+    { tab = "bags", kind = "header", label = "How to arrange my bags" },
+    { tab = "bags", kind = "choice", key = "sortBy", label = "Order items by", values = { "topic", "quality", "name" },
+      names = { topic = "Topic", quality = "Quality (best first)", name = "Name (A to Z)" },
+      desc = "Topic: quest items, consumables, equipment, materials, recipes, other, then gray items. Quality: best items first. Name: alphabetical." },
+    { tab = "bags", kind = "choice", key = "sortBags", label = "Bags to arrange", values = { "all", "bags", "backpack" },
+      names = { all = "All bags", bags = "Bags without the backpack", backpack = "Backpack only" },
+      desc = "Choose which bags are arranged. The chosen bags are ordered as one long bag; the others are left alone." },
+    { tab = "bags", kind = "choice", key = "sortFrom", label = "Where items gather", values = { "start", "end" },
+      names = { start = "Start of the bags", ["end"] = "End of the bags" },
+      desc = "Start: items fill the first slots and the empty slots stay at the end. End: the other way round." },
+    { tab = "bags", kind = "bool", key = "sortKeepBookmarked", label = "Leave bookmarked items where they are",
+      desc = "Turn on so arranging never moves an item you bookmarked with the Space bar; the other items are arranged around it." },
+    { tab = "bags", kind = "action", label = "Arrange my bags now", title = "Arrange bags", button = "Arrange",
+      desc = "Order all your bags by topic once, right now.",
+      action = function() ns.bagTools.sort(true) end },
+    { tab = "bags", kind = "action", label = "Remove all my bookmarks", title = "Bookmarks", button = "Remove all",
+      desc = "Take the bookmark off every item, so gray ones can be sold again.",
+      action = function() ns.print(string.format("%d bookmark(s) removed", ns.bagTools.clearBookmarks())) end },
 
     { tab = "sharing", kind = "header", label = "Offering quests to your party" },
     { tab = "sharing", kind = "bool", key = "auto", label = "Share my quests when someone joins the party",
@@ -172,6 +188,8 @@ ns.settingRows = {
     { tab = "sharing", kind = "choice", key = "area", label = "Which quests to share", values = { "zone", "all" },
       names = { zone = "Current zone only", all = "All my quests" },
       desc = "Choose whether sharing offers quests for your current zone or your whole quest log." },
+    { tab = "sharing", kind = "number", key = "settle", label = "Seconds to wait after the party forms", min = 1, max = 30,
+      desc = "Wait this many seconds after someone joins before the first quest offer, so the party has settled." },
     { tab = "sharing", kind = "number", key = "gap", label = "Seconds between shared quests", min = 2, max = 30,
       desc = "Wait this many seconds between quest offers so party members have time to read each one." },
     { tab = "sharing", kind = "bool", key = "shareNew", label = "Share new quests as I accept them",
@@ -218,8 +236,36 @@ ns.settingRows = {
       desc = "Turn on to add people you group with to your friends list. Skips existing friends, ignored players, and random groups." },
     { tab = "party", kind = "action", label = "Add my current party to my friends list", button = "Add friends",
       desc = "Click to add your current party once, without enabling automatic friend requests.", action = function() ns.addPartyFriends(true) end },
+    { tab = "party", kind = "header", label = "Party finder: invite players who list themselves" },
+    { tab = "party", kind = "bool", key = "lfgHealer", label = "Invite healers",
+      desc = "Each click on the minimap spyglass searches the party finder and invites solo players signed up as healer." },
+    { tab = "party", kind = "bool", key = "lfgTank", label = "Invite tanks", desc = "Also invite solo players signed up as tank." },
+    { tab = "party", kind = "bool", key = "lfgDps", label = "Invite damage dealers", desc = "Also invite solo players signed up as damage." },
+    { tab = "party", kind = "bool", key = "lfgWatch", label = "Also invite from my own party finder searches",
+      desc = "Turn on to invite matches whenever the game's party finder window shows new results." },
+    { tab = "party", kind = "number", key = "lfgMinLevel", label = "Lowest character level to invite", min = 1, max = function() return ns.db.lfgMaxLevel or 60 end,
+      desc = "Players below this level are not invited. Shift-click changes it by 5." },
+    { tab = "party", kind = "number", key = "lfgMaxLevel", label = "Highest character level to invite", min = function() return ns.db.lfgMinLevel or 1 end,
+      max = function() return (GetMaxPlayerLevel and GetMaxPlayerLevel()) or 60 end, desc = "Players above this level are not invited." },
+    { tab = "party", kind = "number", key = "lfgMinIlvl", label = "Lowest item level to invite (0 = any)", min = 0, max = 300,
+      desc = "Average item level of their gear. Known only for players you inspected nearby or who run Quest Sharing. Shift-click changes it by 5." },
+    { tab = "party", kind = "choice", key = "lfgUnknown", label = "When their item level is unknown", values = { "invite", "skip" },
+      names = { invite = "Invite anyway", skip = "Skip them" }, desc = "Used only with a lowest item level above 0." },
+    { tab = "party", kind = "bool", key = "lfgAskIlvl", label = "Ask Quest Sharing users for their item level first",
+      desc = "Waits up to 2 seconds for an answer before inviting. Used only with a lowest item level above 0." },
+    { tab = "party", kind = "header", label = "Item levels of other players" },
+    { tab = "party", kind = "bool", key = "ilvlInspect", label = "Remember the item level of players near me",
+      desc = "Inspects players you target or point at when they are close (out of combat), and remembers the number for 14 days." },
+    { tab = "party", kind = "bool", key = "ilvlShare", label = "Share item levels with other Quest Sharing users",
+      desc = "Answers their questions with your own item level and the numbers you remember." },
+    { tab = "party", kind = "action", label = "Forget all remembered item levels", button = "Forget",
+      desc = "Clears the list of item levels you have seen.", action = function() ns.itemLevel.forget(); ns.print("remembered item levels cleared") end },
+    { tab = "party", kind = "action", label = "Search the party finder and invite now", button = "Search",
+      desc = "The game needs a click or key per search. Bind a key in Key Bindings > Quest Sharing.", action = function() ns.lfgInvite.scan() end },
 
     { tab = "actions", kind = "header", label = "Point out quest targets to the party" },
+    { tab = "actions", kind = "bool", key = "ping", label = "Enable quest pings",
+      desc = "Turn on to use the ping key and the ping slot of the quick chat ring. Off: neither pings." },
     { tab = "actions", kind = "key", which = "ping", label = "Key to target and ping a quest enemy",
       desc = "Click Set key, then press a key. Use it in game to target and ping the nearest quest enemy. Escape cancels." },
     { tab = "actions", kind = "choice", key = "pingGap", label = "Minimum time between pings", values = { 5, 10, 15 },
@@ -446,7 +492,7 @@ function ns.settingsClick(i, button)
         local base = row.step or 1
         local step = (IsShiftKeyDown and IsShiftKeyDown()) and base * 5 or base
         local v = (d[row.key] or 0) + (back and -step or step)
-        ns.setSetting(row.key, math.max(row.min, math.min(limit(row.max), v)))
+        ns.setSetting(row.key, math.max(limit(row.min), math.min(limit(row.max), v)))
     elseif row.kind == "action" then
         row.action()
     elseif row.kind == "key" then
@@ -469,7 +515,7 @@ end
 
 -- The window -----------------------------------------------------------------------------------------------------
 local W = { win = nil, tab = "general", rows = {}, tabs = {}, ed = { selected = nil }, capturing = false }
-local WIDTH, HEIGHT, LEFT = 900, 650, 216
+local WIDTH, HEIGHT, LEFT = 900, 676, 216
 local CONTENT = WIDTH - LEFT - 28
 local TOP, VIEW_H = 118, HEIGHT - 166
 local ROW_H, HEADER_H = 26, 32

@@ -2,7 +2,7 @@
 --   left click: open the settings window     right click: show / hide the Party quests window
 --   the tooltip shows how things are right now (party, tracker, quick chat key, problems)
 --   drag it around the minimap edge to move it       /qs minimap off  hides it
--- Two shortcut buttons sit beside it (Quest guide, Dungeon quests) so nobody has to search the menus; they move
+-- Three shortcut buttons sit beside it (Quest guide, Dungeon quests, Party finder) so nobody has to search the menus; they move
 -- with it and are hidden with it.
 local ADDON, ns = ...
 
@@ -87,6 +87,28 @@ local function buildShortcuts()
     shortcut(2, "QuestSharingDungeonButton", "Interface\\Icons\\INV_Misc_Key_03", "Dungeon quests",
         "Click: browse dungeon quests, pickups and chains.",
         function() local D = ns.dungeonQuests; if D and D.open then D.open(); return true end end)
+    -- party finder: left click searches and invites the chosen roles, right click opens where the roles are chosen
+    local f = shortcut(3, "QuestSharingFinderButton", "Interface\\Icons\\INV_Misc_Spyglass_03", "Party finder",
+        "", function() return true end)
+    if f then
+        f:SetScript("OnClick", function(_, which)
+            local L = ns.lfgInvite
+            if not L then return ns.print("Party finder is not available") end
+            if which == "RightButton" then
+                ns.toggleSettings(true, "party")
+            else L.scan() end
+        end)
+        f:SetScript("OnEnter", function(self)
+            if GameTooltip then
+                pcall(function()
+                    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+                    GameTooltip:SetText("Party finder", 1, 0.82, 0)
+                    for _, line in ipairs(ns.lfgInvite and ns.lfgInvite.tooltipLines() or {}) do GameTooltip:AddLine(line, 1, 1, 1) end
+                    GameTooltip:Show()
+                end)
+            end
+        end)
+    end
 end
 
 local function build()

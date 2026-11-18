@@ -53,3 +53,18 @@
 - What happened: review_d3 found the larger pins (32 px min, `#label*8+16`) still used the 26x22 grouping cell, so `10/11` and `12` 27 px apart overlapped by 17 px and hid a digit.
 - Fix: merge pass in `QuestGuidance.lua` drawMap after grouping — any two groups whose drawn footprints (label width + 8 px slack for the selected-step swap, 28 px height) would overlap merge into one sorted label. Test `test_neighbouring_step_markers_never_overlap_and_merge_instead` (failed first with the 17 px overlap; guidance 46/46).
 - Result / status: solved in source; native rendering pending (also check the overlay vs the player arrow).
+
+---
+## Addendum 2026-11-18 — variant: the game's own ! / ? icon covers the number
+- What happened: user report — when a step number sits exactly on the spot of the native "?" (turn-in) or "!" (pickup) icon, the icon is drawn over the number. Both are centred on the NPC, so the number is hidden whatever the stacking.
+- Why the previous fix did not cover it: it only raised the overlay above native pins (canvas+2000); it cannot guarantee the order against every native/addon pin, and a number exactly under an icon of the same size is unreadable even when drawn on top.
+- Fix: `QuestGuidance.lua` — groups containing a pickup or turn-in stop (`group.native`) anchor the marker's BOTTOMLEFT at the exact spot + (8 px right, 6 px up), constant on screen at every zoom (`NATIVE_DX/NATIVE_DY`); camp-only groups stay CENTER on the exact spot. Merge pass keeps `native` when groups merge. Test `test_pickup_and_turnin_markers_sit_slightly_beside_the_native_icon_and_camps_stay_centred` (failed first); two tests that asserted an exact centre for a pickup were updated. Guidance 48/48; planner, optimizer, style, zone-steps, UI suites pass; Lua 5.1 compile OK.
+- Result / status: solved in source, unreleased (after v0.4.22), native rendering pending. If it still collides in game, raise `NATIVE_DX` (icon half-width is about 12 px).
+
+---
+## Addendum 2026-11-18 — restyle: step numbers as gold-ringed coins
+- User request: the numbers looked crude ("not accurate, not WoW style").
+- Change (`QuestGuidance.lua`): rectangle markers replaced by coins built from the addon's own proven round disc (`Interface\Minimap\UI-Minimap-Background`, also used by Quick chat): outline (near-black) -> gold ring (muted gold, bright gold when selected) -> deep-brown face, number in cream (gold when selected). `COIN = 28` px tall, selected `COIN_SELECTED = 32`; width `max(28, chars*8+12)`, a wider label stretches into a pill (two disc ends + flat middle). Helpers `newShape / fitShape / tintShape / badgeWidth`; merge pass uses `badgeWidth`.
+- Pitfall found by the tests: a new local named `height` shadowed the canvas height used for the marker position (markers landed near the top). Keep the coin size in `size`.
+- Test `test_map_step_numbers_are_gold_ringed_coins_with_large_outlined_text` replaces the old rectangle-colour test; guidance 48/48.
+- Status: solved in source, unreleased; the harness cannot render textures, so the look itself is NOT verified in game. Tune in game by: ring colours (`tintShape` calls in drawMap), `COIN`, ring/face insets (2 and 5 in `fitShape` calls).

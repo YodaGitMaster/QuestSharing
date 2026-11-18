@@ -48,17 +48,26 @@ local function shown() return window and ns.db.enabled and E.visible(OWNER) end
 local function completed(id)
     return U.call((C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted) or IsQuestFlaggedCompleted,id)==true
 end
+local function inLog(id) return C.findEntry(id)~=nil end -- taken: in the quest log right now
 local function finished(id,seen)
     if completed(id) then return true,false end
     seen=seen or {}
     if seen[id] then return false end
     seen[id]=true
+    -- A later step that needs this one is done -> this one was done too (or can no longer be taken).
+    -- Every quest this one leads to is done (even if each only needs "any one of" several earlier quests, and this is
+    -- just one of those): nothing is left for it to unlock, so it is pointless to go and take it.
+    -- "Done" for the quest it leads to also counts when you already took it: the game stops offering a lead-in then.
+    local count,everyDone=0,true
     for after,required in pairs(chainNext[id] or {}) do
-        if required and finished(after,seen) then return true,true end
+        count=count+1
+        if inLog(after) or finished(after,seen) then
+            if required then return true,true end
+        else everyDone=false end
     end
+    if count>0 and everyDone then return true,true end
     return false
 end
-local function inLog(id) return C.findEntry(id)~=nil end -- taken: in the quest log right now
 local function classChoices()
     local list={{value="All classes",label="All classes"}}
     local keys={}
@@ -279,6 +288,39 @@ function D.scan()
             if number(r.availUntil)>0 then link(r.id,r.availUntil,true,true) end
             ns.dataWork.yield()
         end
+        -- Questie often records no link at all for a "go and speak to X" quest (e.g. "Seeking Caitlin" -> "Lost in the
+        -- Thicket Things"). Infer it: a talk-only quest of a dungeon that ends at an NPC who starts a quest of the same
+        -- dungeon, with no prerequisite of its own, leads to that quest.
+        local function npcs(list) return type(list)=="table" and type(list[1])=="table" and list[1] or {} end
+        local function filled(v) return type(v)=="table" and next(v)~=nil end
+        local startsAt={}
+        for _,seed in ipairs(seeds) do
+            seed.starters=npcs(read("quest",seed.id,"startedBy"))
+            for _,npc in ipairs(seed.starters) do startsAt[npc]=startsAt[npc] or {};table.insert(startsAt[npc],seed) end
+        end
+        local function sharesDungeon(a,b) for area in pairs(a.dungeons) do if b.dungeons[area] then return true end end end
+        for _,seed in ipairs(seeds) do
+            local talkOnly=not chainNext[seed.id] and not chainPrev[seed.id] -- a lead-in starts a chain
+            for _,key in ipairs({"triggerEnd","extraObjectives","requiredSourceItems"}) do
+                if talkOnly and filled(read("quest",seed.id,key)) then talkOnly=false end
+            end
+            local objectives=talkOnly and read("quest",seed.id,"objectives")
+            if type(objectives)=="table" then for _,part in pairs(objectives) do if filled(part) then talkOnly=false end end end
+            if talkOnly and (number(read("quest",seed.id,"sourceItemId"))>0 or number(read("quest",seed.id,"specialFlags"))%4>=2) then talkOnly=false end
+            if talkOnly then
+                local targets,mine={}, {}
+                for _,npc in ipairs(seed.starters) do mine[npc]=true end
+                for _,npc in ipairs(npcs(read("quest",seed.id,"finishedBy"))) do
+                    for _,t in ipairs(not mine[npc] and startsAt[npc] or {}) do
+                        if t.id~=seed.id and not filled(t.beforeAny) and not filled(t.beforeAll) and not chainPrev[t.id]
+                            and sharesDungeon(seed,t) and (seed.races==t.races or seed.races==0 or t.races==0) then targets[#targets+1]=t end
+                    end
+                end
+                -- One target: finishing it proves this one is pointless. Several: only when all of them are done.
+                for _,t in ipairs(targets) do link(seed.id,t.id,#targets==1,true);seed.inferred=seed.inferred or {};seed.inferred[#seed.inferred+1]=t.id end
+            end
+            ns.dataWork.yield()
+        end
         -- Include outdoor preparation quests and explicit follow-ups, with cycle guards per dungeon.
         for _,seed in ipairs(seeds) do
             local direct={};for area in pairs(seed.dungeons) do direct[#direct+1]=area end
@@ -405,7 +447,7 @@ local function chainLines(r)
         table.sort(list,function(a,b)return a.id<b.id end)
         if #list>0 then
             lines[#lines+1]=field=="chainBefore" and "Previous chain quests:" or "Next chain quests:"
-            for _,q in ipairs(list) do lines[#lines+1]=q.name.." ("..q.id..")" end
+            for _,q in ipairs(list) do lines[#lines+1]=q.name.." ("..q.id..")"..(finished(q.id) and " - done" or "") end
         end
     end
     return lines
@@ -557,6 +599,15 @@ function D.detail(r)
     for i,line in ipairs(chainLines(r)) do if i>1 then lines[#lines+1]=line end end
     local how=Q.howText(r.id,r.name)
     if how then lines[#lines+1]="\n"..how end
+    -- Raw Questie link fields, so a wrong chain can be diagnosed from a screenshot.
+    local raw={}
+    for _,key in ipairs({"preQuestSingle","preQuestGroup","nextQuestInChain","breadcrumbForQuestId","breadcrumbs","availableUntilCompleted","exclusiveTo","parentQuest"}) do
+        local v=Q.get("quest",r.id,key)
+        if type(v)=="table" then local ids={};for _,x in ipairs(v) do ids[#ids+1]=tostring(x) end;v=#ids>0 and table.concat(ids,",") or nil end
+        if v~=nil and v~=0 and v~="" then raw[#raw+1]=key.."="..tostring(v) end
+    end
+    if r.inferred then raw[#raw+1]="guessed (Questie has no link): speaks to the NPC who offers quest "..table.concat(r.inferred,", ") end
+    lines[#lines+1]=DIM.."\nQuestie data: "..(#raw>0 and table.concat(raw,"  ") or "no chain links").."|r"
     lines[#lines+1]="\nFaction/class/level filters do not check reputation, professions, events or every acceptance condition."
     lines[#lines+1]="Includes known outdoor preparation and follow-ups. Coverage depends on installed QuestieDB."
     return table.concat(lines,"\n")
@@ -609,7 +660,7 @@ paint=function()
             for _,fs in ipairs({row.item,row.from}) do fs:SetWidth(650-indent-60) end
             for _,fs in ipairs({row.task,row.pickup,row.turnIn}) do fs:SetWidth(590-indent) end
             E.paintRow(row,nil,r.name.." · level "..r.level.." · req "..r.required.."+",
-                chainLabel(r).." · "..r.dungeonText..(completed(r.id) and " · Completed" or implied and " · Not needed: a later step is done"
+                chainLabel(r).." · "..r.dungeonText..(completed(r.id) and " · Completed" or implied and " · Not needed: the next step is done or in your log"
                     or taken and " · In your quest log" or ""))
             row.item:SetText((depth>0 and (S.GREY.."» |r") or "")..(done and (GREYED..r.name.."|r") or (S.GOLD..r.name.."|r"))
                 ..S.GREY.." · level "..r.level.." · req "..r.required.."+|r")

@@ -53,6 +53,8 @@ SpellRanks.lua
 Track.lua
 Highlight.lua
 Friends.lua
+ItemLevel.lua
+LFGInvite.lua
 Quick.lua
 Diagnostics.lua
 MinimapButton.lua

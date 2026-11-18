@@ -110,18 +110,43 @@ local function stack()
     setLevel(layer, level, strata); setLevel(legend, level + 1, strata)
     for _, pin in ipairs(markers) do setLevel(pin, level + (pin.selectedStop and 3 or 2), strata) end
 end
-local function inset(texture, pin, px)
-    texture:SetPoint("TOPLEFT", pin, "TOPLEFT", px, -px); texture:SetPoint("BOTTOMRIGHT", pin, "BOTTOMRIGHT", -px, px)
-    return texture
+-- A step number is a round gold-ringed coin: a dark outline, a gold ring and a deep-brown face, built from the
+-- addon's own proven round disc texture (Quick chat uses it too). A label wider than the coin stretches it into a
+-- pill with round ends: two discs for the ends and a flat rectangle between them. The selected step is larger.
+local DISC = "Interface\\Minimap\\UI-Minimap-Background"
+local COIN, COIN_SELECTED = 28, 32
+local function badgeWidth(chars) return math.max(COIN, chars * 8 + 12) end
+local function newShape(pin, sub)
+    local shape = { left = pin:CreateTexture(nil, "ARTWORK"), right = pin:CreateTexture(nil, "ARTWORK"),
+        mid = S.fill(pin, "ARTWORK", 1, 1, 1, 1) }
+    shape.left:SetTexture(DISC); shape.right:SetTexture(DISC)
+    for _, part in pairs(shape) do if part.SetDrawLayer then part:SetDrawLayer("ARTWORK", sub) end end
+    return shape
 end
+-- Fit one shape inside the pin frame, `inset` px from every edge: full-circle ends, flat middle.
+local function fitShape(shape, pin, height, inset)
+    local d = height - 2 * inset
+    for _, end_ in ipairs({ { shape.left, "LEFT", inset }, { shape.right, "RIGHT", -inset } }) do
+        local part = end_[1]
+        part:ClearAllPoints(); part:SetWidth(d); part:SetHeight(d); part:SetPoint(end_[2], pin, end_[2], end_[3], 0)
+    end
+    shape.mid:ClearAllPoints()
+    shape.mid:SetPoint("TOPLEFT", pin, "TOPLEFT", inset + d / 2, -inset)
+    shape.mid:SetPoint("BOTTOMRIGHT", pin, "BOTTOMRIGHT", -(inset + d / 2), inset)
+end
+local function tintShape(shape, r, g, b)
+    for _, part in pairs(shape) do part:SetVertexColor(r, g, b, 1) end
+end
+-- The game draws its own ! and ? icon centred on a quest giver or turn-in NPC. A step number for that spot hangs
+-- off it instead: its bottom-left corner sits NATIVE_DX px right and NATIVE_DY px up on screen (zoom-constant),
+-- so the icon cannot hide the number. Camps have no native icon and stay centred on their exact spot.
+local NATIVE_DX, NATIVE_DY = 8, 6
 local function makeMarker()
     -- Avoid map pin pools/data providers and click scripts traversed by the client's secure gamepad cursor.
     local pin = CreateFrame("Frame", nil, layer)
-    pin:SetWidth(32); pin:SetHeight(26); pin:EnableMouse(true)
-    -- Dark 1 px edge, 2 px bright border (colored per draw), dark solid face: readable on light and dark map art.
-    pin.bg = S.fill(pin, "BACKGROUND", 0, 0, 0, 1); pin.bg:SetAllPoints(pin)
-    pin.border = inset(S.fill(pin, "BORDER", 1, 1, 1, 1), pin, 1)
-    pin.face = inset(S.fill(pin, "ARTWORK", 1, 1, 1, 1), pin, 3)
+    pin:SetWidth(COIN); pin:SetHeight(COIN); pin:EnableMouse(true)
+    -- Outline, gold ring (coloured per draw) and face stack in that order: readable on light and dark map art.
+    pin.edge, pin.rim, pin.face = newShape(pin, -3), newShape(pin, -2), newShape(pin, -1)
     pin.text = pin:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     pin.text:SetAllPoints(pin)
     -- FontString flags must never be nil; keep the template's (locale) font file, only larger and outlined.
@@ -230,6 +255,7 @@ drawMap = function()
                 cells[key] = cells[key] or {}; cells[key][#cells[key] + 1] = group
             end
             group.steps[#group.steps + 1] = i
+            if stop.kind == "pickup" or stop.kind == "turnin" then group.native = true end
         end
     end
     -- Markers are wider than the grouping cell (multi-number labels, 32 px minimum), so merge any two groups
@@ -238,7 +264,7 @@ drawMap = function()
         local count = math.min(3, #steps)
         local chars = count - 1 + (#steps > 3 and 1 or 0)
         for j = 1, count do chars = chars + #tostring(steps[j]) end
-        return math.max(32, chars * 8 + 16) + 8 -- slack: the selected step may replace the third number
+        return badgeWidth(chars) + 8 -- slack: the selected step may replace the third number
     end
     local merged = true
     while merged do
@@ -248,8 +274,9 @@ drawMap = function()
             for b = a + 1, #groups do
                 local B = groups[b]
                 if math.abs(A.x - B.x) * width * scale < (footprint(A.steps) + footprint(B.steps)) / 2
-                    and math.abs(A.y - B.y) * height * scale < 28 then
+                    and math.abs(A.y - B.y) * height * scale < COIN then
                     for _, step in ipairs(B.steps) do A.steps[#A.steps + 1] = step end
+                    A.native = A.native or B.native
                     table.sort(A.steps)
                     table.remove(groups, b)
                     merged = true
@@ -277,15 +304,17 @@ drawMap = function()
             and selected ~= group.steps[3] then labels[3] = tostring(selected) end
         local label = table.concat(labels, "/") .. (#group.steps > 3 and "+" or "")
         pin.steps, pin.selectedStop = group.steps, active and selected or nil
-        pin.text:SetText((active and S.GOLD or S.WHITE) .. label .. "|r")
-        if active then
-            pin.border:SetVertexColor(1, 0.82, 0, 1); pin.face:SetVertexColor(0.17, 0.1, 0.02, 1)
-        else
-            pin.border:SetVertexColor(0.85, 0.85, 0.85, 1); pin.face:SetVertexColor(0.05, 0.06, 0.07, 1)
-        end
-        pin:SetWidth(math.max(32, #label * 8 + 16)); pin:ClearAllPoints(); pin:SetScale(1 / scale)
+        pin.text:SetText((active and S.GOLD or S.hex(1, 0.96, 0.82)) .. label .. "|r")
+        local size = active and COIN_SELECTED or COIN -- not `height`: that is the canvas height used below
+        pin:SetWidth(badgeWidth(#label)); pin:SetHeight(size); pin:ClearAllPoints(); pin:SetScale(1 / scale)
+        fitShape(pin.edge, pin, size, 0); fitShape(pin.rim, pin, size, 2); fitShape(pin.face, pin, size, 5)
+        tintShape(pin.edge, 0.03, 0.02, 0.02)
+        if active then tintShape(pin.rim, 1, 0.82, 0); tintShape(pin.face, 0.2, 0.12, 0.03)
+        else tintShape(pin.rim, 0.8, 0.64, 0.24); tintShape(pin.face, 0.1, 0.07, 0.04) end
         local position = active and points[selected] or group
-        pin:SetPoint("CENTER", layer, "TOPLEFT", position.x * width * scale, -position.y * height * scale)
+        local ox, oy = position.x * width * scale, -position.y * height * scale
+        if group.native then pin:SetPoint("BOTTOMLEFT", layer, "TOPLEFT", ox + NATIVE_DX, oy + NATIVE_DY)
+        else pin:SetPoint("CENTER", layer, "TOPLEFT", ox, oy) end
         pin:Show()
     end
     for i = #groups + 1, #markers do markers[i].steps = nil; markers[i]:Hide() end

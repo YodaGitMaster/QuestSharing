@@ -32,3 +32,20 @@
 ## If it shows up again
 - Ask for the quest ID and dump its raw record (`/qs questie` or `QuestDB.Get(id, key)` for keys 12,13,22,27,28,33,36). If none of those point at the other quest, the data has no link and nothing can be derived.
 - Not handled on purpose: `disabledByQuest` (only while the other quest is in the log), `exclusiveTo`, `parentQuest`.
+
+---
+## Addendum 2026-11-18 — recurred: user's "Seeking Caitlin" still offered for the dungeon
+- What happened: after the first fix the user still saw Seeking Caitlin as a quest to retrieve (gold border, not greyed) although the dungeon quest was done.
+- Why the previous fix did not hold (probable, NOT verified on the user's data): `finished()` only propagated through *required* links; a lead-in that is one of several `preQuestSingle` alternatives of the dungeon quest was `required=false`, so it never turned grey. The quest itself is not in the Forever/TBC QuestieDB I could fetch (no "Caitlin" quest), so the real record was never seen.
+- New approach: also treat a quest as finished/not needed when ALL quests it leads to are done (`count>0 and everyDone`). Two tests with an "any of" pair. Details panel now prints "- done" next to chain neighbours.
+- Result / new status: workaround-level fix pending user confirmation (status stays open until the user sees it in game). If still wrong: need the quest ID (right panel "(quest NNN)") of Seeking Caitlin and of the dungeon quest, plus whether the dungeon quest shows a green check.
+
+---
+## Addendum 2026-11-18 (2) — real root cause found: Questie has NO link for Seeking Caitlin
+- Real record (QuestieDB master `src/corrections/Forever/generated/foreverBaseQuest.lua`): quest 95737 "Seeking Caitlin": startedBy {{3970}} (Llana), finishedBy {{1480}} (Caitlin Grassman, Menethil Harbor), objectivesText "Speak with Caitlin Grassman in Menethil Harbor.", zoneOrSort EXCAVATION_SITE_WETLANDS, NO preQuest/next/breadcrumb fields. Wowhead shows no series either. The quest it leads to, 95647 "Lost in the Thicket Things", is startedBy {{1480}} in the same zone, also without any link. IDs 9xxxx are Forever-only quests; they are not in `data/Forever/foreverQuestDB.lua` of the data branch, only in `src/corrections/Forever/`.
+- Why the earlier fixes did not hold: they all followed link fields that do not exist for this quest.
+- Methodology: fetched the user's quest page (wowhead forever/quest=95737), then grepped the QuestieDB repo tarball (codeload.github.com/Questie/QuestieDB tar.gz) for the quest id to read the real record and the quests started by the same NPC.
+- Fix: `D.scan` infers a lead-in: talk-only (no objectives/trigger/items/event), no own prerequisite or next, finishes at an NPC (not its own starter) who starts dungeon quest(s) of the same area, same race mask, with no prerequisite -> `link(seed,t,required=(one target),lead)`. Panel shows "guessed (Questie has no link)".
+- Status: solved in mock tests; verify in game with quest 95737 / 95647.
+- If it recurs: check other NPC-based false positives (an NPC who ends a talk-only quest and starts an unrelated dungeon quest).
+

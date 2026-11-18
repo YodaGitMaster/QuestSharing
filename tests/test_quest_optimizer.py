@@ -762,6 +762,23 @@ def test_mid_size_zone_is_polished_over_the_whole_route(style):
     assert g.eval("PROBE.deepest")>12,g.eval("PROBE.deepest")
     assert report.expectedSeconds<report.nearestSeconds,(report.expectedSeconds,report.nearestSeconds)
 
+
+def test_item_taken_from_a_world_object_is_priced_as_pickups_not_a_farm(style):
+    g=Game(style,WESTFALL,fresh=True)
+    g.run(r'''
+local q={[1]={id=1,name="Bloom",status="active",xp=100}}
+local s={
+ {id=1,kind="objective",point={map=1436,x=.1,y=.5},quests={[1]="Bloom"},deps={},
+  objectives={{questID=1,target={kind="loot",itemID=900,required=2},sourceKind="object",remaining=2}}},
+ {id=2,kind="turnin",point={map=1436,x=.1,y=.5},quests={[1]="Bloom"},deps={[1]=true}},
+}
+r,rep=NS.questOptimizer.optimize(q,s,{mode="all",origin={map=1436,x=.1,y=.5},interactionSeconds=3,killSeconds=10,
+ travelSeconds=function() return 0 end})
+''')
+    # Two pickups (3 s each) plus the hand-in (3 s): never the 60 s "unknown farm" estimate.
+    assert abs(g.eval("rep.workSeconds")-9)<1e-9, g.eval("rep.workSeconds")
+    assert not g.eval("rep.uncertain") and g.eval("rep.coverage")==1
+
 if __name__=="__main__":
     failed=total=0
     for name,test in sorted(list(globals().items())):

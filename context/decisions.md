@@ -1,5 +1,13 @@
 # Decisions
 
+## 2026-11-18 — Party finder auto-invite
+- One search per click/key (C_LFGList.Search HasRestrictions in classic_era source), no timer scan; invite solo players (numMembers==1) by lfgRoles via C.invite; healers on by default, own-window watching (lfgWatch) off by default so browsing never invites by surprise. Rows live in the Party window tab (no 16th tab fits). Gear number not built: no ilvl in LFG data; only addon-message (Quest Sharing users) or inspect (nearby) possible, waiting on user.
+
+## 2026-11-18 — Item levels for the party finder
+- GearScore/TacoTip model (inspect nearby + cache + share between users of the addon) chosen; armory query rejected: addons have no network, SavedVariables only sync on /reload/logout, so an external Battle.net API script cannot answer in time (and Forever coverage unknown).
+- Ask-first waits only when a minimum item level is set (no delay for "any"). Unknown default = invite (never silently lose a healer); user can pick skip.
+- Separate prefix QSILVL (works outside a party, independent of the `sync` switch); answering is behind `ilvlShare` (default on).
+
 ## 2026-11-18 — Memory: free the big catalogues after 2 minutes closed
 - Problem: Dungeon quests (`records`, chain tables), Quest rewards (`index`) and map search (`vendors`, `itemRows`) were built on demand and never freed; a paused half-read dungeon scan even kept its coroutine locals alive.
 - Chosen (user, 2026-11-18): grace period of 120 s after the window/map closes, then free; reopening inside it is instant, later it rescans. Alternatives dropped: free at once (every reopen rescans, the slow first scan), manual `/qs memory free` only.

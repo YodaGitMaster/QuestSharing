@@ -668,7 +668,12 @@ local function targetSummary(target, source, probability)
     local verbs = { kill = "Kill ", loot = "Collect ", object = "Use ", explore = "Visit ",
         talk = "Talk to ", escort = "Escort ", use = "Use ", event = "Complete " }
     local text = (verbs[target.kind] or "Visit ") .. (target.name or "objective")
-    if target.kind == "loot" and source and source.name then
+    if target.kind == "loot" and source and source.kind == "object" then
+        -- A world object (flower, chest, crate) gives the item outright: no drop chance, and
+        -- "Heavenly Bloom from Heavenly Bloom" says nothing.
+        text = "Pick up " .. (target.name or "item")
+        if source.name and source.name ~= target.name then text = text .. " from " .. source.name end
+    elseif target.kind == "loot" and source and source.name then
         text = text .. " from " .. source.name
         if probability then text = text .. string.format(" (%.2g%%)", probability * 100) end
     end
@@ -741,10 +746,20 @@ end
 targetLocation = function(target)
     if #(target.sources or {}) == 0 then return nearestPoint(target.points) end
     if not target.camps then
-        local largest, here, pooled = 0, {}, {}
+        local largest, here, pooled, objects = 0, {}, {}, {}
         for _, source in ipairs(target.sources) do
             local probability = target.dropRates and target.dropRates[source.id]
-            if source.kind ~= "npc" or target.kind ~= "loot" or probability ~= 0 then
+            if source.kind == "object" then
+                -- A world object gives the item outright and any one of them will do, so every local spawn is a
+                -- destination. The camp rule below exists for creature grinds; it would drop a lone nearby flower
+                -- in favour of a far cluster.
+                for _, spawn in ipairs(source.spawns or {}) do
+                    if not spawn.dungeon and finite(spawn.x) and finite(spawn.y) then
+                        local point = pointForSpawn(spawn)
+                        if point then objects[#objects + 1] = { point = point, source = source } end
+                    end
+                end
+            elseif source.kind ~= "npc" or target.kind ~= "loot" or probability ~= 0 then
                 local byMap = {}
                 for _, spawn in ipairs(source.spawns or {}) do
                     if not spawn.dungeon and finite(spawn.x) and finite(spawn.y) then
@@ -786,6 +801,7 @@ targetLocation = function(target)
                 target.camps[#target.camps + 1] = { point = row.camp.mark.point, source = row.source }
             end
         end
+        for _, object in ipairs(objects) do target.camps[#target.camps + 1] = object end
     end
     local ranked = {}
     for _, camp in ipairs(target.camps) do
@@ -827,22 +843,22 @@ local function questActions()
                         local text = targetSummary(target, src, id and target.dropRates and target.dropRates[id])
                         if progress then text = text .. " (" .. progress .. ")"
                         elseif required then text = text .. " ×" .. required end
-                        return text, id
+                        return text, id, src and src.kind
                     end
-                    local text, npc = describe(source)
+                    local text, npc, kind = describe(source)
                     local stop = atom(stops, "objective", point, q, text,
                         target.name and ("the " .. target.name .. " area"), i)
                     -- Other real camps of the same work; the optimizer may choose one that suits the route.
                     for n = 2, math.min(#(camps or {}), MAX_CAMP_CHOICES) do
-                        local altText, altNPC = describe(camps[n].source)
+                        local altText, altNPC, altKind = describe(camps[n].source)
                         stop.alternatives = stop.alternatives or {}
-                        stop.alternatives[#stop.alternatives + 1] = { point = camps[n].point, sourceID = altNPC,
+                        stop.alternatives[#stop.alternatives + 1] = { point = camps[n].point, sourceID = altNPC, sourceKind = altKind,
                             tasks = { altText }, questTasks = { [q.id] = { altText } } }
                     end
                     local sharing = npc and target.shareable ~= false and
                         ((target.kind == "kill" and target.creditID) or (target.kind == "loot" and target.itemID))
                     stop.objectives = { { questID = id, target = target, remaining = required and math.max(0, required - (have or 0)),
-                        sourceID = npc, shareable = sharing and true or false } }
+                        sourceID = npc, sourceKind = kind, shareable = sharing and true or false } }
                     addDep(stop, a.pickup)
                     a.objectives[#a.objectives + 1] = stop
                 end
@@ -931,7 +947,7 @@ local function avoidBusyCamps(stop, now)
     end
     if promote then
         stop.point, stop.tasks, stop.questTasks = promote.point, promote.tasks, promote.questTasks
-        stop.objectives[1].sourceID = promote.sourceID
+        stop.objectives[1].sourceID, stop.objectives[1].sourceKind = promote.sourceID, promote.sourceKind
     end
     stop.alternatives = free[1] and free or nil
     return busyUntil and busyUntil - now, narrowed

@@ -28,9 +28,9 @@ cutpdf/
 │   ├── state.md                                      # Current task and handoff
 │   └── walkable-routing-research.md                  # Terrain-routing feasibility, provider sources and proposed integration (not implemented)
 ├── questidea.txt                                     # User-provided predictive quest optimizer design requirements
-├── QuestSharing/                                     # WoW addon runtime (51 files, collapsed; BagTools.lua = bag bookmarks / sell grays / arrange by topic, ChatLock.lua = no chat box in combat)
+├── QuestSharing/                                     # WoW addon runtime (52 files, collapsed; LFGInvite.lua = party finder search + auto-invite by role/level/item level, ItemLevel.lua = inspect + remembered/shared item levels, BagTools.lua = bag bookmarks / sell grays / arrange by topic, ChatLock.lua = no chat box in combat)
 ├── README.md                                         # User documentation
-├── tests/                                            # Python tests and Lua API harness (49 files, collapsed)
+├── tests/                                            # Python tests and Lua API harness (51 files, collapsed; test_lfg_invite.py = party finder, test_item_level.py = item levels)
 └── tools/                                            # Local UI emulation utilities, never shipped in the addon
     ├── build_cooking_reference.py                    # Rebuild pinned factual Cooking subset with upstream MIT attribution
     ├── lua-syntax-review-prompt.md                   # Reusable Lua 5.1 syntax/bug review prompt (parse, 5.2+ leaks, globals, nil traps)
@@ -187,6 +187,28 @@ flowchart TD
 ```
 
 ## Sequence diagrams
+```mermaid
+sequenceDiagram
+    participant Player
+    participant MB as MinimapButton.lua: QuestSharingFinderButton / key QUESTSHARING_LFGSCAN
+    participant L as LFGInvite.lua: ns.lfgInvite
+    participant API as C_LFGList
+    participant IL as ItemLevel.lua
+    participant Them as Listed player's Quest Sharing
+    Player->>MB: left click (hardware event)
+    MB->>L: scan()
+    L->>L: freeSpots() (leader/solo, < 5 incl. pending invites)
+    L->>API: Search(cat, 0, 0, nil, false, nil, acts)
+    API-->>L: LFG_LIST_SEARCH_RESULTS_RECEIVED
+    L->>API: GetFilteredSearchResults / GetSearchResultInfo / GetSearchResultPlayerInfo(id,1)
+    L->>L: matches(): numMembers==1, lfgRoles in lfgHealer/lfgTank/lfgDps, level in lfgMinLevel..lfgMaxLevel, not invited/skipped < 300 s
+    L->>IL: ItemLevel.lua known(name)
+    alt unknown and lfgMinIlvl > 0 and lfgAskIlvl
+        IL->>Them: QSILVL "Q" whisper (+ "Q:name" to party)
+        Them-->>IL: "M:33" / "S:name:33:age" (or nothing within 2 s -> lfgUnknown)
+    end
+    L->>Player: C.invite(name) or skip + chat line "(healer, ilvl 33)"
+```
 ```mermaid
 sequenceDiagram
     participant Player

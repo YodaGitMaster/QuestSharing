@@ -6,4 +6,7 @@
             QuestSharing_QuickUp()
         end
     </Binding>
+    <Binding name="QUESTSHARING_LFGSCAN" header="QUESTSHARING">
+        QuestSharing_LFGScan()
+    </Binding>
 </Bindings>

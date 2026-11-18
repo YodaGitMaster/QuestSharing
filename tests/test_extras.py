@@ -253,11 +253,11 @@ def test_the_minimap_button_can_be_hidden_and_shown_again(style):
 
 def test_shortcut_buttons_open_the_quest_guide_and_dungeon_quests(style):
     g = game(style)
-    guide, dungeon = g.eval("NS._minimapShortcuts()").values()
+    guide, dungeon, finder = g.eval("NS._minimapShortcuts()").values()
     main = g.eval("NS._minimapButton()")
     assert guide.shown is True and dungeon.shown is True
-    pts = [main.point, guide.point, dungeon.point]
-    assert len({(round(p[4]), round(p[5])) for p in pts}) == 3, "three separate buttons"
+    pts = [main.point, guide.point, dungeon.point, finder.point]
+    assert len({(round(p[4]), round(p[5])) for p in pts}) == 4, "four separate buttons"
     g.eval("function() NS.questPlanner.open = function() CALLED_GUIDE = true end end")()
     g.eval("function() NS.dungeonQuests.open = function() CALLED_DUNGEON = true end end")()
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(guide)

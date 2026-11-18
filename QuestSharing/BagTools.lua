@@ -1,9 +1,10 @@
--- BagTools.lua: three small helpers for your bags, each with its own switch in Settings > Quest items.
+-- BagTools.lua: three small helpers for your bags, each with its own switch in Settings > Bags.
 --   * Bookmarks (bagBookmarks): point at an item in your bags and press Space. A bookmarked item shows a note icon and
 --     is never sold by the addon. The bookmark follows the item type (its item ID), so it survives moving the item.
 --   * Sell gray items (autoSellGray): at a vendor, every gray item is sold except bookmarked ones and ones a quest needs.
---   * Arrange by topic (autoSortBags, /qs sort): all your bags, the backpack included, are treated as ONE long bag and
---     ordered by topic: quest items, consumables, equipment, materials, recipes, other, gray items last.
+--   * Arrange (autoSortBags, /qs sort): the chosen bags (sortBags) are treated as ONE long bag and ordered by
+--     sortBy: topic (quest items, consumables, equipment, materials, recipes, other, gray items last), quality or name.
+--     sortFrom "end" gathers the items at the end of the bags; sortKeepBookmarked leaves bookmarked items in their slot.
 -- Only the game's own bags are handled (bag replacement addons use their own buttons).
 local ADDON, ns = ...
 
@@ -290,9 +291,21 @@ function T.sellGray()
     return #list
 end
 
+local hinted = false                               -- the "selling is off" hint, once per session
 ns.on("MERCHANT_SHOW", function()
     merchantOpen = true
-    if ns.db.enabled and ns.db.autoSellGray then ns.after(0.2, T.sellGray) end
+    if not ns.db.enabled then return end
+    if ns.db.autoSellGray then ns.after(0.2, T.sellGray); return end
+    -- Off (the default): say once that the gray items could go, so a quiet vendor does not look like a broken feature.
+    if hinted then return end
+    ns.after(0.2, function()
+        if hinted or not merchantReady() or ns.db.autoSellGray then return end
+        local n = #T.grayItems()
+        if n == 0 then return end
+        hinted = true
+        ns.print(string.format("%d gray item%s could be sold here - selling gray items is off: /qs sellgray on or Settings > Bags",
+            n, n == 1 and "" or "s"))
+    end)
 end)
 ns.on("MERCHANT_CLOSED", function() merchantOpen = false end)
 
@@ -319,7 +332,7 @@ local function describe(info, bag, slot, pos)
              name = string.lower(f.name or ""), pos = pos }
 end
 
-local function before(a, b)
+local function byTopic(a, b)
     if a.topic ~= b.topic then return a.topic < b.topic end
     if a.class ~= b.class then return a.class < b.class end
     if a.sub ~= b.sub then return a.sub < b.sub end
@@ -330,24 +343,57 @@ local function before(a, b)
     return a.pos < b.pos                       -- identical items keep their order, so a tidy bag needs no moves
 end
 
+local function byQuality(a, b)                 -- best first; the same quality falls back to the topic order
+    if a.quality ~= b.quality then return a.quality > b.quality end
+    return byTopic(a, b)
+end
+
+local function byName(a, b)                    -- A to Z; the same name falls back to the topic order
+    if a.name ~= b.name then return a.name < b.name end
+    return byTopic(a, b)
+end
+
+local ORDERS = { topic = byTopic, quality = byQuality, name = byName }
+local ORDER_WORDS = { topic = "by topic", quality = "by quality", name = "by name" }
+T.orders = { "topic", "quality", "name" }
+
+-- the bags the player chose to arrange (Settings > Bags > Bags to arrange)
+local function sortedBags()
+    local which, list = ns.db.sortBags, {}
+    local first = (which == "bags") and 1 or 0
+    local last = (which == "backpack") and 0 or lastBag()
+    for bag = first, last do list[#list + 1] = bag end
+    return list
+end
+
 -- The moves that would put every item in its place: { { from = {bag, slot}, to = {bag, slot} }, ... } and the items in
--- their target order. All the bags are one list of slots: backpack first, then bag 1, 2, 3, 4.
+-- their target order. The chosen bags are one list of slots: backpack first, then bag 1, 2, 3, 4 (reversed when
+-- the items gather at the end). A bookmarked item kept in place takes its slot out of the list.
 function T.plan(keepFacts)
     if not keepFacts then factMemo = {} end
-    local slots, items = {}, {}
-    for bag = 0, lastBag() do
+    local keepMarked = ns.db.sortKeepBookmarked
+    local raw = {}
+    for _, bag in ipairs(sortedBags()) do
         if bagKind(bag) == 0 then
             for slot = 1, numSlots(bag) do
-                local pos = #slots + 1
-                slots[pos] = { bag = bag, slot = slot }
                 local info = slotInfo(bag, slot)
-                if info then items[#items + 1] = describe(info, bag, slot, pos) end
+                if not (keepMarked and info and T.isBookmarked(info.id)) then
+                    raw[#raw + 1] = { bag = bag, slot = slot, info = info }
+                end
             end
         end
     end
+    if ns.db.sortFrom == "end" then
+        for i = 1, math.floor(#raw / 2) do raw[i], raw[#raw + 1 - i] = raw[#raw + 1 - i], raw[i] end
+    end
+    local slots, items = {}, {}
+    for pos, r in ipairs(raw) do
+        slots[pos] = { bag = r.bag, slot = r.slot }
+        if r.info then items[#items + 1] = describe(r.info, r.bag, r.slot, pos) end
+    end
     local order = {}
     for i, it in ipairs(items) do order[i] = it end
-    table.sort(order, before)
+    table.sort(order, ORDERS[ns.db.sortBy] or byTopic)
     local cur, where, moves = {}, {}, {}
     for _, it in ipairs(items) do cur[it.pos], where[it] = it, it.pos end
     for i, it in ipairs(order) do
@@ -381,7 +427,7 @@ local function finishSort(job, why)
     sorting = nil
     if job.manual or why ~= "done" then
         ns.print(why == "done" and (job.moves == 0 and "your bags are already in order"
-            or string.format("bags arranged by topic (%d moves)", job.moves)) or ("bag arrangement stopped: " .. why))
+            or string.format("bags arranged %s (%d moves)", ORDER_WORDS[ns.db.sortBy] or ORDER_WORDS.topic, job.moves)) or ("bag arrangement stopped: " .. why))
     end
     ns.log("sort", why .. ", " .. job.moves .. " moves")
 end

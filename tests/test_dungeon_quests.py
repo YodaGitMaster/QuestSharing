@@ -683,10 +683,11 @@ def test_quest_in_log_shows_exclamation_and_missing_quests_get_a_gold_border(sty
     rows=rows_by_id(g)
     assert "AvailableQuestIcon" in rows[2].icon.texture and "In your quest log" in rows[2]["from"].text
     assert not border_on(rows[2]), "already taken: no 'still to take' border"
-    assert border_on(rows[1]) and "AvailableQuestIcon" not in rows[1].icon.texture, "not taken yet: bordered"
-    g.run("FINISHED[1]=true");g.eval("NS.dungeonQuests.refresh")();g.advance(.3)
+    assert border_on(rows[3]) and "AvailableQuestIcon" not in rows[3].icon.texture, "not taken yet: bordered"
+    assert "ReadyCheck-Ready" in rows[1].icon.texture and not border_on(rows[1]), "its lead-in is pointless once it is taken"
+    g.run("FINISHED[3]=true");g.eval("NS.dungeonQuests.refresh")();g.advance(.3)
     rows=rows_by_id(g)
-    assert "ReadyCheck-Ready" in rows[1].icon.texture and not border_on(rows[1]), "done: tick, no border"
+    assert "ReadyCheck-Ready" in rows[3].icon.texture and not border_on(rows[3]), "done: tick, no border"
     assert not g.eval("NS.db.errors")
 
 
@@ -713,6 +714,84 @@ def test_a_paused_half_read_scan_is_dropped_after_the_grace_period(style):
     assert g.eval("NS.dataWork.busy")("dungeonQuests"), "paused, so reopening can continue it"
     g.advance(130)
     assert not g.eval("NS.dataWork.busy")("dungeonQuests") and not g.eval("NS.dungeonQuests._state()")[0]
+
+
+ANYOF=r'''
+QUESTIE_QUESTS[40]={name="Seeking Caitlin",questLevel=15,startedBy={{197}},finishedBy={{400}}}
+QUESTIE_QUESTS[42]={name="Seeking Another",questLevel=15,startedBy={{197}},finishedBy={{400}}}
+QUESTIE_QUESTS[41]={name="Dungeon from harbor",questLevel=18,zoneOrSort=1581,startedBy={{400}},preQuestSingle={40,42}}
+'''
+
+
+def test_lead_in_that_is_one_of_several_any_prerequisites_is_greyed_when_the_quest_is_done(style):
+    g=game(style,ANYOF);filters(g,dungeon=1581)
+    rows=lead_rows(g)
+    assert not any("ReadyCheck-Ready" in rows[q].icon for q in (40,41,42))
+    g.run("FINISHED[41]=true");g.eval("NS.dungeonQuests.refresh")();g.advance(.3)
+    rows=lead_rows(g)
+    for q in (40,42):
+        assert "ReadyCheck-Ready" in rows[q].icon and "Not needed" in rows[q].from_ and "|cff7d7d7d" in rows[q].item, q
+    assert not g.eval("NS.db.errors")
+
+
+def test_a_quest_with_a_not_done_follow_up_is_not_greyed_by_another_done_follow_up(style):
+    g=game(style,ANYOF+"QUESTIE_QUESTS[43]={name='Other branch',questLevel=18,zoneOrSort=1581,startedBy={{400}},preQuestSingle={40,44}};QUESTIE_QUESTS[44]={name='Other lead',questLevel=15,startedBy={{197}}}")
+    filters(g,dungeon=1581);g.run("FINISHED[41]=true");g.eval("NS.dungeonQuests.refresh")();g.advance(.3)
+    rows=lead_rows(g)
+    assert "ReadyCheck-Ready" not in rows[40].icon, "40 still unlocks 43, which is not done"
+    assert "ReadyCheck-Ready" in rows[42].icon
+
+
+def test_panel_shows_raw_questie_link_fields_for_diagnosis(style):
+    g=game(style,HOVER_DATA);text=plain(chain_text(g,2))
+    assert "Questie data: preQuestSingle=1  nextQuestInChain=3" in text
+    assert "Questie data: no chain links" in plain(chain_text(g,4))
+
+
+SEEKING=r'''
+QUESTIE_NPCS[500]={name="Llana",spawns={[12]={{20,20}}}}
+QUESTIE_NPCS[501]={name="Caitlin Grassman",spawns={[12]={{11,58}}}}
+QUESTIE_QUESTS[50]={name="Seeking Caitlin",questLevel=31,zoneOrSort=1581,startedBy={{500}},finishedBy={{501}}}
+QUESTIE_QUESTS[51]={name="Lost in the Thicket",questLevel=31,zoneOrSort=1581,startedBy={{501}},finishedBy={{501}},objectives={{{900}}}}
+QUESTIE_QUESTS[52]={name="Caitlin unrelated errand",questLevel=22,zoneOrSort=718,startedBy={{501}}}
+QUESTIE_QUESTS[53]={name="Fetch for Llana",questLevel=31,zoneOrSort=1581,startedBy={{500}},finishedBy={{501}},objectives={nil,nil,{{950}}}}
+'''
+
+
+def test_talk_only_quest_to_an_npc_who_starts_a_dungeon_quest_is_linked_even_without_questie_data(style):
+    # Real case: "Seeking Caitlin" (95737) has no link fields in QuestieDB; Caitlin Grassman starts the dungeon quest.
+    g=game(style,SEEKING);filters(g,dungeon=1581)
+    order=[r.id for r in g.eval("NS.dungeonQuests._results()").values()]
+    assert order.index(50)+1==order.index(51), "the quest she offers sits right under the talk-only one"
+    rows=lead_rows(g)
+    assert "ReadyCheck-Ready" not in rows[50].icon
+    g.run("FINISHED[51]=true");g.eval("NS.dungeonQuests.refresh")();g.advance(.3)
+    rows=lead_rows(g)
+    assert "ReadyCheck-Ready" in rows[50].icon and "Not needed" in rows[50].from_ and "|cff7d7d7d" in rows[50].item
+    assert "Not needed" not in rows[53].from_, "a quest with real objectives is not treated as a lead-in"
+    assert "guessed" in plain(chain_text(g,50)) and "51" in plain(chain_text(g,50))
+    assert not g.eval("NS.db.errors")
+
+
+def test_inferred_lead_in_ignores_quests_of_other_dungeons_and_ones_with_their_own_prerequisite(style):
+    g=game(style,SEEKING+"QUESTIE_QUESTS[51].preQuestSingle={53}");filters(g,dungeon=1581)
+    assert "guessed" not in plain(chain_text(g,50)), "51 has its own prerequisite chain"
+    g=game(style,SEEKING);filters(g,dungeon=718)
+    assert "guessed" not in plain(chain_text(g,52))
+    g=game(style,SEEKING+"QUESTIE_QUESTS[50].preQuestSingle={53}");filters(g,dungeon=1581)
+    assert "guessed" not in plain(chain_text(g,50)), "a quest with its own prerequisite is a later step, not a lead-in"
+
+
+def test_lead_in_is_not_needed_once_the_quest_it_leads_to_is_already_in_my_log(style):
+    # Llana stops offering "Seeking Caitlin" as soon as the quest Caitlin gives is taken, not only when it is finished.
+    g=game(style,SEEKING);filters(g,dungeon=1581)
+    g.run("QUESTS[#QUESTS+1]={id=51,title='Lost in the Thicket',level=31,objectives={}}");g.fire("QUEST_LOG_UPDATE");g.advance(.3)
+    rows=lead_rows(g)
+    assert "ReadyCheck-Ready" in rows[50].icon and "Not needed" in rows[50].from_ and "|cff7d7d7d" in rows[50].item
+    assert "AvailableQuestIcon" in rows[51].icon and "In your quest log" in rows[51].from_, "the quest itself is just marked as taken"
+    w=g.eval("NS.dungeonQuests._window()");click(w.completed)
+    assert 50 not in ids(g) and 51 in ids(g), "Hide completed also hides the lead-in that can no longer be taken"
+    assert not g.eval("NS.db.errors")
 
 
 if __name__=="__main__":

@@ -291,8 +291,10 @@ def test_zoom_preserves_stop_screen_positions_and_constant_pin_size_without_extr
         tick(g)
         pin = next(p for p in markers(g) if p.selectedStop == 1)
         assert abs(pin.scale * scale - 1) < 1e-9
-        assert abs(pin.point[4] * pin.scale - 550) < 1e-9
-        assert abs(pin.point[5] * pin.scale + 315) < 1e-9
+        # Step 1 is a pickup: its marker hangs 8 px right / 6 px up (on screen, at every zoom) of the exact spot.
+        assert pin.point[1] == "BOTTOMLEFT"
+        assert abs((pin.point[4] - 8) * pin.scale - 550) < 1e-9
+        assert abs((pin.point[5] - 6) * pin.scale + 315) < 1e-9
         assert len(overlay.children) == before
 
 
@@ -309,8 +311,9 @@ end
     g.fire("WORLD_MAP_UPDATE")
     pins = markers(g)
     assert len(pins) == 1 and len(pins[0].steps) == 2
-    assert abs(pins[0].point[4] - 500) < 1e-8
-    assert abs(pins[0].point[5] + 350) < 1e-8
+    # Pickup/turn-in group: bottom-left corner 8 px right and 6 px up of the exact projected spot.
+    assert abs(pins[0].point[4] - 8 - 500) < 1e-8
+    assert abs(pins[0].point[5] - 6 + 350) < 1e-8
 
 
 
@@ -361,6 +364,7 @@ NS.questGuidance.set(stops,1,QuestSharingPlannerPanel,function() end,"Far 1")
     pins = markers(g)
     def rect(p):
         cx, cy, w, h = p.point[4] * p.scale, p.point[5] * p.scale, p.width, p.height
+        if p.point[1] == "BOTTOMLEFT": cx, cy = cx + w / 2, cy + h / 2
         return cx - w / 2, cx + w / 2, cy - h / 2, cy + h / 2
     for i, a in enumerate(pins):
         for b in pins[i + 1:]:
@@ -370,6 +374,34 @@ NS.questGuidance.set(stops,1,QuestSharingPlannerPanel,function() end,"Far 1")
             assert not overlap, (a.text.text, b.text.text, rect(a), rect(b))
     merged = next(p for p in pins if 10 in list(p.steps.values()))
     assert sorted(merged.steps.values()) == [10, 11, 12], list(merged.steps.values())
+
+
+def test_pickup_and_turnin_markers_sit_slightly_beside_the_native_icon_and_camps_stay_centred(style):
+    g = game(style)
+    open_guide(g)
+    g.run(r'''
+local stops={
+ {point={map=1436,x=0.30,y=0.30},kind="pickup",destination="Giver"},
+ {point={map=1436,x=0.70,y=0.50},kind="objective",destination="Camp"},
+ {point={map=1436,x=0.30,y=0.70},kind="turnin",destination="Turn-in"},
+}
+NS.questGuidance.set(stops,2,QuestSharingPlannerPanel,function() end,"Camp")
+''')
+    for scale in (0.5, 1, 3):
+        g.run(f"WorldMapFrame.ScrollContainer.Child.scale={scale}")
+        tick(g)
+        pins = {p.steps[1]: p for p in markers(g)}
+        # The pickup and turn-in markers hang off the exact spot: bottom-left corner 8 px right and 6 px up on
+        # screen at every zoom, so the game's ! and ? icon centred on that spot cannot cover the number.
+        for step, (x, y) in ((1, (300, -210)), (3, (300, -490))):
+            pin = pins[step]
+            assert pin.point[1] == "BOTTOMLEFT", (step, pin.point)
+            assert abs((pin.point[4] * pin.scale - x) * scale - 8) < 1e-9, (scale, pin.point)
+            assert abs((pin.point[5] * pin.scale - y) * scale - 6) < 1e-9, (scale, pin.point)
+        # A camp has no native icon: its marker stays centred on the exact spot.
+        camp = pins[2]
+        assert camp.point[1] == "CENTER"
+        assert abs(camp.point[4] * camp.scale - 700) < 1e-9 and abs(camp.point[5] * camp.scale + 350) < 1e-9
 
 
 def assert_on_top(g):
@@ -414,9 +446,14 @@ def test_map_step_numbers_stay_above_native_pins_on_every_redraw_and_map_show(st
     assert_on_top(g)
 
 
-def test_map_step_numbers_use_large_outlined_text_bright_border_and_dark_face(style):
+def test_map_step_numbers_are_gold_ringed_coins_with_large_outlined_text(style):
     g = game(style, LEVELS)
     open_guide(g)
+    DISC = "Interface\\Minimap\\UI-Minimap-Background"
+    def colour(shape):
+        values = {tuple(part.vertex.values()) for part in (shape.left, shape.right, shape.mid)}
+        assert len(values) == 1, values  # the three parts of one shape always share a colour
+        return list(values.pop())
     for scale in (1, 0.5, 3):
         g.run(f"WorldMapFrame.ScrollContainer.Child.scale={scale}")
         tick(g)
@@ -425,23 +462,35 @@ def test_map_step_numbers_use_large_outlined_text_bright_border_and_dark_face(st
         for pin in pins:
             _, size, flags = pin.text.font[1], pin.text.font[2], pin.text.font[3]
             assert size >= 13 and flags is not None and "OUTLINE" in flags, (size, flags)
-            assert pin.text.shadow[1] == 1 and pin.text.shadow[2] == -1
-            assert pin.text.shadowColor[4] == 1
-            # On-screen size: the canvas zoom times the pin's inverse scale stays 1.
-            assert pin.width * pin.scale * scale >= 30 and pin.height * pin.scale * scale >= 24
-            border, face = list(pin.border.vertex.values()), list(pin.face.vertex.values())
-            assert face[3] == 1 and max(face[:3]) <= 0.2, face
+            assert pin.text.shadow[1] == 1 and pin.text.shadow[2] == -1 and pin.text.shadowColor[4] == 1
+            # On-screen size: the canvas zoom times the pin's inverse scale stays 1; a coin is at least 28 px tall.
+            assert pin.width * pin.scale * scale >= 28 - 1e-9 and pin.height * pin.scale * scale >= 28 - 1e-9
+            # Three stacked round shapes: dark outline, gold ring, dark face; every part opaque.
+            edge, rim, face = colour(pin.edge), colour(pin.rim), colour(pin.face)
+            assert edge[3] == rim[3] == face[3] == 1
+            assert max(edge[:3]) <= 0.1 and max(face[:3]) <= 0.25, (edge, face)
+            assert rim[0] >= 0.75 and rim[0] > rim[1] > rim[2] and rim[2] <= 0.35, rim  # gold, not grey
+            for shape in (pin.edge, pin.rim, pin.face):
+                assert shape.left.texture == DISC and shape.right.texture == DISC
+            # The ring is 2 px inside the outline and the face 3 px inside the ring, caps are full circles.
+            assert pin.edge.left.width == pin.edge.left.height == pin.height
+            assert pin.rim.left.width == pin.height - 4 and pin.face.left.width == pin.height - 10
             if pin.selectedStop:
-                assert border == [1, 0.82, 0, 1], border
-                assert "|cffffd100" in pin.text.text
+                assert rim == [1, 0.82, 0, 1], rim
+                assert "|cffffd100" in pin.text.text and pin.height == 32
             else:
-                assert min(border[:3]) >= 0.75 and max(border[:3]) - min(border[:3]) < 0.05 and border[3] == 1, border
-                assert "|cffffffff" in pin.text.text
-    # Selecting another stop moves the gold border and keeps the label format.
+                assert rim[:3] != [1, 0.82, 0] and pin.height == 28
+                assert "|cfffff5d1" in pin.text.text
+        # A single number is a round coin; a shared spot stretches into a pill with round ends.
+        single = next(p for p in pins if len(p.steps) == 1)
+        shared = next(p for p in pins if len(p.steps) == 2)
+        assert single.width == single.height
+        assert shared.width > shared.height
+    # Selecting another stop moves the gold ring and the larger size, and keeps the label format.
     shared = next(p for p in markers(g) if len(p.steps) == 2)
     click(g, shared)
     assert shared.selectedStop == 3 and "1/3" in shared.text.text
-    assert list(shared.border.vertex.values()) == [1, 0.82, 0, 1]
+    assert colour(shared.rim) == [1, 0.82, 0, 1] and shared.height == 32
     assert_on_top(g)
 
 

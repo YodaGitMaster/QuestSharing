@@ -53,6 +53,10 @@ ns.defaults = {
     bagBookmarks = true, -- point at a bag item and press Space: it is bookmarked and never sold by the addon
     autoSellGray = false, -- (off) sell every gray item when a vendor window opens (bookmarked and quest items stay)
     autoSortBags = false, -- (off) arrange all bags, backpack included, by topic once they have been quiet for a moment
+    sortBy = "topic",   -- how bags are arranged: "topic", "quality" (best first) or "name" (A to Z)
+    sortBags = "all",   -- which bags are arranged: "all", "bags" (all but the backpack) or "backpack"
+    sortFrom = "start", -- where the items gather: "start" (empty slots at the end) or "end" (empty slots at the start)
+    sortKeepBookmarked = false, -- (off) bookmarked items stay in their slot while the bags are arranged
     chatLock = false,   -- (off) no chat typing box while you are in a fight
     debug = true,       -- diagnostic actions and outcomes, saved on /reload or logout
     shareByClick = false, -- share only on my clicks (set by itself when the game refuses an automatic share)
@@ -70,6 +74,17 @@ ns.defaults = {
     panelSolo = true,   -- show the Party quests window when you are not in a party too (your quests of the zone)
     panelScale = 100,   -- size of the Party quests window, in percent
     quickSize = "normal", -- size of the quick chat ring: "small", "normal" or "large"
+    lfgHealer = true,   -- party finder button: invite solo players listed as healer
+    lfgTank = false,    -- ... listed as tank
+    lfgDps = false,     -- ... listed as damage
+    lfgWatch = false,   -- (off) also invite from searches made in the game's own party finder window
+    lfgMinLevel = 1,    -- party finder: lowest character level to invite
+    lfgMaxLevel = 60,   -- ... highest character level to invite
+    lfgMinIlvl = 0,     -- ... lowest average item level to invite (0 = any)
+    lfgUnknown = "invite", -- ... when the item level is unknown: "invite" or "skip" (only with a minimum)
+    lfgAskIlvl = true,  -- ... ask Quest Sharing users for their item level first (waits up to 2 s)
+    ilvlInspect = true, -- remember the item level of players I target or point at nearby (inspect)
+    ilvlShare = true,   -- tell other Quest Sharing users my item level and the ones I remember
 }
 ns.db = {}
 for k, v in pairs(ns.defaults) do ns.db[k] = v end        -- until the saved variables are loaded
@@ -382,7 +397,7 @@ function ns.setSetting(key, value)
         if key == "enabled" and not value and ns.loot then ns.loot.close() end
         if key == "enabled" and not value and ns.dungeonQuests then ns.dungeonQuests.close() end
         if (key == "bagMarks" or key == "enabled") and ns.refreshBagMarks then ns.refreshBagMarks() end
-        if (key == "bagBookmarks" or key == "autoSortBags" or key == "enabled") and ns.bagTools then ns.bagTools.refresh() end
+        if (key == "bagBookmarks" or key == "autoSortBags" or key == "enabled" or (type(key) == "string" and string.sub(key, 1, 4) == "sort")) and ns.bagTools then ns.bagTools.refresh() end
         if (key == "chatLock" or key == "enabled") and ns.chatLock then ns.chatLock.refresh() end
         if (key == "hideTracker" or key == "enabled") and ns.applyTrackerHidden then ns.applyTrackerHidden() end
         if key == "quickSend" and value then               -- you ask for it again: refused channels get another try
@@ -463,7 +478,8 @@ local help = {
     "/qs hidetracker on|off hide the game's quest tracker (outside fights)",
     "/qs bookmarks [on|off|list|clear]  Space on a bag item bookmarks it (never sold); list or clear the bookmarks",
     "/qs sellgray on|off  sell the gray items when a vendor opens (bookmarked and quest items stay)",
-    "/qs sort [on|off]    arrange all your bags by topic now; on/off = do it by itself when the bags change",
+    "/qs sort [on|off]    arrange your bags now; on/off = do it by itself when the bags change",
+    "/qs sort by topic|quality|name, bags all|bags|backpack, from start|end, keep on|off   how and what to arrange",
     "/qs chatlock on|off  no chat typing box while you are in a fight",
     "/qs debug on|off     the debug log: every action and its outcome, saved to the addon's file on /reload or logout",
     "/qs log [clear]      all diagnostics in one copyable window (clear empties the debug log)",
@@ -507,7 +523,19 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     elseif cmd == "plan" then ns.questPlanner.command(arg)
     elseif cmd == "cleanup" then ns.questCleanup.open()
     elseif cmd == "sort" then
-        if arg == "on" or arg == "off" then ns.setSetting("autoSortBags", arg == "on") else ns.bagTools.sort(true) end
+        local what, val = string.match(string.lower(arg or ""), "^(%S+)%s*(%S*)$")
+        local SORT_OPTS = { by = { "sortBy", topic = 1, quality = 1, name = 1 }, bags = { "sortBags", all = 1, bags = 1, backpack = 1 },
+                            from = { "sortFrom", start = 1, ["end"] = 1 } }
+        if arg == "on" or arg == "off" then ns.setSetting("autoSortBags", arg == "on")
+        elseif what == "keep" and (val == "on" or val == "off") then
+            ns.setSetting("sortKeepBookmarked", val == "on"); ns.print("bookmarked items " .. (val == "on" and "stay in their slot" or "are arranged too"))
+        elseif what and SORT_OPTS[what] then
+            local o = SORT_OPTS[what]
+            if o[val] then ns.setSetting(o[1], val); ns.print("bag arrangement: " .. what .. " = " .. val)
+            else ns.print("usage: /qs sort by topic|quality|name, bags all|bags|backpack, from start|end, keep on|off") end
+        else ns.bagTools.sort(true) end
+    elseif cmd == "lfg" or cmd == "finder" then ns.lfgInvite.command(arg)
+    elseif cmd == "ilvl" then ns.itemLevel.command(arg)
     elseif cmd == "bookmarks" then
         if arg == "on" or arg == "off" then ns.setSetting("bagBookmarks", arg == "on")
         elseif arg == "clear" then ns.print(string.format("%d bookmark(s) removed", ns.bagTools.clearBookmarks()))

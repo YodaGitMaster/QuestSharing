@@ -504,3 +504,23 @@
 - The mock test harness never fires `PLAYER_LOGIN`, so timers started there (VendorMap `tick`) do not run in tests unless the test fires it itself.
 - Next: user runs `/reload`, `/qs memory`, opens each catalogue, closes, waits 2+ minutes, `/qs memory` again; put the real numbers here.
 
+
+## 2026-11-18 — Data sources for drop % and rare/timed spawns (research, no code)
+- Drop %: QuestieDB `support/Forever/DropTables/classicItemDrops.lua` = `{itemID = {npcID = percent}}`, "automatically generated from wowhead data based upon objective data from our DB" (only items that quest objectives reference); Questie also merges a cmangos ("pserver") table + `itemDropCorrections`. Runtime access: `QuestieDB.GetItemDroprate(itemId, npcId)` (already used by the planner).
+- NPC record (`src/meta/npcMeta.lua`, 15 fields): has `rank` (Enum.npcRanks, cmangos creature_template.rank: rare / rare-elite exist), `spawns`, `waypoints`, `npcFlags`, `zoneID`. NO respawn time, NO day/event/holiday condition.
+- Respawn timers live in the cmangos emulator DB: `creature.spawntimesecsmin/max` per spawn point; random pick among several creatures at one point = `spawn_group_entry.Chance`; event/holiday/worldstate conditions = `spawn_group` + conditions (CONDITION_ACTIVE_GAME_EVENT / HOLIDAY / WORLDSTATE). Not in any in-game API; Wowhead has no public API (comments only). "Every other day" style rotations are not modelled anywhere found.
+- Possible in-game signals (unverified on Forever): `UnitClassification(unit)` = rare/rareelite for a seen unit; creature GUID carries npcID + spawn UID, so deaths/sightings can be timed by the addon itself.
+
+## 2026-11-18 — Respawn time + mob count: measured on the real cmangos classic-db (research, no code)
+- Source: `cmangos/classic-db` `Full_DB/ClassicDB_1_12_1_z2815.sql.gz` (13 MB gz, public). Table `creature`: one row per spawn point with `id`, `map`, position, `spawntimesecsmin`, `spawntimesecsmax`, `spawndist`. Parsed 66,310 rows / 7,422 creature ids (copy kept only at /tmp/cmangos-data/db.sql.gz; untrusted download, not in repo).
+- Respawn: 300 s is the most common (27,682 rows), then 7200 s (7,638 rows, 499 ids always exactly 2 h), 275/120/180/333 s. 403 ids use a random window (min != max). 620 ids >= 4 h. 241 ids have 1-11 day timers, e.g. Gorefang 24-48 h, Mazzranache 24-48 h, Swiftmane 24-32 h, Zaricotl 24-48 h (3 spawn points), Geomancer Flintdagger 24-48 h. 1,000,000 s = scripted/one-shot, not a real timer.
+- Mob count = number of spawn points of the id (e.g. npc 6: 31 points / 180 s; npc 114: 35 / 300 s; npc 589: 6 / 300 s; Rabbit 464). Questie `spawns` already lists the same points; our camp grouping already counts them.
+- Depletion model to add to the optimizer (currently unlimited mobs, 10 s each): with N mobs, respawn R, kill time k, K kills needed: time = (ceil(K/N)-1) * max(R, N*k) + lastCycleKills * k. Example K=40 (10 teeth at 25 %), N=8, R=300 s, k=10 s: 1280 s vs 400 s naive (3.2x).
+- Caveats: data is 1.12.1 emulator data (Forever may differ; unknown new creatures fall back to defaults), other players compete for mobs, spawn_group pools mean fewer mobs alive than points, a rare "may already be up or dead" (only a per-realm observation tells).
+- Build route: offline script -> small Lua data module (npcId -> min, max, spawn count; skip the 300 s default), load-on-demand like other data modules; attribute cmangos (Questie already merges cmangos drop data).
+
+## 2026-11-18 — Party finder and item levels (Classic API limits)
+- Blizzard classic_era `LFGListInfoDocumentation.lua`: `C_LFGList.Search` HasRestrictions (click/key only); `LfgSearchResultPlayerInfo` = name, level, areaName, className, classFilename, specName, assignedRole, lfgRoles, isLeader, isLeaver: no item level. No applicant API (GetApplicants/InviteApplicant absent).
+- Blizzard's own browse list invites solo results with `InviteToGroup(leaderName)`; solo = `numMembers == 1`; no auto refresh in its code.
+- Armory cannot be reached from an addon (no network); only inspect (~28 yd) or addon-to-addon messages give other players' gear.
+- Test harness: `tests/test_look.py rows()` used to read only 18 rows; tabs with more rows need the all-rows version.
