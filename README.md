@@ -1,2 +1,847 @@
-# QuestSharing
-Quest Sharing for World of Warcraft: downloads and release notes
+# Quest Sharing
+
+A World of Warcraft addon for playing quests together.
+
+[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.22)
+
+## Your first party, in four steps
+1. **Install it** (see [Install](#install)) and log in. A short welcome in chat tells you it is ready. Everything is
+   on, except the automatic party chat: **you** decide when to talk.
+2. **Give the quick chat ring a key:** left-click the map button > *General* > **Quick chat key**, click, press the key
+   (for example `V`, or `E` if you do not strafe with it).
+3. **Group up.** Your quests of this area are offered to the newcomers (once each), and the
+   **Party quests** window shows your nearest quests with a check or an X for every member. **Left click** a quest to
+   offer it, **right click** to open its menu: tell the party your progress or choose **Ask in chat to do this quest** directly below it.
+4. **Talk with one key:** hold it, point at *Hello*, *Team up?* ("Doing [your quest] here - anyone want to group up?"
+   in /s), *What I need*... and let go. Each message's channel is yours to choose in the settings.
+
+Hover the map button any time for a quick status (party, tracker, your key, problems). `/qs doctor` checks your setup.
+
+## What it does
+
+**Your messages go into the chat box, and you press Enter.** Some game clients do not let addons send chat messages
+at all (the game says "tried to call the protected function UNKNOWN()"), but typing into the chat box always works.
+So what the addon writes for you (the right-click menu, quest clicks, Post all) is typed into the chat box with the
+right channel set (`/p`, `/s`, `/w Name`, ...). The quick chat ring has its own switch and sends at once by default
+(see below). *Settings > General > How to send quest progress messages* (or
+`/qs mode send`) sends at once instead where the game allows it; if the game refuses, the addon switches back to the
+chat box by itself and says so once. The automatic party messages need "sent at once" (typing them into your chat box
+unasked would take your keys while you play).
+
+**When the game refuses something** ("Interface action failed because of an AddOn"), `/qs errors` says what the addon
+was doing at that moment ("while sharing a quest with the party", "while putting a pin on your map", ...) and
+that one feature switches itself off until you `/reload`, so the message does not keep coming back. Its window also
+says **where it came from**: the line of the addon that made the call ("from QuestItems.lua:150 paint"), the real
+name of the function when the game only says `UNKNOWN()`, what the addon was running ("a timer set at
+QuestItems.lua:342", "the event QUEST_LOG_UPDATE"), whether you were in combat, and the stack (what called what).
+When none of the addon's code is on the stack, it says so (the game noticed it later, often "taint") and names what
+the addon ran last. Lua errors keep their stack too.
+
+**One rule everywhere: a quest you have finished is never shared, announced, listed or marked as something to do
+together.** It is not offered to the party, not part of "in common", not on the ring's quest lists, not in the Party
+quests window, not starred in the quest log, and not preferred by the map pin as a quest you share. (Clicking it in
+the game's tracker still tells the party you are done, because that is your own choice.)
+
+1. **Shares your quests, once, at three moments only:**
+   - when you **join or form a party** (your quests in the current area),
+   - when a **new member joins** (only what that person has not been offered yet),
+   - when you **accept a new quest** while in a party (just that quest; several accepts within 3 seconds
+     become one round).
+
+   Within one round the quests go out a few seconds apart (`/qs gap`, default 4) so nobody is flooded with
+   popups. That spacing applies only inside a round: **nothing is ever repeated on a timer.** A quest is
+   offered to each member at most once, and a quest someone **declined** is never offered to them again
+   automatically. `/qs share` is the manual override that repeats everything.
+
+   **Where the game only lets an addon share from your own click** (it refuses an automatic share: "tried to call
+   the protected function QuestLogPushQuest()"), the addon notices it, says so once and remembers it: a round then
+   waits, and each click on **Share** in the Party quests window (or `/qs share`) offers the next quest; clicking a
+   quest offers that one. *Settings > Quest sharing > Require a Share click for each quest offer* (`/qs shareclick on|off`) shows and
+   changes it. If the game refuses even a share from your click, sharing switches off until you `/reload`.
+
+   If you switch on the party chat
+   announcement (**off by default**: *Settings > Quest sharing > Messages in party chat*), it also tells the party which quests you have
+   in common:
+
+   > Hey Anna! Looks like we have these quests in common: [Wolves Among Us], [Report to Goldshire] Let's do them together :)
+
+   Afterwards you get **one short line** (only you see it), and only when something was shared:
+   `shared 2 quests with the party: Anna took 1, 1 declined`.
+
+2. **Puts your progress in the chat box when you click a quest in the game's tracker** (the list on the right).
+   **Click more quests and they are added**, not replaced, so you send them all with one Enter (the Party quests
+   window has its own clicks: see below):
+
+   > /p [Wolves Among Us] - still need: Wolf slain 3/8, Wolf Pelt 0/4 (Anna has it too!) + [Report to Goldshire] - I'm done with this one, ready to turn in!
+
+   - The names appear only when a party member has that quest, and not once you have finished it.
+   - A quest already in the box is not added twice. Anything you typed first stays; your status goes after it.
+   - One chat message holds 255 letters; when the next one does not fit, the addon says so instead of cutting it.
+     Press Enter, then click again.
+   - Enter or Esc closes the box; the next click starts a new message.
+   - `/qs mode send` sends it to the party at once instead (then the game shows a star when the party has the quest);
+     `/qs mode print` only shows it to you. Shift-clicking a quest link into the chat box adds the status too.
+
+3. **Talks to other Quest Sharing users (sync).** Party members who also run the addon exchange their
+   exact quest lists and objective progress in the background. For them "who has what" is exact instead
+   of guessed, and no popup is needed to find out. Players without the addon still work (see below).
+
+   **When several of you run it, they take turns instead of all talking at once:**
+   - **One popup per quest.** A quest one of you offered is not offered again by the others (their addons are told
+     at once), and each addon looks again right before offering. Accepting a quest someone shared does not make
+     your addon offer it around again.
+   - **One "in common" message.** The addons go in alphabetical order of the players' names, a moment apart; each
+     leaves out the quests somebody already named in party chat in the last two minutes, and says nothing if
+     nothing is left.
+   - **One "done" per quest.** When you finish a quest together (the last kill counts for everybody), only the first
+     one says it.
+   - **Your own chat stays quiet**: no line per answer, no line when a round starts; one line when something was
+     shared; "the tracker paused" is explained once per session.
+
+4. **Helps the party play the same quests together, without spam** (the automatic messages below are **off by
+   default**; you talk with a right click in the Party quests window or with the ring):
+   - **"Picked up [Boar Tusks] - Anna has it too. Want to do it together?"** when you take a quest from a quest giver
+     and someone in the party already has it. Quests from one quest giver go into one message; each quest is said once
+     per party; never for a quest somebody shared with you (they know), never for one somebody just named in chat.
+   - **Where the quest items were.** For objectives you collect or use (items, objects, things to click), the addon
+     remembers where your last progress happened and adds it to the messages you send anyway, but only while someone
+     in the party still needs it: `[Wolves Among Us] - still need: Wolf slain 3/8, Wolf Pelt 2/4 (Anna has it too!) -
+     Wolf Pelt: 42.3, 61.8 in Elwynn Forest`. Not for kills, not inside dungeons (no map spot there).
+   - **A budget for automatic messages:** at most 4 a minute for the whole addon, and the "in common" message never
+     takes more than two lines (the rest is "and 6 more"). What you send yourself (quest clicks, the ring) is never
+     limited.
+
+   `/qs pickup on|off`, `/qs coords on|off`, or *Settings > Quest sharing > Messages in party chat*.
+
+5. **Can announce when a shared quest is done** (off by default). When all objectives of a quest that a party
+   member also has are finished, it says so in party chat, once for the whole party.
+
+6. **Shows who shares what.** A star and the names next to shared quests in the game's quest log, and a small
+   movable **Party quests** window (shown while you are in a party, on the left of the screen the first time; drag it
+   anywhere and it stays there). It is a grid: **your 5 nearest quests** down the side, **one column per party member**:
+
+   ```
+   Party quests (2 of 5 shared)                 [Share] [Post all] [-]  Settings
+   Quest                           [mage] Anna QS   [priest] Bob
+   Wolves Among Us          3/8 +1        v              x
+   Report to Goldshire        done        v*             ?
+   A Personal Quest            ...        x              x
+   ```
+
+   - **v** (green check) = has the quest, **v\*** (gold check) = has it and finished it, **x** (red) = does not have
+     it, **?** = the game cannot tell (the player is out of range or offline; players running Quest Sharing are
+     always known exactly, **QS** after their name).
+   - **Only the quests of the zone you are in**, never filled up with quests from elsewhere.
+   - **Also when you are alone** (*Show it when I am not in a party too*, on by default; `/qs solo off`): then it is
+     "Quests here", your quests of the zone with your progress, without member columns or party buttons.
+   - **The 5 nearest quests, re-sorted as you move** (every few seconds). A quest only moves up, or onto the list, when
+     it is clearly closer (about 20 %), so the rows stay calm while you walk. On a client that cannot measure distance,
+     the quests of the zone you are in come first.
+   - Your own progress is next to the quest name (`3/8 +1`, `done`); a finished quest of yours is green.
+   - **Scroll down** (mouse wheel) for **all your other quests in this zone**, below the 5 nearest.
+   - **Left click** a quest: it is **offered** to the members who do not have it (the quest popup; a click is your
+     decision, so it is offered even to someone who declined before). It says why when it cannot: everybody has it,
+     the game does not let this quest be shared, a share is already running, you are in a raid.
+   - **Right click** a quest: a **small menu** opens (Esc or moving away closes it; a grey line says why it cannot be
+     used right now):
+     - **Tell the party how I am doing** (see below),
+     - **Ask in chat to do this quest**: fills your current chat with `Anyone need [quest]? Wanna group up?`; select World chat first to ask there, then press Enter to send,
+     - **Offer it to the party** (the same as a left click),
+     - **Tell them where to get it**: with the [Questie](https://github.com/Questie/Questie) addon installed, the party
+       hears where it starts, which quest comes before it, **where that earlier quest starts**, and how many steps lie
+       before that: `Bob: [Wolves Among Us] starts at Marshal McBride in Elwynn Forest (48.9, 41.6), after "A Threat
+       Within" (from Deputy Willem in Elwynn Forest (48.2, 42.9)), 1 more step before that.` (Also "starts from the item
+       ..., dropped by ..." when an item starts it.)
+     - **How to do it** (with Questie): **one chat line** with what is still open and where, the spot nearest to you
+       for each, then where to turn it in: `[Wolves Among Us]: kill Wolf (Elwynn Forest 42.5, 61.5); Wolf Pelt from
+       Wolf (Elwynn Forest 42.5, 61.5); then turn in at Marshal McBride (Elwynn Forest 48.9, 41.6)`. Objectives the game
+       already counts as done are left out; a finished quest says only where to turn it in. Also objects to use ("use
+       Kobold Crate"), items from chests and places to go. In a party it goes to the party, alone only to you.
+     - **Trace back the chain** (with Questie): **one chat line** with the level it needs, every quest that comes
+       before it from the first one, where that **first** quest starts, and where this one starts:
+       `[Wolves Among Us] (level 5+): 2 quests before it: "Kobold Camp Cleanup" at Deputy Willem in Elwynn Forest 48.2,
+       42.9 > "A Threat Within" > then this one at Marshal McBride in Elwynn Forest 48.9, 41.6`. "(or 1 other)" means
+       another quest leads there too, "(+2 more)" that more quests are needed. It always fits one chat message: in a
+       long chain the middle steps become "(5 more)", the first one stays. In a party it goes to the party (sent at
+       once or into the chat box, like your other messages); alone it is shown only to you. Use it when a party member
+       does not have a quest you have: they see which quest they still need first and where to get it.
+     - **Focus it on my map** (the game's quest marker and arrow; the nearest-quest pin waits a minute),
+     - **Open it in the quest log** (the old quest log window). Where the quest log is inside the world map, this is
+       **Select it in the quest log**: the addon never opens the map itself (the game would refuse part of that in the
+       addon's name: "protected function SetPassThroughButtons()"), so you press L or M.
+   - **Tell the party how I am doing** sends at once:
+     `[Wolves Among Us] - I still need Wolf slain 3/8, Wolf Pelt 2/4 (Wolf Pelt at 42.3, 61.8). What about you?`. The spot is added only for things you
+     collect or use, and only while someone in the party still needs them; Quest Sharing users also get a pin there on
+     their map.
+   - A **grey dash** means that member **cannot take** the quest (did it before, quest log full, not eligible), so you
+     do not keep offering it. Quests you have finished are not listed at all.
+   - **Hover** a row for everybody's status and progress (and, with Questie, where the quest starts).
+   - In a raid the window says so: the game only lets quests be shared in a 5-player party.
+   - **Share** offers your quests of this area to the party now. **Post all** puts your progress on the quests someone
+     in the party has in the chat box, in one message. **-** folds the window to its title.
+   - It **hides during combat** and comes back afterwards, its **size** can be changed (70-150 %), it is as wide as
+     your party, and *Settings > Party window > Move back* finds it if you lost it.
+
+7. **Shows each other where you are.**
+   - **Quest Sharing users on your world map:** a class icon where each of them is (their addons send their position
+     every 10 seconds while they move, at most once a minute when they stand still), and yours to them.
+   - **A map pin where a teammate found the items** of a quest you still work on, when they right-click it in their
+     Party quests window. `/qs waypoint off` stops that.
+   - **The game's quest marker prefers a quest you share:** in a party it follows the nearest quest someone else also
+     has, otherwise simply your nearest quest.
+
+8. **Pings the quest target for the party** (where the game has its ping system: `/qs doctor` says so).
+   Bind a **ping key** (*Settings > Pings & quest items > Key to target and ping a quest enemy*: click, press the key; or `/qs pingkey G`). Each press:
+   - **the nearest creature one of your quests needs** becomes your target and gets the game's **Attack** ping, so
+     the party sees what to kill ("nearest" = within about 28 yards, then the one closest to the middle of your
+     screen: the game gives addons no distance to enemies);
+   - with no such creature in sight, **the quest object you are facing** (the thing to pick up or use, with the gear or
+     hand icon) gets the game's **"look here"** ping (*Ping quest objects too*, on by default).
+   - **Anti-spam:** a new ping only once the creature you pinged is **dead** (or no longer your target), or, outside
+     combat, after **5, 10 or 15 seconds** (*Ping again after*, default 10). **Shift** + the key pings anyway.
+   - **Every press says what happened** (pinged, nothing to ping, held back), and the game's own ping errors are
+     shown. **`/qs ping`** checks every step and says where it stops (the ping system, the key, quest creatures,
+     enemy nameplates, what the next press does).
+   - A message `@ping` on the quick chat ring is a **ping slot** (`/qs quick add Ping | @ping`): click it outside
+     combat.
+
+   Why a key and not fully automatic: the game lets an addon neither ping nor choose a target by itself; both only
+   happen as the direct result of your key press or click. So the addon keeps a hidden secure button loaded with
+   the nearest quest creature (outside combat; in combat it keeps the last one) and your key presses it. The
+   anti-spam check runs inside the game's secure code, so it also works in combat (there it has no clock: in
+   combat only "dead or no longer your target" and Shift unlock it).
+
+9. **Quest items you can use, one click away.** The game's tracker shows a button only for the quest items it calls
+   "special"; Quest Sharing adds an **icon next to the quest in the tracker** for the other usable quest items in your
+   bags (a torch to light, a flare to throw...). Click it to use the item. Which item goes with which quest: the bag's
+   own quest info, an objective that names the item, or (with Questie) the item the quest gives you or needs; items
+   without a "Use:" effect get nothing, and quests that already have the game's button are left to the game.
+   - **Quest item key** (*Settings > Pings & quest items*, or `/qs itemkey Q`): uses the item of your **nearest** quest that
+     has one, also in combat (the item it had before the fight).
+   - **A small button** with that item (Shift + drag to move it): cooldown, count, red when your target is out of range.
+   - Using an item is protected by the game, so these are secure buttons prepared outside combat; during a fight they
+     keep what they had and the tracker icons are put in place again afterwards.
+   - **Quest items marked in your bags** (*Settings > Pings & quest items > Mark quest items in my bags*, `/qs bagmarks
+     on|off`, on by default): a **gold** border on items for a quest of the zone you are in, a **blue** one on items
+     for one of your quests somewhere else, so the bank can keep those and you only carry what this zone needs. The
+     item's tooltip says which quest and where. An item counts for a quest when an objective names it ("Wolf Pelt:
+     2/4"), when the bag says it belongs to that quest, or (with QuestieDB) when the quest asks for, hands out or
+     needs that exact item. The game's own bags and the bank's main slots; bag replacement addons (Bagnon, ...) use
+     their own buttons and are not marked. Clicks go through to the item.
+
+10. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. **Hide the game's
+    tracker** altogether: *Settings > Quest list > Hide the game's quest list on the right* (`/qs hidetracker on`; outside fights, as
+    the game requires; the Party quests window still shows your quests). It fills the
+   tracker (the list on the right) with the quests closest to you and **re-checks every 2 seconds as you
+   move**, so the list follows you instead of changing only when you cross into another zone.
+   - **Distance mode** (needs a client that can tell how far a quest is) ranks quests by distance. A quest
+     already in your tracker keeps its place unless another one is clearly closer, and a change must be
+     seen twice in a row (about 4 seconds), so a short detour never reshuffles the list.
+   - **Zone mode** (works on every client) tracks the quests of the zone you are standing in and swaps them
+     when you change zone.
+   - `/qs near N` sets how many quests it keeps (default 5, limited by the tracker's maximum).
+   - It manages the whole tracker list while it is on, and **`/qs near off` puts your old list back**.
+     If you change the tracker yourself it steps aside for 10 seconds (a setting; `/qs near resume` to continue). It waits
+     during combat and inside instances.
+   - Note this fills the tracker list. It does not touch the single highlighted "waypoint" quest.
+
+11. **(Beta) Adds the people you group with to your friends list.** `/qs friends` adds everybody in your
+   party now. `/qs friends on` also does it automatically when a party forms or someone joins; this is
+   **off by default** because it changes a list that matters to you. Safeguards: people already on your
+   list and ignored players are skipped; players from another realm are skipped where the client cannot
+   add them; random dungeon-finder groups are skipped in automatic mode; automatic mode never fills the
+   last 5 friend slots; and the adds go out one every 1.5 seconds. Each add gets a note ("Quest Sharing:
+   <zone>"). The game's answers (added, already a friend, not found, list full, other faction) are read and
+   summarised for you.
+
+12. **A quick chat ring, like in Diablo 4.** Bind a key (Game Menu > Options > Key Bindings > Quest Sharing,
+   or `/qs key V`). **Hold the key**: a clean ring of up to 8 messages opens around the mouse, each with a short
+   label (14 letters at most) outside the ring. **Point at one**: its full text appears in the middle. Then
+   **release the key** or **click** it. By default the ring has:
+   *Hello - Team up? - What I need - Same quests? - Thanks - Wait - Follow me - Invite*. *Team up?* says
+   "Doing [your nearest quest] here - anyone want to group up?" in `/s`.
+
+   **Sent at once.** A message you pick on the ring is sent straight away, no Enter (*Settings > Quick chat > Send
+   the message at once*, or `/qs quick send on|off`; on by default). Off: it goes into the chat box and you press
+   Enter. Messages to everybody nearby (`/s`, `/y`) only go out at once from a **click** on the slot, because the game
+   wants a real click for those; **releasing the key on them puts them in your chat box** (press Enter), so a release
+   always does something. **If the game refuses a channel** (some game clients do not let addons post in `/s` at all,
+   not even from a click), that message goes into your chat box instead and the addon remembers it **for that channel
+   only**: from then on `/s` messages go straight into your chat box (press Enter), while whispers and party messages
+   still go out at once. The ring's hint says so ("the game does not let addons send this here"). Ticking *Send the
+   message at once* again gives the refused channels another try.
+
+   Different messages and emotes can follow each other right away (*Hug*, then *Salute*); only the **same** slot
+   picked twice within a second is held back, so a double click never sends it twice.
+
+   **The player a message is for** is your **target** if it is a friendly player, otherwise the friendly player
+   **under your mouse when you open the ring** (the one you highlight). The middle of the ring shows where the message
+   goes ("whispered to Lia") before you let go. Players of the other faction are never picked (they cannot read it).
+
+   **More rings with the mouse wheel.** While the ring is open, **scroll the mouse wheel** to flip to the other rings
+   (and around): **Emotes** (*Thank, Bow, Dance, Wave, Cheer, Point, No, Wait*), **Group calls** (*Follow me, Charge,
+   Attack!, Heal me, Help me, Incoming, Flee, Out of mana*) and **Fun** (*Train, Laugh, Applaud, Salute, Hug, Flex,
+   Chicken, Roar*). The name of the ring is shown above it, and the ring you used last opens first. **All rings
+   are yours to edit**: *Settings > Quick chat*, pick the ring at the top of the editor (*Messages, Emotes, Group
+   calls, Fun*), then change a slot's label and text: type an emote as `/dance`, `/salute`... (any emote the game
+   knows), or a message; Up / Down / Remove / Add / Reset (Reset puts back that ring's defaults). Emotes are the
+   game's own (with their animations and voices), not chat: a release does them. If your game refuses emotes from
+   addons, the emote is typed into the chat box instead (`/bow`, press Enter), and so are the next ones. (There is no
+   "stop" emote in the game; *Wait* is the closest.)
+
+   **Only emotes your game has are on the ring** (the addon reads the game's own list of emotes). After each emote the
+   addon waits for the game's answer ("You dance."); without one it says so ("the game did not show /hug, 1.2 s after
+   the emote before"): the game may hold back emotes done quickly one after another, so try it again in a moment.
+   A quick flick onto a message sends it; only a tap with nothing pointed at keeps the ring open for a click.
+
+   **Test the whole ring:** `/qs quick test` (or **Test the ring** in the log window) runs every slot of every ring,
+   one every 3 seconds, and shows what the game really did: emotes are done for real and the game's line awaited
+   ("You dance."); messages are **whispered to yourself** (nobody else gets them) and the game's "To you" awaited.
+   Pings and invites are skipped. The window lists `[OK]` / `[--]` for each slot with the game's answer, ready to
+   copy. `/qs quick test emotes` or `messages` runs only those, `/qs quick test fast` runs the emotes back to back (to
+   see whether the game holds quick ones back), `/qs quick test stop` ends it. Emotes are seen by players near you.
+   A refusal during the test is only reported, nothing is switched off for it. The game's own chat log is another
+   way to check: `/chatlog` writes every chat line to `Logs/WoWChatLog.txt` in your game folder.
+
+   **Where it goes.** Every message has its **own channel**. In `/qs settings > Quick chat`, click a message and pick
+   one in the **Channel** row under it (the list shows each message's channel), or type `/qs quick route N <channel>`:
+
+   | Channel | Goes to |
+   |---|---|
+   | **Auto** (most messages) | a whisper to the player you picked if they are not in your party (`/w`, and `{name}` is their name); otherwise the party (`/p`; `/i` in a dungeon group); alone with nobody picked `/s` |
+   | **Nearby** (*Hello*) | a whisper to the player you picked, otherwise `/s`: greetings never go to the party chat |
+   | **/s Say**, **/y Yell**, **/p Party**, **/w Whisper** | always that channel (Whisper = the player you picked) |
+
+   The setting *Auto messages go to* (or `/qs quick channel auto|say|party|whisper`) changes only the messages left on
+   Auto.
+
+   **You see where it goes before you send it.** Every dot on the ring has the colour of the chat it goes to, the
+   game's own chat colours: **party blue**, **whisper pink**, **say white**, **yell red**, gold for the invite. The
+   middle of the ring shows the message and, under it, "to the party", "whispered to Lia" or "to everybody nearby
+   (/s)". *Settings > Quick chat > Message ring size*: small, normal or large.
+
+   **Why `/say` needs a click.** The game only lets an addon say things to everybody nearby (`/say`, `/yell`,
+   `/emote`) as the direct result of a key *press* or a mouse *click*, never from a key *release*; that is what
+   caused the "Interface action failed because of an AddOn" message in an earlier version. So:
+   whispers and party chat send the moment you release the key; for `/say` (and for the invite action) a release
+   keeps the ring open on your choice and **one click, or one more press of the key,** sends it. A quick tap of the
+   key also keeps the ring open so you can click a message.
+
+   **Messages are filled in when you point at them.** `{name}` is the friendly player you target (or "there"),
+   `{here}` your subzone or zone, `{need}` what you still have to do in this area (your unfinished
+   objectives, nearest quest first where the client can measure distance), `{mine}` links to your
+   unfinished quests of this area, `{common}` the quests you and your party share, `{quest}` the nearest
+   unfinished quest, `{zone}` the zone, and `{shared}`, a whole sentence that fits the moment.
+   **`{shared}` knows you cannot see a stranger's quests**, so with someone who is not in your party it asks a
+   question that links yours (they can click a link and tell you): *"Are you doing any of these quests here?
+   [Wolves Among Us], [A Personal Quest] Want to do them together?"*. Once you are in a party it says *"We have
+   these quests in common: ..."*, or *"No quest in common yet - I'm on ... Any of these yours?"*.
+
+   **Arrange the messages as you please.** Open `/qs settings`, tab **Quick chat**: click a message, change its
+   label and text, press Enter, use Up / Down / Remove / Add / Reset, and **Show the ring** to see it as it looks in
+   play. Or by command: `/qs quick` lists them; `/qs quick add [label |] <text>`, `edit N <text>`, `label N <label>`,
+   `remove N`, `move N M`, `reset`.
+
+13. **A minimap button.** Left click opens the settings window, right click shows or hides the
+   quests-in-common panel, drag it around the minimap edge to move it (`/qs minimap off` hides it).
+14. **An "Invite" action on the wheel.** A message that starts with `@invite` invites the player you target to
+    your party and whispers them the rest of the text. The last default wheel slot is
+    `@invite Sending you a party invite - let's quest together!`. It checks first that you have a target, are
+    the party leader (if you are in one) and that the party is not full.
+15. **Built-in help for problems.** Diagnostic recording is **on by default**, including once for existing
+    installs when updating to this change. `/qs debug off` stops recording and that choice is preserved afterward.
+    Errors are always captured. Open `/qs log`, `/qs errors`, `/qs doctor`, or **General > Copy logs, errors and setup**:
+    they open **one window with a readable issue overview**: newest issues first, plain-language headings,
+    last-seen times, repeat counts, paused features and separate setup notes. Opening the report does not dump
+    technical output into game chat. Click **Copy all**, then **Ctrl+C** (Windows) or **Cmd+C** (Mac) to copy the
+    **entire report**, including every retained error/stack, setup check, feature setting and log line, even when
+    those details are hidden from the overview. **Show full report / Show overview** switches views in the same
+    window; full settings have one readable entry per line. Text stays fixed while reading or copying;
+    **Refresh** takes a new snapshot.
+
+    The debug log records addon actions and outcomes, commands, setting changes, game replies, your own chat,
+    combat, target/party/zone changes and quest events. Repeated adjacent lines have a count. Recording is bounded
+    to about 3000 lines (trimmed in batches); the newest 30 distinct error records are retained. The report includes
+    everything still retained, with no extra 1000-line or 10-error display limit. The game saves the records on
+    `/reload` or logout to `WTF/Account/<account>/SavedVariables/QuestSharing.lua` (`QuestSharingLog` and
+    `QuestSharingDB.errors`). **Clear records** empties both lists; `/qs log clear` and `/qs errors clear`
+    clear only their respective list. The ring test remains available from the report's **Test the ring** button.
+
+16. **Quest objectives are easier to find.**
+    - **Quest icons over creatures:** every creature that is part of one of your quests gets a gold quest icon
+      above its nameplate (the game itself tells the addon which creatures those are).
+    - **The nearest quest is pinned in the world:** while "tracker follows me" is on, the game's own
+      highlighted-quest marker (waypoint) follows the closest quest as you move. A quest only takes over after
+      it has been the clear winner twice in a row, and if you pin a quest yourself it steps aside for 10 seconds.
+      Switching it off gives back the quest you had pinned.
+    - **Optional game-settings helper** (`/qs highlight cvars on`, off by default because it changes game
+      settings): turns on enemy nameplates (the icons need them) and the game's icons over objects you can
+      interact with. Switching it off puts your own values back.
+    - `/qs highlight mobs|pin|cvars [on|off]`; the same switches are in `/qs settings`.
+
+## Settings window
+Open `/qs settings`, left-click the minimap button, click **Settings** in Party quests, or use
+*Game Menu > Options > AddOns > Quest Sharing*. Choose what you want to change from the left-hand menu:
+
+| Category | What you can change |
+|---|---|
+| **General** | Turn the addon on/off, show its minimap button, choose how progress messages are sent, preview quick chat, check your setup, view logs, reset settings |
+| **Quest markers** | **Show ! above quest enemies**, turn on the enemy health bars those marks need, follow the nearest quest with a waypoint |
+| **Quest list** | Hide the game's tracker or automatically fill it with nearby quests; choose how many and how long to pause after your own edits |
+| **Accept & turn in** | Automatically accept quest offers and turn in ready quests; each has its own switch |
+| **Quest sharing** | Offer quests to your party, require a manual Share click, announce progress, sync quest information, mark shared quests in the quest log |
+| **Party window** | Show/hide/resize the separate Party quests window, restore its position, post progress by clicking, add party friends |
+| **Pings & quest items** | Bind target-ping and quest-item keys, mark bag items, show usable item buttons |
+| **Quick chat** | Set the ring key, choose hold/press, choose where messages go, edit each message or emote |
+| **Map** | Zone level guides, party map icons and shared item-location waypoints |
+| **Browser DB** | Quest rewards, dungeon loot and quests, Cooking recipes, profession upgrades, item/vendor search and item source tooltips |
+| **Extra tools** | Quest planner, bag cleanup, spell ranks, saved fishing spots and quest invitations |
+
+Every option has a visible explanation of what turning it on does and any requirements.
+For example, **Quest markers > Show ! above quest enemies** adds a gold ! above enemies needed for your active
+quests; **Turn on enemy health bars and nearby object icons** enables the game's nameplates those marks need.
+The shared-quest star in the quest log has its own setting under **Quest sharing**.
+
+Checkboxes show **On** or **Off**. For choices, click the named option you want; the selected option is marked
+**[x]** and its explanation appears below. Numbers have separate **-** and **+** buttons (Shift changes five steps).
+For a key binding, click **Set key**, then press the key; Escape cancels. Actions use named buttons such as
+**Run check** and **Browse rewards**. Changes save automatically.
+
+Long pages scroll, including the Quick chat message editor. Use your mouse wheel or the visible **Scroll up** /
+**Scroll down** buttons. Changing a setting keeps your reading position; changing category starts at the top.
+Your existing saved choices and defaults are kept. Quest automation, map extras, spell-rank automation, fishing,
+reward browsing, friend automation, and the game-settings helper remain opt-in.
+
+**The map button's tooltip** shows how things are right now: your party and how many quests you share, whether the
+tracker follows you, your quick chat key (or that it is not set) and how many problems were recorded.
+
+**Good news has a sound** (switch it off under General): a soft ping when someone accepts a quest you shared or a
+party member running Quest Sharing finishes one you share. Never during combat.
+
+## Extra tools and Browser DB
+
+Open `/qs settings` > **Extra tools** for the quest planner, bag cleanup, spell ranks, fishing spots and quest invitations. **Browser DB** collects all equipment, dungeon quest, profession and item/vendor lookups; **Map** contains zone levels and party locations. Quest automation stays under **Accept & turn in**.
+
+Each tool has a card with its purpose, data requirements and a named Open action where available. Its persistent switch appears below the description. Clicking a card description does not change a setting. Database searches run when you use a tool, not when you browse settings; map search explains how to use the world map search box.
+
+**Leftover quest items.** Open **Extra tools > Bag cleanup** or type `/qs cleanup`. Questie is required. The tool checks carried bags against every quest in your log, including completed quests awaiting hand-in and quests in other zones. It keeps known active objective/source/special items and items that start quests; unknown and locked items are skipped. Review each possible leftover, then confirm **Delete stack** to permanently remove that whole stack. These are candidates, and may still have a use in a future quest. Each confirmation rechecks current quests and the exact bag slot/item/count before deletion. Bag or quest changes cancel the review; click **Refresh bags**. Cleanup waits during combat, never scans the bank, and runs only when opened/refreshed or after a confirmed deletion. If the client refuses deletion, it returns the picked-up item and explains how to delete it manually.
+
+**Quest planner.** Open **Extra tools > Quest planner** or type `/qs plan`. It is off by default. Open it when you need it; saving the enabled switch does not open it or scan the database on login. While the guide is visible, it updates when you enter a different zone or your quest log changes. Closing it stops database work until you open it again. Use it outdoors in a zone: it will not scan in towns, cities, dungeons, or continent maps, and it clears or rebuilds the plan if you enter a town or change zones. Questie and a recent QuestieDB are needed for its quest catalogue, prerequisites and locations.
+
+The planner plans the zone's own quests: the ones Questie files under the current zone or one of its sub-zone maps. Class, profession, event and other-zone quests stay out even when their giver or a mob is here; a quest from another zone appears only for its hand-in here once it is ready. Each kill or collect step goes to a real camp: a group of at least three spawns of one creature (or its biggest group, if it never gathers that many), or a spot the step's creatures share, such as 2 + 2 spawns of two creatures. Lone stray spawns are ignored and the step stays put while you walk. Up to four real camps are considered per step; the planner picks the one that suits the whole route, such as the camp beside the hand-in or one already farmed for another quest on the same creature. A step keeps the camp it chose until another one is clearly cheaper (by a quarter of the visit's travel and work and at least 20 seconds), so it does not flip between two camps as you walk. A camp the guide used only because you marked another one busy is not kept once the wait ends, and **Clear camp wait** lets every step choose its camp afresh. Your position is only where the route starts. It checks real acceptance restrictions and follows locally attainable chains without a fixed depth limit. The default goal is to complete the zone's compatible, non-repeatable quests. The **Plan** button chooses **Complete zone**, **Quest XP/hour**, **Selected quests** by quest ID, or a time budget in minutes. Goals and level scope last for the session. **Level range** switches the optional green/yellow filter. Quests requiring a future level, work elsewhere or missing facts appear in the plan report.
+
+The planner compares nearest-ready instructions with alternative pickup, unlock and farming orders. It prices travel, estimated work and known waits, and gives time credit when the same verified creature action can progress accepted quests together. One item drop stream can share kills with kill quotas. An unaccepted follow-up receives no earlier kill credit. Independent objectives at the same camp share travel. Unknown quantities/rates use labelled work estimates. The guide explains measured differences between the schedules it compares. After the first route appears, a background local search moves short runs of steps and reverses short segments, re-checking prerequisites, log slots and budgets for every change, and swaps in a faster route while keeping your selected step, including a step you chose while it was running. It runs again only when your quests, goal or level range change or after you move about a tenth of the map; smaller moves reuse the refined order. The refinement is idle work: it runs only while no other data work (map search, the dungeon scan) is waiting.
+
+Times are forecasts from a bounded search. Default estimates are 10 seconds per kill, 3 seconds per interaction and 60 seconds for work whose count/rate is unknown. Native map dimensions and movement speed scale geometric distances. When dimensions are unavailable, the report identifies its illustrative zone scale. Every leg uses a straight-line travel estimate. Shortest Path Forever is never used for planning, so camps and step order are the same with or without it. Multiple separate loot streams, transport, inventory consumption, future-level XP and custom escort state require further verified data. Live Forever behavior needs in-game confirmation.
+
+The report includes expected travel, kills, hand-ins, same-work nearest-first comparison and unavailable quests. **Camp busy 5 min** marks the selected objective's camp busy for five minutes: the step moves to a free alternative camp when there is one, and if every camp is busy the guide prices a wait for the camp that frees up first. Visible quest, bag, spell and level changes refresh from the zone cache. Meaningful movement can update the order every three seconds while open. Small estimated improvements retain the prior feasible route. The first explicit discovery reads the quest-ID catalogue cooperatively through the shared data scheduler. Later updates reuse the last two zone ID lists and a bounded source cache.
+
+Commands include `/qs plan all`, `/qs plan xp`, `/qs plan selected 123 456`, `/qs plan budget 30`, `/qs plan range`, `/qs plan unrestricted` and `/qs plan why`. The guide's Plan button and `/qs plan options` open **Settings > Quest guide**, where the goal, time limit, quest IDs and level range are saved settings (a command such as `/qs plan xp` saves them too), with **Mark selected camp busy**, **Clear camp waits**, the learned pace and the plan report. While the guide is open it times your kills (the gap between two kills of the same objective) and quest giver visits (quest window open to accept or hand-in). After 5 samples each, your own median (4-40 s per kill, 1-15 s per quest giver) replaces the 10 s and 3 s defaults; **Reset learned pace** forgets it.
+
+The route appears in an opaque dark guide beside the game's quest tracker; drag its header to place it where you want, then use **Lock** to keep it there for the session. The header shows the zone and current/total step. The current step is highlighted in gold on dark red; up to five upcoming steps are muted beneath it. **< / >** reviews previous/next steps and marks the destination; this does not complete quests. **− / +** switches between expanded and current-step-only views. Each step says where to go and which quests to take, complete or hand in. Left-click a step to set its waypoint; right-click to mark that location too, or use **Waypoint**. Open the map with `M` to see the pin. Changing zones immediately clears old steps before building the new zone's plan. With the green/yellow filter enabled, if every mapped quest in the zone is below green, the planner says **This zone is too low level for you.** Long rows grow to fit their text while scrolling. With Shortest Path Forever installed, **Follow with SPF** hands the selected stop to SPF to draw and guide the walk on both maps. This is an explicit action and replaces the route currently being followed. You can also use `/qs plan follow`. It updates after quest progress, and **Refresh** is available if needed. Completing an objective or quest rescans eligibility; progress-only count changes rebuild the current steps. `/qs plan next` selects the next step and sets its regular waypoint; `/qs plan refresh` rediscovers the zone list; `/qs plan hide` closes the panel; `/qs plan on` enables the tool; `/qs plan off` disables it and closes the panel. Following a step does not move your character or accept/complete quests for you.
+
+**Direction arrow and map route.** While the guide is open, a green arrow above it points toward the selected stop relative to your facing. The caption names the action and destination; the distance is in direct yards, with a compass direction. At the destination it says to follow the quest step; arrival does not accept, finish or skip a quest. Missing position/distance/facing data is labelled rather than guessed; delayed measurements recover automatically while the guide is open. The arrow follows the guide when you move it and disappears when you close it.
+
+Open the world map normally to see numbered quest stops and connecting lines; the selected stop is highlighted. Click a number to select that step and set its waypoint. Stops at the same spot share numbers, and repeated clicks cycle through them; the selected number remains visible and its marker uses its exact position. The connections show stop order, not a path around terrain; **Follow with SPF** remains the way to request terrain-aware guidance. Map interactions hide during combat while the read-only arrow keeps updating. The overlay uses addon-owned drawings, and it reads no extra quest database data. Stationary map geometry is reused and all guidance updates stop when the guide closes.
+
+**Travel limits:** SPF is optional and only draws the walk for **Follow with SPF**. That guidance follows SPF's data and water-walking settings; no strict no-swimming promise is made, and SPF may combine travel modes when guiding. The plan itself uses map-distance estimates for every stop, so a river or cliff between you and a camp is not priced in. Questie points often have no height, so cave entrances, stacked floors, elevators and underground connections need in-game checking; an unknown floor is not guaranteed correct. Without SPF, the game's waypoint marks the stop but does not draw a path. The planner may miss quests whose Questie points cannot be mapped to your current area.
+
+**Item source hints and map search.** Turn on **Show where items come from when I hover over them** to add vendor types such as
+**General Goods** to bag and recipe item tooltips. Known mining nodes are labelled **Mining**. Questie stores vendor links
+and object names, but does not mark every gathering profession or craft recipe, so unrecognized source types are not guessed.
+**Map search requires a recent QuestieDB database; it cannot search on its own. QuestieDB can run without the full Questie addon.**
+Install/enable QuestieDB and `/reload`, then run `/qs questie` to check that its data is available.
+The map panel explains when the database is missing or too old, instead of reporting a misleading empty search.
+Turn on **Search items and vendors on the map**, open the map with `M`, and type an item name or vendor type such as
+`General Goods`. Type `vendor` (or `all vendors`) to highlight all known sellers on the displayed map; type
+`general vendor` to highlight only its general sellers. These searches never add pins from another map; browsing a new
+map updates the results. Sellers are recognized from Questie item links, vendor flags (including NPCs without titles),
+or known merchant titles; unrelated titled NPCs such as trainers are excluded from `vendor` results without seller evidence.
+The search panel sits in the map's bottom-right corner. Suggestions appear above it in a solid dark panel with a border
+and larger white text; click one or press
+Tab to complete it. Suggestions only include roles and buyable items with known locations on the displayed map;
+changing maps updates both suggestions and pins. Partial titles also match, so `tail` finds local **Tailor**,
+**Senior Tailor** or **Senior Master Tailor** roles. Choosing **General Goods** searches matching NPC titles even when
+Questie has no item-to-seller links for that NPC. Choosing an item searches sellers of that exact item.
+Class trainers such as `Druid Trainer` and `Paladin Trainer` are also searched by their NPC titles; they do not need
+an item seller link. Discovering these unlinked trainers requires Questie's enumerable NPC list.
+Role search accepts common English profession names and variants: `skinner trainer` finds **Skinning Trainer**,
+`miner trainer` finds **Mining Trainer**, and `leatherworker trainer` finds **Leatherworking Trainer**. Plurals,
+punctuation and word order are flexible. A small typo such as `paladin tranier` is also tolerated; exact or partial
+matches on the displayed map take priority, and suggestions show the actual role title. Typo correction is limited to
+one spelling error in role words of at least five ASCII letters; short/localized words retain literal matching.
+Item searches keep their existing literal matching, and choosing an item still searches that exact item name.
+The panel names the map and reports the search text and number of known locations. Hover a pin to see the matching role,
+query and coordinates; click it to set a waypoint. Click **Clear** or delete the search text to
+remove the pins. The magnifying-glass button inside the search bar runs the search. Buyable items and reagents appear when
+Questie links them to vendors. Searches stay on the displayed map by default. If there are no local pins but known matches
+exist, click **Elsewhere** to explicitly look for the closest known match on your continent by map distance, then
+**Waypoint** to mark it. Changing the query or displayed map restores local search. Ctrl-right-click also searches only
+the displayed map. Search needs a recent QuestieDB NPC or item list; older providers with only item enumeration have
+partial role coverage. Missing item seller links are explained; drops, gathering and crafting are not searched.
+Results use one map view; there is no separate location-list view.
+
+**Lightweight data loading.** Login, a closed map and an empty search do not build these catalogues. The first letter you type starts building reusable NPC role metadata once; later keystrokes continue that work instead of restarting it, and it pauses while the map is hidden or the search box is empty. A matching role query does not load the item catalogue. Item fallback and broad seller queries read item seller links when needed, reading names only for buyable items. The search itself starts after a brief pause in typing. Suggestions appear as soon as the first match on the displayed map is found, earlier suggestions stay visible while you refine the text, and the panel shows progress such as "Indexing 3,200 / 10,122 NPCs". Locations are decoded only for the current query's candidates, including spelling alternatives, and kept in a bounded cache between keystrokes; the cache is cleared on a map change, on **Clear** or an empty search, and when the database goes away. Disabling map search releases its indexes. The guide and map search share a soft 2 ms work budget per 100 ms slice (searches you type get 8 ms while the map is open) and suspend database work in combat; a single provider call can exceed that budget. Hiding a tool stops its scans. Questie and QuestieDB manage their own loading and caches independently. Quest reward and dungeon catalogues also start only when you open their browsers.
+
+**Quest acceptance and turn-ins.** Under `/qs settings` > **Accept & turn in**, enable **Accept quest offers automatically** to
+accept a quest when an NPC or party member presents it. Enable **Turn in completed quests automatically** to continue a ready
+turn-in and take its reward when there is no choice or only one reward choice. Quests with multiple choices or a
+required payment stay open for you. Both options are independent and off by default.
+
+**Questing levels on the world map.** Open the map normally with `M`: continent maps display level badges
+over outdoor zones, and a small **Questing levels** panel shows the range for the zone you view or hover.
+Choose a continent/zone from the world overview to see its details. This is **off by default**; enable
+**Show zone questing level ranges** in Map to display it. Labels do not intercept map clicks and
+follow map resizing/zoom.
+When upgrading from v0.4.11, the option is switched off once; your subsequent choice stays saved across reloads.
+
+Valid player-level map data from the client takes priority. When it is missing or zero, built-in **Zone guide**
+ranges cover the 39 Classic questing zones, Zephras Isle and Riverglades, without another addon. Mount Hyjal
+and Shen'dralas have explicitly labelled **Known quests** spans from verified quest records; these show the
+levels of known quests, rather than claiming a complete recommended bracket. Hover/view a zone to see the
+source label. Cities and Moonglade show **City** or **Sanctuary**. Native data arriving later replaces a guide.
+**?** or **range unavailable** is reserved for areas without either valid native data or a verified fallback.
+Ranges do not guarantee quest availability for your class or faction. Quest/minimap symbols remain removed.
+
+**Highest learned spell ranks on your action bars.** Enable **Auto-update spells to highest learned rank**
+in Extra tools (off by default). It upgrades existing player spell buttons across normal action-bar pages,
+including hidden/form pages and duplicate copies, to the highest rank you have learned. It checks when enabled,
+at login, after learning spells and when spell buttons change. **Check spell ranks now** runs a check and reports
+its result. This does not train or buy spells; macros, items, pet actions and unranked abilities stay unchanged.
+While enabled, deliberately placing a lower-ranked spell on a normal bar also upgrades it.
+
+Updates wait until you leave combat, temporary/vehicle bars end and you finish dragging anything on the cursor.
+Unknown or ambiguous rank data is skipped; if the client refuses a replacement, updates pause until `/reload`
+and report the problem. Turn the option off to keep lower-ranked buttons; disabling it does not undo upgrades.
+Action bars supplied by other addons work when they use the game's normal action slots; custom secure actions
+and spells written inside macros are not edited.
+
+**Ask in chat to do this quest.** Right-click a quest in the Party quests window and choose this action to put
+`Anyone need [quest]? Wanna group up?` straight into your current chat. The actual quest is linked; no invitation
+editor opens. Select World (or another chat channel) first to ask there, review the message, then press Enter.
+An existing draft is kept, and duplicate quests or messages that exceed the chat limit are rejected.
+
+**Seek fellow adventurers (optional editor).** For a longer role-play invitation, use `/qs adventure`
+(optionally followed by a quest ID, exact title or quest link), or *Settings > Extra tools > Quest invitation*.
+It chooses an unfinished quest from your log; **Next quest** browses the others. Choose a channel, edit the text,
+and click **Prepare chat** before pressing Enter to send.
+
+> Hail, fellow adventurers! I seek brave companions for [Wolves Among Us] in Elwynn Forest. Who will join me and share the adventure?
+
+Edit the invitation if you wish. For **Chat channel**, enter `current` to keep the active chat (including its whisper
+recipient or custom channel), or `say`, `yell`, `party`, `raid`, `guild`, `officer`, `instance`, `whisper Anna-Realm`,
+or a joined channel number/name such as `1` or `LookingForGroup`. **Prepare chat** writes the message into your chat
+box; **press Enter to send**. This also applies when the other features send immediately. With `current`, an existing
+draft is kept and the invitation is appended only if it fits; changing channels asks you to send or clear that draft
+first. Completed/abandoned quests cannot be advertised. Generated invitations fit the 255-byte chat limit; unusually
+long quest links fall back to a shortened plain title. This works without a party or Questie.
+
+**Fishing on the big map.** `/qs fishing` opens the water editor. Add a lake, river, coast or fishing pool by name,
+map ID and X/Y coordinates (0–100); **Use my position** fills the coordinates of where you stand.
+On clients with map cursor support, enable the fishing layer and **Alt-click a body of water on the big map** to
+start a new marker at that exact location.
+Enter its minimum fishing skill, skill needed to avoid getaways, fish list and notes such as season or time of day. Leave unknown
+skills blank. **Save water**, then enable **Show fishing waters on the world map**: the map has a fishing icon,
+water name and minimum skill at that location. Hover for the fish and other details; click the icon to edit it.
+Use the editor's saved-water list to revisit any location, with Previous/Next for more waters. Each body of water
+has its own record, including multiple waters in the same zone. Your notes persist across sessions and settings
+resets; **Delete selected** removes just that water.
+
+Installing [AnglerAtlas](https://www.curseforge.com/wow/addons/angler-atlas) adds a scrollable **zone overview** with
+the zone's fishing skill and fish. That overview is read from the installed addon; zone estimates and provisional
+Forever data remain labelled. **There is no built-in verified catalogue of every individual water:** markers and
+their specific fish/skill values are entered by you, and zone summaries are not copied onto individual waters.
+The fishing layer works alongside Questie.
+
+**Cooking inside the game's profession window.** Open Cooking normally. The native window now contains
+one scrollable list of all reference recipes, with a separate **Skill** column and a short source line.
+Learned recipes use gold text; unlearned recipes use readable grey text and remain clickable. Search
+recipes, ingredients or acquisition sources without paging through separate screens.
+
+Select a learned recipe to use WoW's existing crafting pane and controls. Select an unlearned recipe to
+see **Requires Cooking**, **Where to learn**, and **Ingredients** in the same right-hand space; hover an
+ingredient for mob/zone/fishing information. Unknown learned status or source data is explicitly labelled.
+The list uses 133 bundled Forever reference records plus additional live Cooking recipes when available;
+unsupported/obsolete client records can still appear. Native recipe filters are left unchanged.
+
+**Upgrades**, beside **Recipes** at the bottom of that same game window, contains all 12 professions,
+four ranks, and direct **Both / Alliance / Horde** choices. It also works from the profession overview.
+The fishing editor's **Cooking / recipes** button, `/qs cooking`, and `/qs professions` target these embedded
+views; if the native window is closed, open it with K and choose a profession. No separate addon window opens.
+
+Installed Questie supplies ingredient drop mobs, mob levels, coordinates and sellers; the existing zone
+reference supplies zone brackets. Seven example fish waters have guide-backed routes, and AnglerAtlas can
+add zone estimates. Missing fishing entry/no-getaway thresholds stay **unknown**, separate from recommended
+route skill; effective skill includes pole/lure bonuses. Catches may vary by water, season and time.
+Recipe/rank facts are checked **2026-11-17**, using the MIT-licensed [Profit Forever dataset](https://github.com/ExcEssIv3/profit)
+and [Forever profession guides](https://www.wow-professions.com/forever); some guide details remain beta-derived.
+
+The integration is on by explicit request. Disable it in **Browser DB > Cooking recipes** or `/qs professions off` to restore the native view and suppress item farming hints.
+Manual `/qs cooking` or `/qs professions` re-enables it. No login catalogue scan, filter toggling, automatic
+crafting or runtime downloads; live recipe reads pause in combat and stop on close or profession changes.
+
+**One search window.** `/qs rewards`, `/qs loot` and `/qs dungeons` open the same **Quest and equipment explorer**. Switch between
+**Quest rewards**, **Instance drops** and **Dungeon quests** with its tabs. Item rows have icons, quality colors, item/required levels
+and a source line; hover for the game's comparison tooltip. Click a row to update the route or drop-source pane
+on the right. Selecting more items never opens additional route/source windows.
+Each equipment name appears **once**, with every matching mob or quest listed together in its details.
+The shared window uses a WoW-style **Adventurer's Journal**: native red/gold buttons and tabs, warm framed lists,
+item-slot borders, gold selection highlights and readable parchment source/quest pages with dark text.
+The look is shared by all three tabs, including their search fields and dropdowns; existing filters and actions are retained.
+Different item IDs sharing a name are grouped too; details show each version's level, and the comparison
+tooltip uses the highest-level matching version. Filters apply before grouping, so only matching sources remain.
+**Only Rare (blue) quality and above are listed** in both tabs; green, white and grey items are excluded.
+Items with unknown quality stay hidden until their details load. Clear filters keeps this quality minimum.
+
+The filter bar applies to both tabs. Click a **dropdown** and choose directly; type in its search field to
+find an option, scroll for more choices, or use Up/Down and Enter. Escape dismisses the list. Choose **Weapons**,
+**Armor** or **Accessories**, then a specific **Item type** and/or **Slot**. Changing category clears an incompatible
+slot/type selection. Class, faction and dungeon source also use direct dropdowns.
+
+**Search as you type** for an item, quest, boss, zone or dungeon; Enter still applies immediately. The **Clear**
+button or Escape in a search field clears it. Scroll over results or the dungeon list with the **mouse wheel**;
+Up/Down while the result search field has focus selects items and moves between pages. Previous/Next are still
+available and become inactive at list boundaries. Details open automatically for the first visible result;
+click or arrow to another item, and selection stays put across item-data refreshes when still visible.
+
+For **Level range measures**, choose **Required level** or **Item level**, then enter **Min**/**Max**. Bounds update
+while typing; Enter or **Apply** works too. Bounds are inclusive and blank means unrestricted. Invalid or reversed
+ranges keep the last valid range and explain the problem. **My level** sets the required-level maximum to your
+current level without a lower bound. **Sort** by highest item level, lowest required level, or name.
+
+**Stat filters** work in both tabs. Choose up to three bonuses from the searchable stat dropdowns and enter a
+**Min bonus** for each: for example, **Intellect ≥ 10** and **Stamina ≥ 5**. Every selected condition must match;
+minimums are inclusive, blank means 1, and choosing **Any stat** removes that condition. Minimums update while
+typing or on Enter; invalid values keep the last valid filter. Primary attributes, armor, attack/spell bonuses,
+healing, regeneration, combat ratings and resistances are available. Ratings use points, not percentages.
+Only bonuses reported by the client's item-stat API can match; procs and unreported bonuses are not evaluated.
+Missing stat data stays hidden while a condition is active; clients without the API show an explanation.
+
+**Clear filters** clears the shared type/slot/range/stat/sort controls and the active tab's searches. On the dungeon tab
+it also returns to All dungeons/All encounters; on the quest tab it shows all quest levels while keeping completed
+quests hidden and preserving character/class/faction. Blue quality and above remains enforced. Empty results
+explain how to broaden the search; pending item data is labelled as loading.
+
+**Find quest equipment for your character.** `/qs rewards` opens the browser and enables it. It starts with your
+class, current level and faction. Change class or faction with their buttons, edit the character level and
+wait briefly or press Enter, or search for an item, quest or zone. **Quest levels: near** shows quests from ten levels below to three
+above your selected level, while still requiring their minimum acceptance level and the item's required level to
+be within reach. Switch that filter off to browse lower-level rewards too; the completed-quest toggle includes quests
+already completed when requested. **My character** restores your own filters.
+
+Each result shows the item, its item/required levels, quest and starting zone; the details pane includes the slot and quest level. Hover to see the
+game's item tooltip and equipped-item comparison. Click for the quest giver, coordinates and prerequisite quests.
+For example, a level-20 Alliance Druid can find staffs, leather and cloth rewards from ordinary quests as well as
+Druid quests. Results start sorted by item level; compare the actual stats for healing, casting or feral play.
+Class equipment families follow Classic rules, so item-specific restrictions and any Forever proficiency changes
+must be checked in the tooltip. Race restrictions use QuestieDB's active faction masks and your own race when
+browsing your faction. Prerequisites, reputation, skills and other quest conditions may still block acceptance;
+the list is a planning tool, not a promise that every quest is immediately available. Reward choices are alternatives.
+
+The browser needs a recent **QuestieDB** with `ItemDB.GetAllIds`, item `questRewards`, and `LibQuestieDB.Enum` class
+and race mappings; without it the window explains what is missing. It scans only when opened/refreshed, in batches,
+and stops if disabled or its tab/window is closed. Uncached item details update when the game supplies them. **Refresh data** rereads the source.
+Map controls give directions: open the map yourself with `M`, avoiding this client's protected-map restrictions.
+Both tools are covered by Lua mock tests; their rendering and item tooltips still need verification in the game.
+
+**All quests for a dungeon, inside and outside.** `/qs dungeons` (or **Browser DB → Dungeon quests**)
+opens the **Dungeon quests** tab. Choose a dungeon to see its known quests, including pickups outside the entrance,
+outdoor preparation chains and explicit follow-ups. This lists quests regardless of their rewards; equipment quality,
+slot and stat filters apply only to the equipment tabs. Start with all factions, classes, levels and completed quests;
+select **Alliance/Horde**, a **class**, or enter your **character level** to narrow the list. **My character** applies
+your current faction/class/level; **All quests** broadens these filters while keeping the selected dungeon.
+Search by quest name, ID or dungeon; scroll or use Previous/Next. Preparation and follow-up entries are labelled.
+Each row labels **Chain quest** (prerequisite, dungeon step or follow-up) or **Standalone quest**, separately from its
+**Task**: **Talk only — speak to [NPC]**, collect items, defeat enemies, explore, deliver an item, or complete an event.
+A chain step can also be talk-only. Hover or click for its known previous/next chain quests; branching chains are not
+given misleading linear step numbers. Unknown tasks are labelled for checking the quest details.
+**Pickup** and **Turn-in** giver/location lines remain visible; five taller rows fit each page.
+Hover for **base XP**, all known item rewards (including non-equipment), and full pickup/turn-in locations.
+XP is before character-level/bonus adjustments; listed items can be reward choices. Missing data stays labelled unknown.
+Item rewards load on the first hover, in small background slices, and refresh the tooltip when ready.
+Click a quest for its pickup giver/item, coordinates, requirements, chain and objective/turn-in directions.
+Right-click for the usual Quest Sharing menu plus **Where to pick it up** and **Show pickup on map (open M)**.
+Pickup actions mark a native waypoint when supported and print directions; open the map yourself with `M`.
+Quest-log actions explain when you must accept the quest first; unknown dungeon coordinates are never pinned at `-1,-1`.
+Needs an enumerable recent QuestieDB. Association uses dungeon categories and known quest-source/objective locations;
+common materials also dropped outdoors do not associate unrelated quests with a dungeon. The list depends on installed
+data, and filters do not check every reputation, profession, event or acceptance condition. Scans run only on explicit
+open/refresh (reward links on first hover), share the small data-work budget, pause in combat and cancel when the tab closes;
+no login scan or new saved setting.
+
+**Instance drops and who drops them.** Opening the browser inside a recognized dungeon selects that dungeon
+and brings its navigation row into view. This also works after the catalogue finishes loading. Old item/dungeon
+searches and encounter choices are cleared; an explicit `/qs loot [search]` keeps that query inside your current
+dungeon. Shared equipment and stat filters remain. Browse other dungeons normally afterward; unknown or
+ambiguous locations, raids and outdoor areas keep your browsing context.
+
+Open *Settings > Browser DB > Dungeon loot*, click
+**Instance drops** tab in the equipment explorer, or type `/qs loot`. Use **Find dungeon** to narrow
+the list on the left, then click a dungeon to browse its drops. **Search item, ID, boss or dungeon** searches
+within the selected dungeon; **All dungeons** searches the dungeon catalogue. You can also start with
+`/qs loot VanCleef` or `/qs loot 5191`. The **Source** dropdown lets you choose an encounter directly, including
+trash and chest groups with equipment drops. Both instance and item lists have Previous/Next pages.
+Only weapons and wearable equipment are shown: armor, shields, necklaces, rings, trinkets and offhands;
+materials, consumables, bags and other non-equipment are excluded.
+
+Every result shows the item, instance, boss/creature or loot group, and difficulty when supplied. Hover for its item
+tooltip and equipped-item comparison; click for all matching sources. Multiple bosses share one item row,
+with each mob listed once and its difficulty labels combined. Shared quest rewards likewise list every eligible
+quest route in one pane; map directions refer to the first quest listed. Trash tables describe a shared group rather than a particular creature; the browser does not invent a
+specific NPC or a drop percentage when the catalogue does not provide one.
+
+For encounter loot tables, install/enable a compatible **AtlasLoot** and its **DungeonsAndRaids** module, such as
+[AtlasLootClassic (Forever & Era Fix)](https://www.curseforge.com/wow/addons/atlaslootclassic-forever-era-fix).
+The browser reads the installed catalogue at runtime and includes **Classic and Forever dungeons**.
+**Raids, world bosses and unidentified encounter collections are excluded**, even if they contain equipment.
+Dungeon classification comes from AtlasLoot's content category or known dungeon IDs; coverage follows the installed
+catalogue. Dire Maul wings without InstanceID are supported by their known dungeon area. Without compatible AtlasLoot tables, **QuestieDB** provides a clearly labelled **partial**
+list of item sources whose creatures or objects are known to be inside recognized dungeons; raid interiors and
+unknown instance areas are excluded. Some Forever areas cannot be identified by that fallback. QuestieDB alone is not a complete
+dungeon loot database. Without either source, the GUI explains what to install. No loot database is bundled here.
+
+Indexing and game item-name requests happen only while using the browser, in small batches. Names update when the
+game supplies cached data; items stay hidden until a recognized equipment slot is available. **Refresh data** rereads the catalogue.
+If an unloaded AtlasLoot module cannot load during combat, it is retried after combat. These flows are tested with
+Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check.
+
+## Install
+**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.22), unzip `QuestSharing-<version>.zip` and drop the
+`QuestSharing` folder into `Interface\AddOns`. Or:
+1. Copy the folder `QuestSharing` (the one containing `QuestSharing.toc`, not this README's folder) into
+   the game's `Interface\AddOns` folder, so you have `...\AddOns\QuestSharing\QuestSharing.toc`.
+2. Start the game; on the character screen click **AddOns** and make sure **Quest Sharing** is ticked
+   (tick **Load out of date AddOns** if the game says it is out of date).
+3. Optional: install **Questie** too. Quest Sharing only reads its quest database (where quests start, which
+   quests come first) for the quest planner and "Tell them where to get it", and on clients where the game cannot say which creatures your
+   quests need, it adds their names (only when Questie's language is the game's: names on screen are in the game's
+   language). Core party sharing works without it; map search and other database-backed tools require compatible QuestieDB data.
+   QuestieDB can also run without the full Questie addon. **Questie 12 comes as two folders, `Questie` and `QuestieDB`** (its
+   quest data): download the `Questie-v...+v....zip` under *Assets* of
+   [Questie's latest release](https://github.com/Questie/Questie/releases/latest) (not "Source code") and copy **both**
+   folders into `Interface/AddOns`. QuestieDB alone: [QuestieDB's releases](https://github.com/Questie/QuestieDB/releases/latest). Type `/qs questie` to check it: it says, for each of the two,
+   whether it is loaded (with its version) or why not (not installed, switched off in the AddOns list, marked out of
+   date, a folder with another name such as `Questie-master`), what to do about it, how the data is read, the language
+   of its names, and looks up a few quests of your quest log.
+4. Optional: install [Shortest Path Forever](https://www.curseforge.com/wow/addons/shortest-path-forever) for walkable guidance from the quest planner. Quest Sharing still works without it.
+5. In game type `/qs probe`. It tells you what your game client supports. **If something looks wrong,
+   open an issue at https://github.com/YodaGitMaster/QuestSharing/issues and paste that output.**
+
+## Commands (`/qs` or `/questsharing`)
+| Command | What it does |
+|---|---|
+| `/qs share` | share your quests in this area with the party now, repeating earlier offers and declines (one quest per use where the game only allows sharing on a click) |
+| `/qs shareclick on\|off` | share only when you click Share (comes on by itself where the game refuses automatic sharing) |
+| `/qs stop` | cancel a share in progress |
+| `/qs on` / `off` | switch the addon on / off |
+| `/qs auto on\|off` | share automatically when you join a party or someone new joins (default on) |
+| `/qs new on\|off` | share a quest once when you accept it while in a party (default on) |
+| `/qs area zone\|all` | share only this zone's quests (default) or every quest |
+| `/qs gap N` | seconds between two shared quests (default 4, minimum 2) |
+| `/qs chat on\|off` | announce quests in common in party chat (default on) |
+| `/qs click on\|off` | clicking a tracked quest fills the chat box (default on) |
+| `/qs link on\|off` | shift-click links get the status appended (default on) |
+| `/qs mode box\|send\|print` | how your messages go out (the ring, the menu, quest clicks): **box** types them into the chat box and you press Enter (default; works on every client), **send** sends straight away where the game allows it, **print** only shows them to you |
+| `/qs sync on\|off` | exchange exact quest lists with other Quest Sharing users (default on) |
+| `/qs announce on\|off` | say in party chat when a quest we share is done (default on) |
+| `/qs markers on\|off` | star and names next to shared quests in the quest log (default on) |
+| `/qs panel [on\|off]` | show the "Party quests" window while in a party (default on); drag it to move it, click a row to put your progress in the chat box |
+| `/qs near [on\|off]` | keep the quest tracker filled with the quests closest to you (default on) |
+| `/qs near N` | how many quests it keeps (default 5) |
+| `/qs near mode auto\|distance\|zone` | `auto` uses distance if your client can measure it, otherwise your zone |
+| `/qs near now` / `resume` | refresh now / end a pause early |
+| `/qs settings` | open the settings window |
+| `/qs adventure [quest ID or exact title]` | preview a role-play invitation for an unfinished quest, then prepare it in any chosen chat |
+| `/qs friends` | (beta) add everybody in your party to your friends list now |
+| `/qs friends on\|off` | (beta) do it automatically when a party forms or someone joins (default off) |
+| `/qs key [KEY]` | bind the quick chat wheel to a key, e.g. `/qs key V` or `/qs key ALT-E`; `/qs key none` removes it |
+| `/qs quick ...` | the quick chat messages: `add [label \|] <text>`, `edit`, `label`, `route`, `remove`, `move`, `reset`, `editor`, `mode hold\|toggle`, `channel auto\|say\|party\|whisper`, `on\|off` |
+| `/qs highlight mobs\|pin\|cvars [on\|off]` | quest icons over creatures / pin the nearest quest / the game-settings helper |
+| `/qs doctor` | readable issue overview; Copy all includes setup, settings, errors and logs |
+| `/qs errors [clear]` | open the combined diagnostic report; `clear` empties only recorded errors |
+| `/qs bagmarks on\|off` | quest items marked in your bags: gold for quests of this zone, blue for quests elsewhere (default on) |
+| `/qs cleanup` | review leftover quest item stacks in carried bags and confirm individual deletions; requires Questie |
+| `/qs hidetracker on\|off` | hide the game's quest tracker, outside fights (default off) |
+| `/qs fishing [on\|off]` | open the fishing water editor; on/off switches its world-map layer |
+| `/qs cooking` | Cooking recipe catalogue, acquisition sources and ingredient farming hints |
+| `/qs professions [on\|off]` | embedded profession upgrades for both factions; on/off toggles the integration |
+| `/qs rewards [on\|off]` | open quest reward equipment for your class, level and faction; on/off enables/disables the browser |
+| `/qs loot [search]` | search instance drops by item/name/ID, boss or instance and inspect who drops each item |
+| `/qs debug on\|off` | the debug log: every action and its outcome, saved to the addon's file on `/reload` or logout (default on) |
+| `/qs log [clear]` | open the combined diagnostic report; `clear` empties only the debug log |
+| `/qs minimap on\|off` | the minimap button (default on) |
+| `/qs reset` | put every setting back to its default (everything on) |
+| `/qs probe` | show what this game client supports |
+
+## How it knows
+**Can we know right away that we have a quest in common?**
+- **With another Quest Sharing user: yes, exactly.** Their addon sends their quest list (and progress).
+- **Without the addon: probably yes for party members.** WoW has a call for it (`IsUnitOnQuest` /
+  `C_QuestLog.IsUnitOnQuest`). Only a **yes** from it can be trusted: a **no** can also mean "the game has
+  no data about that player yet". For quests the game does not confirm, the addon shares the quest and the
+  reply decides: a player who has it answers "X is already on that quest".
+  `/qs probe` runs a live test on your first party member so you can see whether it works on your client.
+
+**Do we know whether they accept a quest we shared?**
+Yes. The game answers every share with a system message per member: accepted, declined, already on it,
+already completed, busy, quest log full, and so on. The addon reads them by the game's own message
+strings (so it works in any language) and shows them to you.
+
+## About your game client
+The API documentation lists **World of Warcraft: Forever 1.60.1** as a client that "shares Mainline WoW's UI
+architecture, including the vast majority of APIs available in 12.1.5". So the modern calls this addon uses
+(`C_QuestLog`, `C_NamePlate`, `C_SuperTrack`, distances to quests, ...) are documented for it. The classic-style
+fallbacks stay in for other clients. Very recent clients also hide some values from addons in combat and in
+instances ("secret values"); everything that reads such a value is wrapped so it fails quietly instead of
+breaking. `/qs doctor` tells you exactly what works on your copy.
+
+## Sound
+Quest Sharing **never changes your game's sound settings**: its only sound is the soft good-news ping
+(`/qs sound off`, or *Settings > General*). It also refuses to put the quick chat on a key the game uses for its
+sound (toggle sound, toggle music, volume up/down) or for the game menu, so a stray Ctrl+S while choosing a key
+cannot leave you without sound control. `/qs doctor` shows how the game's sound is set right now (only read).
+If the game's sound goes away, check `/qs doctor` and `/qs errors`; another program that records or captures the
+computer's audio can also take the sound device away from the game.
+
+## Known limits (please read)
+- **Not tested in the real game.** Everything is tested in a Lua 5.1 interpreter against a mock of the WoW
+  API (both the modern `C_QuestLog` style and the classic `GetQuestLogTitle` style, 1043 tests), but I could
+  not run it inside your client. The risky parts are what only the real game can show: whether the tracker
+  click hook and the quest-log markers match your client's interface, whether the "right away" check works,
+  and the exact wording of the game's replies. `/qs probe` is there to find out quickly.
+- **Tracker clicks and quest-log markers** hook the game's own interface (modern tracker / quest log and
+  the classic ones). If your client is different, `/qs probe` says `NO` for that hook. Shift-clicking a quest
+  link into the chat box and the panel (`/qs panel`) work on any client. On the modern quest log the markers
+  appear the next time the game redraws the list (open/close it or scroll).
+- **Tracker by distance needs a client that reports quest distances.** WoW's modern interface does
+  (`C_QuestLog.GetDistanceSqToQuest`); the classic one gives addons no quest locations at all, which is why
+  addons like Questie carry their own database. On such a client `/qs near` falls back to zone mode.
+  `/qs probe` shows `distance to quests: yes/NO` and which mode is in use. Quests whose next step is on
+  another continent are ignored.
+- **Quick chat key:** an addon cannot press a key for you, so you choose the key yourself. Pick one you do
+  not need: for example **E is "strafe right" by default**; `/qs key E` tells you what the key used to do
+  before it takes it over. Chat to everybody nearby (`/say`) is only allowed from a key press or a click, so the
+  ring waits for one (see the quick chat section). The ring needs a free mouse pointer (not mouse-look). It is untested in the real game: `/qs probe` shows `quick chat wheel: key ...`.
+- **Quest icons over creatures** only appear where the game shows nameplates: enemy nameplates must be on
+  (`/qs highlight cvars on` does that), and creatures farther away than your nameplate distance have none.
+  Objects (items on the ground, chests) are not creatures, so they get no icon from this addon; the helper
+  above turns on the game's own icon for objects you are close to. The pin uses the game's quest marker; I could
+  not confirm from the documentation exactly how that marker looks on your client.
+- **Friends (beta):** the game's friends list is small (about 100) and, on classic-style clients, belongs to
+  your realm, so players from other realms can only be added where the client allows it. Adding someone is
+  silent for them. Whether `AddFriend` is allowed to an addon on your client is something only the game can
+  tell: `/qs probe` shows `friends (beta): add call yes/NO`, and `/qs friends` reports what the game answers.
+- **Sync only works between players who both run Quest Sharing.** Everyone else is handled by the
+  share-and-read-the-reply method. Messages are small, spaced 0.4 s apart, and only go to your party.
+- **Sharing pops up a window on each member's screen** for every quest they don't have; that is how WoW
+  quest sharing works, and the game shares with the whole party at once (it cannot target one player). So
+  when a new member joins, the others only see a popup for quests they do not have yet and have not
+  declined. If you accept a quest that someone in the party shared with you, the addon offers it back to
+  the party like any new quest; the person who shared it already has it, so they only get a short
+  "already on that quest" reply. Raise the spacing with `/qs gap 8` if rounds feel too busy.
+- **5-player parties only.** WoW cannot share quests in a raid group, so the addon stays quiet there.
+- **The chat icon is the star.** A chat message can only carry the raid target icons; any other picture
+  would show only on your own screen (the `print` mode and the panel do show it to you).
+- **Classic-style quest logs hide quests under a collapsed zone header** from addons. Expand your zone
+  headers if a quest is not being shared.
+
