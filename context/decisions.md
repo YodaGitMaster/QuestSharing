@@ -560,3 +560,8 @@
 
 ## 2026-11-18 — Map search pin = red X raid marker
 - Gold coin read as a random item, not a destination. Chose `UI-RaidTargetingIcon_7` (red X): built into every client, no new art file, universally read as "go here". One pin for all kinds (no per-kind icon).
+
+## 2026-11-18 — Publish v0.4.23 in QuestSharing
+- User explicitly named https://github.com/YodaGitMaster/QuestSharing as the release destination. v0.4.22 is already published there; release the newer source snapshot from cutpdf/main `2edc63d` as v0.4.23.
+- Keep the destination default branch as the README-only distribution repository. Push the tested source via a new release tag; do not replace its unrelated main history or publish to cutpdf. Update the destination README to this release after publication.
+- Use GitHub CLI for release/assets because the connector exposes no release creation or upload tools. Native WoW UI remains unverified.

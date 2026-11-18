@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+## 0.4.23
 - Regrouped the settings by topic. The sidebar now has six groups: **Basics** (General), **Questing** (Quest markers, Quest list, Accept & turn in, and the new **Quest items**), **Party** (Quest sharing, Party window, Pings, Quick chat), **Map & route** (Map, Quest guide), **Look up** (Items & dungeons, Professions & character) and **Help** (Errors & logs). The old **Extra tools** and **Browser DB** grab-bags are gone: Bag cleanup moved to Quest items, Quest invitation to Quest sharing, Cooking recipes and Profession upgrades to Professions & character, and the quest-item switches that sat beside Pings have their own tab. The Quick chat key and its Preview ring button now live only in the Quick chat tab.
 - New **Settings > Errors & logs** tab: Check my setup (`/qs doctor`), the errors the addon recorded with Show/Clear (`/qs errors`), the log with the recording switch and Show/Clear (`/qs log`), Copy logs, errors and setup, and Reset everything. These used to be scattered at the bottom of General.
 - Map search results (vendor, trainer, ...) are now marked with a red X (the game's "go here" marker) instead of a gold coin, so each pin clearly reads as a destination.

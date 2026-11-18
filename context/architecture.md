@@ -47,6 +47,14 @@ cutpdf/
 
 ```mermaid
 flowchart LR
+    Source[cutpdf main: 2edc63d] --> Build[build_release.py: version 0.4.23 ZIP]
+    Build --> Tag[QuestSharing: v0.4.23 source tag]
+    Tag --> Release[QuestSharing GitHub release and install ZIP]
+    Readme[QuestSharing main: README only] --> Release
+```
+
+```mermaid
+flowchart LR
     Native[Existing ProfessionsFrame] --> UI[ProfessionUI.lua: embedded Recipes and Upgrades]
     Fishing[Fishing.lua: Cooking action] --> Model[Professions.lua: source/state model]
     UI --> Model
