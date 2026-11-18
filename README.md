@@ -2,7 +2,7 @@
 
 A World of Warcraft addon for playing quests together.
 
-[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.25)
+[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.26)
 
 ## Your first party, in four steps
 1. **Install it** (see [Install](#install)) and log in. A short welcome in chat tells you it is ready. Everything is
@@ -228,7 +228,7 @@ the game's tracker still tells the party you are done, because that is your own 
      2/4"), when the bag says it belongs to that quest, or (with QuestieDB) when the quest asks for, hands out or
      needs that exact item. The game's own bags and the bank's main slots; bag replacement addons (Bagnon, ...) use
      their own buttons and are not marked. Clicks go through to the item.
-   - **Bag helpers** (*Settings > Quest items > Keep my bags tidy*, all work on the game's own bags only):
+   - **Bag helpers** (*Settings > Bags*, all work on the game's own bags only):
      **Bookmark** an item by pointing at it in your bags and pressing **Space** (again to remove; `/qs bookmarks
      list|clear`, on by default). A bookmarked item shows a small note icon and its tooltip says so; it is never sold
      by this addon, even if the Space key is switched off later. The bookmark belongs to the item type, so it stays
@@ -236,7 +236,10 @@ the game's tracker still tells the party you are done, because that is your own 
      vendor opens, except bookmarked ones and gray items one of your quests still needs; the game's Buyback tab keeps
      the last 12. **Arrange by topic** (`/qs sort` once, or *Arrange my bags by topic automatically*, off by default)
      treats all bags, the backpack included, as one long bag: quest items, consumables, equipment, materials,
-     recipes, other, then gray items last, each group by type, quality and name. It waits until your bags have been
+     recipes, other, then gray items last, each group by type, quality and name. *How to arrange my bags* chooses
+     the order (Topic, Quality best first, or Name A to Z; `/qs sort by topic|quality|name`), which bags (all, all but
+     the backpack, or the backpack only; `/qs sort bags all|bags|backpack`), where the items gather (start or end of the
+     bags; `/qs sort from start|end`) and whether bookmarked items stay in their slot (`/qs sort keep on|off`). It waits until your bags have been
      quiet for 3 seconds, never runs in a fight or while you hold an item, leaves quivers and profession bags alone
      and never splits or merges stacks. Every helper has its switch in Settings; the *Arrange my bags now* and
      *Remove all my bookmarks* buttons sit beside them, so no command is needed.
@@ -746,7 +749,7 @@ If an unloaded AtlasLoot module cannot load during combat, it is retried after c
 Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check.
 
 ## Install
-**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.25), unzip `QuestSharing-<version>.zip` and drop the
+**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.26), unzip `QuestSharing-<version>.zip` and drop the
 `QuestSharing` folder into `Interface\AddOns`. Or:
 1. Copy the folder `QuestSharing` (the one containing `QuestSharing.toc`, not this README's folder) into
    the game's `Interface\AddOns` folder, so you have `...\AddOns\QuestSharing\QuestSharing.toc`.
@@ -959,6 +962,8 @@ mini mode, lock and waypoint preview; it is not the live game or the character's
 | `build_release.py`, `CHANGELOG.md` | builds `dist/QuestSharing-<version>.zip` from the .toc allowlist (plus `Bindings.xml`) and verifies it; versions must progress one step from the last `vX.Y.Z` tag (`--bump` starts the next release, `--check` writes nothing, `--force` rebuilds a tagged version) |
 | `QuestSharing/Quick.lua`, `QuestSharing/Bindings.xml` | the quick chat ring, its placeholders, the message commands and the key binding |
 | `QuestSharing/Friends.lua` | (beta) adds party members to your friends list, with safeguards |
+| `QuestSharing/ItemLevel.lua` | item levels of other players: inspect nearby, remember 14 days, ask/share with Quest Sharing users |
+| `QuestSharing/LFGInvite.lua` | party finder: one click searches, solo players with the chosen roles are invited |
 | `QuestSharing/QuestItems.lua` | usable quest items: icons next to the quests in the tracker, the item key and button |
 | `QuestSharing/Bags.lua` | quest items marked in the bags: gold for quests of this zone, blue for quests elsewhere |
 | `QuestSharing/QuestCleanup.lua` | on-demand leftover quest item review and confirmed per-stack bag deletion |
