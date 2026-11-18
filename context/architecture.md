@@ -28,9 +28,9 @@ cutpdf/
 │   ├── state.md                                      # Current task and handoff
 │   └── walkable-routing-research.md                  # Terrain-routing feasibility, provider sources and proposed integration (not implemented)
 ├── questidea.txt                                     # User-provided predictive quest optimizer design requirements
-├── QuestSharing/                                     # WoW addon runtime (51 files, collapsed; BagTools.lua = bag bookmarks / sell grays / arrange by topic, ChatLock.lua = no chat box in combat)
+├── QuestSharing/                                     # WoW addon runtime (54 install files, collapsed; BagTools.lua = bag bookmarks / sell grays / arrange by topic, ChatLock.lua = no chat box in combat)
 ├── README.md                                         # User documentation
-├── tests/                                            # Python tests and Lua API harness (49 files, collapsed)
+├── tests/                                            # Python regression suites (51) and Lua API harness (collapsed)
 └── tools/                                            # Local UI emulation utilities, never shipped in the addon
     ├── build_cooking_reference.py                    # Rebuild pinned factual Cooking subset with upstream MIT attribution
     ├── lua-syntax-review-prompt.md                   # Reusable Lua 5.1 syntax/bug review prompt (parse, 5.2+ leaks, globals, nil traps)
@@ -44,6 +44,16 @@ cutpdf/
 <!-- /bpmn:file-tree -->
 
 ## Flowchart
+
+```mermaid
+flowchart LR
+    Source[cutpdf main: 0ccf147] --> Bump[build_release.py --bump: 0.4.25]
+    Bump --> Check[build_release.py --check]
+    Check --> Build[build_release.py: allowlisted reproducible ZIP]
+    Build --> Tag[QuestSharing: v0.4.25 full source tag]
+    Tag --> Release[QuestSharing release and verified install ZIP]
+    Readme[QuestSharing main: README only] --> Release
+```
 
 ```mermaid
 flowchart LR
