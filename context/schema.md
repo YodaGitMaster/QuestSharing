@@ -12,7 +12,7 @@ Last updated: 2026-11-18
 - Ingredient hints retain direct installed Questie drops/vendors/NPC min/max/spawns, existing zone ranges, seven guide-backed water examples and optional AnglerAtlas estimates. Modern TooltipDataProcessor with guarded legacy fallback decorates ingredient IDs, excluding recipe books. Unavailable data is labelled; no runtime network downloads.
 
 ## Addon loading and persistence
-- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.19; declares file load order and SavedVariables.
+- `QuestSharing/QuestSharing.toc`: Interface 16001, version 0.4.24; declares file load order and SavedVariables.
 - Lua modules receive `local ADDON, ns = ...`; `ns` is the shared namespace, not a class.
 - `Core.lua`: `ns.defaults`; `ns.db` initially copies defaults. On `ADDON_LOADED`, missing settings are filled and `ns.db` aliases saved `QuestSharingDB`; current `dbVersion = 3`.
 - SavedVariables: `QuestSharingDB` (settings), `QuestSharingLog` (debug log); persisted by the game.
