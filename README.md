@@ -2,7 +2,7 @@
 
 A World of Warcraft addon for playing quests together.
 
-[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.24)
+[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.25)
 
 ## Your first party, in four steps
 1. **Install it** (see [Install](#install)) and log in. A short welcome in chat tells you it is ready. Everything is
@@ -228,6 +228,18 @@ the game's tracker still tells the party you are done, because that is your own 
      2/4"), when the bag says it belongs to that quest, or (with QuestieDB) when the quest asks for, hands out or
      needs that exact item. The game's own bags and the bank's main slots; bag replacement addons (Bagnon, ...) use
      their own buttons and are not marked. Clicks go through to the item.
+   - **Bag helpers** (*Settings > Quest items > Keep my bags tidy*, all work on the game's own bags only):
+     **Bookmark** an item by pointing at it in your bags and pressing **Space** (again to remove; `/qs bookmarks
+     list|clear`, on by default). A bookmarked item shows a small note icon and its tooltip says so; it is never sold
+     by this addon, even if the Space key is switched off later. The bookmark belongs to the item type, so it stays
+     when you move the item. **Sell gray items** (off by default, `/qs sellgray on|off`) sells every gray item when a
+     vendor opens, except bookmarked ones and gray items one of your quests still needs; the game's Buyback tab keeps
+     the last 12. **Arrange by topic** (`/qs sort` once, or *Arrange my bags by topic automatically*, off by default)
+     treats all bags, the backpack included, as one long bag: quest items, consumables, equipment, materials,
+     recipes, other, then gray items last, each group by type, quality and name. It waits until your bags have been
+     quiet for 3 seconds, never runs in a fight or while you hold an item, leaves quivers and profession bags alone
+     and never splits or merges stacks. Every helper has its switch in Settings; the *Arrange my bags now* and
+     *Remove all my bookmarks* buttons sit beside them, so no command is needed.
 
 10. **Keeps your quest tracker on what is near you.** It is on by default; `/qs near off` stops it. **Hide the game's
     tracker** altogether: *Settings > Quest list > Hide the game's quest list on the right* (`/qs hidetracker on`; outside fights, as
@@ -362,7 +374,7 @@ the game's tracker still tells the party you are done, because that is your own 
 
     The debug log records addon actions and outcomes, commands, setting changes, game replies, your own chat,
     combat, target/party/zone changes and quest events. Repeated adjacent lines have a count. Recording is bounded
-    to about 3000 lines (trimmed in batches); the newest 30 distinct error records are retained. The report includes
+    to about 1000 lines (trimmed in batches); the newest 30 distinct error records are retained. The report includes
     everything still retained, with no extra 1000-line or 10-error display limit. The game saves the records on
     `/reload` or logout to `WTF/Account/<account>/SavedVariables/QuestSharing.lua` (`QuestSharingLog` and
     `QuestSharingDB.errors`). **Clear records** empties both lists; `/qs log clear` and `/qs errors clear`
@@ -392,15 +404,15 @@ The categories are grouped by topic:
 | **Questing** | **Quest markers** | **Show ! above quest enemies**, turn on the enemy health bars those marks need, follow the nearest quest with a waypoint |
 | | **Quest list** | Hide the game's tracker or automatically fill it with nearby quests; choose how many and how long to pause after your own edits |
 | | **Accept & turn in** | Automatically accept quest offers and turn in ready quests; each has its own switch |
-| | **Quest items** | Mark quest items in your bags, usable item buttons, the quest-item key, and the leftover-items review (Bag cleanup) |
+| | **Quest items** | Mark quest items in your bags, usable item buttons, the quest-item key, bag bookmarks, selling gray items, arranging bags by topic, and the leftover-items review (Bag cleanup) |
 | **Party** | **Quest sharing** | Offer quests to your party, require a manual Share click, announce progress, sync quest information, mark shared quests in the quest log, write a quest invitation |
 | | **Party window** | Show/hide/resize the separate Party quests window, restore its position, post progress by clicking, add party friends |
 | | **Pings** | Bind the target-ping key and choose the ping delay |
 | | **Quick chat** | Set the ring key, preview the ring, choose hold/press, choose where messages go, edit each message or emote |
-| **Map & route** | **Map** | Dungeon and travel pins, zone level guides, party map icons and shared item-location waypoints |
+| **Map & route** | **Map** | Dungeon, boat and zeppelin pins with a faction choice, your own trainers, zone level guides, party map icons and shared item-location waypoints |
 | | **Quest guide** | The quest route guide, its goal, camps, learned pace and report |
 | **Look up** | **Items & dungeons** | Quest rewards, dungeon loot and quests, item/vendor search and item source tooltips |
-| | **Professions & character** | Cooking recipes, profession upgrades, spell ranks, saved fishing spots |
+| | **Professions & character** | Cooking recipes, spell ranks, saved fishing spots |
 | **Help** | **Errors & logs** | Check my setup, show or clear the recorded errors, show or clear the logs, switch log recording, copy everything for a bug report, reset all settings |
 
 Every option has a visible explanation of what turning it on does and any requirements.
@@ -455,7 +467,7 @@ Open the world map normally to see numbered quest stops and connecting lines; th
 **Item source hints and map search.** Turn on **Show where items come from when I hover over them** to add vendor types such as
 **General Goods** to bag and recipe item tooltips. Known mining nodes are labelled **Mining**. Questie stores vendor links
 and object names, but does not mark every gathering profession or craft recipe, so unrecognized source types are not guessed.
-**Where to gather.** With the same setting on, hover a hide, leather, cloth, meat, herb or ore item (in your bags, the bank or the Professions window) to see the three zones with the most known spawn points of what drops it, for example "1. Senior Raptor (level 38-41) · Arathi Highlands · 7 known spawns". Only one creature is listed per zone, friendly creatures are skipped, and the drop chance is added when QuestieDB has it. **Ctrl+right-click** the item to mark every one of those spawn points on the world map with the item's own icon and to set the game's waypoint on the first zone; Ctrl+right-click it again to remove the marks. The addon never opens the map itself: press `M` and zoom out to see zones elsewhere. Needs QuestieDB; the first hover of a common hide reads many creatures in the background, so the lines may appear a moment later, and not during combat.
+**Where to gather.** With the same setting on, hover a hide, leather, cloth, meat, herb or ore item (in your bags, the bank or the Professions window) to see the three zones with the most known spawn points of what drops it, for example "1. Senior Raptor (level 38-41) · Arathi Highlands · 7 known spawns". Only one creature is listed per zone, friendly creatures are skipped, and the drop chance is added when QuestieDB has it. **Ctrl+right-click** the item to mark every one of those spawn points on the world map with the item's own icon and to set the game's waypoint on the first zone; Ctrl+right-click it again to remove the marks. The addon never opens the map itself: press `M` and zoom out to see zones elsewhere. On a Mac, Cmd+right-click works too. Skinned items (hides, leather, scales) come from a small bundled table of which creatures can be skinned for what and how often, because QuestieDB has no skinning loot (data from CMaNGOS classic-db, regenerated with `tools/build_skinning_data.py`); herbs and ore list their nodes. If an item shows nothing, `/qs gather` explains why (setting off, QuestieDB missing, not a gathering item, no source known). Needs QuestieDB; the first hover of a common hide reads many creatures in the background, so the lines may appear a moment later, and not during combat.
 
 **Map search requires a recent QuestieDB database; it cannot search on its own. QuestieDB can run without the full Questie addon.**
 Install/enable QuestieDB and `/reload`, then run `/qs questie` to check that its data is available.
@@ -498,11 +510,11 @@ required payment stay open for you. Both options are independent and off by defa
 
 **Dungeons, boats and zeppelins on the world map.** Open the map with `M`: a skull marks every dungeon and raid
 entrance (one pin per entrance, so Blackrock Mountain lists its five instances), and a lettered square marks each boat
-(B), zeppelin (Z) and Deeprun Tram (T) stop, coloured blue for the Alliance, red for the Horde and gold for both.
+(B), zeppelin (Z) and Deeprun Tram (T) stop, coloured blue for the Alliance, red for the Horde and white for neutral ones.
 Hover a transport stop to see where it goes and the lines to its other stops (the whole line shows on the Azeroth map;
 on a continent map the tooltip says so when the other end is overseas). Hover a dungeon to see its instances with level
 ranges and, for each faction, the closest town with a flight master that faction can use, with a line and a label to each.
-It is **on by default**; switch it off with **Show dungeons, boats and zeppelins on the world map** in Map. It needs no
+It is **on by default**; switch it off with **Show dungeons, boats and zeppelins on the world map** in Map, and pick **Both factions**, **Alliance only** or **Horde only** with **Whose boats, zeppelins and towns to show** (neutral routes and towns always show, in white). It needs no
 QuestieDB. The positions are typed in from memory of the Classic Era world, so expect them to be 1-3 % off.
 
 **Your trainers on the map.** On a zone or continent map (not the Azeroth overview) the trainers for your class and
@@ -588,16 +600,14 @@ ingredient for mob/zone/fishing information. Unknown learned status or source da
 The list uses 133 bundled Forever reference records plus additional live Cooking recipes when available;
 unsupported/obsolete client records can still appear. Native recipe filters are left unchanged.
 
-**Upgrades**, beside **Recipes** at the bottom of that same game window, contains all 12 professions,
-four ranks, and direct **Both / Alliance / Horde** choices. It also works from the profession overview.
-The fishing editor's **Cooking / recipes** button, `/qs cooking`, and `/qs professions` target these embedded
-views; if the native window is closed, open it with K and choose a profession. No separate addon window opens.
+The fishing editor's **Cooking / recipes** button, `/qs cooking`, and `/qs professions` target this embedded
+view; if the native window is closed, open it with K and choose Cooking. No separate addon window opens.
 
 Installed Questie supplies ingredient drop mobs, mob levels, coordinates and sellers; the existing zone
 reference supplies zone brackets. Seven example fish waters have guide-backed routes, and AnglerAtlas can
 add zone estimates. Missing fishing entry/no-getaway thresholds stay **unknown**, separate from recommended
 route skill; effective skill includes pole/lure bonuses. Catches may vary by water, season and time.
-Recipe/rank facts are checked **2026-11-17**, using the MIT-licensed [Profit Forever dataset](https://github.com/ExcEssIv3/profit)
+Recipe facts are checked **2026-11-17**, using the MIT-licensed [Profit Forever dataset](https://github.com/ExcEssIv3/profit)
 and [Forever profession guides](https://www.wow-professions.com/forever); some guide details remain beta-derived.
 
 The integration is on by explicit request. Disable it in **Professions & character > Cooking recipes** or `/qs professions off` to restore the native view and suppress item farming hints.
@@ -677,6 +687,7 @@ a higher level, is not loaded, which keeps memory use down). Select **Alliance/H
 **character level** to change the list; a filter that reaches past what was read (another faction or class, a higher level,
 **All levels**) reads the rest, and a narrower one reuses what was read. **My character** applies your current
 faction/class/level; **All quests** broadens these filters while keeping the selected dungeon.
+Tick **Hide completed quests** or **Hide quests in my log** to shorten the list. A green tick marks done quests, a yellow "!" the ones already in your quest log, and a gold border the ones you still have to pick up.
 Search by quest name, ID or dungeon; scroll or use Previous/Next. Preparation and follow-up entries are labelled.
 Each row labels **Chain quest** (prerequisite, dungeon step or follow-up) or **Standalone quest**, separately from its
 **Task**: **Talk only — speak to [NPC]**, collect items, defeat enemies, explore, deliver an item, or complete an event.
@@ -735,7 +746,7 @@ If an unloaded AtlasLoot module cannot load during combat, it is retried after c
 Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check.
 
 ## Install
-**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.24), unzip `QuestSharing-<version>.zip` and drop the
+**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.25), unzip `QuestSharing-<version>.zip` and drop the
 `QuestSharing` folder into `Interface\AddOns`. Or:
 1. Copy the folder `QuestSharing` (the one containing `QuestSharing.toc`, not this README's folder) into
    the game's `Interface\AddOns` folder, so you have `...\AddOns\QuestSharing\QuestSharing.toc`.
@@ -787,13 +798,18 @@ Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check
 | `/qs quick ...` | the quick chat messages: `add [label \|] <text>`, `edit`, `label`, `route`, `remove`, `move`, `reset`, `editor`, `mode hold\|toggle`, `channel auto\|say\|party\|whisper`, `on\|off` |
 | `/qs highlight mobs\|pin\|cvars [on\|off]` | quest icons over creatures / pin the nearest quest / the game-settings helper |
 | `/qs doctor` | readable issue overview; Copy all includes setup, settings, errors and logs |
+| `/qs memory` | memory used by Quest Sharing and QuestieDB, and which catalogues (dungeon quests, rewards, map search) are loaded; they free themselves 2 minutes after closing |
 | `/qs errors [clear]` | open the combined diagnostic report; `clear` empties only recorded errors |
 | `/qs bagmarks on\|off` | quest items marked in your bags: gold for quests of this zone, blue for quests elsewhere (default on) |
+| `/qs bookmarks [on\|off\|list\|clear]` | Space on a bag item bookmarks it so it is never sold (default on); `list` and `clear` manage the bookmarks |
+| `/qs sellgray on\|off` | sell gray items when a vendor opens; bookmarked and quest items stay (default off) |
+| `/qs sort [on\|off]` | arrange all bags by topic now; `on`/`off` switches doing it automatically when the bags change (default off) |
+| `/qs chatlock on\|off` | no chat typing box while you are in a fight (default off) |
 | `/qs cleanup` | review leftover quest item stacks in carried bags and confirm individual deletions; requires Questie |
 | `/qs hidetracker on\|off` | hide the game's quest tracker, outside fights (default off) |
 | `/qs fishing [on\|off]` | open the fishing water editor; on/off switches its world-map layer |
 | `/qs cooking` | Cooking recipe catalogue, acquisition sources and ingredient farming hints |
-| `/qs professions [on\|off]` | embedded profession upgrades for both factions; on/off toggles the integration |
+| `/qs professions [on\|off]` | embedded Cooking recipe list; no argument opens it, on/off toggles the integration |
 | `/qs rewards [on\|off]` | open quest reward equipment for your class, level and faction; on/off enables/disables the browser |
 | `/qs loot [search]` | search instance drops by item/name/ID, boss or instance and inspect who drops each item |
 | `/qs debug on\|off` | the debug log: every action and its outcome, saved to the addon's file on `/reload` or logout (default on) |
@@ -884,7 +900,7 @@ python tests/test_tracker.py          # 29 tests: the tracker follows you (dista
 python tests/test_settings.py         # 77 tests: defaults, migration, direct settings controls, scrolling and enemy ! switch
 python tests/test_friends.py          # 42 tests: the friends beta (manual and automatic, safeguards)
 python tests/test_quick.py            # 131 tests: the quick chat ring, placeholders, editing, key binding, performance
-python tests/test_extras.py           # 39 tests: error log + doctor, invite action, minimap buttons, release zip
+python tests/test_extras.py           # 45 tests: error log + doctor, invite action, minimap buttons, release zip
 python tests/test_highlight.py        # 23 tests: quest icons over creatures, the world pin, the game-settings helper
 python tests/test_look.py             # 44 tests: the settings window layout, the key capture, welcome, sounds, ring colours
 python tests/test_together.py         # 30 tests: several Quest Sharing users in one party, fewer messages
@@ -906,14 +922,14 @@ python tests/test_questmap.py         # 15 tests: How to do it, and guards again
 python tests/test_ringtest.py         # 14 tests: /qs quick test: every slot run, checked against what the game did
 python tests/test_log.py              # 47 tests: the debug log: every action and its outcome, kept small, the log window
 python tests/test_optional.py         # 42 tests: fishing water notes, map drawing, reward filters and item comparisons
-python tests/test_professions.py      # 56 tests: embedded native GUI, grey recipes, scrolling, craft handoff, sources and lifecycle
+python tests/test_professions.py      # 52 tests: embedded native GUI, grey recipes, scrolling, craft handoff, sources and lifecycle
 python tests/test_adventure.py        # 44 tests: direct quest questions, role-play invitations, channels and preserved drafts
 python tests/test_equipment.py        # 36 tests: one window, shared filters, rare+ quality, dungeon/raid identity and cancellation
 python tests/test_equipment_grouping.py # 28 tests: unique names, merged sources/routes, variants, filtering, counts and selection
 python tests/test_instance_focus.py   # 24 tests: current dungeon, batched loads, manual browsing, wing identity and settings tab labels
 python tests/test_stats.py            # 20 tests: combined stat minimums, native APIs, cache refresh, live inputs and reset
 python tests/test_spell_ranks.py      # 48 tests: learned rank upgrades, normal pages, cursor/combat guards and client APIs
-python tests/test_zone_levels.py      # 50 tests: native/fallback ranges, full-map missing data, hover, geometry, lifecycle and opt-in overlays
+python tests/test_zone_levels.py      # 48 tests: native/fallback ranges, full-map missing data, hover, geometry, lifecycle and opt-in overlays
 python tests/test_loot.py             # 58 tests: equipment-only instance loot, item/boss searches, source catalogues and asynchronous names
 python tests/test_quest_planner_path.py # 4 tests: SPF API detection, the Follow hand-off, fallbacks and no walking estimates in planning
 python tests/test_quest_planner_ui.py   # 6 tests: movable panel, wrapped rows, level filter, pickup list and map actions
@@ -940,7 +956,7 @@ mini mode, lock and waypoint preview; it is not the live game or the character's
 | `QuestSharing/Highlight.lua` | quest icons over creatures on their nameplates, and the game-settings helper |
 | `QuestSharing/Diagnostics.lua` | the error log, `/qs doctor` and the copyable report window |
 | `QuestSharing/MinimapButton.lua` | the minimap button |
-| `build_release.py`, `CHANGELOG.md` | builds `dist/QuestSharing-<version>.zip` and the release notes |
+| `build_release.py`, `CHANGELOG.md` | builds `dist/QuestSharing-<version>.zip` from the .toc allowlist (plus `Bindings.xml`) and verifies it; versions must progress one step from the last `vX.Y.Z` tag (`--bump` starts the next release, `--check` writes nothing, `--force` rebuilds a tagged version) |
 | `QuestSharing/Quick.lua`, `QuestSharing/Bindings.xml` | the quick chat ring, its placeholders, the message commands and the key binding |
 | `QuestSharing/Friends.lua` | (beta) adds party members to your friends list, with safeguards |
 | `QuestSharing/QuestItems.lua` | usable quest items: icons next to the quests in the tracker, the item key and button |
@@ -951,9 +967,9 @@ mini mode, lock and waypoint preview; it is not the live game or the character's
 | `QuestSharing/Questie.lua` | reads Questie's quest database (when installed): where a quest starts, which quests come first, where objectives are done and quests turned in |
 | `QuestSharing/Fishing.lua` | optional world-map water markers, saved water editor and AnglerAtlas zone summaries |
 | `QuestSharing/Professions.lua` | Cooking source/learned-state model, ingredient tooltips and guarded native-window lifecycle |
-| `QuestSharing/ProfessionUI.lua` | embedded scroll list, native learned-recipe crafting and in-place source/Upgrades panes |
+| `QuestSharing/ProfessionUI.lua` | embedded scroll list, native learned-recipe crafting and in-place source panes |
 | `QuestSharing/CookingReference.lua` | pinned MIT Forever Cooking snapshot with recipe spells, ingredients and acquisition hints |
-| `QuestSharing/ProfessionReference.lua` | dated faction/rank reference, guide-backed starter recipe sources and example fish waters |
+| `QuestSharing/ProfessionReference.lua` | dated guide-backed starter recipe sources and example fish waters |
 | `QuestSharing/Rewards.lua` | optional QuestieDB equipment rewards, filters, item comparisons and quest routes |
 | `QuestSharing/EquipmentUI.lua` | one equipment window, shared item type/slot/level/stat filters, item cards and inline details |
 | `QuestSharing/SpellRanks.lua` | opt-in highest learned spell ranks on existing normal action-bar buttons |
