@@ -42,11 +42,13 @@ def test_on_by_default_records_actions_and_errors(style):
     assert "ERROR BLOCKED by the game" in text(g)
 
 
-def test_existing_installs_enable_once_then_preserve_explicit_off(style):
+def test_an_explicit_off_survives_a_reload(style):
     g = Game(style)
     g.run("QuestSharingDB = { dbVersion = 3, debug = false }")
     g.fire("ADDON_LOADED", "QuestSharing")
-    assert g.eval("NS.db.debug and NS.db.diagnosticsDefaultMigrated") is True
+    assert g.eval("NS.db.debug") is False
+    g.slash("debug on")
+    assert g.eval("NS.db.debug") is True
     g.slash("debug off")
     g.fire("ADDON_LOADED", "QuestSharing")
     assert g.eval("NS.db.debug") is False
@@ -329,6 +331,16 @@ def test_full_report_has_one_setting_per_line_and_complete_messages(style):
     setting_lines = [line for line in box.text.splitlines() if re.search(r"\[[A-Za-z]+=[^]]+\]$", line)]
     assert len(setting_lines) == int(g.eval("(function() local n=0; for k in pairs(NS.defaults) do n=n+1 end; return n end)()"))
     assert all(line.count("[") == 1 for line in setting_lines)
+
+
+def test_memory_command_reports_addon_memory_catalogues_and_log_size(style):
+    g = on(style)
+    g.run("UpdateAddOnMemoryUsage = function() end; GetAddOnMemoryUsage = function(n) return n == 'QuestSharing' and 2048 or 0 end")
+    g.slash("memory")
+    text = "\n".join(g.printed())
+    assert "QuestSharing: 2.0 MB" in text, text
+    assert "Dungeon quests catalogue: free" in text and "Quest rewards catalogue: free" in text, text
+    assert "Map search index: free" in text and "debug log: " in text and "/ 1000 lines" in text, text
 
 
 if __name__ == "__main__":

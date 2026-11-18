@@ -264,21 +264,6 @@ end
 function ns._reportWindow() return win, box end
 
 -- /qs errors --------------------------------------------------------------------------------------------------------
--- full: also what was running and the stack (for the copy window; the chat gets the short lines)
-function ns.errorLines(full, all)
-    local list = ns.db.errors or {}
-    local out = {}
-    for i = all and 1 or math.max(1, #list - 9), #list do
-        local e = list[i]
-        out[#out + 1] = string.format("[%s] %s%s", e.at or "?", e.source and (e.source .. ": ") or "", e.msg)
-        if (e.count or 1) > 1 then out[#out + 1] = string.format("    (happened %d times)", e.count) end
-        if full and type(e.detail) == "table" then
-            for _, d in ipairs(e.detail) do out[#out + 1] = "    " .. tostring(d) end
-        end
-    end
-    return out
-end
-
 function ns.errorsCommand(arg)
     if arg == "clear" then
         ns.db.errors = {}
@@ -608,4 +593,32 @@ end
 
 function ns.doctor()
     ns.diagnostics()
+end
+
+-- /qs memory: what the game says each addon holds, and which of our on-demand catalogues are loaded (they free
+-- themselves two minutes after their window closes). Memory is in KB as the game reports it, after a garbage pass.
+local function kb(n) return n >= 1024 and string.format("%.1f MB", n / 1024) or string.format("%d KB", n) end
+function ns.memoryLines()
+    local out = {}
+    if type(UpdateAddOnMemoryUsage) ~= "function" or type(GetAddOnMemoryUsage) ~= "function" then
+        return { "this game does not report addon memory" }
+    end
+    if type(collectgarbage) == "function" then pcall(collectgarbage) end
+    pcall(UpdateAddOnMemoryUsage)
+    for _, name in ipairs({ ADDON, "Questie", "QuestieDB", "Questie-DB", "!Questie" }) do
+        local ok, use = pcall(GetAddOnMemoryUsage, name)
+        if ok and type(use) == "number" and use > 0 then out[#out + 1] = name .. ": " .. kb(use) end
+    end
+    local function loaded(label, a, b)
+        out[#out + 1] = label .. ": " .. ((a or b) and "loaded" or "free")
+    end
+    if ns.dungeonQuests then loaded("Dungeon quests catalogue", (ns.dungeonQuests._state())) end
+    if ns.rewards then loaded("Quest rewards catalogue", (ns.rewards._state())) end
+    if ns.vendorMap and ns.vendorMap._state then loaded("Map search index", ns.vendorMap._state()) end
+    out[#out + 1] = "debug log: " .. (type(QuestSharingLog) == "table" and #QuestSharingLog or 0) .. " / " .. ns.LOG_MAX .. " lines"
+    return out
+end
+
+function ns.memoryCommand()
+    for _, line in ipairs(ns.memoryLines()) do ns.print(line) end
 end

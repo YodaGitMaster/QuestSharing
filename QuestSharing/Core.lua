@@ -32,13 +32,14 @@ ns.defaults = {
     nearPause = 10,     -- seconds the tracker and the pin leave your choice alone after you change the tracker yourself
     nearMode = "auto",  -- "auto" (distance if the client can measure it, else zone), "distance" or "zone"
     fishingMap = false, -- optional fishing notes on the world map
-    professionGuide = true, -- explicitly requested cooking catalogue and static profession upgrades
+    professionGuide = true, -- explicitly requested cooking catalogue
     rewardBrowser = false, -- optional quest reward catalogue
     autoSpellRanks = false, -- opt-in: highest learned ranks on existing player spell buttons
     zoneLevels = false, -- opt-in: questing level ranges on the world map
     itemSources = false, -- opt-in: QuestieDB source hints on item tooltips
     vendorSearch = false, -- opt-in: vendor search on the world map
     myTrainers = true, -- your class and profession trainers on zone and continent maps (needs QuestieDB)
+    travelFaction = "all", -- travel map: "all", "Alliance" or "Horde" (neutral routes always show)
     travelMap = true, -- dungeon entrances, boats, zeppelins and nearest towns on the world map
     questPlanner = false, -- opt-in: prerequisite-aware quest route suggestions
     questPlannerGoal = "all", -- quest guide aim: "all" (complete the zone), "xp", "selected" (questPlannerSelected) or "budget"
@@ -49,6 +50,10 @@ ns.defaults = {
     autoCompleteQuests = false, -- opt-in: finish safe quest turn-ins without a reward decision
     bagMarks = true,    -- quest items marked in the bags: gold = a quest of this zone, blue = a quest elsewhere
     hideTracker = false, -- hide the game's quest tracker (outside fights)
+    bagBookmarks = true, -- point at a bag item and press Space: it is bookmarked and never sold by the addon
+    autoSellGray = false, -- (off) sell every gray item when a vendor window opens (bookmarked and quest items stay)
+    autoSortBags = false, -- (off) arrange all bags, backpack included, by topic once they have been quiet for a moment
+    chatLock = false,   -- (off) no chat typing box while you are in a fight
     debug = true,       -- diagnostic actions and outcomes, saved on /reload or logout
     shareByClick = false, -- share only on my clicks (set by itself when the game refuses an automatic share)
     pickup = false,     -- (off) say in party chat when I pick up a quest someone in the party has ("let's do it together?")
@@ -78,7 +83,7 @@ for k, v in pairs(ns.defaults) do ns.db[k] = v end        -- until the saved var
 -- Kept in QuestSharingLog, which the game writes to WTF/Account/<account>/SavedVariables/QuestSharing.lua when you
 -- /reload or log out. On by default; /qs debug off stops recording. The same line again becomes one line
 -- with a count ("(x5)"); the oldest lines go once there are more than LOG_MAX.
-local LOG_MAX = 3000
+local LOG_MAX = 1000
 ns.LOG_MAX = LOG_MAX
 function ns.logging() return ns.db ~= nil and ns.db.debug == true end
 -- the visible text of game markup: links as their [name], no colours or icons
@@ -266,29 +271,10 @@ ns.on("ADDON_LOADED", function(_, name)
     if name ~= ADDON then return end
     ns.newInstall = (QuestSharingDB == nil) or (next(QuestSharingDB) == nil)
     QuestSharingDB = QuestSharingDB or {}
-    local savedVersion = QuestSharingDB.dbVersion or 0            -- read before the defaults fill the gaps
-    if QuestSharingDB.diagnosticsDefaultMigrated ~= true then
-        QuestSharingDB.debug = true
-        QuestSharingDB.diagnosticsDefaultMigrated = true
-    end
-    if QuestSharingDB.zoneLevelsOptInMigrated ~= true then
-        -- 0.4.11 enabled this by default; require a fresh opt-in once, then preserve the choice.
-        QuestSharingDB.zoneLevels = false
-        QuestSharingDB.zoneLevelsOptInMigrated = true
-    end
     for k, v in pairs(ns.defaults) do
         if QuestSharingDB[k] == nil then QuestSharingDB[k] = v end
     end
-    if savedVersion < 2 then
-        -- earlier versions saved "near" and "panel" as off; the new defaults have them on
-        QuestSharingDB.near, QuestSharingDB.panel = true, true
-    end
-    if savedVersion < 3 then
-        -- the automatic party chat is off now: you speak when you want to (right click a quest in the Party quests window)
-        QuestSharingDB.chat, QuestSharingDB.announce, QuestSharingDB.pickup = false, false, false
-    end
     QuestSharingDB.dbVersion = ns.defaults.dbVersion
-    QuestSharingDB.questMap = nil -- retired quest overlays; do not retain the old enabled setting
     ns.db = QuestSharingDB
     if ns.refreshSettings then ns.refreshSettings() end
 end)
@@ -368,8 +354,6 @@ function ns.say(msg, always)
     return true
 end
 
-function ns.clearOutbox() outbox = {}; sending = false end
-
 -- Settings: one place that changes a setting and does whatever that setting needs ---------------------------
 function ns.setSetting(key, value)
     local d = ns.db
@@ -388,7 +372,7 @@ function ns.setSetting(key, value)
         if (key == "itemSources" or key == "enabled") and ns.itemSources then ns.itemSources.refresh() end
         if (key == "itemSources" or key == "enabled") and ns.gatherSources then ns.gatherSources.refresh() end
         if (key == "vendorSearch" or key == "enabled") and ns.vendorMap then ns.vendorMap.refresh() end
-        if (key == "travelMap" or key == "myTrainers" or key == "enabled") and ns.travelMap then ns.travelMap.refresh() end
+        if (key == "travelMap" or key == "travelFaction" or key == "myTrainers" or key == "enabled") and ns.travelMap then ns.travelMap.refresh() end
         if key == "questPlanner" and ns.questPlanner then ns.questPlanner.settingChanged(value) end
         -- Goal, time limit, quest IDs and level scope (Settings > Quest guide): the planner rereads them and replans.
         if type(key) == "string" and key ~= "questPlanner" and string.sub(key, 1, 12) == "questPlanner"
@@ -398,6 +382,8 @@ function ns.setSetting(key, value)
         if key == "enabled" and not value and ns.loot then ns.loot.close() end
         if key == "enabled" and not value and ns.dungeonQuests then ns.dungeonQuests.close() end
         if (key == "bagMarks" or key == "enabled") and ns.refreshBagMarks then ns.refreshBagMarks() end
+        if (key == "bagBookmarks" or key == "autoSortBags" or key == "enabled") and ns.bagTools then ns.bagTools.refresh() end
+        if (key == "chatLock" or key == "enabled") and ns.chatLock then ns.chatLock.refresh() end
         if (key == "hideTracker" or key == "enabled") and ns.applyTrackerHidden then ns.applyTrackerHidden() end
         if key == "quickSend" and value then               -- you ask for it again: refused channels get another try
             if type(d.chatRefused) == "table" and next(d.chatRefused) then
@@ -453,7 +439,7 @@ local help = {
     "/qs adventure [quest ID or title]  prepare a role-play invitation in any chat channel",
     "/qs fishing [on|off]  fishing waters on the big map; no argument opens the water editor",
     "/qs cooking          recipes, acquisition sources and ingredient farming hints",
-    "/qs professions [on|off]  rank upgrades for all professions and both factions; on/off toggles integration",
+    "/qs professions [on|off]  cooking recipe list in the profession window; no argument opens it, on/off toggles it",
     "/qs rewards [on|off]  browse quest reward equipment for your class, level and faction",
     "/qs plan [refresh|next|on|off]  plan nearby quests and set a waypoint for a stop",
     "/qs settings         open the settings window (click a line to switch it on or off)",
@@ -475,12 +461,18 @@ local help = {
     "/qs shareclick on|off share only when I click Share (on by itself where the game refuses automatic sharing)",
     "/qs bagmarks on|off  mark quest items in your bags: gold for quests here, blue for quests elsewhere (the bank can keep them)",
     "/qs hidetracker on|off hide the game's quest tracker (outside fights)",
+    "/qs bookmarks [on|off|list|clear]  Space on a bag item bookmarks it (never sold); list or clear the bookmarks",
+    "/qs sellgray on|off  sell the gray items when a vendor opens (bookmarked and quest items stay)",
+    "/qs sort [on|off]    arrange all your bags by topic now; on/off = do it by itself when the bags change",
+    "/qs chatlock on|off  no chat typing box while you are in a fight",
     "/qs debug on|off     the debug log: every action and its outcome, saved to the addon's file on /reload or logout",
     "/qs log [clear]      all diagnostics in one copyable window (clear empties the debug log)",
+    "/qs memory           how much memory Quest Sharing and QuestieDB use, and which catalogues are loaded",
     "/qs pingkey <KEY>    the key that pings the nearest quest creature (Attack) or quest object (look here); none removes it",
     "/qs itemkey <KEY>    the key that uses the item of your nearest quest (a torch, a flare...); none removes it",
     "/qs items on|off     item icons next to the quests in the tracker, and the quest item button",
     "/qs cleanup         review leftover quest items in your bags and delete confirmed stacks",
+    "/qs gather [item]    why an item does or does not show where to gather it (default: the last item you hovered)",
     "/qs questie          does Quest Sharing read Questie's quest database? (with a real lookup from your quest log)",
     "/qs ping             checks every step of the ping key (and says where it stops); /qs ping on|off switches it",
     "/qs mappins on|off   party members running Quest Sharing on my world map (and my position to them)",
@@ -500,7 +492,7 @@ local help = {
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", shareclick = "shareByClick", debug = "debug", bagmarks = "bagMarks", hidetracker = "hideTracker", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", shareclick = "shareByClick", debug = "debug", bagmarks = "bagMarks", hidetracker = "hideTracker", sellgray = "autoSellGray", chatlock = "chatLock", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"
@@ -514,12 +506,22 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     elseif cmd == "dungeons" or cmd == "dungeonquests" then ns.dungeonQuests.open(arg)
     elseif cmd == "plan" then ns.questPlanner.command(arg)
     elseif cmd == "cleanup" then ns.questCleanup.open()
+    elseif cmd == "sort" then
+        if arg == "on" or arg == "off" then ns.setSetting("autoSortBags", arg == "on") else ns.bagTools.sort(true) end
+    elseif cmd == "bookmarks" then
+        if arg == "on" or arg == "off" then ns.setSetting("bagBookmarks", arg == "on")
+        elseif arg == "clear" then ns.print(string.format("%d bookmark(s) removed", ns.bagTools.clearBookmarks()))
+        elseif arg == "list" then
+            local l = ns.bagTools.listBookmarks()
+            ns.print(#l == 0 and "no bookmarked items (point at a bag item and press Space)" or ("bookmarked: " .. table.concat(l, ", ")))
+        else ns.setSetting("bagBookmarks", not d.bagBookmarks) end
     elseif cmd == "questmap" then ns.print("quest symbols on the world map and minimap have been removed")
     elseif cmd == "adventure" then ns.adventure.command(arg)
-    elseif cmd == "cooking" then ns.professions.open("cooking")
+    elseif cmd == "gather" then ns.gatherSources.command(arg)
+    elseif cmd == "cooking" then ns.professions.open()
     elseif cmd == "professions" then
         if arg == "on" or arg == "off" then ns.setSetting("professionGuide",arg=="on")
-        else ns.professions.open("upgrades") end
+        else ns.professions.open() end
     elseif cmd == "fishing" or cmd == "rewards" then
         local key = cmd == "fishing" and "fishingMap" or "rewardBrowser"
         if arg == "on" or arg == "off" then ns.setSetting(key, arg == "on")
@@ -543,6 +545,7 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     elseif cmd == "itemkey" then ns.setItemKey(arg)
     elseif cmd == "questie" then for _, l in ipairs((ns.questie.report())) do ns.print(l) end
     elseif cmd == "doctor" then ns.doctor()
+    elseif cmd == "memory" then ns.memoryCommand()
     elseif cmd == "errors" then ns.errorsCommand(arg)
     elseif cmd == "log" then ns.logCommand(arg)
     elseif cmd == "reset" then ns.resetSettings()

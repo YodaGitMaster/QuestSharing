@@ -99,10 +99,6 @@ function ns.patternCount()
     return #patterns
 end
 
-local WORDS = { accepted = "accepted", declined = "declined", done = "has already done", busy = "is busy",
-                full = "has a full quest log", dead = "is dead", expired = "did not answer in time",
-                other = "cannot take it" }
-
 function ns.onPushReply(kind, name)
     if kind == "sent" then return end
     local id = (run and run.current) or (lastPush and GetTime() - lastPush.at < 15 and lastPush.id)

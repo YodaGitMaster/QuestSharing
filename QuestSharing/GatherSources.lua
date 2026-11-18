@@ -43,7 +43,7 @@ end
 local function collect(id)
     local faction = Q.me().faction
     local byKey, groups = {}, {}
-    local function add(kind, sourceID)
+    local function add(kind, sourceID, skinChance)
         local name = Q.get(kind, sourceID, "name")
         if type(name) ~= "string" or name == "" then return end
         if kind == "npc" then
@@ -56,7 +56,8 @@ local function collect(id)
                 local key = name .. "\0" .. s.area
                 local g = byKey[key]
                 if not g then
-                    g = { kind = kind, id = sourceID, name = name, area = s.area, map = s.map, points = {} }
+                    g = { kind = kind, id = sourceID, name = name, area = s.area, map = s.map, points = {},
+                        skin = skinChance ~= nil, rate = skinChance }
                     byKey[key] = g; groups[#groups + 1] = g
                 end
                 g.points[#g.points + 1] = s
@@ -71,9 +72,17 @@ local function collect(id)
         if i > MAX_SOURCES then break end
         add("npc", sourceID)
     end
-    for i, sourceID in ipairs(type(nodes) == "table" and nodes or {}) do
-        if i > MAX_SOURCES then break end
-        add("object", sourceID)
+    -- QuestieDB has no skinning loot, so hides and leather come from the bundled table (SkinningData.lua):
+    -- { creature, tenths of a percent, ... }
+    local skins = ns.skinningData and ns.skinningData[id]
+    for i = 1, math.min(#(skins or {}), MAX_SOURCES * 2), 2 do add("npc", skins[i], skins[i + 1] / 10) end
+    -- objectDrops of leather, cloth or meat are chests and bags, not places to gather: only real nodes count
+    local _, sub = itemFacts(id)
+    if sub == 7 or sub == 9 or sub == 10 then
+        for i, sourceID in ipairs(type(nodes) == "table" and nodes or {}) do
+            if i > MAX_SOURCES then break end
+            add("object", sourceID)
+        end
     end
     return groups
 end
@@ -96,7 +105,7 @@ local function rank(groups, itemID)
     for i = 1, math.min(TOP, #list) do
         local g = list[i]
         g.count = #g.points
-        if g.kind == "npc" then g.rate = Q.itemDropRate(itemID, g.id) end
+        if g.kind == "npc" and not g.rate then g.rate = Q.itemDropRate(itemID, g.id) end
         while #g.points > MAX_POINTS do table.remove(g.points) end
         out[i] = g
     end
@@ -127,7 +136,8 @@ end
 function G.lines(sources)
     local out = {}
     for i, g in ipairs(sources) do
-        local rate = g.rate and string.format(" · %s%% drop", g.rate >= 10 and string.format("%.0f", g.rate) or string.format("%.1f", g.rate)) or ""
+        local rate = g.rate and string.format(" · %s%% %s", g.rate >= 10 and string.format("%.0f", g.rate) or string.format("%.1f", g.rate),
+            g.skin and "skinning" or "drop") or ""
         out[i] = i .. ". " .. g.name .. levelText(g) .. " · " .. zoneName(g.area) .. " · " .. g.count
             .. " known spawn" .. (g.count == 1 and "" or "s") .. rate
     end
@@ -146,6 +156,7 @@ local function onTooltip(tooltip, data)
     if tooltip ~= GameTooltip or not enabled() or not Q.available() then return end
     local _, link = call(tooltip.GetItem, tooltip)
     local id = itemID(link) or (type(data) == "table" and tonumber(data.id)) or nil
+    if id then G.lastItem = id end
     if not id or tooltip.questSharingGatherID == id or not G.isGathering(id) then return end
     tooltip.questSharingGatherID = id
     G.load(id, function(sources)
@@ -158,7 +169,7 @@ local function pinTip(pin)
     local g = pin.source
     if not g then return end
     local lines = { zoneName(g.area) .. " · " .. g.count .. " known spawn" .. (g.count == 1 and "" or "s"),
-        "Drops " .. (active and active.name or "the item") .. (g.rate and string.format(" (%.1f%%)", g.rate) or ""),
+        (g.skin and "Skin it for " or "Drops ") .. (active and active.name or "the item") .. (g.rate and string.format(" (%.1f%%)", g.rate) or ""),
         S.GREY .. "Click to set a waypoint.|r" }
     U.tip(pin, g.name .. levelText(g), lines)
 end
@@ -274,16 +285,48 @@ function G.mark(id)
 end
 
 -- Ctrl+right-click on whatever item the tooltip is showing: bags, the Professions window, anywhere --------------------------
+local hinted = {}
+local function hintOnce(key, text)
+    if hinted[key] then return end
+    hinted[key] = true; ns.print(text)
+end
+local function modifierDown()
+    return (IsControlKeyDown and IsControlKeyDown()) or (IsMetaKeyDown and IsMetaKeyDown()) -- Cmd stands in for Ctrl on a Mac
+end
 local function onMouseDown(_, button)
-    if button ~= "RightButton" or not (IsControlKeyDown and IsControlKeyDown()) or not enabled() or not Q.available() then return end
+    if button ~= "RightButton" or not modifierDown() or not ns.db or not ns.db.enabled then return end
     if not (GameTooltip and call(GameTooltip.IsShown, GameTooltip)) then return end
     local _, link = call(GameTooltip.GetItem, GameTooltip)
     local id = itemID(link)
     if not id or not G.isGathering(id) then return end
+    if not ns.db.itemSources then
+        hintOnce("setting", "turn on Settings > Look up > \"Show where items come from when I hover over them\" to see where this is gathered")
+        return
+    end
+    if not enabled() then return end
+    if not Q.available() then hintOnce("questie", "where-to-gather needs QuestieDB: install or enable it, then /reload (check with /qs questie)"); return end
     local now = call(GetTime) or 0
     if lastClick.id == id and now - lastClick.time < 0.3 then return end   -- one click, not two events
     lastClick.id, lastClick.time = id, now
     G.mark(id)
+end
+
+-- /qs gather [item id or link]: say why an item does or does not show sources (defaults to the last item you hovered)
+function G.command(arg)
+    local id = tonumber(arg) or itemID(arg) or G.lastItem
+    ns.print("where to gather: setting " .. (ns.db.itemSources and "on" or "OFF (Settings > Look up)")
+        .. ", QuestieDB " .. (Q.available() and "found" or "NOT found") .. ", " .. (ns.skinningData and "skinning table loaded" or "skinning table MISSING"))
+    if not id then ns.print("hover an item first, or type /qs gather <item id>"); return end
+    local class, sub = itemFacts(id)
+    ns.print("item " .. id .. ": class " .. tostring(class) .. ", subclass " .. tostring(sub) .. " -> "
+        .. (G.isGathering(id) and "counts as a gathering item" or "NOT a gathering item (needs trade goods: cloth, leather, metal/stone, meat, herb, elemental)"))
+    if not G.isGathering(id) or not Q.available() then return end
+    ns.print("QuestieDB: " .. #(Q.get("item", id, "npcDrops") or {}) .. " creature drops, " .. #(Q.get("item", id, "objectDrops") or {})
+        .. " object drops; skinning table: " .. math.floor(#((ns.skinningData or {})[id] or {}) / 2) .. " creatures")
+    G.load(id, function(sources)
+        if #sources == 0 then ns.print("no usable spawn found for this item"); return end
+        for _, line in ipairs(G.lines(sources)) do ns.print(line) end
+    end)
 end
 
 local hooked

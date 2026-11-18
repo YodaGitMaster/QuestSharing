@@ -969,9 +969,24 @@ function V.draw()
     end
 end
 
+-- Memory: the NPC/item index is dropped once nothing has searched for GRACE seconds (map closed or search box empty).
+local GRACE, idleSince = 120, nil
+local function releaseWhenIdle(mapShown)
+    if mapShown and currentQuery ~= "" then idleSince = nil; return end
+    local now = GetTime and GetTime() or 0
+    idleSince = idleSince or now
+    if now - idleSince >= GRACE and (ready or itemsReady or loading or next(vendors) or next(cached) or next(itemRows)) then
+        resetIndex(); idleSince = nil
+    end
+end
+V.releaseWhenIdle = releaseWhenIdle
+function V._state() return ready, itemsReady, next(vendors) ~= nil end
+
 local function tick()
     V.draw()
-    ns.after(ns.db.vendorSearch and WorldMapFrame and call(WorldMapFrame.IsShown, WorldMapFrame) and 0.5 or 2, tick)
+    local mapShown = ns.db.vendorSearch and WorldMapFrame and call(WorldMapFrame.IsShown, WorldMapFrame)
+    releaseWhenIdle(mapShown)
+    ns.after(mapShown and 0.5 or 2, tick)
 end
 
 function V.refresh()

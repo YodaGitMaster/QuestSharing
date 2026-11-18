@@ -52,12 +52,13 @@ QUESTIE_NPCS = {
     [5] = { name = "Tess", subName = "Tailoring Trainer", friendlyToFaction = "AH", spawns = { [100] = { { 20.0, 20.0 } } } },
     [6] = { name = "Pike", subName = "Mining Supplies", friendlyToFaction = "AH", spawns = { [100] = { { 70.0, 70.0 } } } },
     [7] = { name = "Chef", subName = "Cooking Trainer", friendlyToFaction = "AH", spawns = { [100] = { { 80.0, 20.0 } } } },
+    [8] = { name = "Digger", subName = "Mining Trainer", friendlyToFaction = "AH", spawns = { [102] = { { 60.5, 58.9 } } } }, -- on the zeppelin tower
 }
 NpcDB.Get = function(id, key) local r = QUESTIE_NPCS[id]; return r and r[key] end
-NpcDB.GetAllIds = function() return { 1, 2, 3, 4, 5, 6, 7 } end
+NpcDB.GetAllIds = function() return { 1, 2, 3, 4, 5, 6, 7, 8 } end
 LibQuestieDB.Support.Get = function(name)
     if name == "ZoneDB" then
-        return { private = { areaIdToUiMapId = "return {[100]=1413,[101]=1440}", areaIdToUiMapIdOverride = "return {}" } }
+        return { private = { areaIdToUiMapId = "return {[100]=1413,[101]=1440,[102]=1420}", areaIdToUiMapIdOverride = "return {}" } }
     end
 end
 UnitClass = function() return "Druid", "DRUID" end
@@ -187,7 +188,7 @@ def test_hovering_a_dungeon_names_the_closest_town_per_faction(style):
     assert title == "Wailing Caverns" and "level 15-25" in text
     assert "Alliance" in text and "Horde" in text
     assert "The Crossroads (The Barrens)" in text, text
-    assert "Ratchet (The Barrens) · neutral" in text, "the Alliance's closest is the neutral town in the same zone"
+    assert "Ratchet (The Barrens) · |cffffffffNeutral|r" in text, "the Alliance's closest is the neutral town in the same zone"
     assert len(strokes(g)) == 2
 
 
@@ -294,6 +295,67 @@ def test_nothing_is_indexed_until_a_map_with_the_setting_on_is_open(style):
 def test_without_questie_nothing_is_drawn_and_nothing_breaks(style):
     g = game(style, 1413)
     assert not trainer_pins(g) and pins(g, "dungeon")
+
+
+def set_faction(g, value):
+    g.eval("NS.setSetting")("travelFaction", value)
+    g.advance(1)
+
+
+def test_faction_choice_filters_transports_and_keeps_neutral_ones(style):
+    g = game(style, 947)
+    assert len(names(g, "stop")) == 11, "both factions by default"
+    set_faction(g, "Horde")
+    assert names(g, "stop") == ["Booty Bay docks", "Grom'gol zeppelin tower", "Orgrimmar zeppelin tower", "Ratchet docks",
+                                "Undercity zeppelin tower"]
+    set_faction(g, "Alliance")
+    assert names(g, "stop") == ["Auberdine docks", "Booty Bay docks", "Deeprun Tram (Ironforge)", "Deeprun Tram (Stormwind)",
+                                "Menethil Harbor docks", "Ratchet docks", "Rut'theran Village dock", "Theramore Isle dock"]
+    set_faction(g, "all")
+    assert len(names(g, "stop")) == 11
+    assert len(pins(g, "dungeon")) == 22, "dungeons are never filtered"
+
+
+def test_faction_choice_limits_the_tooltip_and_the_lines(style):
+    g = game(style, 947)
+    set_faction(g, "Horde")
+    hover(g, "Ratchet docks")
+    _, lines = tooltip(g)
+    assert len(lines) == 1 and "Booty Bay" in lines[0]
+    hover(g, "Orgrimmar zeppelin tower")
+    assert len(strokes(g)) == 2
+    hover(g, "Wailing Caverns")
+    _, lines = tooltip(g)
+    text = "\n".join(lines)
+    assert "Horde" in text and "Alliance" not in text and len(strokes(g)) == 1
+    set_faction(g, "Alliance")
+    hover(g, "Wailing Caverns")
+    _, lines = tooltip(g)
+    assert "Horde" not in "\n".join(lines)
+
+
+def test_neutral_pins_lines_and_towns_are_white(style):
+    g = game(style, 947)
+    ratchet = next(p for p in pins(g, "stop") if p.entry.name == "Ratchet docks")
+    assert list(ratchet.face.vertex.values())[:3] == [1, 1, 1]
+    assert "000000" in ratchet.text.text, "dark letter on the white pin"
+    auberdine = next(p for p in pins(g, "stop") if p.entry.name == "Auberdine docks")
+    assert list(auberdine.face.vertex.values())[:3] == [0.25, 0.5, 1]
+    hover(g, "Ratchet docks")
+    assert [list(c.vertex.values())[:3] for c in strokes(g)] == [[1, 1, 1]]
+    hover(g, "Wailing Caverns")                       # the Alliance's closest town there is neutral Ratchet
+    colours = sorted(tuple(list(c.vertex.values())[:3]) for c in strokes(g))
+    assert (1, 1, 1) in colours and (0.9, 0.2, 0.2) in colours
+    assert "Neutral" in "\n".join(tooltip(g)[1])
+
+
+def test_a_trainer_standing_on_a_transport_is_moved_aside_not_hiding_it(style):
+    g = game(style, 1420, questie=True)
+    stop = next(p for p in pins(g, "stop") if p.entry.id == "uctower")
+    trainer = next(p for p in trainer_pins(g) if "Digger" in members(p))
+    assert abs(stop.point[4] - trainer.point[4]) >= 19 or abs(stop.point[5] - trainer.point[5]) >= 12, "both stay reachable"
+    stop.scripts.OnEnter(stop)
+    assert "Undercity zeppelin tower" in tooltip(g)[0]
 
 
 if __name__ == "__main__":

@@ -160,7 +160,7 @@ def test_quest_log_update_keeps_open_menu_until_its_quest_leaves_results(style):
     # Regression: QUEST_LOG_UPDATE -> D.refresh() -> closeQuestMenu() shut the right-click menu 0.2 s after any log change.
     g=game(style);w=g.eval("NS.dungeonQuests._window()")
     click(w.completed);assert 19 not in ids(g)  # "Hiding completed": finishing a quest removes it from the results
-    row=w.rows[1];qid=row.result.id;other=w.rows[2].result.id
+    row=w.rows[1];qid=row.result.id;other=4  # 4 is a standalone quest: finishing a chain-mate would also hide this one
     row.frame.scripts.OnClick(row.frame,"RightButton")
     menu,_=g.eval("NS._questMenu()")
     assert menu.shown and menu.entry.questID==qid
@@ -529,9 +529,22 @@ def test_detail_panel_keeps_the_yellow_but_drops_the_picture(style):
     assert not surface.grain.shown and surface.base.shown
 
 
-def rows_by_id(g):
+def rows_by_id(g, pages=1):
     w=g.eval("NS.dungeonQuests._window()")
     return {r.result.id:r for r in w.rows.values() if r.result and r.frame.shown}
+
+
+def lead_rows(g):
+    """Rows of the lead-in quests (30-35), whichever page they are on; paints each page once and keeps its text."""
+    out={}
+    go=g.eval("NS.dungeonQuests.go")
+    while go(-1): pass
+    while True:
+        for q,row in rows_by_id(g).items():
+            out[q]=type("Row",(),{"from_":row["from"].text,"item":row.item.text,"icon":row.icon.texture,"pickup":row.pickup.text})
+        if not go(1): break
+    while go(-1): pass
+    return out
 
 
 def test_chain_is_nested_in_the_list_and_the_panel_describes_only_the_clicked_step(style):
@@ -594,6 +607,112 @@ def test_narrowing_keeps_the_scan_and_widening_scans_again(style):
     assert g.eval("QUEST_ENUMS")==3 and {5,7,17}<=ids(g)  # all factions and classes
     click(w.mine);g.advance(.3)
     assert g.eval("QUEST_ENUMS")==3 and 5 not in ids(g)   # back to one character: no new scan
+
+
+LEADIN='''
+QUESTIE_QUESTS[30]={name="Seeking Helper",questLevel=15,startedBy={{197}},finishedBy={{400}},nextQuestInChain=31}
+QUESTIE_QUESTS[31]={name="Deadmine errand",questLevel=18,zoneOrSort=1581,startedBy={{400}}}
+QUESTIE_QUESTS[32]={name="Crypt errand",questLevel=18,zoneOrSort=1581,startedBy={{400}}}
+QUESTIE_QUESTS[33]={name="Seeking Crypt",questLevel=15,startedBy={{197}},finishedBy={{400}},breadcrumbForQuestId=32}
+QUESTIE_QUESTS[34]={name="Vault errand",questLevel=18,zoneOrSort=1581,startedBy={{400}}}
+QUESTIE_QUESTS[35]={name="Seeking Vault",questLevel=15,startedBy={{197}},finishedBy={{400}},availableUntilCompleted=34}
+'''
+
+
+def test_optional_lead_in_quests_are_listed_with_their_dungeon_quest_and_not_standalone(style):
+    # Questie says "30 leads to 31" only on quest 30 (31 does not list it as a prerequisite): a lead-in, not a standalone quest.
+    g=game(style,LEADIN);filters(g,dungeon=1581)
+    assert {30,31,32,33,34,35}<=ids(g), "lead-ins are listed with the dungeon quest they point to"
+    rows=lead_rows(g)
+    for lead,quest in ((30,31),(33,32),(35,34)):
+        assert "optional lead-in" in rows[lead].from_ and "Standalone" not in rows[lead].from_, lead
+        assert "Chain quest" in rows[quest].from_ and "Standalone" not in rows[quest].from_, quest
+    order=[r.id for r in g.eval("NS.dungeonQuests._results()").values()]
+    for lead,quest in ((30,31),(33,32),(35,34)):
+        assert order.index(lead)+1==order.index(quest), "the dungeon quest sits right under its lead-in"
+    assert not g.eval("NS.db.errors")
+
+
+def test_lead_in_is_greyed_and_ticked_once_the_quest_it_leads_to_is_done(style):
+    g=game(style,LEADIN);filters(g,dungeon=1581)
+    rows=lead_rows(g)
+    assert not any("ReadyCheck-Ready" in rows[q].icon for q in (30,31,32,33,34,35))
+    g.run("FINISHED[31]=true;FINISHED[32]=true;FINISHED[34]=true");g.eval("NS.dungeonQuests.refresh")();g.advance(.3)
+    rows=lead_rows(g)
+    for lead in (30,33,35):
+        assert "ReadyCheck-Ready" in rows[lead].icon and "Not needed" in rows[lead].from_ and "|cff7d7d7d" in rows[lead].item, lead
+    assert "Not needed" not in rows[31].from_
+    assert not g.eval("NS.db.errors")
+
+
+def test_real_prerequisite_is_not_mislabelled_as_lead_in(style):
+    g=game(style,HOVER_DATA);filters(g,dungeon=1581)
+    assert "optional lead-in" not in rows_by_id(g)[1]["from"].text  # quest 2 lists quest 1 as its prerequisite
+
+
+def border_on(row):
+    return all(e.shown for e in row.todo.values())
+
+
+def test_hide_options_are_check_boxes_with_a_tick(style):
+    g=game(style);w=g.eval("NS.dungeonQuests._window()")
+    assert "Hide completed" in w.completed.text.text and "Hide quests in my log" in w.inLog.text.text
+    assert not w.completed.tick.shown and not w.inLog.tick.shown
+    click(w.completed);assert w.completed.tick.shown and 19 not in ids(g)
+    click(w.completed);assert not w.completed.tick.shown and 19 in ids(g)
+    click(w.reset);assert not w.completed.tick.shown and not w.inLog.tick.shown
+    assert not g.eval("NS.db.errors")
+
+
+def test_hide_quests_in_my_log_and_hide_completed_also_hide_not_needed_steps(style):
+    g=game(style,HOVER_DATA);filters(g,dungeon=1581);w=g.eval("NS.dungeonQuests._window()")
+    g.run("QUESTS[#QUESTS+1]={id=2,title='A dungeon job',level=20,objectives={}}")
+    g.fire("QUEST_LOG_UPDATE");g.advance(.3)
+    assert 2 in ids(g)
+    click(w.inLog);assert 2 not in ids(g) and {1,3,4}<=ids(g)
+    click(w.inLog);assert 2 in ids(g)
+    g.run("FINISHED[3]=true");g.eval("NS.dungeonQuests.refresh")();g.advance(.3)
+    click(w.completed);assert not ({1,3}&ids(g)), "a finished quest and the lead-ins it made pointless are hidden"
+    assert not g.eval("NS.db.errors")
+
+
+def test_quest_in_log_shows_exclamation_and_missing_quests_get_a_gold_border(style):
+    g=game(style,HOVER_DATA);filters(g,dungeon=1581)
+    g.run("QUESTS[#QUESTS+1]={id=2,title='A dungeon job',level=20,objectives={}}")
+    g.fire("QUEST_LOG_UPDATE");g.advance(.3)
+    rows=rows_by_id(g)
+    assert "AvailableQuestIcon" in rows[2].icon.texture and "In your quest log" in rows[2]["from"].text
+    assert not border_on(rows[2]), "already taken: no 'still to take' border"
+    assert border_on(rows[1]) and "AvailableQuestIcon" not in rows[1].icon.texture, "not taken yet: bordered"
+    g.run("FINISHED[1]=true");g.eval("NS.dungeonQuests.refresh")();g.advance(.3)
+    rows=rows_by_id(g)
+    assert "ReadyCheck-Ready" in rows[1].icon.texture and not border_on(rows[1]), "done: tick, no border"
+    assert not g.eval("NS.db.errors")
+
+
+def test_closed_catalogue_is_kept_two_minutes_then_freed_and_rebuilt_on_reopen(style):
+    g=game(style);enums=g.eval("QUEST_ENUMS")
+    g.eval("NS.equipmentUI.close")();g.advance(60)
+    assert g.eval("NS.dungeonQuests._state()")[0], "still held inside the grace period"
+    g.slash("dungeons");g.advance(1)
+    assert g.eval("NS.dungeonQuests._state()")[0] and g.eval("QUEST_ENUMS")==enums, "reopening in time is instant"
+    g.eval("NS.equipmentUI.close")();g.advance(60)
+    assert g.eval("NS.dungeonQuests._state()")[0], "the timer restarted from the second close"
+    g.advance(70)
+    assert not g.eval("NS.dungeonQuests._state()")[0] and not g.eval("NS.dataWork.busy")("dungeonQuests")
+    assert not g.eval("NS.dataWork.releasePending")("dungeonQuests")
+    assert g.eval("next(NS.dungeonQuests._results()) == nil")
+    g.slash("dungeons");g.advance(90)
+    assert g.eval("NS.dungeonQuests._state()")[0] and ids(g) and g.eval("QUEST_ENUMS")==enums+1
+
+
+def test_a_paused_half_read_scan_is_dropped_after_the_grace_period(style):
+    g=game(style,open_tab=False)
+    g.slash("dungeons");g.advance(.1)
+    g.eval("NS.equipmentUI.close")();g.advance(5)
+    assert g.eval("NS.dataWork.busy")("dungeonQuests"), "paused, so reopening can continue it"
+    g.advance(130)
+    assert not g.eval("NS.dataWork.busy")("dungeonQuests") and not g.eval("NS.dungeonQuests._state()")[0]
 
 
 if __name__=="__main__":

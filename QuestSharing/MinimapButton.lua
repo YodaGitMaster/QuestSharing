@@ -5,7 +5,6 @@
 -- Two shortcut buttons sit beside it (Quest guide, Dungeon quests) so nobody has to search the menus; they move
 -- with it and are hidden with it.
 local ADDON, ns = ...
-local C = ns.compat
 
 local button
 local shortcuts = {}

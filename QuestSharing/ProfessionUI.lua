@@ -1,9 +1,9 @@
 -- Embedded Forever profession views. Own frames are children of Blizzard's existing window;
 -- known recipes still use CraftingPage:SelectRecipe and its native crafting controls.
 local _,ns=...
-local V,P,U,S,D={},ns.professions,ns.optionalUI,ns.style,ns.professionReference
+local V,P,U,S={},ns.professions,ns.optionalUI,ns.style
 ns.professionUI=V
-local w,tab,selected,offset,side=nil,"cooking",nil,0,"Both"
+local w,selected=nil,nil
 local ROW=44
 local drawing=false
 local function show(f,on) if on then f:Show() else f:Hide() end end
@@ -22,13 +22,6 @@ local function panel(parent)
     local level=parent.GetFrameLevel and parent:GetFrameLevel() or 100
     f:SetFrameLevel(level+40);f:EnableMouse(true);return f
 end
-local function button(parent,label,width,fn,template)
-    local ok,b=pcall(CreateFrame,"Button",nil,parent,template or "UIPanelButtonTemplate")
-    if not ok then b=CreateFrame("Button",nil,parent) end
-    b:SetWidth(width);b:SetHeight(24);b:SetText(label);b:SetScript("OnClick",fn)
-    if b.SetNormalFontObject then b:SetNormalFontObject("GameFontNormal") end
-    return b
-end
 local function scroll(parent,x,y,width,h)
     local ok,f=pcall(CreateFrame,"ScrollFrame",nil,parent,"UIPanelScrollFrameTemplate")
     if not ok then f=CreateFrame("ScrollFrame",nil,parent) end
@@ -43,7 +36,7 @@ end
 local function isCooking()
     return w and P.active() and P.ownCooking() and w.host:IsShown() and w.native:IsShown()
 end
-function V.activeCooking() return isCooking() and tab=="cooking" end
+function V.activeCooking() return isCooking() end
 local function stopNativeRecipe()
     local form=w.native.SchematicForm
     if form.ClearTransaction then form:ClearTransaction() end
@@ -51,7 +44,7 @@ local function stopNativeRecipe()
     if w.native.ValidateControls then w.native:ValidateControls() end
 end
 local function hideDetails()
-    w.missing:Hide();w.nativeSource:Hide();w.upgrade:Hide()
+    w.missing:Hide();w.nativeSource:Hide()
 end
 local function recipeTip(self)
     if not self.recipe then return end
@@ -123,39 +116,14 @@ function V.select(r)
     end
     stopNativeRecipe();fillMissing(r);drawRows()
 end
-local function refreshUpgrades()
-    local p=w.profession or D.professions[1]
-    local out={}
-    for _,r in ipairs(p.ranks) do
-        out[#out+1]=S.GOLD..r.name.."  -  maximum skill "..r.cap.."|r"
-        out[#out+1]=r.skill==0 and "No prior skill required" or ("Requires "..p.name.." "..r.skill..(r.level>0 and (" and character level "..r.level) or ""))
-        out[#out+1]=r.method
-        for _,f in ipairs({"Alliance","Horde"}) do
-            if side=="Both" or side==f then out[#out+1]=f..": "..r[f] end
-        end
-        out[#out+1]=""
-    end
-    w.upgradeTitle:SetText(p.name.." - training and upgrades")
-    w.upgradeText:SetText(table.concat(out,"\n\n"))
-    w.upgradeContent:SetHeight(height(w.upgradeText)+12);w.upgradeScroll:SetVerticalScroll(0)
-    for _,b in ipairs(w.professions) do colour(b.label,b.profession==p and 1 or 0.8,b.profession==p and 0.82 or 0.8,b.profession==p and 0.3 or 0.8) end
-    for i,f in ipairs({"Both","Alliance","Horde"}) do w.factions[i]:SetText((side==f and S.GOLD or S.WHITE)..f.."|r") end
-end
 function V.refresh()
     if not w then return end
     local active=P.active() and w.host:IsShown()
-    show(w.tabs,active)
-    U.call(tab=="cooking" and PanelTemplates_SelectTab or PanelTemplates_DeselectTab,w.recipesTab)
-    U.call(tab=="upgrades" and PanelTemplates_SelectTab or PanelTemplates_DeselectTab,w.upgradesTab)
     hideDetails()
     if not active then w.list:Hide();return end
-    if tab=="upgrades" then
-        w.list:Hide();if w.native:IsShown() then stopNativeRecipe() end
-        refreshUpgrades();w.upgrade:Show();return
-    end
     if not w.native:IsShown() or (w.host.BookPage and w.host.BookPage:IsShown()) then w.list:Hide();return end
     local cooking=isCooking()
-    show(w.list,cooking and tab=="cooking")
+    show(w.list,cooking)
     if not cooking then return end
     local previous=selected
     w.results=P.recipes(w.search:GetText())
@@ -171,24 +139,18 @@ function V.refresh()
     drawRows()
     if selected then V.select(selected) end
 end
-function V.open(which)
+function V.open()
     if not w then return end
-    local previous=tab
-    tab=which=="upgrades" and "upgrades" or "cooking"
-    if tab=="cooking" and w.host.BookPage and w.host.BookPage:IsShown() then
+    if w.host.BookPage and w.host.BookPage:IsShown() then
         -- Do not switch the native profession book by hand; its right-hand profession tabs own selection.
-        ns.print("Choose a profession on the right to use Recipes or Upgrades.");return
-    end
-    if previous=="upgrades" and tab=="cooking" and not P.ownCooking() and w.native.Refresh then
-        local info=U.call(C_TradeSkillUI and C_TradeSkillUI.GetBaseProfessionInfo)
-        if info then w.native:Refresh(info) end
+        ns.print("Choose Cooking using the profession tabs on the right.");return
     end
     V.refresh()
     if V.activeCooking() then P.scan() end
 end
 function V.close()
     if not w then return end
-    hideDetails();w.list:Hide();w.tabs:Hide()
+    hideDetails();w.list:Hide()
     if not P.active() and w.native:IsShown() and w.native.Refresh then
         local info=U.call(C_TradeSkillUI and C_TradeSkillUI.GetBaseProfessionInfo)
         if info then w.native:Refresh(info) end
@@ -248,33 +210,6 @@ function V.attach()
     end
     -- A compact caption above the native schematic keeps the selected learned recipe's skill/source visible.
     w.nativeSource=font(native,"",listWidth+20,53,detailWidth-18,12)
-    w.upgrade=panel(host);w.upgrade:SetPoint("TOPLEFT",host,"TOPLEFT",8,-72)
-    w.upgrade:SetPoint("BOTTOMRIGHT",host,"BOTTOMRIGHT",-8,6)
-    w.upgrade:SetFrameLevel((native.GetFrameLevel and native:GetFrameLevel() or 100)+60)
-    w.upgrade:SetWidth(host:GetWidth()-16);w.upgrade:SetHeight(list:GetHeight())
-    w.upgradeTitle=font(w.upgrade,"",215,14,host:GetWidth()-250,18,true)
-    w.factions={}
-    for i,f in ipairs({"Both","Alliance","Horde"}) do
-        local b=button(w.upgrade,f,86,function() side=f;refreshUpgrades() end)
-        b:SetPoint("TOPLEFT",w.upgrade,"TOPLEFT",215+(i-1)*92,-46);w.factions[i]=b
-    end
-    w.upgradeScroll,w.upgradeContent=scroll(w.upgrade,215,88,host:GetWidth()-270,list:GetHeight()-130)
-    w.upgradeText=font(w.upgradeContent,"",0,0,host:GetWidth()-280,14)
-    for i,p in ipairs(D.professions) do
-        local b=CreateFrame("Button",nil,w.upgrade);b.profession=p;b:SetWidth(185);b:SetHeight(32)
-        b:SetPoint("TOPLEFT",w.upgrade,"TOPLEFT",12,-(14+(i-1)*34))
-        b.label=font(b,p.name,8,6,174,14)
-        b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-        b:SetScript("OnClick",function() w.profession=p;refreshUpgrades() end);w.professions[i]=b
-    end
-    local note=font(w.upgrade,"Guide checked "..D.date.." - confirm availability with your trainer.",215,list:GetHeight()-32,host:GetWidth()-270,12)
-    note:SetWordWrap(true)
-    w.tabs=CreateFrame("Frame",nil,host);w.tabs:SetWidth(260);w.tabs:SetHeight(28)
-    w.tabs:SetPoint("TOPLEFT",host,"BOTTOMLEFT",14,0)
-    w.recipesTab=button(w.tabs,"Recipes",110,function() V.open("cooking") end,"PanelTabButtonTemplate")
-    w.recipesTab:SetPoint("TOPLEFT",w.tabs,"TOPLEFT",0,0)
-    w.upgradesTab=button(w.tabs,"Upgrades",110,function() V.open("upgrades") end,"PanelTabButtonTemplate")
-    w.upgradesTab:SetPoint("LEFT",w.recipesTab,"RIGHT",2,0)
     host:HookScript("OnHide",function() P.close() end)
     native:HookScript("OnHide",function()
         w.list:Hide();w.missing:Hide();w.nativeSource:Hide()

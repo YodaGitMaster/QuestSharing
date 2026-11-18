@@ -9,6 +9,7 @@ local filterError
 -- Whole-catalogue quest links from the last scan: chainPrev[id][before]=required, chainNext[id][after]=required.
 -- "required" = the later quest cannot be taken without the earlier one (so finishing it proves the earlier one is done).
 local chainPrev, chainNext = {}, {}
+local chainLead = {} -- chainLead[after][before]=true: an optional lead-in (breadcrumb) that only points you to `after`
 local depthOf = {} -- result id -> nesting level in the list
 local refreshPending=false
 -- What the last scan read: its faction, class and level filters. Quests outside them were skipped by one cheap read each,
@@ -20,6 +21,18 @@ local FOREGROUND_MS = 8 -- the player is waiting on this visible list; it reads 
 local rewardIndex, rewardsReady, rewardsLoading = {}, false, false
 local hovered, showHover
 local paint
+-- Memory: free the whole catalogue (it is rebuilt by the next open). A paused scan still holds its tables, so the jobs go too.
+local GRACE = 120 -- seconds a closed window keeps its catalogue, so closing and reopening stays instant
+local function release()
+    ns.dataWork.keep(OWNER)
+    generation=generation+1
+    ns.dataWork.cancel(OWNER);ns.dataWork.cancel(REWARDS_OWNER)
+    records,results,places={}, {}, {}
+    chainPrev,chainNext,depthOf,chainLead={}, {}, {}, {}
+    rewardIndex,rewardsReady,rewardsLoading={},false,false
+    ready,loading,progress,total,selected,hovered,scope=false,false,0,0,nil,nil,nil
+    if window then for _,row in ipairs(window.rows or {}) do row.result=nil end end
+end
 local function number(v) return tonumber(v) or 0 end
 local function enums() return type(LibQuestieDB)=="table" and LibQuestieDB.Enum or {} end
 local function areaName(area)
@@ -29,12 +42,23 @@ local function defaults(mine)
     local _,class=U.call(UnitClass,"player")
     return {dungeon=0,faction=mine and U.call(UnitFactionGroup,"player") or "All factions",
         class=mine and class or "All classes",level=math.max(1,number(U.call(UnitLevel,"player"))),
-        allLevels=not mine,completed=true,text=""}
+        allLevels=not mine,hideCompleted=false,hideLog=false,text=""}
 end
 local function shown() return window and ns.db.enabled and E.visible(OWNER) end
 local function completed(id)
     return U.call((C_QuestLog and C_QuestLog.IsQuestFlaggedCompleted) or IsQuestFlaggedCompleted,id)==true
 end
+local function finished(id,seen)
+    if completed(id) then return true,false end
+    seen=seen or {}
+    if seen[id] then return false end
+    seen[id]=true
+    for after,required in pairs(chainNext[id] or {}) do
+        if required and finished(after,seen) then return true,true end
+    end
+    return false
+end
+local function inLog(id) return C.findEntry(id)~=nil end -- taken: in the quest log right now
 local function classChoices()
     local list={{value="All classes",label="All classes"}}
     local keys={}
@@ -77,7 +101,8 @@ function D.search(f)
             and (filters.allLevels or (r.required<=filters.level and (r.max==0 or filters.level<=r.max)))
             and (filters.class=="All classes" or r.classes==0 or (class and ns.rewards.overlaps(r.classes,class)))
             and (filters.faction=="All factions" or r.races==0 or (mask and ns.rewards.overlaps(r.races,mask)))
-            and (filters.completed or not completed(r.id))
+            and (not filters.hideCompleted or not finished(r.id))
+            and (not filters.hideLog or not inLog(r.id))
             and (needle=="" or string.find(string.lower(r.name.." "..r.id.." "..r.dungeonText),needle,1,true)) then
             results[#results+1]=r
         end
@@ -190,7 +215,7 @@ function D.scan()
     generation=generation+1
     local token=generation
     records,results,places={}, {}, {}
-    chainPrev,chainNext,depthOf={}, {}, {}
+    chainPrev,chainNext,depthOf,chainLead={}, {}, {}, {}
     ready,loading,progress,total,filterError=false,true,0,0,nil
     message="Needs a recent QuestieDB with an enumerable quest catalogue."
     ns.dataWork.start(OWNER,function()
@@ -207,7 +232,10 @@ function D.scan()
                     required=number(read("quest",id,"requiredLevel")),max=number(read("quest",id,"requiredMaxLevel")),
                     classes=number(read("quest",id,"requiredClasses")),races=number(read("quest",id,"requiredRaces")),
                     beforeAny=read("quest",id,"preQuestSingle"),beforeAll=read("quest",id,"preQuestGroup"),
-                    next=read("quest",id,"nextQuestInChain"),dungeons=memberships(id,read,cache)}
+                    next=read("quest",id,"nextQuestInChain"),dungeons=memberships(id,read,cache),
+                    -- Other ways Questie says "this quest only leads to that one, and goes away once that one is done".
+                    crumbFor=read("quest",id,"breadcrumbForQuestId"),crumbs=read("quest",id,"breadcrumbs"),
+                    availUntil=read("quest",id,"availableUntilCompleted")}
                 all[id]=r
                 if next(r.dungeons) then seeds[#seeds+1]=r end
             end
@@ -216,9 +244,16 @@ function D.scan()
             ns.dataWork.yield()
         end
         -- Chain membership is separate from what a step asks the player to do (a chain can include talk-only steps).
-        local function link(before,after,required)
+        local isPre={}
+        local function link(before,after,required,lead)
             before,after=math.abs(number(before)),math.abs(number(after))
             if before==0 or after==0 or before==after then return end
+            if lead then
+                if not (isPre[after] and isPre[after][before]) then chainLead[after]=chainLead[after] or {};chainLead[after][before]=true end
+            else
+                isPre[after]=isPre[after] or {};isPre[after][before]=true
+                if chainLead[after] then chainLead[after][before]=nil end
+            end
             chainNext[before]=chainNext[before] or {};chainPrev[after]=chainPrev[after] or {}
             if required or chainNext[before][after]==nil then chainNext[before][after]=required==true;chainPrev[after][before]=required==true end
             if all[before] then
@@ -236,7 +271,12 @@ function D.scan()
                 -- "any one of" several prerequisites does not prove which one was done; a single or an "all" list does.
                 for _,before in ipairs(list) do link(before,r.id,index==2 or #list==1) end
             end
-            if number(r.next)>0 then link(r.id,r.next,true) end
+            -- Questie's nextQuestInChain: once the next quest is active or done this one is no longer offered. When that
+            -- next quest does not list this one as a prerequisite, this one is an optional lead-in (a "go and speak to" quest).
+            if number(r.next)>0 then link(r.id,r.next,true,true) end
+            if number(r.crumbFor)>0 then link(r.id,r.crumbFor,true,true) end
+            for _,crumb in ipairs(type(r.crumbs)=="table" and r.crumbs or {number(r.crumbs)}) do link(crumb,r.id,true,true) end
+            if number(r.availUntil)>0 then link(r.id,r.availUntil,true,true) end
             ns.dataWork.yield()
         end
         -- Include outdoor preparation quests and explicit follow-ups, with cycle guards per dungeon.
@@ -253,6 +293,8 @@ function D.scan()
                     for _,list in ipairs({r.beforeAny or {},r.beforeAll or {}}) do
                         for _,before in ipairs(type(list)=="table" and list or {}) do include(before,"Preparation") end
                     end
+                    -- An optional lead-in ("go and speak to X") belongs to the quest it points to, so it is listed with it.
+                    for before in pairs(chainLead[id] or {}) do include(before,"Lead-in") end
                     ns.dataWork.checkpoint()
                 end
                 include(seed.id,true)
@@ -323,6 +365,7 @@ local function chainLabel(r)
     local role=filters.dungeon~=0 and r.dungeons[filters.dungeon]
     if role=="Preparation" then return "Chain quest: prerequisite" end
     if role=="Follow-up" then return "Chain quest: follow-up" end
+    if role=="Lead-in" then return "Chain quest: optional lead-in" end
     if role==true then return "Chain quest: dungeon step" end
     return "Chain quest"
 end
@@ -374,21 +417,6 @@ local GREEN,DIM="|cff0d6e0d","|cff6b4a26"
 local NAME,PICK,TURN="|cff7a0c0c","|cff0a2a8a","|cff5a1a7a" -- panel: quest name crimson, pickup deep blue, turn-in purple
 local GREYED="|cff7d7d7d"
 local ROW_PICK,ROW_TURN,ROW_TASK="|cff9fe6ff","|cffe6b3ff","|cffe0e0e0" -- the same roles, bright for the dark list
-local function finished(id,seen)
-    if completed(id) then return true,false end
-    seen=seen or {}
-    if seen[id] then return false end
-    seen[id]=true
-    for after,required in pairs(chainNext[id] or {}) do
-        if required and finished(after,seen) then return true,true end
-    end
-    return false
-end
-local function sortedKeys(map,keep)
-    local list={}
-    for id in pairs(map or {}) do if not keep or keep[id] then list[#list+1]=id end end
-    table.sort(list);return list
-end
 local function baseXP(id)
     local support=type(LibQuestieDB)=="table" and LibQuestieDB.Support
     local xp=support and U.call(support.Get,"QuestXP")
@@ -561,7 +589,6 @@ function D.updateControls()
     if not window then return end
     for _,control in ipairs(window.controls) do control.refresh() end
     window.levelMode:SetLabel(filters.allLevels and "All levels" or ("Available at level "..filters.level))
-    window.completed:SetLabel(filters.completed and "Including completed" or "Hiding completed")
 end
 paint=function()
     if not window then return end
@@ -569,19 +596,21 @@ paint=function()
     page=math.max(1,math.min(page,math.max(1,math.ceil(#results/PAGE))))
     window.status:SetText(window.levelError or filterError or (loading and ("Reading dungeon quests: "..progress.."/"..total.." (pauses in combat)"))
         or (not ready and message) or (#results==0 and "No matching quests; broaden your filters or refresh Questie data.")
-        or ((page-1)*PAGE+1).."–"..math.min(#results,page*PAGE).." of "..#results.." quests • right-click for quest actions")
+        or ((page-1)*PAGE+1).."–"..math.min(#results,page*PAGE).." of "..#results.." quests • right-click for actions • gold border: still to take • !: in your log • green tick: done")
     E.pageButtons(window.prev,window.next,#results,page,PAGE)
     for i,row in ipairs(window.rows) do
         local r=results[(page-1)*PAGE+i];row.result=r
         if r then
             local done,implied=finished(r.id)
+            local taken=not done and inLog(r.id)
             local depth=math.min(depthOf[r.id] or 0,4);local indent=depth*22
             row.frame:ClearAllPoints();row.frame:SetPoint("TOPLEFT",window.list,"TOPLEFT",indent,-(i-1)*106)
             row.frame:SetWidth(650-indent)
             for _,fs in ipairs({row.item,row.from}) do fs:SetWidth(650-indent-60) end
             for _,fs in ipairs({row.task,row.pickup,row.turnIn}) do fs:SetWidth(590-indent) end
             E.paintRow(row,nil,r.name.." · level "..r.level.." · req "..r.required.."+",
-                chainLabel(r).." · "..r.dungeonText..(completed(r.id) and " · Completed" or implied and " · Not needed: a later step is done" or ""))
+                chainLabel(r).." · "..r.dungeonText..(completed(r.id) and " · Completed" or implied and " · Not needed: a later step is done"
+                    or taken and " · In your quest log" or ""))
             row.item:SetText((depth>0 and (S.GREY.."» |r") or "")..(done and (GREYED..r.name.."|r") or (S.GOLD..r.name.."|r"))
                 ..S.GREY.." · level "..r.level.." · req "..r.required.."+|r")
             local task,talk=taskLabel(r)
@@ -590,8 +619,13 @@ paint=function()
             row.pickup:SetText((done and GREYED or ROW_PICK).."Pickup: "..locationSummary(list.pickups).."|r")
             row.turnIn:SetText((done and GREYED or ROW_TURN).."Turn-in: "..locationSummary(list.turnIns).."|r")
             -- done (or made pointless by a later done step): green tick and grey text, so you do not travel for it
-            row.icon:SetTexture(done and "Interface\\RaidFrame\\ReadyCheck-Ready" or "Interface\\Icons\\INV_Misc_Note_01")
-            row.icon:SetTexCoord(done and 0 or 0.06,done and 1 or 0.94,done and 0 or 0.06,done and 1 or 0.94)
+            -- already in the quest log: a yellow "!" so you know you have it
+            local flat=done or taken
+            row.icon:SetTexture(done and "Interface\\RaidFrame\\ReadyCheck-Ready" or taken and "Interface\\GossipFrame\\AvailableQuestIcon"
+                or "Interface\\Icons\\INV_Misc_Note_01")
+            row.icon:SetTexCoord(flat and 0 or 0.06,flat and 1 or 0.94,flat and 0 or 0.06,flat and 1 or 0.94)
+            -- a gold border marks what you still have to pick up (not done, not in the log)
+            for _,edge in ipairs(row.todo) do if done or taken then edge:Hide() else edge:Show() end end
             row.rarity:Hide();row.frame:Show()
         else row.frame:Hide() end
     end
@@ -625,15 +659,26 @@ local function build()
     end)
     window.levelMode=E.button(f,"All levels",180,function() filters.allLevels=not filters.allLevels;page=1;D.updateControls();D.refresh() end)
     window.levelMode:SetPoint("TOPLEFT",f,"TOPLEFT",110,-60)
-    window.completed=E.button(f,"",180,function() filters.completed=not filters.completed;page=1;D.updateControls();D.refresh() end)
-    window.completed:SetPoint("TOPLEFT",f,"TOPLEFT",300,-60)
+    local function checkbox(label,x,y,width,key)
+        local b=CreateFrame("Button",nil,f)
+        b:SetPoint("TOPLEFT",f,"TOPLEFT",x,-y);b:SetWidth(width);b:SetHeight(24)
+        b.box,b.tick=S.checkBox(b);b.box:SetPoint("LEFT",b,"LEFT",0,0)
+        b.text=E.text(b,label,28,6,width-30)
+        b.refresh=function() if filters[key] then b.tick:Show() else b.tick:Hide() end end
+        b:RegisterForClicks("LeftButtonUp")
+        b:SetScript("OnClick",function() filters[key]=not filters[key];page=1;D.updateControls();D.refresh() end)
+        window.controls[#window.controls+1]=b
+        return b
+    end
+    window.completed=checkbox("Hide completed quests",300,60,185,"hideCompleted")
+    window.inLog=checkbox("Hide quests in my log",310,108,160,"hideLog")
     window.mine=E.button(f,"My character",160,function()
         local dungeon=filters.dungeon;filters=defaults(true);filters.dungeon=dungeon
         window.level:SetText(tostring(filters.level));window.level.cancel();window.search:SetText("");window.search.cancel()
         window.levelError=nil;page=1;D.updateControls();D.refresh()
     end)
     window.mine:SetPoint("TOPLEFT",f,"TOPLEFT",490,-60)
-    window.search,window.clearSearch=E.searchBox(f,"Search dungeon, quest or ID",0,90,470,OWNER,function(text) filters.text=text;page=1;D.refresh() end)
+    window.search,window.clearSearch=E.searchBox(f,"Search dungeon, quest or ID",0,90,300,OWNER,function(text) filters.text=text;page=1;D.refresh() end)
     window.reset=E.button(f,"All quests",170,function()
         local dungeon=filters.dungeon;filters=defaults();filters.dungeon=dungeon
         window.level:SetText(tostring(filters.level));window.level.cancel();window.search:SetText("");window.search.cancel()
@@ -651,6 +696,16 @@ local function build()
     for i=1,PAGE do
         local row=E.row(window.list,0,(i-1)*106,650,i);window.rows[i]=row
         row.frame:SetHeight(102);row.edge:SetHeight(102)
+        row.todo={}
+        for _,side in ipairs({"TOP","BOTTOM","LEFT","RIGHT"}) do
+            local edge=S.fill(row.frame,"OVERLAY",1,0.82,0,1)
+            if side=="TOP" or side=="BOTTOM" then
+                edge:SetHeight(2);edge:SetPoint(side.."LEFT",row.frame,side.."LEFT",0,0);edge:SetPoint(side.."RIGHT",row.frame,side.."RIGHT",0,0)
+            else
+                edge:SetWidth(2);edge:SetPoint("TOP"..side,row.frame,"TOP"..side,0,0);edge:SetPoint("BOTTOM"..side,row.frame,"BOTTOM"..side,0,0)
+            end
+            edge:Hide();row.todo[#row.todo+1]=edge
+        end
         row.task=E.text(row.frame,"",52,44,590);row.task:SetWordWrap(false)
         row.pickup=E.text(row.frame,"",52,62,590);row.pickup:SetWordWrap(false)
         row.turnIn=E.text(row.frame,"",52,80,590);row.turnIn:SetWordWrap(false)
@@ -676,6 +731,7 @@ local function build()
         ns.dataWork.pause(OWNER);ns.closeQuestMenu()
         hovered=nil;U.hideTip();ns.dataWork.cancel(REWARDS_OWNER)
         if rewardsLoading then rewardsLoading,rewardsReady=false,false;rewardIndex={} end
+        ns.dataWork.releaseLater(OWNER,GRACE,function() if not shown() then release() end end)
     end
     f:SetScript("OnHide",f.suspend)
     return true
@@ -687,6 +743,7 @@ end
 function D.open(text)
     if not ns.db.enabled then ns.print("switch Quest Sharing on first (/qs on)");return end
     filters=filters or defaults(true)
+    ns.dataWork.keep(OWNER)
     if not build() then return end
     E.show(OWNER)
     if text and text~="" then filters.text=text;window.search:SetText(text);window.search.cancel() end
@@ -697,7 +754,7 @@ function D.open(text)
     else D.scan() end
 end
 -- Master disable: discard the scan entirely.
-function D.close() if window then E.close(OWNER);stop() end end
+function D.close() if window then E.close(OWNER);stop();release() end end
 function D._window() return window end
 function D._results() return results end
 function D._state() return ready,loading,progress end

@@ -7,7 +7,7 @@ Last updated: 2026-11-18
 cutpdf/
 ├── .gitignore                                        # Exclude caches and release output
 ├── bug.txt                                           # User-provided v0.4.21 diagnostic report
-├── build_release.py                                  # Build install ZIP and release notes
+├── build_release.py                                  # Allowlist build + verify of the install ZIP and release notes (--check, --force)
 ├── CHANGELOG.md                                      # Release history
 ├── context/                                          # Session continuity and live architecture
 │   ├── algo-plan-2026-11-17.md                       # TODO: purpose
@@ -28,7 +28,7 @@ cutpdf/
 │   ├── state.md                                      # Current task and handoff
 │   └── walkable-routing-research.md                  # Terrain-routing feasibility, provider sources and proposed integration (not implemented)
 ├── questidea.txt                                     # User-provided predictive quest optimizer design requirements
-├── QuestSharing/                                     # WoW addon runtime (49 files, collapsed)
+├── QuestSharing/                                     # WoW addon runtime (51 files, collapsed; BagTools.lua = bag bookmarks / sell grays / arrange by topic, ChatLock.lua = no chat box in combat)
 ├── README.md                                         # User documentation
 ├── tests/                                            # Python tests and Lua API harness (49 files, collapsed)
 └── tools/                                            # Local UI emulation utilities, never shipped in the addon
@@ -37,7 +37,7 @@ cutpdf/
     ├── preview_professions.py                        # Export actual profession model into an illustrative native-window layout preview
     ├── preview_quest_planner.py                      # Run actual Lua planner and embed its rows in the Westfall emulation
     ├── preview_search_journal.py                     # Export real Lua search rows/details to a local journal layout emulation
-    ├── profession-preview.html                       # Embedded recipe-list/source/Upgrades visual template with sample learned states
+    ├── profession-preview.html                       # Embedded recipe-list/source visual template with sample learned states
     ├── quest-guide-preview.html                      # Interactive compact-guide fragment template with navigation, mini mode and lock
     └── search-journal-preview.html                   # Interactive three-tab journal layout emulation; native textures approximated
 ```
@@ -47,13 +47,13 @@ cutpdf/
 
 ```mermaid
 flowchart LR
-    Native[Existing ProfessionsFrame] --> UI[ProfessionUI.lua: embedded Recipes and Upgrades]
+    Native[Existing ProfessionsFrame] --> UI[ProfessionUI.lua: embedded Cooking recipe list]
     Fishing[Fishing.lua: Cooking action] --> Model[Professions.lua: source/state model]
     UI --> Model
     Model --> API[C_TradeSkillUI: own Cooking reads]
     UI --> Craft[CraftingPage.SelectRecipe: learned recipes only]
     Model --> Cooking[CookingReference.lua: pinned MIT recipe facts]
-    Model --> Ranks[ProfessionReference.lua: factions, ranks and water examples]
+    Model --> Ranks[ProfessionReference.lua: water examples and vendor places]
     Model --> Sources[Questie.lua: requested item/NPC source records]
     Model --> Levels[ZoneLevels.lua: zone ranges]
     Atlas[Optional AnglerAtlas estimates] --> Model
@@ -67,7 +67,10 @@ flowchart TD
     Diagnostics --> DiagnosticStore[QuestSharingLog and QuestSharingDB.errors: bounded saved records]
     Diagnostics --> Report[QuestSharingReport: issue overview, full details, Copy all, Refresh and Clear records]
     Core --> Share[Share.lua: quest offers]
-    Core --> DataWork[DataWork.lua: shared optional database work budget]
+    Core --> BagTools[BagTools.lua: Space bookmarks, sell grays at vendor, arrange all bags by topic]
+    Bags[Bags.lua: ns.bagEachSlot, bagItemFor] --> BagTools
+    Core --> ChatLock[ChatLock.lua: closes the chat box in combat]
+    Core --> DataWork[DataWork.lua: shared optional database work budget + releaseLater/keep memory release timers]
     Core --> Sync[Sync.lua: party addon messages]
     DB[Optional QuestieDB] --> Q[Questie.lua: ns.questie]
     Q -->|Q.me, Q.questGate, Q.npcFriendly: one cheap read per id before any big table| Gate[Scoped reads: planner, Dungeon quests, map search]
@@ -108,6 +111,7 @@ flowchart TD
     VendorMap -->|pointOnMap, continentPoint| TravelMap[TravelMap.lua: dungeon, boat, zeppelin pins + hover lines + nearest town per faction]
     TravelData[TravelData.lua: static entrances, stops, routes, towns] --> TravelMap
     VendorMap -->|pointOnMap| GatherSources[GatherSources.lua: gathering-item tooltip top-3 zones + Ctrl+right-click map marks]
+    SkinningData[SkinningData.lua: generated skinning table, CMaNGOS] --> GatherSources
     GatherSources --> DataWork
     GatherSources --> Q
     GatherSources --> Waypoint
@@ -245,8 +249,6 @@ sequenceDiagram
     UI->>Native: Clear transaction; Init(nil); ValidateControls
     UI->>Model: Acquisition/ingredient sources for selected record
     UI-->>User: In-place requirements, source and ingredient pane
-    User->>UI: Upgrades tab; profession/faction buttons
-    UI-->>User: Static ranks inside the same native window
     Note over UI,API: No standalone window, filter toggles or automatic crafting
 ```
 ```mermaid
@@ -831,15 +833,6 @@ classDiagram
         sources strings
         uncertain boolean
     }
-    class ProfessionRankReference {
-        name string
-        cap number
-        skill number
-        level number
-        Alliance string
-        Horde string
-        method string
-    }
     class ProfessionModel {
         learned spellID_to_boolean_or_nil
         materialCache itemID_to_lines
@@ -853,11 +846,9 @@ classDiagram
         selected CookingRecipeReference
         rows pooled_44px_scroll_buttons
         missing in_place_source_pane
-        upgrade ProfessionsFrame_child
     }
     ProfessionModel --> CookingRecipeReference : state and acquisition
     EmbeddedProfessionView --> ProfessionModel : query sources and learned state
-    EmbeddedProfessionView --> ProfessionRankReference : selected profession and faction
 ```
 ```mermaid
 classDiagram

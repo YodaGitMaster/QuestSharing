@@ -119,11 +119,8 @@ def test_quest_overlay_renderer_and_setting_are_absent(style):
     assert g.eval("(function() for _,f in ipairs(FRAMES) do if f.qpoint then return true end end return false end)()") is False
 
 
-def test_old_enabled_setting_is_removed_and_legacy_command_cannot_restore_symbols(style):
+def test_legacy_command_cannot_restore_symbols(style):
     g = game(style)
-    g.run("QuestSharingDB.questMap = true")
-    g.fire("ADDON_LOADED", "QuestSharing")
-    assert g.eval("NS.db.questMap") is None
     g.slash("questmap on")
     g.fire("QUEST_LOG_UPDATE")
     g.advance(20)

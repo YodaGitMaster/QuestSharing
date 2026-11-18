@@ -299,8 +299,9 @@ def test_the_minimap_tooltip(style):
 
 # ---- release zip -------------------------------------------------------------------------------------------------------
 def test_the_release_zip_is_ready_to_install():
-    import build_release
-    zpath, ver, names = build_release.build()
+    import build_release, tempfile
+    out = pathlib.Path(tempfile.mkdtemp())                      # never write into the real dist/ (it holds published zips)
+    ver, zpath, names, skipped, data = build_release.build(out=out, policy=False)
     assert ver == VERSION and zpath.name == f"QuestSharing-{VERSION}.zip"
     with zipfile.ZipFile(zpath) as z:
         inside = set(z.namelist())
@@ -310,8 +311,84 @@ def test_the_release_zip_is_ready_to_install():
         assert f"QuestSharing/{f}" in inside, f
     assert "QuestSharing/Bindings.xml" in inside and "QuestSharing/QuestSharing.toc" in inside
     assert not any("test" in n or n.endswith(".py") for n in inside), "no tests in the install package"
+    assert inside == {f"QuestSharing/{n}" for n in names}, "exactly the allowlisted files, nothing else"
+    try:
+        build_release.build(out=out, policy=False)
+        assert False, "an existing zip of the same version must not be replaced without --force"
+    except SystemExit as e:
+        assert "already exists" in str(e)
     notes = (zpath.parent / "RELEASE_NOTES.md").read_text()
     assert notes.strip().startswith("- ") and "## " not in notes, "only this version's section, as a list"
+
+
+# ---- progressive versions ----------------------------------------------------------------------------------------------
+def _problems(ver, released=("0.4.21", "0.4.22"), titles=("Unreleased", "0.4.22", "0.4.21"), zips=(), allow=False):
+    import build_release
+    return build_release.version_problems(ver, list(released) if released is not None else None, list(titles), list(zips), allow)
+
+
+def test_the_next_patch_minor_or_major_version_is_accepted():
+    for ver in ("0.4.23", "0.5.0", "1.0.0"):
+        assert _problems(ver, titles=("Unreleased", ver, "0.4.22", "0.4.21")) == [], ver
+
+
+def test_a_released_skipped_or_older_version_is_refused():
+    assert any("already released" in p for p in _problems("0.4.22"))
+    assert _problems("0.4.22", allow=True) == [], "--force may rebuild a tagged version"
+    assert any("skips ahead" in p and "0.4.23" in p for p in _problems("0.4.24", titles=("0.4.24", "0.4.22")))
+    assert any("skips ahead" in p for p in _problems("0.6.0", titles=("0.6.0", "0.4.22")))
+    assert any("not newer" in p for p in _problems("0.4.20", titles=("0.4.20", "0.4.22")))
+    assert any("not MAJOR.MINOR.PATCH" in p for p in _problems("0.4"))
+
+
+def test_a_changelog_out_of_order_or_a_newer_zip_is_refused():
+    assert any("newest-first" in p for p in _problems("0.4.23", titles=("Unreleased", "0.4.22", "0.4.23")))
+    assert any("older than the newest" in p for p in _problems("0.4.23", titles=("0.4.24", "0.4.22")))
+    assert any("Unreleased" in p for p in _problems("0.4.23", titles=("0.4.23", "Unreleased", "0.4.22")))
+    assert any("newer than 0.4.23" in p for p in _problems("0.4.23", titles=("0.4.23", "0.4.22"), zips=("0.4.24",)))
+    assert _problems("0.4.23", titles=("0.4.23", "0.4.22"), zips=("0.4.20", "0.4.22")) == [], "older zips are fine"
+
+
+def test_without_git_the_previous_release_comes_from_the_changelog():
+    assert _problems("0.4.23", released=None, titles=("0.4.23", "0.4.22")) == []
+    assert any("skips ahead" in p for p in _problems("0.4.25", released=None, titles=("0.4.25", "0.4.22")))
+
+
+def test_the_real_changelog_is_newest_first():
+    import build_release
+    probs = build_release.version_problems(build_release.version(), None, build_release.changelog_titles(), [])
+    assert not [p for p in probs if "newest-first" in p or "not a version" in p or "Unreleased" in p], probs
+
+
+def test_bump_moves_the_unreleased_notes_into_the_next_version():
+    import build_release, tempfile
+    tmp = pathlib.Path(tempfile.mkdtemp())
+    (tmp / "QuestSharing").mkdir()
+    (tmp / "QuestSharing" / "QuestSharing.toc").write_text("## Interface: 1\n## Version: 0.4.22\nCore.lua\n")
+    (tmp / "CHANGELOG.md").write_text("# Changelog\n\n## Unreleased\n- new thing\n\n## 0.4.22\n- old\n\n## 0.4.21\n- older\n")
+    saved = build_release.ROOT, build_release.ADDON, build_release.git_tags
+    build_release.ROOT, build_release.ADDON = tmp, tmp / "QuestSharing"
+    try:
+        build_release.git_tags = lambda: ["0.4.21", "0.4.22"]
+        assert build_release.bump() == ("0.4.22", "0.4.23")
+        assert "## Version: 0.4.23" in (tmp / "QuestSharing" / "QuestSharing.toc").read_text()
+        log = (tmp / "CHANGELOG.md").read_text()
+        assert log.index("## Unreleased") < log.index("## 0.4.23") < log.index("- new thing") < log.index("## 0.4.22")
+        assert build_release.notes("0.4.23") == "- new thing\n"
+        try:
+            build_release.bump()
+            assert False, "0.4.23 has no tag yet: the next bump must wait for its release"
+        except SystemExit as e:
+            assert "not released yet" in str(e)
+        build_release.git_tags = lambda: ["0.4.21", "0.4.22", "0.4.23"]
+        try:
+            build_release.bump()
+            assert False, "nothing unreleased"
+        except SystemExit as e:
+            assert "nothing under" in str(e)
+        assert build_release.bump.__defaults__ == ("patch",)
+    finally:
+        build_release.ROOT, build_release.ADDON, build_release.git_tags = saved
 
 
 if __name__ == "__main__":

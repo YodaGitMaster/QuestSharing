@@ -1,6 +1,6 @@
 -- Recipe/farming data and guarded native Cooking reads; presentation lives inside ProfessionUI.lua.
 local _, ns = ...
-local P, U, S, Q, D, C = {}, ns.optionalUI, ns.style, ns.questie, ns.professionReference, ns.cookingReference
+local P, U, Q, D, C = {}, ns.optionalUI, ns.questie, ns.professionReference, ns.cookingReference
 ns.professions = P
 local learned, liveInfo, scanToken, eventToken = {}, {}, 0, 0
 local materialCache, sourceCache = {}, {}
@@ -253,16 +253,16 @@ function P.scan()
     step()
 end
 function P.clearCaches() materialCache={};sourceCache={} end
-function P.open(tab)
+function P.open()
     if not ns.db.enabled then ns.print("switch Quest Sharing on first (/qs on)");return end
     if not ns.db.professionGuide then ns.setSetting("professionGuide",true) end
     local v=ui()
-    if not v or not v.attach() then ns.print("Open the game's profession window (K), then choose Cooking or the Upgrades tab.");return end
+    if not v or not v.attach() then ns.print("Open the game's profession window (K), then choose Cooking.");return end
     if not ProfessionsFrame:IsShown() then
-        ns.print("Open the game's profession window (K); the Recipes and Upgrades tabs are inside it.");return
+        ns.print("Open the game's profession window (K), then choose Cooking.");return
     end
-    v.open(tab=="upgrades" and "upgrades" or "cooking")
-    if tab~="upgrades" and not ownCooking() then ns.print("Choose Cooking using the profession tabs on the right.") end
+    v.open()
+    if not ownCooking() then ns.print("Choose Cooking using the profession tabs on the right.") end
 end
 function P.close() eventToken=eventToken+1;scanToken=scanToken+1;if ui() then ui().close() end end
 function P.settingChanged()

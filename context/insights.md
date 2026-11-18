@@ -487,3 +487,20 @@
 - Addon code must not open or re-centre Blizzard's world map (`ToggleWorldMap`, `SetMapID`): `test_box` forbids it (taint). Print "open your world map (M)" instead.
 - Ctrl+right-click on any item: `GLOBAL_MOUSE_DOWN` plus the item GameTooltip currently shown covers bags and custom frames; `ns.on` pcalls RegisterEvent, so an unknown event is harmless. Unverified in game.
 - Do not run `git stash` to compare against HEAD in this repo: it stashes all of the user's uncommitted work.
+
+## 2026-11-18 — Bag helpers
+- Re-planning before every single move (and doing only the first) makes the bag sort self-healing: loot arriving, a locked slot or a refused move never leave a stale move list. A stable tie-break on the old position makes an already tidy bag cost zero moves, which is what lets the automatic mode converge instead of looping on its own `BAG_UPDATE_DELAYED` events.
+- The mock harness needs `C_Container.GetContainerItemInfo` / `PickupContainerItem` / `CursorHasItem` overridden per test (see `tests/test_bagtools.py` WORLD); the shared mock only returns `{ itemID }`.
+- Settings window fit: the General tab took one extra header ("During a fight") and `test_look` lists General's headers exactly; Quest items took four rows without overflowing. A 15th tab or long descriptions would break the fit tests.
+- QuestieDB (Classic/Forever) has no skinning loot: `npcDrops` of hides/leather is nil and `objectDrops` holds containers (Battered Chest etc.). Verify data assumptions against `https://raw.githubusercontent.com/Questie/QuestieDB/HEAD/data/Forever/foreverItemDB.lua` before building features on a Questie field; item field order there is name, npcDrops, objectDrops, itemDrops, startQuest, questRewards...
+- A silent early return is a bug-report trap: every gate in a user-triggered action should say why it did nothing (once).
+
+## 2026-11-18 — Tests were overwriting the published zip
+- `tests/test_extras.py::test_the_release_zip_is_ready_to_install` called `build_release.build()` with the default output, so every test run rewrote `dist/QuestSharing-<version>.zip` with the current (often unreleased) code. `dist/QuestSharing-0.4.22.zip` held BagTools/ChatLock/SkinningData, which are not in the release. Fix: `build(out=tmpdir)`; the script also refuses to replace an existing version without `--force`.
+- Audit method that worked for dead code (no luacheck/lua installed): regex every `function ns.x`/`X.x =` and count `.x`/`:x` uses across `QuestSharing/` and `tests/`; zero hits = dead, test-only hits = keep. Unused locals: names that occur once in their file.
+
+## 2026-11-18 — Memory map (static estimate, not measured)
+- Always resident ~2-3 MB (50 Lua files 1.04 MB source, static data tables, ~90 frame sites, debug log). On-demand catalogues 4-12 MB while loaded: DungeonQuests, Rewards, VendorMap. QuestieDB's own cache grows with every id/field our scans read (probably a few MB, unmeasured).
+- The mock test harness never fires `PLAYER_LOGIN`, so timers started there (VendorMap `tick`) do not run in tests unless the test fires it itself.
+- Next: user runs `/reload`, `/qs memory`, opens each catalogue, closes, waits 2+ minutes, `/qs memory` again; put the real numbers here.
+

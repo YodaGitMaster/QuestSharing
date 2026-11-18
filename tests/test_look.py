@@ -56,7 +56,7 @@ def test_every_tab_has_a_short_intro_and_sections(style):
     g.eval("NS.settingsTab")("party")
     assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["The separate Party quests window", "Posting progress by clicking", "Adding party members as friends"]
     g.eval("NS.settingsTab")("general")
-    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Start here", "Messages and sounds"]
+    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Start here", "Messages and sounds", "During a fight"]
     g.eval("NS.settingsTab")("support")
     assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Is something wrong?", "Errors", "Logs", "Copy everything", "Reset"]
     g.eval("NS.settingsTab")("guide")

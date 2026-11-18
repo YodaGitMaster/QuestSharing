@@ -19,6 +19,8 @@ Marker.lua
 Ping.lua
 QuestItems.lua
 Bags.lua
+BagTools.lua
+ChatLock.lua
 Panel.lua
 Questie.lua
 OptionalUI.lua
@@ -33,6 +35,7 @@ VendorMap.lua
 TravelData.lua
 TrainerIndex.lua
 TravelMap.lua
+SkinningData.lua
 GatherSources.lua
 Menu.lua
 ZoneLevels.lua

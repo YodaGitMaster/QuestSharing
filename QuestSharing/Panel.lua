@@ -195,13 +195,6 @@ function ns.panelMine(e)
     return txt .. (open > 1 and (" +" .. (open - 1)) or "")
 end
 
--- A click on a row does what a click on the game's tracker does: your status for that quest goes into the chat box,
--- added to what is already there (click several quests, then press Enter once)
-function ns.sharePanelQuest(e)
-    if not e then return false end
-    return ns.shareStatus(e)
-end
-
 -- Post my progress at once (the "Post all" button): the quests on the window that someone in the party has, one message
 function ns.postAllProgress()
     local grid = ns.panelGrid()

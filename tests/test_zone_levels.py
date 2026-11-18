@@ -186,20 +186,9 @@ def test_extra_tools_toggle_fits_settings_and_saved_false_stays_false(style):
     assert not h.eval('NS.db.zoneLevels')
 
 
-def test_old_default_is_switched_off_once_then_explicit_opt_in_survives_reload(style):
-    g=Game(style,DATA,fresh=True)
-    g.run('QuestSharingDB={zoneLevels=true,dbVersion=3}')
-    g.start();assert not g.eval('NS.db.zoneLevels')
-    assert g.eval('QuestSharingDB.zoneLevelsOptInMigrated')
-    g.eval('NS.setSetting')('zoneLevels',True)
-    g.fire('ADDON_LOADED','QuestSharing')
-    assert g.eval('NS.db.zoneLevels') and g.eval('QuestSharingDB.zoneLevelsOptInMigrated')
-
-
-def test_reset_returns_optional_ranges_to_off_without_repeating_migration(style):
+def test_reset_returns_optional_ranges_to_off_and_an_explicit_opt_in_survives_reload(style):
     g=game(style);assert g.eval('NS.db.zoneLevels')
     g.eval('NS.resetSettings')();assert not g.eval('NS.db.zoneLevels')
-    assert g.eval('QuestSharingDB.zoneLevelsOptInMigrated')
     g.eval('NS.setSetting')('zoneLevels',True);g.fire('ADDON_LOADED','QuestSharing')
     assert g.eval('NS.db.zoneLevels')
 

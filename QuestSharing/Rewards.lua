@@ -8,6 +8,15 @@ local loading, ready, generation, pending = false, false, 0, false
 local page, PAGE, scanDone, scanTotal = 1, 7, 0, 0
 local unknownItems = 0
 local filters, selectedKey
+-- Memory: a closed window keeps its catalogue for GRACE seconds (reopening is instant), then frees it; the next open rescans.
+local OWNER, GRACE = "rewards", 120
+local function release()
+    ns.dataWork.keep(OWNER)
+    generation = generation + 1
+    index, quests, results = {}, {}, {}
+    loading, ready, scanDone, scanTotal, selectedKey = false, false, 0, 0, nil
+    if window then for _, row in ipairs(window.rows or {}) do row.result = nil end end
+end
 local function resultKey(r) return r.key end
 local catalogueError = "Needs a recent QuestieDB with an enumerable item catalogue."
 local function get(kind, id, key) return ns.questie.get(kind, id, key) end
@@ -67,7 +76,6 @@ local function canEquip(item, class, level)
     return item.sub >= 1 and item.sub <= max
 end
 
-local SLOTS = { "All slots", "Head", "Neck", "Shoulder", "Back", "Chest", "Wrist", "Hands", "Waist", "Legs", "Feet", "Finger", "Trinket", "Weapon", "Offhand", "Ranged" }
 local SLOT = { INVTYPE_HEAD = "Head", INVTYPE_NECK = "Neck", INVTYPE_SHOULDER = "Shoulder", INVTYPE_CLOAK = "Back",
     INVTYPE_CHEST = "Chest", INVTYPE_ROBE = "Chest", INVTYPE_WRIST = "Wrist", INVTYPE_HAND = "Hands", INVTYPE_WAIST = "Waist",
     INVTYPE_LEGS = "Legs", INVTYPE_FEET = "Feet", INVTYPE_FINGER = "Finger", INVTYPE_TRINKET = "Trinket",
@@ -417,6 +425,7 @@ local function build()
     f.suspend = function()
         generation = generation + 1
         if loading then loading, ready = false, false end
+        ns.dataWork.releaseLater(OWNER, GRACE, function() if not E.visible("quests") then release() end end)
     end
     f:SetScript("OnHide", f.suspend)
     return true
@@ -426,6 +435,7 @@ function R.open()
     if not ns.db.enabled then ns.print("switch Quest Sharing on first (/qs on)"); return end
     if not ns.db.rewardBrowser then ns.setSetting("rewardBrowser", true) end
     filters = filters or defaults()
+    ns.dataWork.keep(OWNER)
     if not build() then return end
     R.updateControls(); E.show("quests")
     for _,box in ipairs({window.search,window.level}) do if box.dirty then box.flush() end end
@@ -436,6 +446,7 @@ function R.settingChanged()
     if not ns.db.enabled or not ns.db.rewardBrowser then
         generation = generation + 1; loading = false
         if window then E.close("quests") end
+        release()
     end
 end
 

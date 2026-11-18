@@ -179,13 +179,6 @@ def test_native_refresh_preserves_selected_unlearned_recipe(style):
     assert not w.native.CreateButton.enabled
 
 
-def test_overview_book_retains_embedded_upgrades_access(style):
-    g=game(style);w=open_cooking(g)
-    g.run('ProfessionsFrame.BookPage=CreateFrame("Frame",nil,ProfessionsFrame);ProfessionsFrame.CraftingPage:Hide()')
-    w.upgradesTab.scripts.OnClick(w.upgradesTab)
-    assert w.tabs.shown and w.upgrade.shown and not w.list.shown
-
-
 def test_short_source_returns_one_text_value_for_drop_recipes(style):
     g=game(style)
     text=g.eval('NS.professions.shortSource(NS.professions.record(1249957))')
@@ -227,34 +220,10 @@ def test_cooking_sources_cover_both_factions_without_questie(style):
     assert "Harn Longcast" not in joined(g.eval('NS.professions.acquisition')(r))
 
 
-def test_upgrades_are_embedded_with_direct_faction_buttons(style):
-    g=game(style);w=open_cooking(g);w.upgradesTab.scripts.OnClick(w.upgradesTab)
-    assert w.upgrade.shown and not w.list.shown
-    assert g.eval("NS.professions._window().upgrade.parent==ProfessionsFrame")
-    assert len(w.professions)==12
-    assert "Alliance:" in w.upgradeText.text and "Horde:" in w.upgradeText.text
-    w.factions[2].scripts.OnClick(w.factions[2])
-    assert "Alliance:" in w.upgradeText.text and "Horde:" not in w.upgradeText.text
-    w.professions[3].scripts.OnClick(w.professions[3])
-    assert "Clamlette Surprise" in w.upgradeText.text and "12 Giant Eggs" in w.upgradeText.text
-    w.recipesTab.scripts.OnClick(w.recipesTab)
-    assert w.list.shown and not w.upgrade.shown
-
-
-def test_all_professions_have_four_ranks_and_both_factions(style):
-    g=game(style)
-    g.run('''assert(#NS.professionReference.professions==12)
-      for _,p in ipairs(NS.professionReference.professions)do assert(#p.ranks==4)
-       for _,r in ipairs(p.ranks)do assert(r.Alliance and r.Horde and r.cap and r.skill)end
-      end''')
-
-
 def test_linked_or_other_profession_does_not_gain_cooking_overlay(style):
     g=game(style,"PROFESSION=171");w=open_cooking(g)
     assert not w.list.shown and g.eval("READS")==0
-    w.upgradesTab.scripts.OnClick(w.upgradesTab);assert w.upgrade.shown
     g.run("PROFESSION=185;LINKED=true");g.fire("TRADE_SKILL_DATA_SOURCE_CHANGED");g.advance(3)
-    w.recipesTab.scripts.OnClick(w.recipesTab)
     assert not w.list.shown and g.eval("READS")==0
 
 
@@ -282,10 +251,10 @@ def test_pending_native_open_cancels_on_close(style):
 
 def test_disable_hides_overlays_and_restores_native_view(style):
     g=game(style);w=open_cooking(g);select(g,7752);g.slash("professions off")
-    assert not w.list.shown and not w.missing.shown and not w.upgrade.shown and not w.tabs.shown
+    assert not w.list.shown and not w.missing.shown
     before=g.eval("READS");g.fire("TRADE_SKILL_SHOW");g.advance(3);assert g.eval("READS")==before
-    g.slash("professions");assert g.eval("NS.db.professionGuide") and w.upgrade.shown
-    g.slash("off");assert not w.upgrade.shown
+    g.slash("professions");assert g.eval("NS.db.professionGuide") and w.list.shown
+    g.slash("off");assert not w.list.shown
 
 
 def test_new_live_cooking_recipe_is_included_without_cross_profession_leaks(style):

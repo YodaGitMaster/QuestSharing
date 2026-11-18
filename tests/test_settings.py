@@ -61,24 +61,20 @@ def test_the_window_has_a_row_for_every_switch(style):
         assert key in keys, key
 
 
-def test_settings_saved_by_earlier_versions_are_switched_on_but_choices_are_kept(style):
+def test_an_older_save_keeps_every_choice_and_gains_the_new_defaults(style):
     g = fresh(style, loaded=False)
     g.run("QuestSharingDB = { near = false, panel = false, gap = 7, auto = false }")          # no dbVersion: an old save
     g.fire("ADDON_LOADED", "QuestSharing")
-    assert g.eval("NS.db.near") is True and g.eval("NS.db.panel") is True, "the two new defaults arrive"
-    assert g.eval("NS.db.gap") == 7 and g.eval("NS.db.auto") is False, "the player's other choices stay"
+    assert g.eval("NS.db.near") is False and g.eval("NS.db.panel") is False, "the player's choices stay"
+    assert g.eval("NS.db.gap") == 7 and g.eval("NS.db.auto") is False
+    assert g.eval("NS.db.nearCount") == 5, "a setting the old save lacks gets its default"
     assert g.eval("QuestSharingDB.dbVersion") == 3
 
 
-def test_the_automatic_party_chat_is_off_in_a_new_install_and_after_the_update(style):
+def test_the_automatic_party_chat_is_off_in_a_new_install(style):
     g = fresh(style)
     for key in QUIET:
         assert g.eval(f"NS.db.{key}") is False, key
-    g2 = fresh(style, loaded=False)
-    g2.run("QuestSharingDB = { dbVersion = 2, chat = true, announce = true, pickup = true, gap = 7 }")
-    g2.fire("ADDON_LOADED", "QuestSharing")
-    assert [g2.eval(f"NS.db.{k}") for k in QUIET] == [False, False, False], "switched off once by the update"
-    assert g2.eval("NS.db.gap") == 7
 
 
 def test_a_choice_made_in_the_current_version_is_never_overridden(style):
@@ -403,6 +399,16 @@ def test_map_overlays_have_switches_in_the_map_tab_that_work(style):
         assert g.eval(f"NS.db.{key}") is True, f"{key} turns back on"
 
 
+def test_travel_faction_choice_cycles_all_alliance_horde(style):
+    g = fresh(style)
+    assert g.eval("NS.db.travelFaction") == "all" and g.eval(f"NS.settingRows[{idx(g, 'travelFaction')}].tab") == "maps"
+    seen = []
+    for _ in range(4):
+        click(g, "travelFaction")
+        seen.append(g.eval("NS.db.travelFaction"))
+    assert seen == ["Alliance", "Horde", "all", "Alliance"]
+
+
 def test_settings_does_not_drop_rows_after_eighteen_and_last_row_is_reachable(style):
     g = fresh(style)
     g.run("""for i = 1, 25 do table.insert(NS.settingRows, {
@@ -481,7 +487,7 @@ def test_browser_db_contains_all_reference_launchers_and_extra_tools_stays_focus
     g.run("""OPENED_TOOLS={}; NS.rewards.open=function() table.insert(OPENED_TOOLS,'rewards') end
        NS.loot.open=function() table.insert(OPENED_TOOLS,'loot') end
        NS.dungeonQuests.open=function() table.insert(OPENED_TOOLS,'dungeons') end
-       NS.professions.open=function(view) table.insert(OPENED_TOOLS,view) end""")
+       NS.professions.open=function() table.insert(OPENED_TOOLS,'cooking') end""")
     for r in cards:
         if r.button.shown:
             press(g, r.button)
@@ -492,13 +498,13 @@ def test_browser_db_contains_all_reference_launchers_and_extra_tools_stays_focus
     assert W.rowScroll.vscroll == 0
     cards = [r for r in W.rows.values() if r.index and r.frame.shown and r.card.shown]
     assert "Professions & character" in W.heading.text
-    assert len(cards) == 4
-    assert {r.button.text for r in cards} == {"Cooking recipes", "Upgrades", "Update ranks", "Edit spots"}
+    assert len(cards) == 3
+    assert {r.button.text for r in cards} == {"Cooking recipes", "Update ranks", "Edit spots"}
     assert all(r.button.shown for r in cards)
     for r in cards:
-        if r.button.text in ("Cooking recipes", "Upgrades"):
+        if r.button.text == "Cooking recipes":
             press(g, r.button)
-    assert list(g.eval("OPENED_TOOLS").values()) == ["rewards", "loot", "dungeons", "cooking", "upgrades"]
+    assert list(g.eval("OPENED_TOOLS").values()) == ["rewards", "loot", "dungeons", "cooking"]
     # the leftover-items review lives with the other quest item settings, the invitation with quest sharing
     by_label = {r.label: r.tab for r in g.eval("NS.settingRows").values() if r.kind == "action"}
     assert by_label["Review quest items left in my bags"] == "items"

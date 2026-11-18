@@ -122,6 +122,8 @@ local function eachSlot(fn)
     end
 end
 
+ns.bagEachSlot = eachSlot                                         -- BagTools.lua points at slots with it
+
 -- The borders ------------------------------------------------------------------------------------------------------------
 local marks = setmetatable({}, { __mode = "k" })       -- the game's button -> our border frame
 local function markFor(b)

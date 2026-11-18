@@ -203,7 +203,7 @@ local function build()
     if not f then return false end
     editor = { frame = f, rows = {} }
     U.text(f, "Record each body of water; blank skill means unknown. Coordinates are 0–100 on the selected map.", 24, 32, 620)
-    local cooking=S.button(f,"Cooking / recipes",155,function() ns.professions.open("cooking") end)
+    local cooking=S.button(f,"Cooking / recipes",155,function() ns.professions.open() end)
     cooking:SetPoint("BOTTOMRIGHT",f,"BOTTOMRIGHT",-24,20)
     editor.name = U.box(f, "Water name", 24, 60, 300, "", 80)
     editor.map = U.box(f, "Map ID", 340, 60, 90, "", 6)

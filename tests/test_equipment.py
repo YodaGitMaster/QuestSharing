@@ -214,6 +214,19 @@ def test_partial_questie_dungeon_sources_respect_the_same_quality_floor(style):
     assert {r[0] for r in loot_results(g)}=={10002}
 
 
+def test_closed_quest_rewards_catalogue_is_freed_after_two_minutes(style):
+    g=quest_game(style);g.slash("rewards");g.advance(5)
+    assert quest_ids(g) and g.eval("NS.rewards._state()")[0]
+    g.eval("NS.equipmentUI.close")();g.advance(60)
+    assert g.eval("NS.rewards._state()")[0], "kept inside the grace period"
+    g.slash("rewards");g.advance(5);assert quest_ids(g)
+    g.eval("NS.equipmentUI.close")();g.advance(130)
+    ready,loading,count=g.eval("NS.rewards._state()")
+    assert not ready and not loading and count==0
+    g.slash("rewards");g.advance(5)
+    assert quest_ids(g) and g.eval("NS.rewards._state()")[0]
+
+
 if __name__=="__main__":
     total=failed=0
     for name,fn in sorted(list(globals().items())):

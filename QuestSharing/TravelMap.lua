@@ -10,8 +10,15 @@ local call = U.call
 local function finite(n) return type(n) == "number" and n == n and n > -math.huge and n < math.huge end
 local function combat() return call(InCombatLockdown) end
 
-local COLORS = { Alliance = { 0.25, 0.5, 1 }, Horde = { 0.9, 0.2, 0.2 }, Both = { 1, 0.82, 0 } }
-local WORDS = { Alliance = S.BLUE .. "Alliance|r", Horde = S.RED .. "Horde|r", Both = S.GOLD .. "Both factions|r" }
+-- Neutral (both factions) is white: white pin, white line, white label.
+local COLORS = { Alliance = { 0.25, 0.5, 1 }, Horde = { 0.9, 0.2, 0.2 }, Both = { 1, 1, 1 } }
+local WORDS = { Alliance = S.BLUE .. "Alliance|r", Horde = S.RED .. "Horde|r", Both = S.WHITE .. "Neutral|r" }
+-- Settings > Map "Show": "all", "Alliance" or "Horde". Neutral routes and towns always count.
+local function allowed(faction)
+    local pick = ns.db.travelFaction
+    if pick == "Alliance" or pick == "Horde" then return faction == pick or faction == "Both" end
+    return true
+end
 local LETTERS = { Boat = "B", Zeppelin = "Z", Tram = "T" }
 local ASPECT = 2 / 3 -- continent maps are about 3:2, so a vertical step counts less than a horizontal one
 
@@ -190,8 +197,10 @@ local function stopTip(pin)
     local lines_ = {}
     local targets = {}
     for _, link in ipairs(entry.links) do
-        lines_[#lines_ + 1] = link.kind .. " to " .. link.stop.name .. " (" .. link.stop.zone .. ") · " .. WORDS[link.faction]
-        targets[#targets + 1] = { entry = link.stop, color = COLORS[link.faction] }
+        if allowed(link.faction) then
+            lines_[#lines_ + 1] = link.kind .. " to " .. link.stop.name .. " (" .. link.stop.zone .. ") · " .. WORDS[link.faction]
+            targets[#targets + 1] = { entry = link.stop, color = COLORS[link.faction] }
+        end
     end
     local missing = connect(pin, targets)
     if missing > 0 then lines_[#lines_ + 1] = S.GREY .. "Open the Azeroth map to see the whole line.|r" end
@@ -207,12 +216,13 @@ local function dungeonTip(pin)
     lines_[#lines_ + 1] = " "
     lines_[#lines_ + 1] = "Closest town you can use:"
     for _, faction in ipairs({ "Alliance", "Horde" }) do
-        local town = T.nearestTown(entry, faction)
+        local town = allowed(faction) and T.nearestTown(entry, faction)
         if town then
+            local neutral = town.faction == "Both"
             lines_[#lines_ + 1] = WORDS[faction] .. ": " .. town.name .. " (" .. town.zone .. ")"
-                .. (town.faction == "Both" and " · neutral" or "")
-            targets[#targets + 1] = { entry = town, color = COLORS[faction], label = town.name }
-        else
+                .. (neutral and " · " .. WORDS.Both or "")
+            targets[#targets + 1] = { entry = town, color = neutral and COLORS.Both or COLORS[faction], label = town.name }
+        elseif allowed(faction) then
             lines_[#lines_ + 1] = WORDS[faction] .. ": none known on this continent"
         end
     end
@@ -310,14 +320,23 @@ function T.draw()
     local searching = V.querying and V.querying() or false
     if lastView and lastView.map == map and lastView.width == width and lastView.height == height
         and lastView.scale == scale and lastView.known == knownKey and lastView.searching == searching and lastView.travel == ns.db.travelMap
+        and lastView.faction == ns.db.travelFaction
         and lastView.revision == (I and I.revision) then layer:Show(); return end
     ns.trying("drawing dungeon and travel pins on the world map", "travelmap") -- a failure here turns the overlay off
     layer:Show(); clearHover(); hovered = nil
     local strata = call(child.GetFrameStrata, child)
-    local base = math.min(9800, (call(child.GetFrameLevel, child) or 0) + 1500)
+    -- Well above Blizzard's own map icons (a city icon must not sit over a zeppelin pin); transports on top of all.
+    local base = math.min(9900, (call(child.GetFrameLevel, child) or 0) + 5000)
     level(layer, base, strata)
     local used = { dungeon = 0, stop = 0, trainer = 0 }
+    local LEVELS = { trainer = 1, dungeon = 2, stop = 3 }
+    local taken = {} -- where a dungeon or transport pin stands, so a trainer pin never hides one
     local function put(kind, entry)
+        if kind == "stop" then
+            local any = false
+            for _, link in ipairs(entry.links) do if allowed(link.faction) then any = true; break end end
+            if not any then return end
+        end
         local x, y = project(entry, map)
         if not x then return end
         used[kind] = used[kind] + 1
@@ -325,12 +344,14 @@ function T.draw()
         local pin = list[used[kind]] or makePin(kind)
         list[used[kind]] = pin
         pin.entry = entry
-        level(pin, base + 1, strata)
+        level(pin, base + LEVELS[kind], strata)
         if kind == "stop" then
             local c = COLORS[entry.faction] or COLORS.Both
             pin.face:SetVertexColor(c[1], c[2], c[3], 1)
-            pin.text:SetText(S.WHITE .. (LETTERS[entry.kind] or "?") .. "|r")
+            -- the letter must read on the pin: black on the white neutral pin, white on blue and red
+            pin.text:SetText((entry.faction == "Both" and "|cff000000" or S.WHITE) .. (LETTERS[entry.kind] or "?") .. "|r")
         end
+        taken[#taken + 1] = { x * width * scale, -y * height * scale }
         pin:ClearAllPoints(); pin:SetScale(1 / scale)
         pin:SetPoint("CENTER", layer, "TOPLEFT", x * width * scale, -y * height * scale)
         pin:Show()
@@ -346,13 +367,17 @@ function T.draw()
             local pin = pins.trainer[used.trainer] or makePin("trainer")
             pins.trainer[used.trainer] = pin
             pin.entry = group
-            level(pin, base + 2, strata)
+            level(pin, base + LEVELS.trainer, strata)
             local first = group.members[1].entry
             local texture, coords = V.iconFor(first.title)
             pin.icon:SetTexture(texture)
             if coords then pin.icon:SetTexCoord(coords[1], coords[2], coords[3], coords[4]) else pin.icon:SetTexCoord(0, 1, 0, 1) end
             pin:ClearAllPoints(); pin:SetScale(1 / scale)
-            pin:SetPoint("CENTER", layer, "TOPLEFT", group.x * width * scale, -group.y * height * scale)
+            local ox, oy = group.x * width * scale, -group.y * height * scale
+            for _, spot in ipairs(taken) do          -- stand beside a dungeon or transport pin, not under it
+                if math.abs(ox - spot[1]) < 19 and math.abs(oy - spot[2]) < 19 then ox, oy = spot[1] + 20, spot[2] - 12; break end
+            end
+            pin:SetPoint("CENTER", layer, "TOPLEFT", ox, oy)
             pin:Show()
         end
     end
@@ -360,7 +385,7 @@ function T.draw()
         for i = used[kind] + 1, #list do list[i]:Hide() end
     end
     lastView = { map = map, width = width, height = height, scale = scale, known = knownKey, searching = searching, travel = ns.db.travelMap,
-        revision = I and I.revision }
+        faction = ns.db.travelFaction, revision = I and I.revision }
 end
 
 function T.refresh() lastView = nil; T.draw() end

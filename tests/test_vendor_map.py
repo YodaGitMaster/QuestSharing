@@ -783,6 +783,24 @@ QUESTIE_NPCS[4].friendlyToFaction = "A"
     assert sorted(p.result.vendor.id for p in pins(g)) == [2, 4, 5]
 
 
+def test_map_search_index_is_dropped_after_two_idle_minutes_and_rebuilt_by_the_next_search(style):
+    g = game(style)
+    g.fire("PLAYER_LOGIN")  # the harness does not send it; it starts the map's own timer, which does the releasing
+    type_query(g, "General Goods")
+    assert g.eval("NS.vendorMap._state()")[2], "the typed search built the index"
+    g.advance(60)
+    assert g.eval("NS.vendorMap._state()")[2], "kept while the query is still typed on an open map"
+    g.run("WorldMapFrame:Hide()")
+    g.advance(60)
+    assert g.eval("NS.vendorMap._state()")[2], "kept inside the grace period"
+    g.advance(130)
+    assert not any(g.eval("NS.vendorMap._state()")), "dropped once the map has been closed for two minutes"
+    g.run("WorldMapFrame:Show()")
+    g.advance(2)
+    type_query(g, "General Goods")
+    assert g.eval("NS.vendorMap._state()")[2] and pins(g), "the next search rebuilds it"
+
+
 if __name__ == "__main__":
     failed = total = 0
     for name, test in sorted(list(globals().items())):

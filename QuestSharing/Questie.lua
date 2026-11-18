@@ -459,14 +459,6 @@ local function appendSources(out, kind, ids, cache)
     end
 end
 
-local function objectiveIds(rows, fieldIndex)
-    local ids = {}
-    for _, row in ipairs(type(rows) == "table" and rows or {}) do
-        if type(row) == "table" and type(row[fieldIndex]) == "number" then ids[#ids + 1] = row[fieldIndex] end
-    end
-    return ids
-end
-
 local function itemSources(itemID, cache)
     local out = {}
     appendSources(out, "npc", plannerField("item", itemID, "npcDrops", cache), cache)
@@ -827,7 +819,6 @@ function Q.uiMapOf(areaId)
     end
     return areaToMap and areaToMap[areaId] or nil
 end
-function Q._resetMaps() areaToMap = nil end                    -- for the tests
 
 -- every spawn of an npc or object: { { area, map, x, y (0..100), dungeon }, ... }
 spawnList = function(kind, id)

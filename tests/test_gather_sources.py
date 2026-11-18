@@ -18,6 +18,8 @@ TooltipDataProcessor = { AddTooltipPostCall = function(kind, fn) POST[#POST + 1]
 function GetItemInfoInstant(id)
     if id == 1000 then return id, "Trade Goods", "Leather", "", "Interface\\Icons\\INV_Misc_Pelt_Wolf_01", 7, 6 end
     if id == 1001 then return id, "Weapon", "Sword", "", "Interface\\Icons\\INV_Sword_04", 2, 7 end
+    if id == 1002 then return id, "Trade Goods", "Leather", "", "Interface\\Icons\\INV_Misc_LeatherScrap_02", 7, 6 end
+    if id == 1003 then return id, "Trade Goods", "Herb", "", "Interface\\Icons\\INV_Misc_Herb_01", 7, 9 end
 end
 GameTooltip.CUR = nil
 function GameTooltip:GetItem() return "x", GameTooltip.CUR end
@@ -41,6 +43,11 @@ LibQuestieDB.Support.Get = function(name)
         return { private = { areaIdToUiMapId = "return {[100]=1413,[101]=1440,[102]=1441,[103]=1442,[104]=1443}", areaIdToUiMapIdOverride = "return {}" } }
     end
 end
+QUESTIE_ITEMS[1002] = { name = "Light Leather", objectDrops = { 90 } }   -- QuestieDB: a chest, no creature (as in the real data)
+QUESTIE_ITEMS[1003] = { name = "Peacebloom", objectDrops = { 90 } }
+QUESTIE_OBJECTS[90] = { name = "Peacebloom Node", spawns = { [101] = pts(3, 50) } }
+IsMetaKeyDown = function() return META end
+META = false
 UnitFactionGroup = function() return "Alliance" end
 '''
 
@@ -49,6 +56,8 @@ def game(style):
     g = Game(style, DATA, fresh=True)
     g.start()
     g.fire("PLAYER_LOGIN")
+    # the bundled skinning table: creature, tenths of a percent (a 17 = friendly Cow, 12 = Young Wolf, under the 1% floor)
+    g.run("NS.skinningData[1002] = { 11, 610, 13, 450, 12, 20, 17, 900 }")
     g.run("NS.db.itemSources = true; NS.gatherSources.refresh()")
     return g
 
@@ -125,6 +134,41 @@ def test_item_with_no_known_source_says_so_and_marks_nothing(style):
     g.run("WorldMapFrame:Show(); CTRL = true"); g.fire("GLOBAL_MOUSE_DOWN", "RightButton"); g.advance(2)
     assert g.eval("NS.gatherSources._active()") is None
     assert any("no creature or node" in p for p in g.printed())
+
+
+def test_skinned_item_without_questie_drops_uses_the_bundled_skinning_table(style):
+    g = game(style)
+    text = "\n".join(hover(g, 1002))
+    assert "1. Senior Raptor (level 38-40) · " in text and "5 known spawns" in text and "61% skinning" in text, text
+    assert "2. Stranglethorn Leopard" in text and "45% skinning" in text
+    assert "Cow" not in text, "friendly creatures are never skinned for this"
+    assert "Kobold Crate" not in text and "Chest" not in text, "leather is not gathered from containers"
+
+
+def test_herb_node_is_listed_for_a_herb(style):
+    text = "\n".join(hover(game(style), 1003))
+    assert "1. Peacebloom Node · " in text and "3 known spawns" in text, text
+
+
+def test_command_explains_the_state(style):
+    g = game(style)
+    hover(g, 1002)
+    g.run("NS.gatherSources.command('')"); g.advance(2)
+    out = "\n".join(g.printed())
+    assert "setting on" in out and "QuestieDB found" in out and "counts as a gathering item" in out and "skinning table: 4 creatures" in out, out
+    g.run("NS.gatherSources.command('1001')")
+    assert "NOT a gathering item" in "\n".join(g.printed())
+
+
+def test_cmd_works_like_ctrl_and_a_hint_says_when_the_setting_is_off(style):
+    g = game(style)
+    hover(g, 1002)
+    g.run("WorldMapFrame:Show(); CTRL = false; META = true"); g.fire("GLOBAL_MOUSE_DOWN", "RightButton"); g.advance(2)
+    assert g.eval("NS.gatherSources._active().id") == 1002
+    g.run("NS.gatherSources.clear(); NS.db.itemSources = false")
+    g.fire("GLOBAL_MOUSE_DOWN", "RightButton"); g.fire("GLOBAL_MOUSE_DOWN", "RightButton"); g.advance(2)
+    hints = [p for p in g.printed() if "turn on Settings" in p]
+    assert len(hints) == 1 and g.eval("NS.gatherSources._active()") is None
 
 
 if __name__ == "__main__":

@@ -112,4 +112,22 @@ pump = function()
     wake()
 end
 
+-- Memory: a catalogue built for a window stays for a short grace period after it closes (reopening is instant), then
+-- fn() frees it. keep(owner) cancels the pending release. One timer per owner.
+local releases = {}
+function W.keep(owner)
+    local t = releases[owner]
+    if t then ns.cancel(t); releases[owner] = nil end
+end
+
+function W.releaseLater(owner, seconds, fn)
+    W.keep(owner)
+    releases[owner] = ns.after(seconds, function()
+        releases[owner] = nil
+        fn()
+    end)
+end
+
+function W.releasePending(owner) return releases[owner] ~= nil end
+
 ns.on("PLAYER_REGEN_ENABLED", wake)

@@ -199,7 +199,7 @@ def test_switch_off_cancels_scan_and_reopen_restarts(style):
     assert g.eval("NS.rewards._state()")[1]
     g.slash("rewards off"); g.advance(1)
     ready,loading,count=g.eval("NS.rewards._state()")
-    assert not ready and not loading and count==100
+    assert not ready and not loading and count==0, "switching off frees the half-read index"
     assert not g.eval("NS.rewards._window().frame.shown")
     g.slash("rewards"); g.advance(1)
     assert g.eval("NS.rewards._state()")[0]
