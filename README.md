@@ -2,7 +2,7 @@
 
 A World of Warcraft addon for playing quests together.
 
-[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.27)
+[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.28)
 
 ## Your first party, in four steps
 1. **Install it** (see [Install](#install)) and log in. A short welcome in chat tells you it is ready. Everything is
@@ -426,7 +426,7 @@ The categories are grouped by topic:
 | **Questing** | **Quest markers** | **Show ! above quest enemies**, turn on the enemy health bars those marks need, follow the nearest quest with a waypoint |
 | | **Quest list** | Hide the game's tracker or automatically fill it with nearby quests; choose how many and how long to pause after your own edits |
 | | **Accept & turn in** | Automatically accept quest offers and turn in ready quests; each has its own switch |
-| | **Quest items** | Mark quest items in your bags, usable item buttons, the quest-item key, move the item button back, and the leftover-items review (Bag cleanup) |
+| | **Quest items** | Mark quest items in your bags, usable item buttons, the quest-item key, and the leftover-items review (Bag cleanup) |
 | | **Bags** | Space-bar bookmarks, selling gray items, arranging bags automatically or now, the order, which bags, where items gather, the wait before arranging, keeping bookmarked items in place |
 | **Party** | **Quest sharing** | Offer quests to your party, require a manual Share click, announce progress, sync quest information, mark shared quests in the quest log, write a quest invitation |
 | | **Party window** | Show/hide/resize the separate Party quests window, restore its position, post progress by clicking, add party friends and the friend slots to keep free |
@@ -473,8 +473,7 @@ For a group leader who wants a healer (or a tank, or damage dealers) without scr
    as healer."
 
 Who is invited: per role only what is still open (1 healer, 1 tank, 3 damage), highest level first; a player
-listed for two roles takes whichever is open. Tick **Supercharge** to invite every match at once (up to 10 per
-Find): the first to accept gets the spot, and extra players who accept may need to be removed. A decline frees the
+listed for two roles takes whichever is open. Tick **Supercharge** to fill every free spot at once (open invites count as spots, as in the game): the first to accept gets the spot, and extra players who accept may need to be removed. A decline frees the
 spot at once. Item levels: the party finder shows none, so the addon remembers players you inspected nearby and
 asks other Quest Sharing users; with a lowest item level set, unknown players are invited or skipped as you choose.
 All options: right click the spyglass, or **Settings > Party finder**.
@@ -499,7 +498,7 @@ The report includes expected travel, kills, hand-ins, same-work nearest-first co
 
 Commands include `/qs plan all`, `/qs plan xp`, `/qs plan selected 123 456`, `/qs plan budget 30`, `/qs plan range`, `/qs plan unrestricted` and `/qs plan why`. The guide's Plan button and `/qs plan options` open **Settings > Quest guide**, where the goal, time limit, quest IDs and level range are saved settings (a command such as `/qs plan xp` saves them too), with **Mark selected camp busy**, **Clear camp waits**, the learned pace and the plan report. While the guide is open it times your kills (the gap between two kills of the same objective) and quest giver visits (quest window open to accept or hand-in). After 5 samples each, your own median (4-40 s per kill, 1-15 s per quest giver) replaces the 10 s and 3 s defaults; **Reset learned pace** forgets it.
 
-**Shared camps.** Turn on *Show shared camps on the world map* in **Settings > Quest guide** (off by default), or type `/qs plan camps`. With the Quest guide open, the world map of your zone shows a circle for each camp of your planned kill and collect quests: at least 5 spawns within 100 yards, the guide's own camp size. A blue circle serves 2 or more quests, so one visit helps several of them; a grey one serves one quest. Hover the small label (A1, A2, ...) for the mobs, their spawn counts and quests; click it for a waypoint. The circles never block map clicks and hide during combat. **Camps table** (or `/qs plan camps table`) opens the **Shared camps** window with three views: a network (quest → mob or object → camp, line width = spawns there), a map of the zone with every spawn, the camps and the quest givers, and a matrix of camps against objectives with the spawns in each cell (darker = more). Click an objective button at the top, or a mob in the network, to highlight it in all three; click a camp for a waypoint. Camps are named by the nearest quest giver, such as "A2 - 120 yd SW of Talin".
+**Shared camps.** Turn on *Show shared camps on the world map* in **Settings > Quest guide** (off by default), or type `/qs plan camps`. With the Quest guide open, the world map of your zone shows a circle for each camp of your planned kill and collect quests: at least 5 spawns within 100 yards, the guide's own camp size. A blue circle serves 2 or more quests, so one visit helps several of them; a grey one serves one quest. Hover the small label (A1, A2, ...) for the mobs, their spawn counts and quests; click it for a waypoint. The circles never block map clicks and hide during combat. The **Camps** button on the Quest guide (beside the step counter), **Camps table** in Settings, or `/qs plan camps table` opens the **Shared camps** window with three views: a network (quest → mob or object → camp, line width = spawns there), a map of the zone with every spawn, the camps and the quest givers, and a matrix of camps against objectives with the spawns in each cell (darker = more). Click an objective button at the top, or a mob in the network, to highlight it in all three; click a camp for a waypoint. Camps are named by the nearest quest giver, such as "A2 - 120 yd SW of Talin".
 
 The route appears in an opaque dark guide beside the game's quest tracker; drag its header to place it where you want, then use **Lock** to keep it there for the session. The header shows the zone and current/total step. The current step is highlighted in gold on dark red; up to five upcoming steps are muted beneath it. **< / >** reviews previous/next steps and marks the destination; this does not complete quests. **− / +** switches between expanded and current-step-only views. Each step says where to go and which quests to take, complete or hand in; pickup and hand-in steps name the quest giver once, e.g. "Pick up from Sentinel Hill Giver:" then the quests. Click a step to set its waypoint (this also works in combat), or use **Waypoint**. Open the map with `M` to see the pin. Changing zones immediately clears old steps before building the new zone's plan. With the green/yellow filter enabled, if every mapped quest in the zone is below green, the guide says **This zone is too low level for you.** Long rows grow to fit their text while scrolling. With Shortest Path Forever installed, **Follow with SPF** hands the selected stop to SPF to draw and guide the walk on both maps. This is an explicit action and replaces the route currently being followed. You can also use `/qs plan follow`. It updates after quest progress, and **Refresh** is available if needed. Completing an objective or quest rescans eligibility; progress-only count changes rebuild the current steps. `/qs plan next` selects the next step and sets its regular waypoint; `/qs plan refresh` rediscovers the zone list; `/qs plan hide` closes the panel; `/qs plan on` enables the tool; `/qs plan off` disables it and closes the panel. Following a step does not move your character or accept/complete quests for you.
 
@@ -796,7 +795,7 @@ If an unloaded AtlasLoot module cannot load during combat, it is retried after c
 Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check.
 
 ## Install
-**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.27), unzip `QuestSharing-<version>.zip` and drop the
+**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.28), unzip `QuestSharing-<version>.zip` and drop the
 `QuestSharing` folder into `Interface\AddOns`. Or:
 1. Copy the folder `QuestSharing` (the one containing `QuestSharing.toc`, not this README's folder) into
    the game's `Interface\AddOns` folder, so you have `...\AddOns\QuestSharing\QuestSharing.toc`.
