@@ -1,5 +1,5 @@
 # State
-Last updated: 2026-11-18
+Last updated: 2026-11-19
 
 <!-- bpmn:state -->
 - Active run: none
@@ -11,6 +11,7 @@ Last updated: 2026-11-18
 - Fix the regressions found in the 2026-11-17 audit (planner A1–A5, map-search typing B1–B4, dungeon menu C1), decouple the planner from SPF and keep map step numbers readable, then release v0.4.22 once the user approves.
 
 ## Status (2026-11-17/18)
+- 2026-11-19: Added the full user-provided v0.4.26 Stormwind City report to `bugs.txt` (30 recorded errors / 1,634 occurrences), verified byte-for-byte against the attachment. User clarified delivery belongs in `YodaGitMaster/cutpdf`, after the initial push to `YodaGitMaster/QuestSharing`. Report storage only; no addon fixes or runtime changes. Existing `bug.txt` is preserved. Commit/push to `origin/main` authorized; Git records delivery status.
 - 2026-11-18 bag sort options: ns.db sortBy (topic|quality|name), sortBags (all|bags|backpack), sortFrom (start|end), sortKeepBookmarked (bool); BagTools.plan filters/reverses the slot list, ORDERS comparators; /qs sort by|bags|from|keep; Settings > Bags rows; 7 new tests in test_bagtools.py. NOTE: test files exit 0 on failure, grep "^FAIL" when running them. test_quest_guidance map-number test fails only with the separate uncommitted QuestGuidance.lua edit (not this work).
 - 2026-11-18 settings coverage: every ns.defaults key now has a Settings control except dbVersion (internal). Added Bags tab (bagBookmarks, autoSellGray, autoSortBags, arrange/clear actions moved from Quest items), Pings > ping on/off, Quest sharing > settle (1-30 s). Window HEIGHT 650->676 so 15 tabs fit above "Changes save automatically.". All tests pass; uncommitted; dist zip NOT rebuilt.
 - BPMN run r-20261117-234605-6ba9 (decouple) finished with outcome "Planner decoupled" (D1–D3 built, each reviewed and approved, final check of the whole tree done). FIXED IN SOURCE, uncommitted, unreleased, no native WoW check. Supersedes the fix-all A2 SPF lock and the A4 quest-costs residual (decisions D5–D8).

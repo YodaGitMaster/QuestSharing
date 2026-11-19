@@ -1,0 +1,978 @@
+QUEST SHARING - ISSUE OVERVIEW
+
+Version 0.4.26  |  Stormwind City
+Recorded errors: 30  |  Total occurrences: 1634
+Recording: On
+Activity log: 1209 retained lines included with Copy all.
+
+SHARE A PROBLEM
+Click Copy all, then press Ctrl+C (Windows) or Cmd+C (Mac).
+Paste it into your message and describe what you clicked and what you expected.
+
+RECORDED ISSUES - newest first
+1. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+   Last seen: 00:23:35  |  Occurrences: 308  |  Source: BLOCKED by the game
+
+2. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:46:00  |  Occurrences: 696  |  Source: BLOCKED by the game
+
+3. An error was recorded
+   Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+   Last seen: 22:24:01  |  Occurrences: 2  |  Source: PLAYER_TARGET_CHANGED
+
+4. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:23:41  |  Occurrences: 133  |  Source: BLOCKED by the game
+
+5. An error was recorded
+   Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+   Last seen: 22:22:50  |  Occurrences: 1  |  Source: PLAYER_TARGET_CHANGED
+
+6. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:22:26  |  Occurrences: 8  |  Source: BLOCKED by the game
+
+7. An error was recorded
+   Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+   Last seen: 22:22:25  |  Occurrences: 1  |  Source: PLAYER_TARGET_CHANGED
+
+8. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:22:25  |  Occurrences: 6  |  Source: BLOCKED by the game
+
+9. An error was recorded
+   Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+   Last seen: 22:22:23  |  Occurrences: 1  |  Source: PLAYER_TARGET_CHANGED
+
+10. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:22:23  |  Occurrences: 60  |  Source: BLOCKED by the game
+
+11. An error was recorded
+   Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+   Last seen: 22:22:11  |  Occurrences: 1  |  Source: PLAYER_TARGET_CHANGED
+
+12. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:22:11  |  Occurrences: 11  |  Source: BLOCKED by the game
+
+13. An error was recorded
+   Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+   Last seen: 22:22:06  |  Occurrences: 3  |  Source: PLAYER_TARGET_CHANGED
+
+14. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:21:45  |  Occurrences: 57  |  Source: BLOCKED by the game
+
+15. An error was recorded
+   Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+   Last seen: 22:21:34  |  Occurrences: 1  |  Source: PLAYER_TARGET_CHANGED
+
+16. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:21:34  |  Occurrences: 50  |  Source: BLOCKED by the game
+
+17. An error was recorded
+   Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+   Last seen: 22:21:24  |  Occurrences: 1  |  Source: PLAYER_TARGET_CHANGED
+
+18. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:21:24  |  Occurrences: 8  |  Source: BLOCKED by the game
+
+19. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167 (while closing the chat box during a fight, then closing the chat box during a fight)
+   Last seen: 22:21:21  |  Occurrences: 1  |  Source: BLOCKED by the game
+
+20. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167 (while closing the chat box during a fight)
+   Last seen: 22:21:20  |  Occurrences: 1  |  Source: BLOCKED by the game
+
+21. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:20:46  |  Occurrences: 98  |  Source: BLOCKED by the game
+
+22. An error was recorded
+   Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+   Last seen: 22:20:24  |  Occurrences: 1  |  Source: PLAYER_TARGET_CHANGED
+
+23. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:20:24  |  Occurrences: 74  |  Source: BLOCKED by the game
+
+24. An error was recorded
+   Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+   Last seen: 22:20:08  |  Occurrences: 2  |  Source: PLAYER_TARGET_CHANGED
+
+25. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:19:57  |  Occurrences: 45  |  Source: BLOCKED by the game
+
+26. An error was recorded
+   Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+   Last seen: 22:19:43  |  Occurrences: 1  |  Source: PLAYER_TARGET_CHANGED
+
+27. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:19:42  |  Occurrences: 8  |  Source: BLOCKED by the game
+
+28. An error was recorded
+   Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+   Last seen: 22:19:23  |  Occurrences: 1  |  Source: PLAYER_TARGET_CHANGED
+
+29. The game blocked an addon action
+   tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+   Last seen: 22:19:20  |  Occurrences: 53  |  Source: BLOCKED by the game
+
+30. An error was recorded
+   Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+   Last seen: 22:19:00  |  Occurrences: 1  |  Source: PLAYER_TARGET_CHANGED
+
+SETUP NOTES
+Setup or client limitations below are separate from recorded addon errors.
+  - sync with other Quest Sharing users (addon message prefix registered)
+
+Full messages, stacks, setup checks, settings and activity are available in Show full report.
+
+================ ERROR DETAILS - newest first ================
+
+ISSUE 1: The game blocked an addon action
+  Last seen: 00:23:35
+  Source: BLOCKED by the game
+  Occurrences: 308
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran a timer set at Fishing.lua:279, 0.0 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:168: in function <BagTools.lua:165>
+
+ISSUE 2: The game blocked an addon action
+  Last seen: 22:46:00
+  Source: BLOCKED by the game
+  Occurrences: 696
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran the event GLOBAL_MOUSE_DOWN, 0.2 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 3: An error was recorded
+  Last seen: 22:24:01
+  Source: PLAYER_TARGET_CHANGED
+  Occurrences: 2
+  Message:
+Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+  Technical context and stack:
+    stack (newest call first):
+      Diagnostics.lua:323: in function <Diagnostics.lua:314>
+      [tail call]: ?
+      [C]: in function 'xpcall'
+      Core.lua:260: in function <Core.lua:248>
+      [C]: in function 'CameraOrSelectOrMoveStop'
+      [CAMERAORSELECTORMOVE]:4: in function <CAMERAORSELECTORMOVE:1>
+
+ISSUE 4: The game blocked an addon action
+  Last seen: 22:23:41
+  Source: BLOCKED by the game
+  Occurrences: 133
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran a timer set at BagTools.lua:213, 0.1 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 5: An error was recorded
+  Last seen: 22:22:50
+  Source: PLAYER_TARGET_CHANGED
+  Occurrences: 1
+  Message:
+Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+  Technical context and stack:
+    stack (newest call first):
+      Diagnostics.lua:323: in function <Diagnostics.lua:314>
+      [tail call]: ?
+      [C]: in function 'xpcall'
+      Core.lua:260: in function <Core.lua:248>
+      [C]: in function 'CameraOrSelectOrMoveStop'
+      [CAMERAORSELECTORMOVE]:4: in function <CAMERAORSELECTORMOVE:1>
+
+ISSUE 6: The game blocked an addon action
+  Last seen: 22:22:26
+  Source: BLOCKED by the game
+  Occurrences: 8
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran the event NAME_PLATE_UNIT_REMOVED, 0.0 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 7: An error was recorded
+  Last seen: 22:22:25
+  Source: PLAYER_TARGET_CHANGED
+  Occurrences: 1
+  Message:
+Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+  Technical context and stack:
+    stack (newest call first):
+      Diagnostics.lua:323: in function <Diagnostics.lua:314>
+      [tail call]: ?
+      [C]: in function 'xpcall'
+      Core.lua:260: in function <Core.lua:248>
+      [C]: in function 'TurnOrActionStop'
+      [TURNORACTION]:4: in function <TURNORACTION:1>
+
+ISSUE 8: The game blocked an addon action
+  Last seen: 22:22:25
+  Source: BLOCKED by the game
+  Occurrences: 6
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran the event GLOBAL_MOUSE_DOWN, 0.0 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 9: An error was recorded
+  Last seen: 22:22:23
+  Source: PLAYER_TARGET_CHANGED
+  Occurrences: 1
+  Message:
+Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+  Technical context and stack:
+    stack (newest call first):
+      Diagnostics.lua:323: in function <Diagnostics.lua:314>
+      [tail call]: ?
+      [C]: in function 'xpcall'
+      Core.lua:260: in function <Core.lua:248>
+      [C]: in function 'TurnOrActionStop'
+      [TURNORACTION]:4: in function <TURNORACTION:1>
+
+ISSUE 10: The game blocked an addon action
+  Last seen: 22:22:23
+  Source: BLOCKED by the game
+  Occurrences: 60
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran the event GLOBAL_MOUSE_DOWN, 0.1 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 11: An error was recorded
+  Last seen: 22:22:11
+  Source: PLAYER_TARGET_CHANGED
+  Occurrences: 1
+  Message:
+Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+  Technical context and stack:
+    stack (newest call first):
+      Diagnostics.lua:323: in function <Diagnostics.lua:314>
+      [tail call]: ?
+      [C]: in function 'xpcall'
+      Core.lua:260: in function <Core.lua:248>
+      [C]: in function 'TurnOrActionStop'
+      [TURNORACTION]:4: in function <TURNORACTION:1>
+
+ISSUE 12: The game blocked an addon action
+  Last seen: 22:22:11
+  Source: BLOCKED by the game
+  Occurrences: 11
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran the event CURSOR_CHANGED, 0.0 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 13: An error was recorded
+  Last seen: 22:22:06
+  Source: PLAYER_TARGET_CHANGED
+  Occurrences: 3
+  Message:
+Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+  Technical context and stack:
+    stack (newest call first):
+      Diagnostics.lua:323: in function <Diagnostics.lua:314>
+      [tail call]: ?
+      [C]: in function 'xpcall'
+      Core.lua:260: in function <Core.lua:248>
+      [C]: in function 'TurnOrActionStop'
+      [TURNORACTION]:4: in function <TURNORACTION:1>
+
+ISSUE 14: The game blocked an addon action
+  Last seen: 22:21:45
+  Source: BLOCKED by the game
+  Occurrences: 57
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran the event CURSOR_CHANGED, 0.0 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 15: An error was recorded
+  Last seen: 22:21:34
+  Source: PLAYER_TARGET_CHANGED
+  Occurrences: 1
+  Message:
+Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+  Technical context and stack:
+    stack (newest call first):
+      Diagnostics.lua:323: in function <Diagnostics.lua:314>
+      [tail call]: ?
+      [C]: in function 'xpcall'
+      Core.lua:260: in function <Core.lua:248>
+      [C]: in function 'TargetNearestEnemy'
+      [TARGETNEARESTENEMY]:2: in function <TARGETNEARESTENEMY:1>
+
+ISSUE 16: The game blocked an addon action
+  Last seen: 22:21:34
+  Source: BLOCKED by the game
+  Occurrences: 50
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran a timer set at BagTools.lua:213, 0.0 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 17: An error was recorded
+  Last seen: 22:21:24
+  Source: PLAYER_TARGET_CHANGED
+  Occurrences: 1
+  Message:
+Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+  Technical context and stack:
+    stack (newest call first):
+      Diagnostics.lua:323: in function <Diagnostics.lua:314>
+      [tail call]: ?
+      [C]: in function 'xpcall'
+      Core.lua:260: in function <Core.lua:248>
+      [C]: in function 'TurnOrActionStop'
+      [TURNORACTION]:4: in function <TURNORACTION:1>
+
+ISSUE 18: The game blocked an addon action
+  Last seen: 22:21:24
+  Source: BLOCKED by the game
+  Occurrences: 8
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran the event CURSOR_CHANGED, 0.1 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 19: The game blocked an addon action
+  Last seen: 22:21:21
+  Source: BLOCKED by the game
+  Occurrences: 1
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167 (while closing the chat box during a fight, then closing the chat box during a fight)
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran a timer set at Fishing.lua:279, 0.1 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 20: The game blocked an addon action
+  Last seen: 22:21:20
+  Source: BLOCKED by the game
+  Occurrences: 1
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167 (while closing the chat box during a fight)
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran the event PLAYER_REGEN_DISABLED, 0.1 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 21: The game blocked an addon action
+  Last seen: 22:20:46
+  Source: BLOCKED by the game
+  Occurrences: 98
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran a timer set at BagTools.lua:213, 0.0 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 22: An error was recorded
+  Last seen: 22:20:24
+  Source: PLAYER_TARGET_CHANGED
+  Occurrences: 1
+  Message:
+Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+  Technical context and stack:
+    stack (newest call first):
+      Diagnostics.lua:323: in function <Diagnostics.lua:314>
+      [tail call]: ?
+      [C]: in function 'xpcall'
+      Core.lua:260: in function <Core.lua:248>
+      [C]: in function 'UseAction'
+      Blizzard_FrameXML/SecureTemplates.lua:357: in function 'handler'
+      Blizzard_FrameXML/SecureTemplates.lua:752: in function <...terface/AddOns/Blizzard_FrameXML/SecureTemplates.lua:730>
+      Blizzard_FrameXML/SecureTemplates.lua:766: in function <...terface/AddOns/Blizzard_FrameXML/SecureTemplates.lua:759>
+      Blizzard_FrameXML/SecureTemplates.lua:818: in function 'SecureActionButton_OnClick'
+      Blizzard_ActionBar/Shared/ActionButton.lua:112: in function 'TryUseActionButton'
+      Blizzard_ActionBar/Shared/ActionButton.lua:157: in function 'ActionButtonDown'
+      [ACTIONBUTTON4]:2: in function <ACTIONBUTTON4:1>
+
+ISSUE 23: The game blocked an addon action
+  Last seen: 22:20:24
+  Source: BLOCKED by the game
+  Occurrences: 74
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran the event PLAYER_TARGET_CHANGED, 0.1 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 24: An error was recorded
+  Last seen: 22:20:08
+  Source: PLAYER_TARGET_CHANGED
+  Occurrences: 2
+  Message:
+Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+  Technical context and stack:
+    stack (newest call first):
+      Diagnostics.lua:323: in function <Diagnostics.lua:314>
+      [tail call]: ?
+      [C]: in function 'xpcall'
+      Core.lua:260: in function <Core.lua:248>
+      [C]: in function 'CameraOrSelectOrMoveStop'
+      [CAMERAORSELECTORMOVE]:4: in function <CAMERAORSELECTORMOVE:1>
+
+ISSUE 25: The game blocked an addon action
+  Last seen: 22:19:57
+  Source: BLOCKED by the game
+  Occurrences: 45
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran a timer set at Track.lua:235, 0.2 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 26: An error was recorded
+  Last seen: 22:19:43
+  Source: PLAYER_TARGET_CHANGED
+  Occurrences: 1
+  Message:
+Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+  Technical context and stack:
+    stack (newest call first):
+      Diagnostics.lua:323: in function <Diagnostics.lua:314>
+      [tail call]: ?
+      [C]: in function 'xpcall'
+      Core.lua:260: in function <Core.lua:248>
+      [C]: in function 'TurnOrActionStop'
+      [TURNORACTION]:4: in function <TURNORACTION:1>
+
+ISSUE 27: The game blocked an addon action
+  Last seen: 22:19:42
+  Source: BLOCKED by the game
+  Occurrences: 8
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran a timer set at ZoneLevels.lua:193, 0.1 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 28: An error was recorded
+  Last seen: 22:19:23
+  Source: PLAYER_TARGET_CHANGED
+  Occurrences: 1
+  Message:
+Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+  Technical context and stack:
+    stack (newest call first):
+      Diagnostics.lua:323: in function <Diagnostics.lua:314>
+      [tail call]: ?
+      [C]: in function 'xpcall'
+      Core.lua:260: in function <Core.lua:248>
+      [C]: in function 'TurnOrActionStop'
+      [TURNORACTION]:4: in function <TURNORACTION:1>
+
+ISSUE 29: The game blocked an addon action
+  Last seen: 22:19:20
+  Source: BLOCKED by the game
+  Occurrences: 53
+  Message:
+tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:167
+  Technical context and stack:
+    the game's event: ADDON_ACTION_BLOCKED
+    running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+    the addon last ran a timer set at ZoneLevels.lua:193, 0.0 s before
+    in combat: yes
+    stack (newest call first):
+      [C]: in function 'SetPropagateKeyboardInput'
+      BagTools.lua:167: in function <BagTools.lua:164>
+
+ISSUE 30: An error was recorded
+  Last seen: 22:19:00
+  Source: PLAYER_TARGET_CHANGED
+  Occurrences: 1
+  Message:
+Interface/AddOns/QuestSharing/Diagnostics.lua:323: attempt to compare local 't' (a secret string value, while execution tainted by 'QuestSharing')
+  Technical context and stack:
+    stack (newest call first):
+      Diagnostics.lua:323: in function <Diagnostics.lua:314>
+      [tail call]: ?
+      [C]: in function 'xpcall'
+      Core.lua:260: in function <Core.lua:248>
+      [C]: in function 'CameraOrSelectOrMoveStop'
+      [CAMERAORSELECTORMOVE]:4: in function <CAMERAORSELECTORMOVE:1>
+
+
+================ SETUP CHECK ================
+
+Quest Sharing 0.4.26 | game interface 16001 | modern quest API | 28 quests (3 in Stormwind City)
+[OK] = works here, [--] = not available on this client (the note says what still works)
+[OK] share quests: push call yes, 46 reply messages recognised
+[OK] ask the game who has a quest (otherwise the replies decide)
+[--] sync with other Quest Sharing users (addon message prefix registered)
+[OK] click a tracked quest (tracker yes, watch frame no)
+[OK] shift-click a quest link into the chat box
+[OK] quest log markers (classic no, modern yes)
+[OK] tracker follows you: distance mode
+[OK] quest icons above creatures that are part of your quests
+[OK] pin the nearest quest in the world (the game's waypoint marker)
+[OK] friends (beta): add call yes, 7 reply messages recognised
+[OK] quick chat wheel: key B
+[OK] invite a player from the wheel
+[OK] entry in the game's options (/qs settings works anyway)
+[OK] minimap button
+[OK] game sound: on, effects on (Quest Sharing never changes these; its only sound is the good-news ping, on: /qs sound off)
+[OK] pings: the game's ping system is here, ping key G
+[OK] Questie: found (QuestieDB) - "where to get it" works; /qs questie tests it
+[--] 30 error(s) recorded - see below
+chat the game refused for addons: PARTY, SAY (into the chat box instead; tick Send the message at once again to retry)
+debug log: on, 1209 lines (/qs log)
+features blocked this session: none
+
+================ SETTINGS - one per line ================
+
+  Tell the party when I finish a shared quest: On [announce=true]
+  Which quests to share: zone [area=zone]
+  Share my quests when someone joins the party: On [auto=true]
+  Accept quest offers automatically: On [autoAcceptQuests=true]
+  Turn in completed quests automatically: On [autoCompleteQuests=true]
+  Sell gray items when I open a vendor: On [autoSellGray=true]
+  Arrange my bags by topic automatically: On [autoSortBags=true]
+  Auto-update spells to highest learned rank: On [autoSpellRanks=true]
+  Bookmark bag items with the Space bar: On [bagBookmarks=true]
+  Mark quest items in my bags: On [bagMarks=true]
+  Announce quests in common in party chat: On [chat=true]
+  Block the chat box during combat: On [chatLock=true]
+  Click tracked quests to prepare a progress message: On [click=true]
+  Include where I found quest items in progress messages: On [coords=true]
+  dbVersion: 3 [dbVersion=3]
+  Record addon actions for troubleshooting: On [debug=true]
+  Turn on Quest Sharing: On [enabled=true]
+  Saved fishing spots: Off [fishingMap=false]
+  Automatically add party members as friends (beta): Off [friends=false]
+  Seconds between shared quests: 4 [gap=4]
+  Hide the game's quest list on the right: On [hideTracker=true]
+  Turn on enemy health bars and nearby object icons: On [highlightCVars=true]
+  Remember the item level of players near me: On [ilvlInspect=true]
+  Share item levels with other Quest Sharing users: On [ilvlShare=true]
+  Show a separate button for my nearest quest's item: On [itemButton=true]
+  Show where items come from when I hover over them: On [itemSources=true]
+  Ask Quest Sharing users for their item level first: On [lfgAskIlvl=true]
+  Invite damage dealers: Off [lfgDps=false]
+  Invite healers: On [lfgHealer=true]
+  Highest character level to invite: 60 [lfgMaxLevel=60]
+  Lowest item level to invite (0 = any): 0 [lfgMinIlvl=0]
+  Lowest character level to invite: 1 [lfgMinLevel=1]
+  Invite tanks: Off [lfgTank=false]
+  When their item level is unknown: invite [lfgUnknown=invite]
+  Also invite from my own party finder searches: Off [lfgWatch=false]
+  Shift-click quest links in chat to post my progress: On [link=true]
+  Show Quest Sharing party members on my world map: On [mapPins=true]
+  Show ! above quest enemies: On [markMobs=true]
+  Mark shared quests with a star in my quest log: On [markers=true]
+  Show the minimap button: On [minimap=true]
+  How to send quest progress messages: box [mode=box]
+  Show my class and profession trainers on the map: On [myTrainers=true]
+  Automatically track nearby quests: On [near=true]
+  Maximum quests to track: 5 [nearCount=5]
+  Which quests count as nearby: auto [nearMode=auto]
+  Pause after I edit the quest list (seconds): 10 [nearPause=10]
+  Follow my nearest quest with a waypoint: On [nearPin=true]
+  Show the Party quests window: On [panel=true]
+  Hide the Party quests window during combat: On [panelCombat=true]
+  Party quests window size (%): 100 [panelScale=100]
+  Also show the Party quests window when playing alone: On [panelSolo=true]
+  Tell the party when I accept a quest a teammate has: On [pickup=true]
+  Enable quest pings: On [ping=true]
+  Minimum time between pings: 10 [pingGap=10]
+  Also ping quest objects I am facing: On [pingObjects=true]
+  Cooking recipes and sources: On [professionGuide=true]
+  Show usable item buttons beside tracked quests: On [questItems=true]
+  Quest route guide: On [questPlanner=true]
+  Minutes for the Time limit goal: 30 [questPlannerBudget=30]
+  What the route aims for: all [questPlannerGoal=all]
+  Which quests by level: all [questPlannerScope=all]
+  Quest IDs for the Chosen quests goal: (empty) [questPlannerSelected=""]
+  Enable the quick chat ring: On [quick=true]
+  Who receives messages set to Automatic: auto [quickChannel=auto]
+  How the quick chat key works: hold [quickMode=hold]
+  Send quick chat messages without pressing Enter: On [quickSend=true]
+  Message ring size: normal [quickSize=normal]
+  Quest rewards: On [rewardBrowser=true]
+  Seconds to wait after the party forms: 5 [settle=5]
+  Require a Share click for each quest offer: On [shareByClick=true]
+  Share new quests as I accept them: On [shareNew=true]
+  Bags to arrange: all [sortBags=all]
+  Order items by: topic [sortBy=topic]
+  Where items gather: start [sortFrom=start]
+  Leave bookmarked items where they are: Off [sortKeepBookmarked=false]
+  Play a sound when a shared quest is accepted or finished: On [sound=true]
+  Sync quest lists with other Quest Sharing users: On [sync=true]
+  Add a waypoint where a teammate found quest items: On [teamWaypoint=true]
+  Whose boats, zeppelins and towns to show: all [travelFaction=all]
+  Show dungeons, boats and zeppelins on the world map: On [travelMap=true]
+  Search items and vendors on the map: On [vendorSearch=true]
+  Show zone questing level ranges: Off [zoneLevels=false]
+
+================ ACTIVITY LOG - oldest to newest ================
+
+debug log (on): all 1209 retained lines; saved to WTF/Account/<account>/SavedVariables/QuestSharing.lua after /reload or logout
+00:22:04       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:04 game error: Not enough energy
+00:22:04 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:04     the game's event: ADDON_ACTION_BLOCKED
+00:22:04     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:04     the addon last ran a timer set at ZoneLevels.lua:193, 0.0 s before
+00:22:04     in combat: yes
+00:22:04     stack (newest call first):
+00:22:04       [C]: in function 'SetPropagateKeyboardInput'
+00:22:04       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:04 game error: Not enough energy
+00:22:05 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:05     the game's event: ADDON_ACTION_BLOCKED
+00:22:05     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:05     the addon last ran a timer set at BagTools.lua:214, 0.0 s before
+00:22:05     in combat: yes
+00:22:05     stack (newest call first):
+00:22:05       [C]: in function 'SetPropagateKeyboardInput'
+00:22:05       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:05 game error: Not enough energy
+00:22:05 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:05     the game's event: ADDON_ACTION_BLOCKED
+00:22:05     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:05     the addon last ran a timer set at Bags.lua:176, 0.1 s before
+00:22:05     in combat: yes
+00:22:05     stack (newest call first):
+00:22:05       [C]: in function 'SetPropagateKeyboardInput'
+00:22:05       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:05 game error: Not enough energy
+00:22:06 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:06     the game's event: ADDON_ACTION_BLOCKED
+00:22:06     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:06     the addon last ran a timer set at BagTools.lua:214, 0.1 s before
+00:22:06     in combat: yes
+00:22:06     stack (newest call first):
+00:22:06       [C]: in function 'SetPropagateKeyboardInput'
+00:22:06       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:06 game error: Not enough energy
+00:22:06 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:06     the game's event: ADDON_ACTION_BLOCKED
+00:22:06     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:06     the addon last ran a timer set at Fishing.lua:279, 0.0 s before
+00:22:06     in combat: yes
+00:22:06     stack (newest call first):
+00:22:06       [C]: in function 'SetPropagateKeyboardInput'
+00:22:06       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:06 game error: Not enough energy
+00:22:06 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:06     the game's event: ADDON_ACTION_BLOCKED
+00:22:06     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:06     the addon last ran a timer set at Track.lua:235, 0.0 s before
+00:22:06     in combat: yes
+00:22:06     stack (newest call first):
+00:22:06       [C]: in function 'SetPropagateKeyboardInput'
+00:22:06       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:06 game error: Not enough energy
+00:22:06 event: target: nothing
+00:22:06 game says: You are no longer rested.
+00:22:06 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:06     the game's event: ADDON_ACTION_BLOCKED
+00:22:06     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:06     the addon last ran a timer set at ZoneLevels.lua:193, 0.0 s before
+00:22:06     in combat: yes
+00:22:06     stack (newest call first):
+00:22:06       [C]: in function 'SetPropagateKeyboardInput'
+00:22:06       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:06 game error: There is nothing to attack.
+00:22:07 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:07     the game's event: ADDON_ACTION_BLOCKED
+00:22:07     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:07     the addon last ran a timer set at Fishing.lua:279, 0.1 s before
+00:22:07     in combat: yes
+00:22:07     stack (newest call first):
+00:22:07       [C]: in function 'SetPropagateKeyboardInput'
+00:22:07       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:07 game error: There is nothing to attack.
+00:22:07 event: target: Old Town Thug (creature, not friendly)
+00:22:08 event: target: nothing
+00:22:09 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:09     the game's event: ADDON_ACTION_BLOCKED
+00:22:09     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:09     the addon last ran the event BAG_UPDATE_DELAYED, 0.2 s before
+00:22:09     in combat: yes
+00:22:09     stack (newest call first):
+00:22:09       [C]: in function 'SetPropagateKeyboardInput'
+00:22:09       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:09 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:09     the game's event: ADDON_ACTION_BLOCKED
+00:22:09     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:09     the addon last ran the event BAG_UPDATE_DELAYED, 0.2 s before
+00:22:09     in combat: yes
+00:22:09     stack (newest call first):
+00:22:09       [C]: in function 'SetPropagateKeyboardInput'
+00:22:09       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:09 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:09     the game's event: ADDON_ACTION_BLOCKED
+00:22:09     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:09     the addon last ran a timer set at Fishing.lua:279, 0.1 s before
+00:22:09     in combat: yes
+00:22:09     stack (newest call first):
+00:22:09       [C]: in function 'SetPropagateKeyboardInput'
+00:22:09       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:10 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:10     the game's event: ADDON_ACTION_BLOCKED
+00:22:10     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:10     the addon last ran the event GLOBAL_MOUSE_DOWN, 0.1 s before
+00:22:10     in combat: yes
+00:22:10     stack (newest call first):
+00:22:10       [C]: in function 'SetPropagateKeyboardInput'
+00:22:10       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:10 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:10     the game's event: ADDON_ACTION_BLOCKED
+00:22:10     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:10     the addon last ran a timer set at Track.lua:235, 0.1 s before
+00:22:10     in combat: yes
+00:22:10     stack (newest call first):
+00:22:10       [C]: in function 'SetPropagateKeyboardInput'
+00:22:10       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:11 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:11     the game's event: ADDON_ACTION_BLOCKED
+00:22:11     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:11     the addon last ran a timer set at Fishing.lua:279, 0.2 s before
+00:22:11     in combat: yes
+00:22:11     stack (newest call first):
+00:22:11       [C]: in function 'SetPropagateKeyboardInput'
+00:22:11       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:12 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:12     the game's event: ADDON_ACTION_BLOCKED
+00:22:12     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:12     the addon last ran the event UPDATE_MOUSEOVER_UNIT, 0.0 s before
+00:22:12     in combat: yes
+00:22:12     stack (newest call first):
+00:22:12       [C]: in function 'SetPropagateKeyboardInput'
+00:22:12       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:12 event: target: Old Town Thug (creature, not friendly)
+00:22:12 game error: You cannot attack that target.
+00:22:12 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:22:12     the game's event: ADDON_ACTION_BLOCKED
+00:22:12     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:22:12     the addon last ran a timer set at Highlight.lua:93, 0.0 s before
+00:22:12     in combat: yes
+00:22:12     stack (newest call first):
+00:22:12       [C]: in function 'SetPropagateKeyboardInput'
+00:22:12       BagTools.lua:168: in function <BagTools.lua:165>
+00:22:12 game error: You cannot attack that target.
+00:22:13 event: combat ends
+00:22:14 event: target: Dashel Stonefist (creature, friendly)
+00:22:14 call: hiding the game's quest tracker
+00:22:17 call: arranging the bags
+00:22:17 call: hiding the game's quest tracker
+00:22:17 call: arranging the bags
+00:22:17 call: hiding the game's quest tracker
+00:22:17 call: arranging the bags
+00:22:17 call: hiding the game's quest tracker
+00:22:17 call: arranging the bags
+00:22:17 call: hiding the game's quest tracker
+00:22:17 call: arranging the bags
+00:22:17 call: hiding the game's quest tracker
+00:22:18 call: arranging the bags
+00:22:18 call: hiding the game's quest tracker
+00:22:18 call: arranging the bags
+00:22:18 call: hiding the game's quest tracker
+00:22:18 call: arranging the bags
+00:22:18 call: hiding the game's quest tracker
+00:22:18 call: arranging the bags
+00:22:18 call: hiding the game's quest tracker
+00:22:18 sort: done, 9 moves
+00:22:21 game says: You feel rested.
+00:22:35 event: target: Godgiff (player, friendly)
+00:22:40 game says: You have requested to join Doktor Pop's group.
+00:22:43 game says: Looting set to Group Loot.
+00:22:43 game says: Loot threshold set to Uncommon.
+00:22:43 event: party: Doktor, Godgiff
+00:22:48 share: round (joined a party): 1 to offer, 0 already with everyone, 0 offered before, 0 declined
+00:22:48 share: waiting for your click: 1 quest(s) to offer
+00:22:48 shown: 1 quest(s) to offer: click Share in the Party quests window, one quest per click (or click a quest there)
+00:22:52 call: hiding the game's quest tracker
+00:22:53 call: drawing dungeon and travel pins on the world map
+00:22:55 call: hiding the game's quest tracker
+00:23:05 event: quest removed: 1447
+00:23:05 call: hiding the game's quest tracker (x2)
+00:23:06 event: target: Dashel Stonefist (creature, friendly)
+00:23:06 call: accepting an offered quest
+00:23:07 game says: Quest accepted: The Missing Diplomat
+00:23:07 event: quest accepted: "The Missing Diplomat"
+00:23:07 call: hiding the game's quest tracker (x2)
+00:23:08 event: combat starts
+00:23:08 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:23:08     the game's event: ADDON_ACTION_BLOCKED
+00:23:08     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:23:08     the addon last ran a timer set at Progress.lua:108, 0.0 s before
+00:23:08     in combat: yes
+00:23:08     stack (newest call first):
+00:23:08       [C]: in function 'SetPropagateKeyboardInput'
+00:23:08       BagTools.lua:168: in function <BagTools.lua:165>
+00:23:08 shown: an error was recorded (tried to call the protected function Frame:SetPropagateKeyboardInput() from BagT) - /qs errors shows it
+00:23:08 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:23:08     the game's event: ADDON_ACTION_BLOCKED
+00:23:08     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:23:08     the addon last ran a timer set at Progress.lua:108, 0.0 s before
+00:23:08     in combat: yes
+00:23:08     stack (newest call first):
+00:23:08       [C]: in function 'SetPropagateKeyboardInput'
+00:23:08       BagTools.lua:168: in function <BagTools.lua:165>
+00:23:09 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:23:09     the game's event: ADDON_ACTION_BLOCKED
+00:23:09     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:23:09     the addon last ran the event UPDATE_MOUSEOVER_UNIT, 0.0 s before
+00:23:09     in combat: yes
+00:23:09     stack (newest call first):
+00:23:09       [C]: in function 'SetPropagateKeyboardInput'
+00:23:09       BagTools.lua:168: in function <BagTools.lua:165>
+00:23:09 game error: Target needs to be in front of you.
+00:23:09 game error: You are facing the wrong way!
+00:23:09 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:23:09     the game's event: ADDON_ACTION_BLOCKED
+00:23:09     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:23:09     the addon last ran a timer set at Fishing.lua:279, 0.0 s before
+00:23:09     in combat: yes
+00:23:09     stack (newest call first):
+00:23:09       [C]: in function 'SetPropagateKeyboardInput'
+00:23:09       BagTools.lua:168: in function <BagTools.lua:165>
+00:23:09 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:23:09     the game's event: ADDON_ACTION_BLOCKED
+00:23:09     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:23:09     the addon last ran the event UPDATE_MOUSEOVER_UNIT, 0.1 s before
+00:23:09     in combat: yes
+00:23:09     stack (newest call first):
+00:23:09       [C]: in function 'SetPropagateKeyboardInput'
+00:23:09       BagTools.lua:168: in function <BagTools.lua:165>
+00:23:09 game error: Target needs to be in front of you.
+00:23:09 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:23:09     the game's event: ADDON_ACTION_BLOCKED
+00:23:09     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:23:09     the addon last ran a timer set at Team.lua:26, 0.0 s before
+00:23:09     in combat: yes
+00:23:09     stack (newest call first):
+00:23:09       [C]: in function 'SetPropagateKeyboardInput'
+00:23:09       BagTools.lua:168: in function <BagTools.lua:165>
+00:23:09 event: target: Old Town Thug (creature, not friendly)
+00:23:09 game error: Target needs to be in front of you.
+00:23:09 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:23:09     the game's event: ADDON_ACTION_BLOCKED
+00:23:09     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:23:09     the addon last ran the event UI_ERROR_MESSAGE, 0.0 s before
+00:23:09     in combat: yes
+00:23:09     stack (newest call first):
+00:23:09       [C]: in function 'SetPropagateKeyboardInput'
+00:23:09       BagTools.lua:168: in function <BagTools.lua:165>
+00:23:09 game error: You are facing the wrong way!
+00:23:10 game error: You must be behind your target.
+00:23:10 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:23:10     the game's event: ADDON_ACTION_BLOCKED
+00:23:10     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:23:10     the addon last ran the event UI_ERROR_MESSAGE, 0.0 s before
+00:23:10     in combat: yes
+00:23:10     stack (newest call first):
+00:23:10       [C]: in function 'SetPropagateKeyboardInput'
+00:23:10       BagTools.lua:168: in function <BagTools.lua:165>
+00:23:10 ERROR BLOCKED by the game: tried to call the protected function Frame:SetPropagateKeyboardInput() from BagTools.lua:168
+00:23:10     the game's event: ADDON_ACTION_BLOCKED
+00:23:10     running: no timer or event of the addon (a click, a key, a hook, or the game's own code)
+00:23:10     the addon last ran the event GLOBAL_MOUSE_DOWN, 0.0 s before
+00:23:10     in combat: yes
+00:23:10     stack (newest call first):
+00:23:10       [C]: in function 'SetPropagateKeyboardInput'
+00:23:10       BagTools.lua:168: in function... (62 KB left)

@@ -1,5 +1,5 @@
 # Architecture
-Last updated: 2026-11-18
+Last updated: 2026-11-19
 
 ## File tree
 <!-- bpmn:file-tree -->
@@ -7,6 +7,7 @@ Last updated: 2026-11-18
 cutpdf/
 ├── .gitignore                                        # Exclude caches and release output
 ├── bug.txt                                           # User-provided v0.4.21 diagnostic report
+├── bugs.txt                                          # User-provided v0.4.26 Stormwind diagnostic report
 ├── build_release.py                                  # Allowlist build + verify of the install ZIP and release notes (--check, --force)
 ├── CHANGELOG.md                                      # Release history
 ├── context/                                          # Session continuity and live architecture
