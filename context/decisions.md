@@ -750,3 +750,8 @@ Not done (needs data): mob level per objective for kill XP (assumes your own lev
 - Only the small labels take the mouse; circles never block map clicks. Hidden in combat. Table: <= 14 rows, <= 8 columns (rest fold into "Other", no spawn dropped).
 - Unverified: the circle texture's look in the real client.
 - 2026-11-19 (user: "this is what i wanna see but in wow style inside"): the camps table became the full Shared camps window mirroring tools/coldridge-network.html (buttons, network, map, matrix). Network curves = 8 straight CreateLine pieces per link; map background = the zone's own map art (dimmed), plain inset when the client gives no art; givers within 14 px share one label; "Mountaineer" title dropped from short names.
+
+## 2026-11-19 — Script-driven v0.4.27
+- Release latest cutpdf/main `ab917e9` through YodaGitMaster/QuestSharing; preserve cutpdf refs and README-only distribution main.
+- Restore the published changelog history, retain only new/changed source notes, align version to published 0.4.26, then run unchanged build_release.py --bump/--check/build. No runtime edits; user requested plain-language updates.
+- Use process status, explicit FAIL detection and complete summary counts for all test scripts; compile every Lua module with Lua 5.1.
