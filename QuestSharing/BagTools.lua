@@ -161,12 +161,28 @@ function T.keyDown(key)
 end
 
 local keys = CreateFrame("Frame", nil, UIParent)
+local propagating = true
 keys:SetPropagateKeyboardInput(true)
+-- SetPropagateKeyboardInput is protected during combat lockdown: never call it then (keys stay passed on to the game)
+local function propagate(self, v)
+    if v == propagating or (InCombatLockdown and InCombatLockdown()) then return end
+    propagating = v
+    self:SetPropagateKeyboardInput(v)
+end
 keys:SetScript("OnKeyDown", function(self, key)
+    if InCombatLockdown and InCombatLockdown() then                -- no bookmarks in a fight: say so once instead of a silent jump
+        if key == "SPACE" and not T.toldFight and ns.db.enabled and ns.db.bagBookmarks then
+            local ok, bag = pcall(T.pointedSlot)
+            if ok and bag then T.toldFight = true; ns.print("bookmarks cannot be changed during a fight; press Space on the item again afterwards") end
+        end
+        return
+    end
     local ok, taken = pcall(T.keyDown, key)
     if not ok then ns.logError("bookmark key", taken); taken = false end
-    self:SetPropagateKeyboardInput(not taken)           -- every other key (and Space away from the bags) goes on to the game
+    propagate(self, not taken)                          -- every other key (and Space away from the bags) goes on to the game
 end)
+-- fires just before the lockdown starts: the last chance to make sure every key reaches the game during the fight
+ns.on("PLAYER_REGEN_DISABLED", function() propagate(keys, true) end)
 
 -- the note icon in a corner of bookmarked items
 local icons = setmetatable({}, { __mode = "k" })
@@ -491,7 +507,7 @@ function T.isSorting() return sorting ~= nil end
 local function schedule()
     if autoTimer then ns.cancel(autoTimer); autoTimer = nil end
     if sorting or not (ns.db.enabled and ns.db.autoSortBags) then return end
-    autoTimer = ns.after(AUTO_DELAY, function()
+    autoTimer = ns.after(tonumber(ns.db.sortDelay) or AUTO_DELAY, function()
         autoTimer = nil
         if inFight() then return end                         -- PLAYER_REGEN_ENABLED starts the wait again
         local started, why = T.sort(false)

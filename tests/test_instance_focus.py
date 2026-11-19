@@ -16,7 +16,7 @@ def test_first_open_uses_eighth_return_id_even_when_localized_names_differ(style
     assert {r[1] for r in results(g)}=={"Wailing Caverns"}
     w=g.eval("NS.loot._window()")
     assert "Wailing Caverns" in w.selection.text
-    assert any(b.shown and "> " in b.text and b.place.name=="Wailing Caverns" for b in w.instances.values())
+    assert any(b.shown and g.eval("NS.style.GOLD") in b.text and b.place.name=="Wailing Caverns" for b in w.instances.values())
 
 
 def test_reopen_refocuses_and_clears_stale_text_source_and_dungeon_search(style):

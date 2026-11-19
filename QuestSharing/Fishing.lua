@@ -32,6 +32,12 @@ function F.list(map)
     return out
 end
 
+-- The zone a map number stands for, as players know it ("Elwynn Forest"); nil when the game does not know it.
+local function zoneOf(map)
+    local info = tonumber(map) and C_Map and U.call(C_Map.GetMapInfo, tonumber(map))
+    return type(info) == "table" and type(info.name) == "string" and info.name ~= "" and info.name or nil
+end
+
 local function skillText(w)
     return "Minimum skill: " .. (w.minSkill and tostring(w.minSkill) or "unknown")
         .. " | No-getaway skill: " .. (w.safeSkill and tostring(w.safeSkill) or "unknown")
@@ -101,7 +107,8 @@ local function newPin(parent)
     p:SetScript("OnEnter", function(self)
         local w = self.water
         U.tip(self, w.name, { skillText(w), "Fish: " .. (type(w.fish) == "string" and w.fish ~= "" and w.fish or "not recorded"),
-            type(w.notes) == "string" and w.notes or "", "User-recorded water. Click to edit." })
+            type(w.notes) == "string" and w.notes or "", "User-recorded water. Click to edit.",
+            (zoneOf(w.map) or ("Map " .. tostring(w.map))) .. string.format(" %.1f, %.1f", w.x, w.y) })
     end)
     p:SetScript("OnLeave", U.hideTip)
     p:SetScript("OnClick", function(self) F.open(self.waterID) end)
@@ -133,7 +140,7 @@ function F.draw()
             n = n + 1
             local p, w = pins[n] or newPin(cv), row.water
             pins[n], p.water, p.waterID = p, w, row.id
-            p.label:SetText(w.name .. " (" .. (w.minSkill and tostring(w.minSkill) or "?") .. ")")
+            p.label:SetText(w.name .. " · skill " .. (w.minSkill and tostring(w.minSkill) or "unknown"))
             p:ClearAllPoints(); p:SetScale(1 / scale)
             p:SetPoint("CENTER", cv, "TOPLEFT", w.x / 100 * cv:GetWidth() * scale, -w.y / 100 * cv:GetHeight() * scale)
             p:Show()
@@ -148,7 +155,7 @@ function F.draw()
             add:SetPoint("BOTTOMLEFT", overview, "BOTTOMLEFT", 8, 8)
         end
         local z = F.zoneSummary(map)
-        local text = S.GOLD .. "Fishing waters|r\n" .. n .. " water markers on this map.\n"
+        local text = S.GOLD .. "Fishing spots|r\n" .. n .. " water markers on this map.\n"
             .. (wm.GetNormalizedCursorPosition and "Alt-click water to add a marker.\n" or "")
         if z then
             text = text .. "\n" .. z.name .. " (AnglerAtlas zone overview)\nMinimum skill: " .. tostring(z.minSkill or "unknown")
@@ -175,15 +182,23 @@ local function fill(w)
     end
 end
 
+local function showZone()
+    if not editor then return end
+    local text = trim(editor.map:GetText())
+    local zone = zoneOf(text)
+    editor.zone:SetText(zone and (S.WHITE .. zone .. "|r") or (text ~= "" and (S.GREY .. "unknown zone|r") or ""))
+end
+
 local function refreshEditor()
     if not editor then return end
+    showZone()
     local list = F.list()
     page = math.max(1, math.min(page, math.max(1, math.ceil(#list / PAGE))))
     for i, b in ipairs(editor.rows) do
         local r = list[(page - 1) * PAGE + i]
         if r then
             b.waterID = r.id
-            b:SetLabel((selected == r.id and "> " or "") .. r.water.name .. " — map " .. r.water.map)
+            b:SetLabel((selected == r.id and "> " or "") .. r.water.name .. " — " .. (zoneOf(r.water.map) or ("map " .. r.water.map)))
             b:Show()
         else b.waterID = nil; b:Hide() end
     end
@@ -194,19 +209,23 @@ local function currentPosition()
     local map, x, y = ns.compat.playerPos()
     if not (map and x and y) then editor.message:SetText(S.RED .. "Your position is unavailable; enter map ID and coordinates.|r"); return end
     editor.map:SetText(tostring(map)); editor.x:SetText(string.format("%.2f", x * 100)); editor.y:SetText(string.format("%.2f", y * 100))
+    showZone()
     editor.message:SetText("Position set to where you are standing; move X/Y to the water if needed.")
 end
 
 local function build()
     if editor then return true end
-    local f = U.window("QuestSharingFishing", 670, 550, "Fishing waters")
+    local f = U.window("QuestSharingFishing", 670, 550, "Fishing spots")
     if not f then return false end
     editor = { frame = f, rows = {} }
     U.text(f, "Record each body of water; blank skill means unknown. Coordinates are 0–100 on the selected map.", 24, 32, 620)
     local cooking=S.button(f,"Cooking / recipes",155,function() ns.professions.open() end)
     cooking:SetPoint("BOTTOMRIGHT",f,"BOTTOMRIGHT",-24,20)
-    editor.name = U.box(f, "Water name", 24, 60, 300, "", 80)
-    editor.map = U.box(f, "Map ID", 340, 60, 90, "", 6)
+    editor.name = U.box(f, "Water name", 24, 60, 200, "", 80)
+    editor.map = U.box(f, "Map ID", 240, 60, 70, "", 6)
+    editor.zone = U.text(f, "", 318, 81, 120)                       -- the zone that map number is, beside the field
+    if editor.zone.SetWordWrap then editor.zone:SetWordWrap(false) end
+    editor.map:SetScript("OnTextChanged", showZone)
     editor.x = U.box(f, "X (%)", 446, 60, 86, "", 8)
     editor.y = U.box(f, "Y (%)", 548, 60, 86, "", 8)
     editor.minSkill = U.box(f, "Minimum fishing skill", 24, 112, 195, "", 5)
@@ -219,7 +238,11 @@ local function build()
         local input = {}
         for _, k in ipairs({ "name", "map", "x", "y", "minSkill", "safeSkill", "fish", "notes" }) do input[k] = editor[k]:GetText() end
         local id, err = F.save(input, selected)
-        if id then selected = id; editor.message:SetText(S.GREEN .. "Saved." .. (ns.db.fishingMap and "" or " Enable fishing in Optional to show markers.") .. "|r"); refreshEditor()
+        if id then
+            selected = id
+            local where = ns.settingPath and ns.settingPath("fishingMap") or "Settings"
+            editor.message:SetText(S.GREEN .. "Saved." .. (ns.db.fishingMap and "" or (" To see it on the world map, turn on " .. where .. ".")) .. "|r")
+            refreshEditor()
         else editor.message:SetText(S.RED .. err .. "|r") end
     end)
     save:SetPoint("TOPLEFT", f, "TOPLEFT", 24, -270)
@@ -230,7 +253,12 @@ local function build()
     end)
     del:SetPoint("LEFT", new, "RIGHT", 10, 0)
     local show = S.button(f, "Map location", 120, function()
-        if not U.mapHint(tonumber(editor.map:GetText())) then editor.message:SetText("Enter a map ID first.") end
+        local map, x, y = tonumber(editor.map:GetText()), tonumber(editor.x:GetText()), tonumber(editor.y:GetText())
+        if not map then editor.message:SetText("Enter a map ID first."); return end
+        local zone = zoneOf(map) or ("map " .. map)
+        local spot = (finite(x) and finite(y)) and string.format(" at %.1f, %.1f", x, y) or ""
+        local text = "This water is in " .. zone .. spot .. ": open your world map (M) and choose " .. zone .. "."
+        editor.message:SetText(text); ns.print(text)
     end)
     show:SetPoint("LEFT", del, "RIGHT", 10, 0)
     editor.message = U.text(f, "", 24, 300, 610)
@@ -268,6 +296,7 @@ function F.openAt(map, x, y)
     F.open()
     if not editor or not ns.db.enabled then return end
     editor.map:SetText(tostring(map)); editor.x:SetText(string.format("%.2f", x)); editor.y:SetText(string.format("%.2f", y))
+    showZone()
     editor.message:SetText("Map location selected. Name this water, add its skill and fish, then Save water.")
 end
 

@@ -195,9 +195,9 @@ def test_fish_hover_has_zone_levels_skill_and_explicit_unknowns(style):
     g=game(style);w=open_cooking(g);select(g,7753)
     b=w.ingredients[1];b.scripts.OnEnter(b)
     text=joined(g.eval("TOOLTIP.lines"))
-    assert "Stormwind" in text and "no-getaway: 75" in text
+    assert "Stormwind" in text and "Fish stay hooked from skill 75" in text
     text=joined(g.eval("NS.professions.materialLines(13759)"))
-    assert "Feralas" in text and "12:00-18:00" in text and "minimum: unknown" in text
+    assert "Feralas" in text and "12:00-18:00" in text and "Fishing skill needed: not known" in text
 
 
 def test_meat_drop_tooltip_has_mob_levels_locations_and_zone_range(style):
@@ -294,7 +294,7 @@ def test_item_source_hint_uses_tooltip_data_so_professions_items_get_it(style):
     g.run('NS.db.itemSources=true;NS.itemSources.refresh()')
     # The Professions window hands the tooltip data only (no GetItem link); the hint must still appear.
     g.run('GameTooltip:SetOwner(UIParent);for _,fn in ipairs(POST) do fn(GameTooltip,{id=9900}) end')
-    assert "Questie sources: Cook Supplies" in joined(g.eval('TOOLTIP.lines'))
+    assert "Sold by: Cook Supplies" in joined(g.eval('TOOLTIP.lines'))
     count=len(g.eval('TOOLTIP.lines'));g.run('for _,fn in ipairs(POST) do fn(GameTooltip,{id=9900}) end')
     assert len(g.eval('TOOLTIP.lines'))==count
 
@@ -306,6 +306,16 @@ def test_long_sources_and_ingredients_flow_vertically_in_scroll_content(style):
     assert -w.ingredients[1].point[5]>-w.sourceText.point[5]+w.sourceText.GetStringHeight(w.sourceText)
     assert w.detailContent.GetHeight(w.detailContent)>w.detailScroll.GetHeight(w.detailScroll)
     assert w.detailScroll.GetVerticalScroll(w.detailScroll)==0
+
+
+def test_ingredient_tooltip_leaves_drops_to_the_ranked_gather_block(style):
+    g=game(style)
+    f=g.eval("NS.professions._withoutDrops")
+    rows=g.eval("""{ "Fish: Stormwind canals; zone levels 1-12", "Drops from: Boar; mob level 5-6", "  Elwynn Forest 40, 50",
+        "  +3 other recorded spawn points.", "More drop sources exist in Questie.", "Buy from: Tharynn", "  Stormwind 70, 60",
+        "Loot this ingredient from slain mobs; a loot drop does not require Skinning." }""")
+    out=[str(v) for v in f(rows).values()]
+    assert out==["Fish: Stormwind canals; zone levels 1-12","Buy from: Tharynn","  Stormwind 70, 60"],out
 
 
 if __name__=="__main__":

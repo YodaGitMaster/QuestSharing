@@ -159,6 +159,37 @@ def test_events_invalidate_confirmation_without_rescanning(style):
         assert g.eval("ITEM_READS") == count
 
 
+def test_own_deletion_bag_events_keep_the_list_but_later_changes_still_clear_it(style):
+    # UX-12: the bag events the game fires after our own Delete must not empty the list.
+    g = game(style)
+    review(g)
+    assert g.eval("NS.questCleanup.confirm")()
+    assert ids(g) == [301]
+    count = g.eval("ITEM_READS")
+    g.fire("BAG_UPDATE", 0)
+    g.fire("BAG_UPDATE_DELAYED")
+    assert ids(g) == [301]
+    assert "Click Refresh" not in g.eval("NS.questCleanup._window().status.text")
+    assert g.eval("ITEM_READS") == count       # no background re-scan
+    g.fire("BAG_UPDATE", 0)                    # an outside change after that still clears the list
+    assert ids(g) == []
+    assert "Refresh bags" in g.eval("NS.questCleanup._window().status.text")
+
+
+def test_own_deletion_does_not_hide_other_bag_or_late_changes(style):
+    g = game(style)
+    review(g)
+    assert g.eval("NS.questCleanup.confirm")()
+    g.fire("BAG_UPDATE", 1)                    # a different bag changed: outside change
+    assert ids(g) == []
+    g = game(style)
+    review(g)
+    assert g.eval("NS.questCleanup.confirm")()
+    g.advance(5)                               # the game never sent the follow-up events
+    g.fire("BAG_UPDATE", 0)
+    assert ids(g) == []
+
+
 def test_busy_unreadable_or_unavailable_cursor_blocks_pickup(style):
     for extra in ("CLEAN_CURSOR={kind='spell',id=7}", "GetCursorInfo=function()error('blocked')end", "GetCursorInfo=nil"):
         g = game(style)

@@ -17,12 +17,13 @@ ns.defaults = {
     sync = true,        -- talk to other players' Quest Sharing addons (exact quest lists and progress)
     announce = false,   -- (off) say in party chat when a quest we share has all its objectives done
     markers = true,     -- mark quests your party shares in the quest log
-    panel = true,       -- show the "quests in common" panel while you are in a party
+    panel = true,       -- show the Party quests window while you are in a party
     minimap = true,     -- the minimap button
     quick = true,       -- the quick chat wheel (hold a key, point, release)
     quickMode = "hold", -- "hold" (open while the key is held) or "toggle" (press to open, click a slot)
     quickSend = true,   -- a message picked on the ring is sent at once (off: it goes into the chat box, you press Enter)
     quickChannel = "auto", -- "auto" (party if grouped, else a whisper to your target, else say), "say", "party" or "whisper" (your target)
+    friendsReserve = 5, -- friend slots the automatic friends mode always leaves free (0-20)
     friends = false,    -- (BETA, off) add the people you group with to your friends list automatically
     markMobs = true,    -- a quest icon above the nameplate of creatures that are part of your quests
     nearPin = true,     -- the game's own waypoint marker follows the nearest quest (with "near")
@@ -33,19 +34,20 @@ ns.defaults = {
     nearMode = "auto",  -- "auto" (distance if the client can measure it, else zone), "distance" or "zone"
     fishingMap = false, -- optional fishing notes on the world map
     professionGuide = true, -- explicitly requested cooking catalogue
-    rewardBrowser = false, -- optional quest reward catalogue
     autoSpellRanks = false, -- opt-in: highest learned ranks on existing player spell buttons
     zoneLevels = false, -- opt-in: questing level ranges on the world map
     itemSources = false, -- opt-in: QuestieDB source hints on item tooltips
     vendorSearch = false, -- opt-in: vendor search on the world map
     myTrainers = true, -- your class and profession trainers on zone and continent maps (needs QuestieDB)
-    travelFaction = "all", -- travel map: "all", "Alliance" or "Horde" (neutral routes always show)
+    travelFaction = "mine", -- travel map: "mine" (own faction), "all", "Alliance" or "Horde" (neutral routes always show)
     travelMap = true, -- dungeon entrances, boats, zeppelins and nearest towns on the world map
     questPlanner = false, -- opt-in: prerequisite-aware quest route suggestions
     questPlannerGoal = "all", -- quest guide aim: "all" (complete the zone), "xp", "selected" (questPlannerSelected) or "budget"
     questPlannerBudget = 30, -- minutes for the "budget" goal (5-240)
     questPlannerSelected = "", -- quest IDs for the "selected" goal, e.g. "123, 456"
     questPlannerScope = "all", -- quest levels the guide plans: "all" or "green-yellow"
+    routeAllFlights = false, -- (off) dungeon "Get them all" route: plan as if every flight path were known
+    campMap = false, -- opt-in: the Quest guide's shared camps as circles on the world map
     autoAcceptQuests = false, -- opt-in: accept quests when their offer is shown
     autoCompleteQuests = false, -- opt-in: finish safe quest turn-ins without a reward decision
     bagMarks = true,    -- quest items marked in the bags: gold = a quest of this zone, blue = a quest elsewhere
@@ -56,8 +58,11 @@ ns.defaults = {
     sortBy = "topic",   -- how bags are arranged: "topic", "quality" (best first) or "name" (A to Z)
     sortBags = "all",   -- which bags are arranged: "all", "bags" (all but the backpack) or "backpack"
     sortFrom = "start", -- where the items gather: "start" (empty slots at the end) or "end" (empty slots at the start)
+    sortDelay = 3,      -- seconds the bags must stay quiet before the automatic arrangement starts (1-30)
     sortKeepBookmarked = false, -- (off) bookmarked items stay in their slot while the bags are arranged
+    chatLockNotice = 20, -- seconds between two "the chat box is locked" notes while you fight (5-120)
     chatLock = false,   -- (off) no chat typing box while you are in a fight
+    aggroPlates = false, -- (off) tanks: my aggro % on enemy nameplates in combat, lowest one next to me marked
     debug = true,       -- diagnostic actions and outcomes, saved on /reload or logout
     shareByClick = false, -- share only on my clicks (set by itself when the game refuses an automatic share)
     pickup = false,     -- (off) say in party chat when I pick up a quest someone in the party has ("let's do it together?")
@@ -78,11 +83,16 @@ ns.defaults = {
     lfgTank = false,    -- ... listed as tank
     lfgDps = false,     -- ... listed as damage
     lfgWatch = false,   -- (off) also invite from searches made in the game's own party finder window
+    lfgSupercharge = false, -- (off) party finder: invite every match at once, the first to accept gets the spot
+    lfgWhisper = true,  -- party finder: whisper each invited player which dungeon the invite is for
+    lfgWhisperText = "Hi! I invited you to my group for {dungeon} as {role}.", -- {dungeon} and {role} are filled in
     lfgMinLevel = 1,    -- party finder: lowest character level to invite
     lfgMaxLevel = 60,   -- ... highest character level to invite
     lfgMinIlvl = 0,     -- ... lowest average item level to invite (0 = any)
     lfgUnknown = "invite", -- ... when the item level is unknown: "invite" or "skip" (only with a minimum)
     lfgAskIlvl = true,  -- ... ask Quest Sharing users for their item level first (waits up to 2 s)
+    ilvlKeepDays = 14,  -- days a remembered item level stays valid (1-60)
+    lfgReinvite = 5,    -- party finder: minutes before a player we invited (or skipped) is looked at again (1-30)
     ilvlInspect = true, -- remember the item level of players I target or point at nearby (inspect)
     ilvlShare = true,   -- tell other Quest Sharing users my item level and the ones I remember
 }
@@ -93,7 +103,7 @@ for k, v in pairs(ns.defaults) do ns.db[k] = v end        -- until the saved var
 -- Calls the game may refuse ("Interface action failed because of an AddOn", "protected function UNKNOWN()") ----------
 -- Right before such a call we note what we are doing. If the game then blocks something, the error log says what it
 -- was, and that one feature switches itself off until /reload, so the message cannot keep coming back.
--- The debug log (Settings > General > Debug log, /qs debug on|off) -------------------------------------------------
+-- The debug log (Settings > Errors & logs > Record addon actions, /qs debug on|off) -------------------------------------------------
 -- Every action and its outcome, errors or not, one line each: "12:34:56 ring: "Thanks!" -> WHISPER Lia (sent)".
 -- Kept in QuestSharingLog, which the game writes to WTF/Account/<account>/SavedVariables/QuestSharing.lua when you
 -- /reload or log out. On by default; /qs debug off stops recording. The same line again becomes one line
@@ -159,12 +169,20 @@ end
 function ns.print(...)
     local parts = {}
     for i = 1, select("#", ...) do parts[#parts + 1] = tostring((select(i, ...))) end
-    local msg = "|cff55ccffQuest Sharing:|r " .. table.concat(parts, " ")
+    -- gold (S.GOLD; Style.lua loads after this file): blue is kept for "quest elsewhere" in the bag marks
+    local msg = "|cffffd100Quest Sharing:|r " .. table.concat(parts, " ")
     if ns.db and ns.db.debug then ns.log("shown", table.concat(parts, " ")) end   -- what you were told goes in too
     if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then DEFAULT_CHAT_FRAME:AddMessage(msg) else print(msg) end
 end
 
 function ns.pick(list) return list[math.random(#list)] end
+
+-- "1 bookmark removed" / "3 bookmarks removed" (the chat line after removing every bag bookmark)
+function ns.bookmarksRemovedText(n)
+    n = tonumber(n) or 0
+    if n == 0 then return "no bookmarks to remove" end
+    return string.format("%d bookmark%s removed", n, n == 1 and "" or "s")
+end
 
 -- Stacks, for the error log: what called what ------------------------------------------------------------------------
 -- The game's debugstack() lines, readable: our files as "QuestItems.lua:150: in function 'paint'", other addons and the
@@ -296,7 +314,9 @@ end)
 
 -- A friendly hello the first time (and a short "what's new" after an update). Once per version, a few seconds after
 -- login so it is not buried under the login messages.
-local WHATS_NEW = "your messages now go into the chat box - just press Enter (this game does not let addons send them), and anything the game refuses is written in /qs errors and switched off"
+-- RELEASE CHECKLIST: before each release, rewrite WHATS_NEW as one short line about the newest features of that
+-- release (the top of CHANGELOG.md), in the words the Settings window uses.
+local WHATS_NEW = "new Bags and Party finder pages, a search box at the top of the settings, and tank aggro on enemy nameplates (General > During a fight)"
 local greeted = false
 local function welcome()
     local d = ns.db
@@ -370,6 +390,28 @@ function ns.say(msg, always)
 end
 
 -- Settings: one place that changes a setting and does whatever that setting needs ---------------------------
+-- A setting as players read it: its Settings label, its value and where it is.
+-- "Sell gray items when I open a vendor: on (Settings > Bags)"
+local function settingRow(key)
+    for _, r in ipairs(ns.settingRows or {}) do if r.key == key then return r end end
+end
+function ns.settingLine(key)
+    local v, row = ns.db[key], settingRow(key)
+    local path = ns.settingPath and ns.settingPath(key) or "Settings"
+    local where, label = string.match(path, "^(Settings > .-) > (.+)$")
+    local shown = (type(v) == "boolean" and (v and "on" or "off")) or (row and row.names and row.names[v]) or tostring(v)
+    return (label or (row and row.label) or tostring(key)) .. ": " .. shown .. " (" .. (where or path) .. ")"
+end
+
+-- The automatic party messages go out only with "Send immediately" (ns.say): switching one on says so.
+local PARTY_CHAT = { chat = true, announce = true, pickup = true }
+local function sendNote(key)
+    local row, mode = settingRow(key), settingRow("mode")
+    local modeName = mode and mode.names and mode.names[ns.db.mode] or tostring(ns.db.mode)
+    return string.format("%s: nothing is sent to the party while \"How to send quest progress messages\" is %s - " ..
+        "choose Send immediately in Settings > General, or type /qs mode send", row and row.label or key, modeName)
+end
+
 function ns.setSetting(key, value)
     local d = ns.db
     if key == "debug" and not value then ns.log("setting", "debug = false (the log stops here)") end
@@ -379,9 +421,10 @@ function ns.setSetting(key, value)
     else
         d[key] = value
         if key == "debug" and value and ns.logSession then ns.logSession("debug log on") end
+        if PARTY_CHAT[key] and value and d.mode ~= "send" then ns.print(sendNote(key)) end
         if (key == "fishingMap" or key == "enabled") and ns.fishing then ns.fishing.refresh() end
         if (key == "professionGuide" or key == "enabled") and ns.professions then ns.professions.settingChanged() end
-        if (key == "rewardBrowser" or key == "enabled") and ns.rewards then ns.rewards.settingChanged() end
+        if key == "enabled" and ns.rewards then ns.rewards.settingChanged() end
         if (key == "autoSpellRanks" or key == "enabled") and ns.spellRanks then ns.spellRanks.settingChanged() end
         if (key == "zoneLevels" or key == "enabled") and ns.zoneLevels then ns.zoneLevels.refresh() end
         if (key == "itemSources" or key == "enabled") and ns.itemSources then ns.itemSources.refresh() end
@@ -393,12 +436,14 @@ function ns.setSetting(key, value)
         if type(key) == "string" and key ~= "questPlanner" and string.sub(key, 1, 12) == "questPlanner"
             and ns.questPlanner and type(ns.questPlanner.applySettings) == "function" then ns.questPlanner.applySettings() end
         if key == "enabled" and ns.questPlanner then ns.questPlanner.masterChanged(value) end
+        if (key == "campMap" or key == "enabled") and ns.campMap then ns.campMap.refresh() end
         if key == "enabled" and not value and ns.adventure then ns.adventure.close() end
         if key == "enabled" and not value and ns.loot then ns.loot.close() end
         if key == "enabled" and not value and ns.dungeonQuests then ns.dungeonQuests.close() end
         if (key == "bagMarks" or key == "enabled") and ns.refreshBagMarks then ns.refreshBagMarks() end
         if (key == "bagBookmarks" or key == "autoSortBags" or key == "enabled" or (type(key) == "string" and string.sub(key, 1, 4) == "sort")) and ns.bagTools then ns.bagTools.refresh() end
         if (key == "chatLock" or key == "enabled") and ns.chatLock then ns.chatLock.refresh() end
+        if (key == "aggroPlates" or key == "enabled") and ns.aggro then ns.aggro.settingChanged() end
         if (key == "hideTracker" or key == "enabled") and ns.applyTrackerHidden then ns.applyTrackerHidden() end
         if key == "quickSend" and value then               -- you ask for it again: refused channels get another try
             if type(d.chatRefused) == "table" and next(d.chatRefused) then
@@ -414,9 +459,11 @@ function ns.setSetting(key, value)
         if key == "mapPins" and ns.refreshMapPins then ns.refreshMapPins() end
         if (key == "questItems" or key == "itemButton") and ns.applyQuestItems then ns.applyQuestItems() end
         if key == "minimap" and ns.syncMinimapButton then ns.syncMinimapButton() end
+        if string.sub(key, 1, 3) == "lfg" and ns.lfgFinder then ns.lfgFinder.refresh() end
         if key == "markMobs" and ns.refreshMarkers then ns.refreshMarkers() end
         if key == "nearPin" and not value and ns.releasePin then ns.releasePin() end
         if key == "highlightCVars" and ns.setHighlightCVars then ns.setHighlightCVars(value) end
+        if key == "highlightCVars" and not value and ns.aggro then ns.aggro.applyNameplates() end -- aggro still needs nameplates
         if (key == "nearMode" or key == "nearCount") and d.near and ns.nearEvaluate then ns.nearEvaluate(true) end
     end
     if ns.refreshSettings then ns.refreshSettings() end
@@ -430,7 +477,7 @@ function ns.resetSettings()
     if ns.resetPanelPosition then ns.resetPanelPosition(true) end
     if ns.defaultQuickItems then ns.db.quickItems = ns.defaultQuickItems() end
     ns.db.quickPages, ns.db.quickPage = nil, nil
-    ns.print("all settings are back to their defaults (everything on)")
+    ns.print("all settings and the quick chat messages are back to their defaults")
     if ns.refreshSettings then ns.refreshSettings() end
 end
 
@@ -451,20 +498,27 @@ end
 local help = {
     "/qs loot [search]    search instance drops and the boss or creature that drops each item",
     "/qs dungeons [search]  browse dungeon quests, pickup locations and prerequisites",
-    "/qs adventure [quest ID or title]  prepare a role-play invitation in any chat channel",
-    "/qs fishing [on|off]  fishing waters on the big map; no argument opens the water editor",
+    "/qs lfg              party finder: search your listing's dungeon and invite (also: healer|tank|dps on|off, ilvl <n>, level <low> <high>, unknown invite|skip, watch on|off)",
+    "/qs ilvl             your item level and how many players' item levels are remembered",
+    "/qs adventure [quest ID or title]  open the Quest invitation window (any chat)",
+    "/qs fishing [on|off]  Fishing spots on the world map; no argument opens the Fishing spots window",
     "/qs cooking          recipes, acquisition sources and ingredient farming hints",
     "/qs professions [on|off]  cooking recipe list in the profession window; no argument opens it, on/off toggles it",
-    "/qs rewards [on|off]  browse quest reward equipment for your class, level and faction",
-    "/qs plan [refresh|next|on|off]  plan nearby quests and set a waypoint for a stop",
+    "/qs rewards          browse quest reward equipment for your class, level and faction",
+    "/qs plan [refresh|next|follow|busy|hide|on|off]  open the Quest guide, replan, waypoint to the next stop, walk there with Shortest Path Forever, mark the selected camp busy, close it",
+    "/qs plan camps [on|off|table]  shared camps on the world map (blue = 2+ quests), or the camps table",
+    "/qs plan all|xp|budget <minutes>|selected <quest IDs or names>  what the route aims for: complete zone, quest XP/hour, time limit, chosen quests",
+    "/qs plan range|unrestricted   only green and yellow quests, or every level  |  /qs plan why|options|debug   report, Quest guide settings, full details",
     "/qs settings         open the settings window (click a line to switch it on or off)",
+    "/qs status           the main switches in one line  |  /qs help   this list",
+    "/qs map              the world map switches and where they are in the settings",
     "/qs share            share your quests in this area with the party now",
     "/qs stop             cancel a share that is in progress",
     "/qs on | off         switch the addon on / off",
     "/qs auto on|off      share automatically when you join a party or someone new joins",
     "/qs new on|off       share a quest once when you accept it while in a party",
     "/qs area zone|all    share only this zone's quests, or every quest",
-    "/qs gap N            seconds between two shared quests (default 4)",
+    "/qs gap N            seconds between two shared quests, 2-30 (default 4)",
     "/qs chat on|off      announce quests in common in party chat",
     "/qs click on|off     clicking a tracked quest fills the chat box with a status",
     "/qs link on|off      shift-click links in the chat box get the status appended",
@@ -481,20 +535,26 @@ local help = {
     "/qs sort [on|off]    arrange your bags now; on/off = do it by itself when the bags change",
     "/qs sort by topic|quality|name, bags all|bags|backpack, from start|end, keep on|off   how and what to arrange",
     "/qs chatlock on|off  no chat typing box while you are in a fight",
+    "/qs sound on|off     a soft sound when someone accepts your quest or a teammate finishes a shared quest",
+    "/qs aggro on|off     tanks: my aggro % on enemies in combat, lowest one next to me marked",
     "/qs debug on|off     the debug log: every action and its outcome, saved to the addon's file on /reload or logout",
     "/qs log [clear]      all diagnostics in one copyable window (clear empties the debug log)",
     "/qs memory           how much memory Quest Sharing and QuestieDB use, and which catalogues are loaded",
+    "/qs memory purge     free every catalogue read from QuestieDB (each reads again when next used)",
     "/qs pingkey <KEY>    the key that pings the nearest quest creature (Attack) or quest object (look here); none removes it",
     "/qs itemkey <KEY>    the key that uses the item of your nearest quest (a torch, a flare...); none removes it",
     "/qs items on|off     item icons next to the quests in the tracker, and the quest item button",
+    "/qs itembutton on|off the separate movable button with the item of your nearest quest",
     "/qs cleanup         review leftover quest items in your bags and delete confirmed stacks",
     "/qs gather [item]    why an item does or does not show where to gather it (default: the last item you hovered)",
     "/qs questie          does Quest Sharing read Questie's quest database? (with a real lookup from your quest log)",
     "/qs ping             checks every step of the ping key (and says where it stops); /qs ping on|off switches it",
+    "/qs pingobjects on|off  also ping the quest object you face when no quest enemy is near",
     "/qs mappins on|off   party members running Quest Sharing on my world map (and my position to them)",
     "/qs waypoint on|off  a map pin where a teammate found the quest items",
     "/qs markers on|off   mark shared quests in the quest log",
-    "/qs panel [on|off]   show / hide the \"quests in common\" panel (drag it to move it)",
+    "/qs panel [on|off]   show the Party quests window (off hides it; drag it to move it)",
+    "/qs solo on|off      also show the Party quests window when you play alone",
     "/qs near [on|off]    keep the tracker (right-hand list) filled with the quests closest to you",
     "/qs near N           how many quests it keeps  |  /qs near mode auto|distance|zone  |  now  |  resume",
     "/qs friends          (beta) add everybody in your party to your friends list now; /qs friends on|off = automatically",
@@ -504,12 +564,18 @@ local help = {
     "/qs doctor           setup, errors and debug log in one copyable report",
     "/qs errors [clear]   open all diagnostics (clear empties recorded errors)",
     "/qs minimap on|off   the minimap button",
-    "/qs reset            put every setting back to its default (everything on)",
+    "/qs reset            put every setting and the quick chat messages back to their defaults",
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", shareclick = "shareByClick", debug = "debug", bagmarks = "bagMarks", hidetracker = "hideTracker", sellgray = "autoSellGray", chatlock = "chatLock", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", shareclick = "shareByClick", debug = "debug", bagmarks = "bagMarks", hidetracker = "hideTracker", sellgray = "autoSellGray", chatlock = "chatLock", aggro = "aggroPlates", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
+
+-- /qs map: the world map switches, wherever they are in the settings
+local MAP_SWITCHES = { "zoneLevels", "travelMap", "travelFaction", "myTrainers", "mapPins", "teamWaypoint", "vendorSearch",
+                       "itemSources", "fishingMap" }
+-- after a command changed a setting: one line naming it as the Settings window does
+local function said(key) ns.print(ns.settingLine(key)) end
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"
 SlashCmdList["QUESTSHARING"] = function(msg)
@@ -526,60 +592,78 @@ SlashCmdList["QUESTSHARING"] = function(msg)
         local what, val = string.match(string.lower(arg or ""), "^(%S+)%s*(%S*)$")
         local SORT_OPTS = { by = { "sortBy", topic = 1, quality = 1, name = 1 }, bags = { "sortBags", all = 1, bags = 1, backpack = 1 },
                             from = { "sortFrom", start = 1, ["end"] = 1 } }
-        if arg == "on" or arg == "off" then ns.setSetting("autoSortBags", arg == "on")
+        if arg == "on" or arg == "off" then ns.setSetting("autoSortBags", arg == "on"); said("autoSortBags")
         elseif what == "keep" and (val == "on" or val == "off") then
-            ns.setSetting("sortKeepBookmarked", val == "on"); ns.print("bookmarked items " .. (val == "on" and "stay in their slot" or "are arranged too"))
+            ns.setSetting("sortKeepBookmarked", val == "on"); said("sortKeepBookmarked")
         elseif what and SORT_OPTS[what] then
             local o = SORT_OPTS[what]
-            if o[val] then ns.setSetting(o[1], val); ns.print("bag arrangement: " .. what .. " = " .. val)
+            if o[val] then ns.setSetting(o[1], val); said(o[1])
             else ns.print("usage: /qs sort by topic|quality|name, bags all|bags|backpack, from start|end, keep on|off") end
         else ns.bagTools.sort(true) end
     elseif cmd == "lfg" or cmd == "finder" then ns.lfgInvite.command(arg)
     elseif cmd == "ilvl" then ns.itemLevel.command(arg)
     elseif cmd == "bookmarks" then
-        if arg == "on" or arg == "off" then ns.setSetting("bagBookmarks", arg == "on")
-        elseif arg == "clear" then ns.print(string.format("%d bookmark(s) removed", ns.bagTools.clearBookmarks()))
+        if arg == "on" or arg == "off" then ns.setSetting("bagBookmarks", arg == "on"); said("bagBookmarks")
+        elseif arg == "clear" then ns.print(ns.bookmarksRemovedText(ns.bagTools.clearBookmarks()))
         elseif arg == "list" then
             local l = ns.bagTools.listBookmarks()
             ns.print(#l == 0 and "no bookmarked items (point at a bag item and press Space)" or ("bookmarked: " .. table.concat(l, ", ")))
-        else ns.setSetting("bagBookmarks", not d.bagBookmarks) end
+        else ns.setSetting("bagBookmarks", not d.bagBookmarks); said("bagBookmarks") end
     elseif cmd == "questmap" then ns.print("quest symbols on the world map and minimap have been removed")
     elseif cmd == "adventure" then ns.adventure.command(arg)
     elseif cmd == "gather" then ns.gatherSources.command(arg)
     elseif cmd == "cooking" then ns.professions.open()
     elseif cmd == "professions" then
-        if arg == "on" or arg == "off" then ns.setSetting("professionGuide",arg=="on")
+        if arg == "on" or arg == "off" then ns.setSetting("professionGuide", arg == "on"); said("professionGuide")
         else ns.professions.open() end
-    elseif cmd == "fishing" or cmd == "rewards" then
-        local key = cmd == "fishing" and "fishingMap" or "rewardBrowser"
-        if arg == "on" or arg == "off" then ns.setSetting(key, arg == "on")
-        elseif cmd == "fishing" then ns.fishing.open() else ns.rewards.open() end
+    elseif cmd == "rewards" then ns.rewards.open()
+    elseif cmd == "fishing" then
+        if arg == "on" or arg == "off" then ns.setSetting("fishingMap", arg == "on"); said("fishingMap")
+        else ns.fishing.open() end
     elseif cmd == "stop" then ns.stopShare("stopped by you")
-    elseif cmd == "on" or cmd == "off" then ns.setSetting("enabled", cmd == "on"); status()
+    elseif cmd == "on" or cmd == "off" then ns.setSetting("enabled", cmd == "on"); said("enabled")
     elseif cmd == "ping" and (arg == "" or arg == "test" or arg == "status") then
         for _, l in ipairs(ns.pingReport()) do ns.print(l) end
-    elseif BOOLS[cmd] then ns.setSetting(BOOLS[cmd], onoff(arg, d[BOOLS[cmd]])); status()
-    elseif cmd == "area" and (arg == "zone" or arg == "all") then ns.setSetting("area", arg); status()
-    elseif cmd == "gap" and tonumber(arg) then ns.setSetting("gap", math.max(2, tonumber(arg))); status()
-    elseif cmd == "mode" and (arg == "box" or arg == "send" or arg == "print") then ns.setSetting("mode", arg); status()
-    elseif cmd == "near" then ns.nearCommand(arg); if arg == "" or arg == "on" or arg == "off" then status() end
+    elseif cmd == "panel" and arg == "" then ns.setSetting("panel", true); said("panel") -- no argument shows it; the x hides it
+    elseif BOOLS[cmd] and (arg == "" or arg == "on" or arg == "off") then ns.setSetting(BOOLS[cmd], onoff(arg, d[BOOLS[cmd]])); said(BOOLS[cmd])
+    elseif cmd == "area" and (arg == "zone" or arg == "all") then ns.setSetting("area", arg); said("area")
+    elseif cmd == "gap" and tonumber(arg) then
+        local row, n = settingRow("gap"), tonumber(arg)          -- the same range as the Settings row
+        local lo, hi = row and row.min or 2, row and row.max or 30
+        local v = math.min(hi, math.max(lo, n))
+        if v ~= n then ns.print(string.format("The time between shared quests is kept between %d and %d seconds.", lo, hi)) end
+        ns.setSetting("gap", v); said("gap")
+    elseif cmd == "mode" and (arg == "box" or arg == "send" or arg == "print") then ns.setSetting("mode", arg); said("mode")
+    elseif cmd == "near" then ns.nearCommand(arg); if arg == "" or arg == "on" or arg == "off" then said("near") end
     elseif cmd == "settings" or cmd == "config" or cmd == "options" then ns.toggleSettings()
     elseif cmd == "quick" then ns.quickCommand(arg)
     elseif cmd == "key" then ns.setQuickKey(arg)
     elseif cmd == "friends" then
-        if arg == "on" or arg == "off" then ns.setSetting("friends", arg == "on"); status() else ns.addPartyFriends(true) end
+        if arg == "on" or arg == "off" then ns.setSetting("friends", arg == "on"); said("friends") else ns.addPartyFriends(true) end
     elseif cmd == "highlight" then ns.highlightCommand(arg)
     elseif cmd == "pingkey" then ns.setPingKey(arg)
     elseif cmd == "itemkey" then ns.setItemKey(arg)
     elseif cmd == "questie" then for _, l in ipairs((ns.questie.report())) do ns.print(l) end
     elseif cmd == "doctor" then ns.doctor()
-    elseif cmd == "memory" then ns.memoryCommand()
+    elseif cmd == "memory" then ns.memoryCommand(arg)
     elseif cmd == "errors" then ns.errorsCommand(arg)
     elseif cmd == "log" then ns.logCommand(arg)
     elseif cmd == "reset" then ns.resetSettings()
     elseif cmd == "probe" then ns.probe()
-    elseif cmd == "" or cmd == "status" then status()
+    elseif cmd == "status" then status()
+    elseif cmd == "" then
+        ns.print("Version " .. tostring(ns.version) .. " is " .. (d.enabled and "on" or "off") ..
+            ". Type /qs settings (or left-click the minimap button) to change anything.")
+        ns.print("/qs help lists every command; /qs status shows the main switches in one line.")
+    elseif cmd == "help" then for _, line in ipairs(help) do ns.print(line) end
+    elseif cmd == "map" then
+        for _, key in ipairs(MAP_SWITCHES) do ns.print(ns.settingLine(key)) end
     else
-        for _, line in ipairs(help) do ns.print(line) end
+        -- a known command with a value it does not take: its own help line; anything else: one line, not the whole list
+        local usage
+        for _, line in ipairs(help) do
+            if string.find(line, "/qs " .. cmd .. " ", 1, true) == 1 then usage = line; break end
+        end
+        ns.print(usage and ("usage: " .. usage) or ("unknown command \"" .. cmd .. "\" - /qs help lists them"))
     end
 end

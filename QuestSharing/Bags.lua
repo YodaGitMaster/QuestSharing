@@ -185,7 +185,7 @@ local function hookTooltip()
         if not (ns.db.enabled and ns.db.bagMarks) then return end
         local r = ns.bagItemFor(bag, slot)
         if not r then return end
-        local where = r.here and "here" or ("in " .. tostring(r.quest.header or "another zone") .. " - the bank can keep it")
+        local where = r.here and "in this zone" or ("in " .. tostring(r.quest.header or "another zone") .. " - the bank can keep it")
         pcall(function()
             tip:AddLine("Quest Sharing: for \"" .. tostring(r.quest.title) .. "\" (" .. where .. ")",
                 r.here and 1 or 0.45, r.here and 0.82 or 0.7, r.here and 0 or 1)

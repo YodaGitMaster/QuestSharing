@@ -13,9 +13,15 @@ local function combat() return call(InCombatLockdown) end
 -- Neutral (both factions) is white: white pin, white line, white label.
 local COLORS = { Alliance = { 0.25, 0.5, 1 }, Horde = { 0.9, 0.2, 0.2 }, Both = { 1, 1, 1 } }
 local WORDS = { Alliance = S.BLUE .. "Alliance|r", Horde = S.RED .. "Horde|r", Both = S.WHITE .. "Neutral|r" }
--- Settings > Map "Show": "all", "Alliance" or "Horde". Neutral routes and towns always count.
-local function allowed(faction)
+-- Settings > Map "Show": "mine" (your own faction, the default), "all", "Alliance" or "Horde".
+-- Neutral routes and towns always count. "mine" falls back to both when the game has no faction yet.
+local function shownFaction()
     local pick = ns.db.travelFaction
+    if pick == "mine" then return call(UnitFactionGroup, "player") or "all" end
+    return pick
+end
+local function allowed(faction)
+    local pick = shownFaction()
     if pick == "Alliance" or pick == "Horde" then return faction == pick or faction == "Both" end
     return true
 end
@@ -204,6 +210,7 @@ local function stopTip(pin)
     end
     local missing = connect(pin, targets)
     if missing > 0 then lines_[#lines_ + 1] = S.GREY .. "Open the Azeroth map to see the whole line.|r" end
+    lines_[#lines_ + 1] = S.GREY .. "Click to set a waypoint.|r"
     U.tip(pin, entry.name .. " · " .. entry.zone, lines_)
 end
 
@@ -214,7 +221,9 @@ local function dungeonTip(pin)
         lines_[#lines_ + 1] = inside[1] .. " · level " .. inside[2]
     end
     lines_[#lines_ + 1] = " "
-    lines_[#lines_ + 1] = "Closest town you can use:"
+    -- One faction shown: the towns it can use. Both shown: each side's town, so "you can use" would be wrong for one.
+    local both = allowed("Alliance") and allowed("Horde")
+    lines_[#lines_ + 1] = both and "Closest flight master towns:" or "Closest flight master town you can use:"
     for _, faction in ipairs({ "Alliance", "Horde" }) do
         local town = allowed(faction) and T.nearestTown(entry, faction)
         if town then
@@ -227,6 +236,7 @@ local function dungeonTip(pin)
         end
     end
     connect(pin, targets)
+    lines_[#lines_ + 1] = S.GREY .. "Click to set a waypoint.|r"
     U.tip(pin, entry.name, lines_)
 end
 
@@ -247,25 +257,34 @@ local function trainerTip(pin)
 end
 
 local function makePin(kind)
-    local pin = CreateFrame(kind == "trainer" and "Button" or "Frame", nil, layer)
+    -- every pin is a button: a click puts the game's waypoint on it, as on vendor, gather and trainer pins
+    local pin = CreateFrame("Button", nil, layer)
     pin:SetWidth(18); pin:SetHeight(18); pin:EnableMouse(true)
+    pin:RegisterForClicks("LeftButtonUp")
     if kind == "trainer" then
         pin:SetWidth(20); pin:SetHeight(20)
         pin.ring = S.fill(pin, "BACKGROUND", 1, 0.82, 0, 1); pin.ring:SetAllPoints(pin) -- gold rim: this one is yours
         pin.icon = pin:CreateTexture(nil, "ARTWORK")
         pin.icon:SetPoint("TOPLEFT", pin, "TOPLEFT", 2, -2); pin.icon:SetPoint("BOTTOMRIGHT", pin, "BOTTOMRIGHT", -2, 2)
-        pin:RegisterForClicks("LeftButtonUp")
         pin:SetScript("OnClick", function(self)
             local sp = self.entry and self.entry.members[1].spawn
             if sp and not ns.compat.setWaypoint(sp.map, sp.x / 100, sp.y / 100) then
                 ns.print("the game could not set a waypoint for this trainer")
             end
         end)
-    elseif kind == "dungeon" then
+    else
+        pin:SetScript("OnClick", function(self)
+            local e = self.entry
+            if e and not ns.compat.setWaypoint(e.map, e.x / 100, e.y / 100) then
+                ns.print("the game could not set a waypoint here")
+            end
+        end)
+    end
+    if kind == "dungeon" then
         pin.icon = pin:CreateTexture(nil, "OVERLAY")
         pin.icon:SetAllPoints(pin)
         pin.icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8") -- skull
-    else
+    elseif kind ~= "trainer" then
         pin.border = S.fill(pin, "BACKGROUND", 0, 0, 0, 1); pin.border:SetAllPoints(pin)
         pin.face = S.fill(pin, "ARTWORK", 1, 1, 1, 1)
         pin.face:SetPoint("TOPLEFT", pin, "TOPLEFT", 2, -2); pin.face:SetPoint("BOTTOMRIGHT", pin, "BOTTOMRIGHT", -2, 2)
@@ -320,7 +339,7 @@ function T.draw()
     local searching = V.querying and V.querying() or false
     if lastView and lastView.map == map and lastView.width == width and lastView.height == height
         and lastView.scale == scale and lastView.known == knownKey and lastView.searching == searching and lastView.travel == ns.db.travelMap
-        and lastView.faction == ns.db.travelFaction
+        and lastView.faction == shownFaction()
         and lastView.revision == (I and I.revision) then layer:Show(); return end
     ns.trying("drawing dungeon and travel pins on the world map", "travelmap") -- a failure here turns the overlay off
     layer:Show(); clearHover(); hovered = nil
@@ -385,7 +404,7 @@ function T.draw()
         for i = used[kind] + 1, #list do list[i]:Hide() end
     end
     lastView = { map = map, width = width, height = height, scale = scale, known = knownKey, searching = searching, travel = ns.db.travelMap,
-        faction = ns.db.travelFaction, revision = I and I.revision }
+        faction = shownFaction(), revision = I and I.revision }
 end
 
 function T.refresh() lastView = nil; T.draw() end

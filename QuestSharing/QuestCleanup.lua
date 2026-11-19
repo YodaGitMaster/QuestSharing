@@ -4,6 +4,8 @@ local C, U, S = ns.compat, ns.optionalUI, ns.style
 local R = {}
 ns.questCleanup = R
 local window, results, pending, page = nil, {}, nil, 1
+-- The bag our own Delete just emptied: its follow-up bag events keep the rescanned list (no extra scan).
+local ownBag, ownUntil
 local PAGE_SIZE = 6
 local render
 
@@ -55,12 +57,12 @@ end
 
 local function snapshot()
     local Q = ns.questie
-    if not (Q and Q.available() and Q.get) then return nil, "Questie data is required. Load Questie, then refresh." end
+    if not (Q and Q.available() and Q.get) then return nil, "QuestieDB is required. Install or update QuestieDB (see /qs questie), then refresh." end
     local state = { active = {}, ids = {}, names = {}, q = Q }
     for _, e in ipairs(C.entries()) do
         -- Unknown/custom quests cannot be checked reliably against the provider.
         if not Q.get("quest", e.questID, "name") then
-            return nil, "Some current quests are missing from Questie. Cleanup is paused until their item requirements can be checked."
+            return nil, "Some current quests are missing from QuestieDB. Cleanup is paused until their item requirements can be checked."
         end
         state.active[e.questID] = true
         addIDs(state.ids, Q.questItemIds and Q.questItemIds(e.questID))
@@ -121,7 +123,7 @@ function R.scan()
             if item then results[#results + 1] = item end
         end
     end
-    return results, #results .. " possible leftover stack(s). Active quest matches and quest starters are kept. Unknown or locked items are skipped."
+    return results, #results .. (#results == 1 and " possible leftover stack." or " possible leftover stacks.") .. " Active quest matches and quest starters are kept. Unknown or locked items are skipped."
 end
 
 local function message(text)
@@ -197,6 +199,7 @@ function R.confirm()
         return false
     end
     R.refresh()
+    ownBag, ownUntil = fresh.bag, (GetTime and GetTime() or 0) + 2
     ns.print("deleted " .. fresh.name .. " x" .. fresh.count)
     return true
 end
@@ -247,7 +250,9 @@ render = function()
     for i, row in ipairs(window.rows) do
         row.item = results[(page - 1) * PAGE_SIZE + i]
         if row.item then
-            row.text:SetText(string.format("%s x%d  (bag %d, slot %d)", row.item.name, row.item.count, row.item.bag, row.item.slot))
+            -- Bag 0 is the backpack; equipped bags are numbered 1-4 as on the bag bar.
+            local where = row.item.bag == 0 and "Backpack" or ("Bag " .. row.item.bag)
+            row.text:SetText(string.format("%s x%d  (%s, slot %d)", row.item.name, row.item.count, where, row.item.slot))
             row:Show()
         else row:Hide() end
     end
@@ -265,8 +270,17 @@ function R.open()
     R.refresh()
 end
 
-local function invalidate()
+local function ownChange(event, bag)
+    if ownBag == nil then return false end
+    if (GetTime and GetTime() or 0) > ownUntil then ownBag = nil; return false end
+    if event == "BAG_UPDATE_DELAYED" then ownBag = nil; return true end
+    return event == "BAG_UPDATE" and bag == ownBag
+end
+
+local function invalidate(event, bag)
     if not (window and window:IsShown()) then return end
+    if ownChange(event, bag) then return end
+    ownBag = nil
     results, pending = {}, nil
     render()
     message("Bags or quests changed. Click Refresh bags to check again.")

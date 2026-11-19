@@ -166,7 +166,7 @@ def test_passive_and_future_ranks_are_not_used(style):
 
 def test_missing_api_explains_and_never_changes_any_slot(style):
     g=game(style,'GetActionInfo=nil');enable(g)
-    assert g.eval("PICKUPS")==0 and "APIs" in g.eval("NS.spellRanks.status()")
+    assert g.eval("PICKUPS")==0 and "cannot change action bar spells" in g.eval("NS.spellRanks.status()")
 
 
 def test_pickup_refusal_pauses_once_and_preserves_original_slots(style):
@@ -239,6 +239,33 @@ def test_manual_check_cancels_duplicate_debounced_scan_and_reports_status(style)
     reads=g.eval("BOOK_READS");g.advance(.6)
     assert g.eval("BOOK_READS")==reads
     assert "Updated 4 spell buttons" in '\n'.join(g.printed())
+
+
+def test_update_ranks_button_runs_once_with_auto_update_off(style):
+    # UX-17: the Settings button updates once whatever the toggle says; only automatic updates need the toggle.
+    g=game(style)
+    assert not g.eval("NS.db.autoSpellRanks")
+    assert g.eval("NS.spellRanks.update")(True)==4
+    assert g.eval("ACTION_SLOTS[1][2]")==103
+    assert "Auto-update spell ranks is off" not in '\n'.join(g.printed())
+    assert not g.eval("NS.db.autoSpellRanks")
+    # learning a new rank afterwards does not update by itself while the toggle is off
+    g.run('SPELL_DATA[104]={name="Healing Touch",rank="Rank 11"};table.insert(SPELL_BOOK,104)')
+    g.fire("SPELLS_CHANGED",104);g.advance(1)
+    assert g.eval("ACTION_SLOTS[1][2]")==103
+
+
+def test_update_ranks_button_in_combat_says_to_click_again_when_auto_is_off(style):
+    g=game(style,'IN_COMBAT=true')
+    assert g.eval("NS.spellRanks.update")(True)==0
+    assert "click Update ranks again" in '\n'.join(g.printed())
+    g.run("IN_COMBAT=false");g.fire("PLAYER_REGEN_ENABLED");g.advance(1)
+    assert g.eval("PICKUPS")==0, "no automatic retry while the toggle is off"
+
+
+def test_update_ranks_button_respects_master_switch(style):
+    g=game(style);g.eval("NS.setSetting")("enabled",False)
+    assert g.eval("NS.spellRanks.update")(True)==0 and g.eval("PICKUPS")==0
 
 
 def test_page_count_does_not_limit_hidden_or_form_slots(style):

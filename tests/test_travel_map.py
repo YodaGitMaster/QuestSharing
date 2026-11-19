@@ -316,12 +316,21 @@ def test_faction_choice_filters_transports_and_keeps_neutral_ones(style):
     assert len(pins(g, "dungeon")) == 22, "dungeons are never filtered"
 
 
+def test_my_faction_is_the_default_and_follows_the_player(style):
+    g = game(style, 947)
+    assert g.eval("NS.db.travelFaction") == "mine"
+    assert len(names(g, "stop")) == 11, "no faction known yet: both are shown"
+    g.run("UnitFactionGroup = function() return 'Horde' end; NS.travelMap.refresh()"); g.advance(1)
+    assert names(g, "stop") == ["Booty Bay docks", "Grom'gol zeppelin tower", "Orgrimmar zeppelin tower", "Ratchet docks",
+                                "Undercity zeppelin tower"]
+
+
 def test_faction_choice_limits_the_tooltip_and_the_lines(style):
     g = game(style, 947)
     set_faction(g, "Horde")
     hover(g, "Ratchet docks")
     _, lines = tooltip(g)
-    assert len(lines) == 1 and "Booty Bay" in lines[0]
+    assert len(lines) == 2 and "Booty Bay" in lines[0] and "Click to set a waypoint" in lines[1]
     hover(g, "Orgrimmar zeppelin tower")
     assert len(strokes(g)) == 2
     hover(g, "Wailing Caverns")
@@ -351,6 +360,7 @@ def test_neutral_pins_lines_and_towns_are_white(style):
 
 def test_a_trainer_standing_on_a_transport_is_moved_aside_not_hiding_it(style):
     g = game(style, 1420, questie=True)
+    set_faction(g, "all")                       # the Undercity tower is Horde; this Alliance druid sees it with Both factions
     stop = next(p for p in pins(g, "stop") if p.entry.id == "uctower")
     trainer = next(p for p in trainer_pins(g) if "Digger" in members(p))
     assert abs(stop.point[4] - trainer.point[4]) >= 19 or abs(stop.point[5] - trainer.point[5]) >= 12, "both stay reachable"

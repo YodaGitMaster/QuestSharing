@@ -166,17 +166,30 @@ end
 local function close() if menu then menu:Hide() end end
 ns.closeQuestMenu = close
 
+-- a menu line: a grey one says why on hover (its tipText), the same words a click prints
+local function menuLine(f, i)
+    local b = S.button(f, "", WIDTH - 16, function() ns.questMenuPick(i) end)
+    b:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -26 - (i - 1) * (LINE_H + 2))
+    b:SetScript("OnEnter", function(self)
+        self.label:SetText(S.WHITE .. tostring(self.text or "") .. "|r")       -- the hover look of S.button
+        if self.tipText and GameTooltip then
+            pcall(function()
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText(self.tipText, 1, 1, 1, 1, true)
+                GameTooltip:Show()
+            end)
+        end
+    end)
+    return b
+end
+
 local function build()
     if menu then return menu end
     local f = S.window("QuestSharingMenu", WIDTH, 40, "", "hud")
     if not f then return nil end
     f:SetFrameStrata("FULLSCREEN_DIALOG")
     lines = {}
-    for i = 1, 8 do
-        local b = S.button(f, "", WIDTH - 16, function() ns.questMenuPick(i) end)
-        b:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -26 - (i - 1) * (LINE_H + 2))
-        lines[i] = b
-    end
+    for i = 1, 8 do lines[i] = menuLine(f, i) end
     local away = 0
     f:SetScript("OnUpdate", function(self, dt)                   -- the mouse went elsewhere for a while: close it
         if MouseIsOver and not MouseIsOver(self) then
@@ -197,12 +210,7 @@ function ns.openQuestMenu(e, items)
     local f = build()
     if not f then return end
     f.entry, f.items = e, items or ns.questMenuItems(e)
-    for i=#lines+1,#f.items do
-        local index=i
-        local b=S.button(f,"",WIDTH-16,function() ns.questMenuPick(index) end)
-        b:SetPoint("TOPLEFT",f,"TOPLEFT",8,-26-(i-1)*(LINE_H+2))
-        lines[i]=b
-    end
+    for i = #lines + 1, #f.items do lines[i] = menuLine(f, i) end
     f.title:SetText(S.GOLD .. e.title .. "|r")
     for i, b in ipairs(lines) do
         local it = f.items[i]

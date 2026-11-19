@@ -6,17 +6,16 @@ Last updated: 2026-11-19
 ```
 cutpdf/
 ├── .gitignore                                        # Exclude caches and release output
-├── bug.txt                                           # User-provided v0.4.21 diagnostic report
 ├── bugs.txt                                          # User-provided v0.4.26 Stormwind diagnostic report
 ├── build_release.py                                  # Allowlist build + verify of the install ZIP and release notes (--check, --force)
 ├── CHANGELOG.md                                      # Release history
 ├── context/                                          # Session continuity and live architecture
-│   ├── algo-plan-2026-11-17.md                       # TODO: purpose
+│   ├── algo-plan-2026-11-17.md                       # Planner algorithm tuning plan (streams E-opt/E-plan: stability, horizon, calibration, yards) with outcome
 │   ├── architecture.md                               # Live source map and runtime diagrams
-│   ├── bpmn/                                         # BPMN plugin run index + last run per process (process.json/.bpmn, diagram.mmd) (13 files, collapsed)
-│   ├── BUGS/                                         # Verified bug methodology and regressions (35 files, collapsed)
+│   ├── bpmn/                                         # BPMN plugin run index + last run per process (process.json/.bpmn, diagram.mmd) (22 files, collapsed)
+│   ├── BUGS/                                         # Verified bug methodology and regressions (45 files, collapsed)
 │   ├── decisions.md                                  # Choices and rationale
-│   ├── diagrams/                                     # Dated Mermaid snapshots captured during BPMN runs (flowcharts, sequence diagrams) (31 files, collapsed)
+│   ├── diagrams/                                     # Dated Mermaid snapshots captured during BPMN runs (flowcharts, sequence diagrams) (155 files, collapsed)
 │   ├── fix-plan-2026-11-17.md                        # Audit fix plan (streams A/B/C) with per-bug results of the fix-all run
 │   ├── insights.md                                   # Timestamped findings
 │   ├── predictive-quest-optimizer.md                 # Implemented algorithm, executed simulation and evidence limits
@@ -27,13 +26,22 @@ cutpdf/
 │   ├── schema.md                                     # Data structures and formats
 │   ├── shortest-path-source-study.md                 # External router implementation trace; no runtime dependency
 │   ├── state.md                                      # Current task and handoff
+│   ├── ux-review-2026-11-19.json                     # Machine-readable UX findings (id, area, lens, severity, where, evidence, suggestion, effort, batch) fed to the ux-fix run
+│   ├── ux-review-2026-11-19.md                       # Whole-addon UX review: 75 ranked findings with verifier verdicts, user stories, fix batches B1-B5
+│   ├── ux-review-verdicts-2026-11-19.json            # Verifier verdicts per UX id (confirmed/partly/refuted + fix notes) used by the ux-fix builders
 │   └── walkable-routing-research.md                  # Terrain-routing feasibility, provider sources and proposed integration (not implemented)
 ├── questidea.txt                                     # User-provided predictive quest optimizer design requirements
-├── QuestSharing/                                     # WoW addon runtime (52 files, collapsed; LFGInvite.lua = party finder search + auto-invite by role/level/item level, ItemLevel.lua = inspect + remembered/shared item levels, BagTools.lua = bag bookmarks / sell grays / arrange by topic, ChatLock.lua = no chat box in combat)
+├── QuestSharing/                                     # WoW addon runtime (52 files, collapsed; LFGInvite.lua = party finder (needs own listing) search + auto-invite by activity/role/class/level/item level, highest level first, LFGFinderUI.lua = spyglass picker window, ItemLevel.lua = inspect + remembered/shared item levels, BagTools.lua = bag bookmarks / sell grays / arrange by topic, ChatLock.lua = no chat box in combat, Aggro.lua = tank aggro % over enemy nameplates + lowest-aggro near enemy marked) (60 files, collapsed; CampMap.lua = Quest guide shared camps on the world map + camps table; DungeonRoute.lua = 'get them all' route: walk/flight/boat/hearth graph, Dijkstra legs, precedence-aware stop order) (59 files, collapsed)
 ├── README.md                                         # User documentation
-├── tests/                                            # Python tests and Lua API harness (51 files, collapsed; test_lfg_invite.py = party finder, test_item_level.py = item levels)
+├── tests/                                            # Python tests and Lua API harness (collapsed; test_aggro.py = tank aggro marks, test_lfg_invite.py = party finder, test_item_level.py = item levels, test_coldridge_valley.py = optimizer reference case on real QuestieDB rows; test_camp_map.py = shared camps map + table; data/coldridge_valley.lua = its generated fixture) (63 files + data/, collapsed)
 └── tools/                                            # Local UI emulation utilities, never shipped in the addon
     ├── build_cooking_reference.py                    # Rebuild pinned factual Cooking subset with upstream MIT attribution
+    ├── coldridge-network.html                        # Static view: Coldridge Valley quests -> mobs/objects -> 100-yd camps (network, map, intersection matrix), data baked in from tests/data/coldridge_valley.lua
+    ├── preview_camp_window.py                        # Render the real Shared camps window (harness frames, recorded anchors/colours) to an SVG/HTML preview
+    ├── build_coldridge_fixture.py                    # Regenerate tests/data/coldridge_valley.lua (14 gnome-mage quests + NPCs/objects/items/XP) from a local Classic QuestieDB checkout
+    ├── build_skinning_data.py                        # Regenerate QuestSharing/SkinningData.lua (creature -> skinning item + chance) from a CMaNGOS classic-db SQL dump
+    ├── lua-optimization-prompt.md                    # Lua 5.1 speed optimization prompt that applies proven (>= 20 %, benchmarked) fixes
+    ├── lua-performance-review-prompt.md              # Reusable Lua 5.1 speed review prompt (hot paths, dictionaries, fewer loops, no per-loop allocs)
     ├── lua-syntax-review-prompt.md                   # Reusable Lua 5.1 syntax/bug review prompt (parse, 5.2+ leaks, globals, nil traps)
     ├── preview_professions.py                        # Export actual profession model into an illustrative native-window layout preview
     ├── preview_quest_planner.py                      # Run actual Lua planner and embed its rows in the Westfall emulation
@@ -67,11 +75,14 @@ flowchart TD
     Settings --> Diagnostics
     Diagnostics --> DiagnosticStore[QuestSharingLog and QuestSharingDB.errors: bounded saved records]
     Diagnostics --> Report[QuestSharingReport: issue overview, full details, Copy all, Refresh and Clear records]
-    Core --> Share[Share.lua: quest offers]
+    Core --> Share[Share.lua: quest offers; ns.shareBusy true while a round offers quests]
+    Share -->|ns.shareBusy: Share button reads Stop -> ns.stopShare| PanelWin[Panel.lua: Party quests window; close x -> ns.closePanel sets db.panel=false]
     Core --> BagTools[BagTools.lua: Space bookmarks, sell grays at vendor, arrange all bags by topic]
     Bags[Bags.lua: ns.bagEachSlot, bagItemFor] --> BagTools
     Core --> ChatLock[ChatLock.lua: closes the chat box in combat]
-    Core --> DataWork[DataWork.lua: shared optional database work budget + releaseLater/keep memory release timers]
+    Core --> Aggro[Aggro.lua: aggroPlates, threat % labels over nameplates, lowest near enemy marked; no auto-target, TargetUnit protected]
+    Aggro -->|ns.getCVar/ns.setCVar, ns.markerFor| Highlight[Highlight.lua]
+    Core --> DataWork[DataWork.lua: shared optional database work budget + onPurge/purge registry + saved ID lists in QuestSharingCache (W.saved/W.save); W.fighting for combat status]
     Core --> Sync[Sync.lua: party addon messages]
     DB[Optional QuestieDB] --> Q[Questie.lua: ns.questie]
     Q -->|Q.me, Q.questGate, Q.npcFriendly: one cheap read per id before any big table| Gate[Scoped reads: planner, Dungeon quests, map search]
@@ -79,6 +90,8 @@ flowchart TD
     Core --> Planner
     Planner --> Diagnostics
     Planner --> Guidance[QuestGuidance.lua: arrow, distance, numbered stops above map pins and straight connections]
+    Planner -->|P.campView: planned objectives' spawns in 100-yd camps| CampMap[CampMap.lua: shared-camp circles on WorldMapFrame + Shared camps window: network, map, matrix]
+    Settings -->|campMap switch, Camps table button| CampMap
     Guidance --> MapAPI
     Planner -->|quest-plan normal, quest-improve idle priority| DataWork
     Planner --> Q
@@ -99,7 +112,8 @@ flowchart TD
     Path -. unsupported or missing .-> Planner
     Share --> API[WoW APIs via Compat.lua]
     Sync --> API
-    Settings[Settings.lua: sidebar categories] --> Tools[Extra tools: utility cards]
+    Settings[Settings.lua: sidebar categories + search box] --> Tools[Extra tools: utility cards]
+    Settings --> Search[ns.settingsResults: matches across all tabs, grouped Page > Section]
     Settings --> Browser[Browser DB: lookup cards]
     Tools --> Fishing[Fishing.lua: water notes]
     Tools --> Cleanup[QuestCleanup.lua: review leftovers on demand]
@@ -109,7 +123,8 @@ flowchart TD
     Cleanup --> BagAPI[Carried bags and explicit cursor item deletion]
     Browser --> ItemSources[ItemSources.lua: item tooltip source hints]
     Browser --> VendorMap[VendorMap.lua: item/vendor search and map pins]
-    VendorMap -->|pointOnMap, continentPoint| TravelMap[TravelMap.lua: dungeon, boat, zeppelin pins + hover lines + nearest town per faction]
+    VendorMap -->|pointOnMap, continentPoint| TravelMap[TravelMap.lua: dungeon, boat, zeppelin pins + hover lines + nearest town per faction; every pin is a Button, click sets a waypoint]
+    TravelMap --> Waypoint
     TravelData[TravelData.lua: static entrances, stops, routes, towns] --> TravelMap
     VendorMap -->|pointOnMap| GatherSources[GatherSources.lua: gathering-item tooltip top-3 zones + Ctrl+right-click map marks]
     SkinningData[SkinningData.lua: generated skinning table, CMaNGOS] --> GatherSources
@@ -121,7 +136,8 @@ flowchart TD
     TrainerIndex --> Q
     TrainerIndex --> DataWork
     TravelMap --> ExistingMap
-    Browser --> Rewards[Rewards.lua: reward browser]
+    Browser --> Rewards[Rewards.lua: reward browser; R.markGiver = Mark quest giver waypoint]
+    Rewards --> Waypoint
     OptionalUI[OptionalUI.lua] --> Equipment[EquipmentUI.lua: shared WoW-style journal; equipment tabs Rare+ only]
     Equipment --> NativeJournalArt[Built-in dialog, QuestBG, Quickslot2 and red button textures]
     Equipment --> Parchment[Scoped dark-ink scrollable detail pages]
@@ -155,7 +171,8 @@ flowchart TD
     VendorMap --> Waypoint[Compat.lua: user waypoint]
     Rewards --> Items[WoW item info and comparison tooltips]
     Browser --> Loot[Loot.lua: instance drop search]
-    Browser --> DungeonQuests[DungeonQuests.lua: dungeon quest catalogue]
+    Browser --> DungeonQuests[DungeonQuests.lua: dungeon quest catalogue, kept for the session; D.purge via DataWork.purge]
+    Settings --> DataWork
     DungeonQuests --> Equipment
     DungeonQuests --> Q
     DungeonQuests --> Loot
@@ -163,6 +180,8 @@ flowchart TD
     DungeonQuests --> RewardLinks[QuestieDB Item.questRewards: first-hover reward index]
     DungeonQuests --> DataWork
     DungeonQuests --> Menu[Menu.lua: quest and pickup actions]
+    DungeonQuests --> Route[DungeonRoute.lua: get-them-all route; TAXIMAP_OPENED learns flight paths]
+    Route --> TravelData[TravelData.lua: flight towns, boat/zeppelin/tram stops + ride seconds, dungeon entrances]
     Loot --> AtlasLoot[Optional AtlasLoot encounter tables]
     Loot --> Q
     Loot --> Items
@@ -174,6 +193,23 @@ flowchart TD
     Settings --> Adventure
     Adventure --> Compat[Compat.lua: quest log and links]
     Adventure --> Chat[Existing chat draft or ChatFrame_OpenChat]
+```
+
+UX fix round 2026-11-19 (run r-20261119-104206-0145): shared key warnings, teammate-spot waypoint guard, second-click actions.
+```mermaid
+flowchart TD
+    QuestItems[QuestItems.lua: ns.setItemKey] --> KeyHelp[Quick.lua: ns.keyRefused, ns.keyUsedToDo, ns.keyActionWords]
+    Ping[Ping.lua: ping key] --> KeyHelp
+    LFGKey[LFGInvite.lua: party finder key] --> KeyHelp
+    QuickKey[Quick.lua: quick chat key] --> KeyHelp
+    KeyHelp -->|protected check BEFORE unbinding the old key| Bindings[SetBinding / GetBindingAction]
+    MarkerHook[Marker.lua: hooksecurefunc C_Map.SetUserWaypoint records own waypoint time] --> PeerSpot[Marker.lua: ns.onPeerSpot]
+    PeerSpot -->|own waypoint < 5 min old| Link[Chat line with zone + addon link Set waypoint via EventRegistry SetItemRef]
+    PeerSpot -->|else| Waypoint2[ns.compat.setWaypoint]
+    SettingsAction[Settings.lua action rows with confirm: Reset settings, Clear errors, Clear logs] -->|first click arms 5 s: Click again to ...| SettingsAction
+    ReportClear[Diagnostics.lua report: Clear records] -->|same second-click rule| ReportClear
+    Toggle[Core.lua ns.setSetting / slash on-off] --> Line[ns.settingLine: label + state + ns.settingPath]
+    Toggle -->|chat/announce/pickup on while mode ~= send| SendNote[one warning line; rows greyed via inactiveNote]
 ```
 
 Shared classic menu look (2026-11-17): every window and panel draws through `Style.lua`.
@@ -196,13 +232,14 @@ sequenceDiagram
     participant API as C_LFGList
     participant IL as ItemLevel.lua
     participant Them as Listed player's Quest Sharing
-    Player->>MB: left click (hardware event)
+    Player->>MB: left click -> LFGFinderUI.lua picker; Find (hardware event)
     MB->>L: scan()
+    L->>API: HasActiveEntryInfo / GetActiveEntryInfo().activityIDs (not listed -> stop)
     L->>L: freeSpots() (leader/solo, < 5 incl. pending invites)
-    L->>API: Search(cat, 0, 0, nil, false, nil, acts)
+    L->>API: Search(categoryID of my 1st activity, 0, 0, nil, false, nil, my activityIDs)
     API-->>L: LFG_LIST_SEARCH_RESULTS_RECEIVED
     L->>API: GetFilteredSearchResults / GetSearchResultInfo / GetSearchResultPlayerInfo(id,1)
-    L->>L: matches(): numMembers==1, lfgRoles in lfgHealer/lfgTank/lfgDps, level in lfgMinLevel..lfgMaxLevel, not invited/skipped < 300 s
+    L->>L: matches(): shares one of my activityIDs, numMembers==1, lfgRoles in lfgHealer/lfgTank/lfgDps + class not in lfgClassOff, sorted level desc, level in lfgMinLevel..lfgMaxLevel, not invited/skipped < 300 s
     L->>IL: ItemLevel.lua known(name)
     alt unknown and lfgMinIlvl > 0 and lfgAskIlvl
         IL->>Them: QSILVL "Q" whisper (+ "Q:name" to party)
@@ -308,6 +345,23 @@ sequenceDiagram
     end
     Note over D,Menu: D.refresh() without argument (filters, search, buttons), D.go, f.suspend, D.scan still close the menu. Other windows' menus untouched
     Note over Work: Combat and close/Esc/tab switch pause the scan (reopen resumes); master disable and Refresh data cancel it
+```
+```mermaid
+sequenceDiagram
+    participant User
+    participant D as DungeonQuests.lua
+    participant R as DungeonRoute.lua
+    participant T as TravelData.lua
+    participant Game as WoW client
+    User->>D: Choose dungeon, click "Plan route to get them all"
+    D->>D: routeTargets: open + takeable quests, talk-only lead-ins (with unlocks), "do first", later
+    D->>R: plan(targets, {start = player pos, finish = entrance, assumeAllFlights})
+    R->>Game: GetWorldPosFromMapPos (yards), GetBindLocation, hearthstone count/cooldown
+    R->>T: towns (known flights per ns.db.knownFlights), docks + routes
+    R->>R: Dijkstra legs (walk, fly, boat/zeppelin/tram) per stop; nearest-eligible order; or-opt + 2-opt; hearth on best leg
+    R-->>D: steps (grouped by NPC), totalSeconds, unknown, notes
+    D-->>User: Read-only route window; click a step = native waypoint
+    Game-->>R: TAXIMAP_OPENED -> learnFlights() saves known nodes
 ```
 
 ```mermaid
@@ -603,7 +657,7 @@ sequenceDiagram
     Work->>DB: hydrate(): decode spawns only for uncached candidates (cache bounded at SPAWN_CACHE 2000 + current matches)
     Work-->>Search: refreshSuggestions at first local match, then each doubling
     Search-->>User: Status "Indexing N / M NPCs…" / "Finding locations: N / M matches…" until resolved
-    Note over Work,DB: Combat and hidden map pause both jobs. Map change, Clear and resetIndex drop cached spawns
+    Note over Work,DB: Combat and hidden map pause both jobs (W.fighting(): status "Search waits until the fight ends."). Map change, Clear and resetIndex drop cached spawns
     Search-->>User: Show suggestions with usable locations on the displayed map
     User->>Search: Choose suggestion, press Enter, or click search icon
     Search->>Search: Interpret vendor as all sellers; general vendor as matching seller roles
@@ -614,9 +668,10 @@ sequenceDiagram
     alt Query is empty or Clear is clicked
         Search->>Map: Hide all pins immediately
     else No matching pin on shown map but known matches exist
-        Search->>User: Show zero locations and Elsewhere button
-        User->>Search: Click Elsewhere explicitly
-        Search-->>User: Offer nearest same-continent waypoint or explain missing coordinates
+        Search->>User: Show zero locations, "Click Elsewhere to find the closest one." and Elsewhere button
+        User->>Search: Click Elsewhere once
+        Search->>Map: Set waypoint at the closest same-continent match at once (2026-11-19, UX-37)
+        Search-->>User: "Waypoint set. Closest one is in <zone>: ..." or explain missing coordinates
     else No known seller link or matching title
         Search->>User: Explain database coverage and vendor-only search
     end
@@ -748,6 +803,25 @@ sequenceDiagram
     Note over G,Map: never opens the map itself (taint); user presses M
 ```
 
+### Catalogue open with saved QuestieDB ID lists (2026-11-19)
+```mermaid
+sequenceDiagram
+    participant Win as DungeonQuests / Rewards / Loot / VendorMap / TrainerIndex / QuestPlanner
+    participant W as DataWork.lua
+    participant Disk as QuestSharingCache (SavedVariables)
+    participant Q as Questie.lua -> QuestieDB
+    Win->>W: saved(name, scope)
+    W->>Disk: stamp == build + addon/Questie/QuestieDB versions? (once per session; mismatch wipes)
+    alt saved list
+        W-->>Win: ID list
+        Win->>Q: read only those records
+    else none / Refresh data
+        Win->>Q: ids(kind) full enumeration + reads
+        Win->>W: save(name, scope, kept IDs)
+    end
+    Note over Win: hide pauses the scan; reopen continues; Purge (W.purge) frees memory and sets QuestSharingCache=nil
+```
+
 ## Class diagram
 
 ```mermaid
@@ -812,6 +886,7 @@ classDiagram
         completedIDs
         missingIDs
         reasons
+        stepNotes
         uncertainty
         searchChecks
         searchExhausted
@@ -978,7 +1053,6 @@ classDiagram
         enabled
         bagMarks
         fishingMap
-        rewardBrowser
         autoSpellRanks
         zoneLevels
         autoAcceptQuests

@@ -21,14 +21,20 @@ local function call(fn, ...) return U.call(fn, ...) end
 local function trim(s) return (string.gsub(string.gsub(tostring(s or ""), "^%s+", ""), "%s+$", "")) end
 local function lower(s) return string.lower(type(s) == "string" and s or "") end
 local function finite(n) return type(n) == "number" and n == n and n > -math.huge and n < math.huge end
+-- Speed: scans call this once per item name with the same query, so the query is split once and the words reused.
+local lastQuery, lastWords = nil, {}
 local function matchesWords(text, query)
-    local hay = lower(text)
-    local any = false
-    for word in string.gmatch(lower(query), "%S+") do
-        any = true
-        if not string.find(hay, word, 1, true) then return false end
+    if query ~= lastQuery then
+        lastQuery, lastWords = query, {}
+        for word in string.gmatch(lower(query), "%S+") do lastWords[#lastWords + 1] = word end
     end
-    return any
+    local words = lastWords
+    if #words == 0 then return false end
+    local hay, find = lower(text), string.find
+    for i = 1, #words do
+        if not find(hay, words[i], 1, true) then return false end
+    end
+    return true
 end
 
 local sellerWords = { vendor = true, vendors = true, seller = true, sellers = true,
@@ -144,10 +150,14 @@ local function metadata(id, linked)
 end
 
 -- Keep only role/name/link metadata; a query reads locations for its matching NPCs later.
+-- Saved list (ns.dataWork.saved) "mapSearchNPCs": the NPC IDs that got a role row; later sessions read only those.
+-- Items are not saved: their scan reads one name per item and a vendor list only for names with the typed words.
+local savedNPCs
 local function indexRoles()
     if ready then return end
     if not npcIDs then
-        npcIDs = Q and Q.ids and Q.ids("npc") or {}
+        savedNPCs = Work.saved("mapSearchNPCs")
+        npcIDs = savedNPCs or (Q and Q.ids and Q.ids("npc")) or {}
         mask = vendorMask()
         playerFaction = Q.me().faction
     end
@@ -157,7 +167,8 @@ local function indexRoles()
         if npcCursor % 500 == 1 then progress() end
         Work.yield()
     end
-    ready, npcIDs = true, nil
+    if not savedNPCs then Work.save("mapSearchNPCs", "", Work.sortedKeys(vendors)) end
+    ready, npcIDs, savedNPCs = true, nil, nil
 end
 
 local function wordsOf(query)
@@ -291,13 +302,17 @@ local function thousands(n)
 end
 
 local function progressText()
+    -- DataWork runs nothing in combat: say so, instead of a progress line that does not move
+    if Work.fighting and Work.fighting() then
+        return "Search waits until the fight ends.\nResults appear as soon as you leave combat."
+    end
     local line
     if not ready then
-        line = npcIDs and ("Indexing " .. thousands(npcCursor - 1) .. " / " .. thousands(#npcIDs) .. " NPCs…")
-            or "Indexing QuestieDB NPCs…"
+        line = npcIDs and ("Reading the NPC list: " .. thousands(npcCursor - 1) .. " / " .. thousands(#npcIDs) .. "…")
+            or "Reading the NPC list…"
     elseif waiting == generation and not itemsReady then
-        line = itemIDs and ("Searching " .. thousands(itemCursor - 1) .. " / " .. thousands(#itemIDs) .. " items…")
-            or "Searching QuestieDB items…"
+        line = itemIDs and ("Searching items: " .. thousands(itemCursor - 1) .. " / " .. thousands(#itemIDs) .. "…")
+            or "Searching items…"
     elseif scan then
         line = "Finding locations: " .. thousands(scan.done) .. " / " .. thousands(scan.total) .. " matches…"
     else
@@ -388,6 +403,12 @@ end
 
 local function category(v)
     return type(v.title) == "string" and trim(v.title) ~= "" and trim(v.title) or "Vendor"
+end
+
+-- What a suggested NPC title is, for its label: "Trainer: Paladin Trainer", "Vendor: General Goods", "NPC: Innkeeper"
+local function titleKind(v)
+    for _, word in ipairs(v.roleWords or {}) do if word == "trainer" then return "Trainer: " end end
+    return v.isSeller and "Vendor: " or "NPC: "
 end
 
 -- One icon per kind of NPC, chosen from its title ("Druid Trainer", "Mining Trainer", "Innkeeper"...). The first
@@ -614,7 +635,7 @@ local function ensureUI(wm)
     local panel = CreateFrame("Frame", nil, wm, "BackdropTemplate")
     panel:SetWidth(400); panel:SetHeight(122); panel:SetPoint("BOTTOMRIGHT", wm, "BOTTOMRIGHT", -20, 24)
     S.panel(panel)
-    local heading = U.text(panel, "Search this map", 8, 5, 384)
+    local heading = U.text(panel, S.GOLD .. "Search this map|r", 8, 5, 384)
     heading:SetWordWrap(false)
     local edit = CreateFrame("EditBox", nil, panel)
     edit:SetWidth(316); edit:SetHeight(22); edit:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -22)
@@ -641,11 +662,16 @@ local function ensureUI(wm)
     status:SetWordWrap(true); status:SetHeight(66)
     local waypoint = S.button(panel, "Waypoint", 78, function()
         local r = mapUI and mapUI.closest
-        if not r then
+        if not r then                                  -- Elsewhere: find the closest one and set the waypoint at once
             currentOnly, lastRender = false, nil
             V.draw()
-        elseif not ns.compat.setWaypoint(r.spawn.map, r.spawn.x / 100, r.spawn.y / 100) then
+            r = mapUI.closest
+            if not r then return end
+        end
+        if not ns.compat.setWaypoint(r.spawn.map, r.spawn.x / 100, r.spawn.y / 100) then
             ns.print("the game could not set a waypoint for this vendor")
+        elseif mapUI.closestText then
+            mapUI.status:SetText("Waypoint set. " .. mapUI.closestText)
         end
     end)
     waypoint:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -6, 4)
@@ -657,10 +683,7 @@ local function ensureUI(wm)
     suggestionBox:SetFrameStrata("TOOLTIP")
     suggestionBox:SetFrameLevel((call(wm.GetFrameLevel, wm) or 0) + 40)
     suggestionBox:EnableMouse(true); suggestionBox:SetClampedToScreen(true)
-    S.fill(suggestionBox, "BACKGROUND", 0.38, 0.43, 0.52, 1):SetAllPoints(suggestionBox)
-    local suggestionBackground = S.fill(suggestionBox, "BORDER", 0.035, 0.045, 0.065, 1)
-    suggestionBackground:SetPoint("TOPLEFT", suggestionBox, "TOPLEFT", 1, -1)
-    suggestionBackground:SetPoint("BOTTOMRIGHT", suggestionBox, "BOTTOMRIGHT", -1, 1)
+    S.panel(suggestionBox)                             -- the same stone and bronze rim as the other map panels
     suggestionBox:Hide()
     mapUI = { frame = panel, heading = heading, edit = edit, status = status, waypoint = waypoint,
         searchIcon = searchIcon, clearButton = clearButton,
@@ -726,6 +749,10 @@ local function ensureUI(wm)
         end
         -- Offer the useful role word first: typing "tail" can complete to "Tailor", which still matches
         -- every role containing Tailor, including "Senior Master Tailor".
+        -- ...but only while the last typed word is unfinished: "vendor" or "general" get whole titles, not their words.
+        local typedWords = roleWords(roleNeedle)
+        local last = typedWords[#typedWords]
+        local finished = last == nil
         local suggestionWords = {}
         for id in pairs(hydrated) do
             local vendor = vendors[id]
@@ -734,12 +761,16 @@ local function ensureUI(wm)
             local eligible = localIDs[id] and (not sellersOnly or vendor.isSeller)
             for raw in string.gmatch(eligible and title or "", "%S+") do
                 local word = string.gsub(string.gsub(raw, "^%p+", ""), "%p+$", "")
-                local score = roleScore(roleWords(word))
+                local forms = roleWords(word)
+                if forms[1] == last then finished = true end
+                local score = roleScore(forms)
                 if score then suggestionWords[lower(word)] = { value = word, score = score } end
             end
         end
-        for _, word in pairs(suggestionWords) do
-            add(word.value, "Vendor type: " .. word.value, 1 + word.score * 3, roleKind)
+        if not finished then
+            for _, word in pairs(suggestionWords) do
+                add(word.value, word.value .. " (all matches)", 1 + word.score * 3, roleKind)
+            end
         end
         for id in pairs(hydrated) do
             local vendor = vendors[id]
@@ -747,7 +778,7 @@ local function ensureUI(wm)
             local title = category(vendor)
             local score = roleScore(vendor.roleWords)
             if localIDs[id] and (not sellersOnly or vendor.isSeller) and score then
-                add(title, "Vendor: " .. title, 2 + score * 3, roleKind)
+                add(title, titleKind(vendor) .. title, 2 + score * 3, roleKind)
             end
         end
         local itemCount = 0
@@ -850,7 +881,7 @@ function V.draw()
     local map = call(wm.GetMapID, wm)
     local info = mapInfo(map)
     local mapName = info and info.name or "this map"
-    ui.heading:SetText("Search this map: " .. mapName)
+    ui.heading:SetText(S.GOLD .. "Search this map: " .. mapName .. "|r")
     if ui.map ~= map then
         ui.map, currentOnly, lastRender = map, true, nil
         -- Suggestions and cached locations belong to the shown map; only the current matches keep theirs.
@@ -952,7 +983,8 @@ function V.draw()
     elseif next(selected) == nil then
         ui.status:SetText("No known seller for \"" .. query .. "\".\nQuestie may have no vendor link; drops and crafting are not searched.")
     elseif currentOnly then
-        ui.status:SetText("0 locations for \"" .. query .. "\" in " .. mapName .. ".\nKnown matches exist elsewhere or have no usable map coordinates.")
+        ui.status:SetText("0 locations for \"" .. query .. "\" in " .. mapName .. ".\nKnown matches are elsewhere or have no map spot.\n"
+            .. "Click Elsewhere to find the closest one.")
         ui.waypoint:SetLabel("Elsewhere"); ui.waypoint:Show()
     else
         local nearest = nearestVendor(selected)
@@ -963,29 +995,22 @@ function V.draw()
             ui.closest = nearest
             ui.waypoint:SetLabel("Waypoint")
             ui.waypoint:Show()
-            local label = category(v) .. " · " .. zoneName(s.area) .. string.format(" (%.1f, %.1f)", s.x, s.y)
-            ui.status:SetText("Closest by map distance: " .. label)
+            local zone = (mapInfo(s.map) or {}).name or zoneName(s.area)
+            ui.closestText = "Closest one is in " .. zone .. ":\n" .. category(v) .. string.format(" (%.1f, %.1f)", s.x, s.y)
+            ui.status:SetText(ui.closestText)
         end
     end
 end
 
--- Memory: the NPC/item index is dropped once nothing has searched for GRACE seconds (map closed or search box empty).
-local GRACE, idleSince = 120, nil
-local function releaseWhenIdle(mapShown)
-    if mapShown and currentQuery ~= "" then idleSince = nil; return end
-    local now = GetTime and GetTime() or 0
-    idleSince = idleSince or now
-    if now - idleSince >= GRACE and (ready or itemsReady or loading or next(vendors) or next(cached) or next(itemRows)) then
-        resetIndex(); idleSince = nil
-    end
-end
-V.releaseWhenIdle = releaseWhenIdle
+-- Memory: the NPC/item index is read once and kept for the session (closing the map pauses it); Purge frees it.
+function V.purge() Work.forget("mapSearchNPCs"); resetIndex(); V.draw() end
+V._release = resetIndex -- tests: free memory only, the saved lists stay
+ns.dataWork.onPurge("Map search", V.purge)
 function V._state() return ready, itemsReady, next(vendors) ~= nil end
 
 local function tick()
     V.draw()
     local mapShown = ns.db.vendorSearch and WorldMapFrame and call(WorldMapFrame.IsShown, WorldMapFrame)
-    releaseWhenIdle(mapShown)
     ns.after(mapShown and 0.5 or 2, tick)
 end
 

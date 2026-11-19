@@ -50,7 +50,13 @@ local function update(tooltip, data)
     tooltip.questSharingSourceID = id
     local sources = I.sources(id)
     if #sources == 0 then return end
-    tooltip:AddLine("Questie sources: " .. table.concat(sources, ", "), 0.95, 0.78, 0.30, true)
+    -- Seller types on one line, "Mined from veins" on its own; "Where to gather" (GatherSources) is the place heading.
+    local sellers, mined = {}, false
+    for _, source in ipairs(sources) do
+        if source == "Mining" then mined = true else sellers[#sellers + 1] = source end
+    end
+    if #sellers > 0 then tooltip:AddLine("Sold by: " .. table.concat(sellers, ", "), 0.95, 0.78, 0.30, true) end
+    if mined then tooltip:AddLine("Mined from veins", 0.95, 0.78, 0.30, true) end
     tooltip:Show()
 end
 

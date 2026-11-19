@@ -295,14 +295,16 @@ function ns.setItemKey(key)
     if not (SetBindingClick and buildKeyButton()) then return ns.print("this client does not allow it") end
     key = string.upper(key or "")
     if key == "" then return ns.print("quest item key: " .. (ns.itemKeyName() or "not set") .. "  (/qs itemkey <KEY>, /qs itemkey none)") end
+    -- a refused key changes nothing: checked before the old key is unbound
+    local refused = key ~= "NONE" and ns.keyRefused and ns.keyRefused(key)
+    if refused then return ns.print(refused) end
+    local before = key ~= "NONE" and GetBindingAction and GetBindingAction(key) or ""
     for _, k in ipairs({ GetBindingKey(CLICK) }) do SetBinding(k) end
     if key ~= "NONE" then
-        local before = GetBindingAction and GetBindingAction(key) or ""
-        if ns.PROTECTED_KEYS and ns.PROTECTED_KEYS[before] then
-            return ns.print(key .. " is the game's \"" .. ns.PROTECTED_KEYS[before] .. "\" key - pick another one (nothing was changed)")
-        end
         ns.trying("setting the quest item key")
         if not SetBindingClick(key, KEY_BUTTON, "LeftButton") then return ns.print("could not bind " .. key) end
+        local was = ns.keyUsedToDo and ns.keyUsedToDo(key, before, "CLICK " .. KEY_BUTTON .. ":LeftButton")
+        if was then ns.print(was .. " (it now uses your quest item; /qs itemkey none and rebind it in Key Bindings to undo)") end
     end
     local save = SaveBindings or AttemptToSaveBindings
     if save then save(GetCurrentBindingSet and GetCurrentBindingSet() or 1) end

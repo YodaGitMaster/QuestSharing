@@ -49,3 +49,9 @@
 - Status: solved in mock tests; verify in game with quest 95737 / 95647.
 - If it recurs: check other NPC-based false positives (an NPC who ends a talk-only quest and starts an unrelated dungeon quest).
 
+---
+## Addendum 2026-11-19 — scan of the real Forever data, one false positive fixed
+- Scan script (`/tmp/leadscan/scan.py`, rerun on a QuestieDB master tarball): base `data/Forever/foreverQuestDB.lua` (4,244) + Forever-only `src/corrections/Forever/generated/foreverBaseQuest.lua` (1,607) = 5,851 quests; dungeon areas from `support/Forever/Zones/dungeons.lua` (231 ids). Dungeon membership approximated by `zoneOrSort` only (the addon also uses objective spawns, so in-game counts can be a bit higher).
+- Results: A) `nextQuestInChain` lead-ins not listed as prerequisite: 110 total, 9 into a dungeon quest (e.g. 2041 Speak with Shoni -> 2040 Underground Assault, 2861 Tabetha's Task -> 2846 Tiara of the Deep). B) breadcrumb fields: 0. C) no link, inferred from the NPC: 8 before the fix, 6 after (95737 Seeking Caitlin, 95663 Dragonmaw Rumors, 4 Alterac Valley quests).
+- False positive found: 95795 "Fallen in the Fen" (finishedBy Dorin Songblade, NO NPC starter; it is the chain's last "return" step) was paired with 95772 "Songblade Search" (started by Dorin) -> would have greyed the final step once Songblade Search was taken. Fix: an inferred lead-in must have an NPC starter (`#seed.starters>0`). Side effect: 84555 Nostro's Compendium (no NPC starter) is no longer inferred; accepted, conservative.
+

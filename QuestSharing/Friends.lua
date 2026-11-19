@@ -164,7 +164,7 @@ function ns.addPartyFriends(manual)
         end
     end
 
-    local room = C.maxFriends() - C.friendCount() - (manual and 0 or RESERVE)
+    local room = C.maxFriends() - C.friendCount() - (manual and 0 or (tonumber(ns.db.friendsReserve) or RESERVE))
     if #run.queue > math.max(room, 0) then
         for i = #run.queue, math.max(room, 0) + 1, -1 do
             run.skipped[key(run.queue[i].name)] = "no room"

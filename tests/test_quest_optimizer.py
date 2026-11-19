@@ -121,7 +121,7 @@ end
     g=Game(style,WESTFALL+setup,fresh=True);g.start();g.slash("plan");g.advance(12)
     r=g.eval("NS.questPlanner.report")()
     assert r.coverage==2 and abs(r.expectedKills-20.094718933105)<1e-6
-    assert "Pick up Harvest Cores" in rows(g)[0].detail.text
+    assert "Pick up from Sentinel Hill Giver:\n[1] Harvest Cores" in rows(g)[0].detail.text
     assert r.expectedSeconds<r.baselineSeconds
     g.slash("plan hide");g.fire("BAG_UPDATE_DELAYED");g.advance(4)
     assert not g.eval('NS.dataWork.busy("quest-plan")')

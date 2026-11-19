@@ -82,12 +82,12 @@ end
 local function buildShortcuts()
     if #shortcuts > 0 then return end
     shortcut(1, "QuestSharingGuideButton", "Interface\\Icons\\INV_Misc_Map_01", "Quest guide",
-        "Click: open the quest optimizer (route for this zone).",
+        "Click: open the Quest guide (route for this zone).",
         function() local P = ns.questPlanner; if P and P.open then P.open(); return true end end)
     shortcut(2, "QuestSharingDungeonButton", "Interface\\Icons\\INV_Misc_Key_03", "Dungeon quests",
         "Click: browse dungeon quests, pickups and chains.",
         function() local D = ns.dungeonQuests; if D and D.open then D.open(); return true end end)
-    -- party finder: left click searches and invites the chosen roles, right click opens where the roles are chosen
+    -- party finder: left click opens the picker (roles, classes, Find), right click the settings
     local f = shortcut(3, "QuestSharingFinderButton", "Interface\\Icons\\INV_Misc_Spyglass_03", "Party finder",
         "", function() return true end)
     if f then
@@ -95,8 +95,8 @@ local function buildShortcuts()
             local L = ns.lfgInvite
             if not L then return ns.print("Party finder is not available") end
             if which == "RightButton" then
-                ns.toggleSettings(true, "party")
-            else L.scan() end
+                ns.toggleSettings(true, "finder")
+            elseif ns.lfgFinder then ns.lfgFinder.toggle() else L.scan() end
         end)
         f:SetScript("OnEnter", function(self)
             if GameTooltip then
@@ -118,7 +118,9 @@ local function build()
     if not b then return nil end
     b.slot = 0
     b:SetScript("OnClick", function(_, which)
-        if which == "RightButton" then ns.setSetting("panel", not ns.db.panel) else ns.toggleSettings() end
+        if which == "RightButton" then
+            if ns.db.panel and ns.closePanel then ns.closePanel() else ns.setSetting("panel", not ns.db.panel) end
+        else ns.toggleSettings() end
     end)
     b:SetScript("OnEnter", function(self)
         if GameTooltip then
@@ -155,10 +157,10 @@ function ns.minimapLines()
         local key = ns.quickKeyName and ns.quickKeyName()
         lines[#lines + 1] = "Quick chat key: " .. (key and (S.GOLD .. key .. "|r") or (S.RED .. "not set|r - Settings > Quick chat"))
         local errors = d.errors and #d.errors or 0
-        if errors > 0 then lines[#lines + 1] = S.RED .. errors .. " problem(s) recorded|r - /qs errors" end
+        if errors > 0 then lines[#lines + 1] = S.RED .. errors .. (errors == 1 and " problem" or " problems") .. " recorded|r - /qs errors" end
     end
     lines[#lines + 1] = " "
-    lines[#lines + 1] = S.GREY .. "Left click: settings   Right click: Party quests   Drag: move|r"
+    lines[#lines + 1] = S.GREY .. "Left click: settings   Right click: Party quests window   Drag: move|r"
     return lines
 end
 

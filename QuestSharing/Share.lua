@@ -6,6 +6,8 @@ local C = ns.compat
 ns.known = {}             -- ns.known[questID][lowercased member name] = "has" | "accepted" | "declined" | "done" | ...
 ns.offered = {}           -- ns.offered[questID][lowercased member name] = true once a share has reached them
 local run                 -- the share in progress (nil when idle)
+local BUSY = "quests are being shared right now - try again in a few seconds"
+local function relabel() if ns.refreshPanel then ns.refreshPanel() end end    -- the window's Share / Stop button
 local lastPush            -- { id = questID, at = time } of the most recent push
 local group = { joined = false, names = {}, ready = false }
 local pendingJoin
@@ -169,6 +171,7 @@ end
 -- the next quest waits for your click (at most 2 minutes, then the round ends quietly)
 local function park()
     run.waiting = true
+    relabel()
     ns.log("share", "waiting for your click: " .. #run.queue .. " quest(s) to offer")
     if not run.told then
         run.told = true
@@ -253,6 +256,7 @@ finish = function()
     local r = run
     run = nil
     if not r then return end
+    relabel()
     summary(r)
     -- a quest you just accepted is no news to the party (they are usually the ones who gave it to you)
     if r.reason == "new quest" or not ns.db.chat then return end
@@ -304,6 +308,7 @@ function ns.shareClick()
             run.waiting = false
             if run.timer then ns.cancel(run.timer) end
             step()
+            relabel()
         else
             ns.startShare("manual")
         end
@@ -319,7 +324,7 @@ function ns.offerQuest(e)
     if C.doneByMe(e) then ns.print("you have finished " .. C.link(e) .. " - it is not offered"); return false end
     if not C.pushable(e) then ns.print(C.link(e) .. " cannot be shared: the game does not allow it for this quest"); return false end
     if ns.isBlocked("share") then ns.print("sharing quests was refused by the game earlier: /reload to try again"); return false end
-    if run and not run.waiting then ns.print("quests are being shared right now - try again in a few seconds"); return false end
+    if run and not run.waiting then ns.print(BUSY); return false end
     local lacking = {}
     for _, m in ipairs(C.members()) do
         local st = ns.memberStatus and ns.memberStatus(m, e) or "unknown"
@@ -338,10 +343,12 @@ function ns.stopShare(reason)
     if not run then return end
     if run.timer then ns.cancel(run.timer) end
     run = nil
+    relabel()
     ns.print("sharing stopped (" .. (reason or "?") .. ")")
 end
 
 function ns.isSharing() return run ~= nil end
+function ns.shareBusy() return run ~= nil and not run.waiting end       -- a round is offering quests right now
 
 -- Does this quest need to be pushed? Returns "push", or why not:
 --   "known"    everybody already has it
@@ -382,7 +389,7 @@ function ns.startShare(reason, opts)
     local quiet = opts.only ~= nil
     if not d.enabled then return not quiet and ns.print("the addon is switched off (/qs on)") end
     if ns.isBlocked("share") then return not quiet and ns.print("sharing quests was refused by the game earlier: /reload to try again") end
-    if run then return not quiet and ns.print("already sharing (/qs stop to cancel)") end
+    if run then return not quiet and ns.print(BUSY) end
     if not C.inGroup() then return not quiet and ns.print("you are not in a party") end
     if C.inRaid() then return not quiet and ns.print("quests can only be shared in a 5-player party, not a raid") end
     local members = C.members()
@@ -418,9 +425,10 @@ function ns.startShare(reason, opts)
     if why.declined > 0 then notes[#notes + 1] = why.declined .. " skipped, someone declined them (/qs share forces it)" end
     if (why.unshareable or 0) > 0 then notes[#notes + 1] = why.unshareable .. " cannot be shared" end
     if force then                                                 -- only when you asked for it; automatic rounds stay quiet
-        ns.print(string.format("sharing %d quest(s) with %d player(s), %d second(s) apart%s (/qs stop to cancel)",
+        ns.print(string.format("sharing %d quest(s) with %d player(s), %d second(s) apart%s (click Stop or type /qs stop to cancel)",
             #run.queue, #members, d.gap, #notes > 0 and (" - " .. table.concat(notes, ", ")) or ""))
     end
+    relabel()
     ns.log("share", string.format("round (%s): %d to offer, %d already with everyone, %d offered before, %d declined",
         tostring(reason), #run.queue, why.known, why.offered, why.declined))
     step()

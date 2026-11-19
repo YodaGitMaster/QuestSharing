@@ -10,6 +10,9 @@ local function call(fn, ...)
     if ok then return a,b,c,d end
 end
 local function enabled() return ns.db.enabled and ns.db.autoSpellRanks and not ns.isBlocked("spellRanks") end
+-- A run asked for by the player (Update ranks) needs no auto-update toggle; event-driven runs do.
+local manual=false
+local function allowed() return ns.db.enabled and not ns.isBlocked("spellRanks") and (manual or ns.db.autoSpellRanks) end
 local function rank(text)
     return type(text)=="string" and tonumber(string.match(text,"(%d+)%D*$")) or nil
 end
@@ -103,13 +106,14 @@ local function spell(id,known)
     return {id=id,name=name,rank=rank(text)}
 end
 local function stop(text)
-    message=text;waiting=false
+    message="spell ranks paused until /reload - "..text..". /qs errors lists any game errors."
+    waiting=false
     ns.blockedFeatures.spellRanks=true
-    ns.print(text.." Auto-update is paused until /reload; /qs errors has any client errors.")
+    ns.print(message)
 end
 local function replace(slot,old,best,api)
     local readable,cursor=cursorState()
-    if not readable then stop("The client could not confirm that the cursor is clear.");return false end
+    if not readable then stop("your cursor was busy");return false end
     if restricted() or cursor then waiting=true;return false end
     local kind,id,subtype=call(GetActionInfo,slot)
     if kind~="spell" or id~=old.id or subtype=="pet" then return false end
@@ -122,7 +126,7 @@ local function replace(slot,old,best,api)
     if not ok or not readable or not expected or ns.isBlocked("spellRanks") then
         -- The cursor was empty on entry; anything here came from our pickup.
         if cursor then call(ClearCursor) end
-        stop("The client could not pick up the learned spell rank.");return false
+        stop("the new rank could not be picked up");return false
     end
     if restricted() then call(ClearCursor);waiting=true;return false end
     local beforeKind,beforeID,beforeSubtype=call(GetActionInfo,slot)
@@ -131,26 +135,35 @@ local function replace(slot,old,best,api)
     local newKind,newID=call(GetActionInfo,slot)
     if newKind=="spell" and newID==best.id then
         call(ClearCursor) -- PlaceAction swaps the previous rank onto the cursor.
-        if not placed or ns.isBlocked("spellRanks") then stop("The client interrupted a spell-rank update.") end
+        if not placed or ns.isBlocked("spellRanks") then stop("a spell change was interrupted") end
         return true
     end
     if newKind==kind and newID==id then call(ClearCursor) end
     -- If an unexpected action replaced the slot, retain the cursor for manual recovery.
-    stop("The client did not confirm the spell-rank update.");return false
+    stop("a spell change did not stick");return false
 end
 function R.update(report)
     if running then return 0 end
     serial=serial+1;queued=false
-    if not enabled() then message=ns.isBlocked("spellRanks") and "Spell-rank updates are paused until /reload." or "Auto-update spell ranks is off.";if report then ns.print(message) end;return 0 end
+    manual=report and true or false
+    if not allowed() then
+        message=ns.isBlocked("spellRanks") and "spell ranks paused until /reload."
+            or (not ns.db.enabled and "Quest Sharing is off; turn it on to update spell ranks.") or "Auto-update spell ranks is off."
+        if report then ns.print(message) end;return 0
+    end
     local api=bookAPI()
     if not api or type(GetActionInfo)~="function" or type(PlaceAction)~="function" or type(GetCursorInfo)~="function" or type(ClearCursor)~="function" or type(InCombatLockdown)~="function" then
-        message="This client does not expose the spell-book/action-bar APIs needed for rank updates."
+        message="this game version cannot change action bar spells."
         if report then ns.print(message) end;return 0
     end
     local readable,cursor=cursorState()
-    if not readable then message="The client could not read the cursor; no spell buttons were changed.";if report then ns.print(message) end;return 0 end
+    if not readable then message="could not read your cursor; no action bar spells were changed.";if report then ns.print(message) end;return 0 end
     if restricted() or cursor then
-        waiting=true;message="Spell-rank update queued until combat/temporary bars end and your cursor is clear."
+        if enabled() then
+            waiting=true;message="Spell-rank update queued until combat/temporary bars end and your cursor is clear."
+        else
+            message="Leave combat, return to your normal action bars and empty your cursor, then click Update ranks again."
+        end
         if report then ns.print(message) end;return 0
     end
     local families,known=catalogue(api)
@@ -162,21 +175,22 @@ function R.update(report)
     local slots=math.max(180,tonumber(MAX_ACTION_BUTTONS) or 0)
     slots=math.min(1000,math.max(1,math.floor(slots)))
     for slot=1,slots do
-        if not enabled() or restricted() then waiting=enabled();break end
+        if not allowed() or restricted() then waiting=enabled();break end
         local kind,id,subtype=call(GetActionInfo,slot)
         if kind=="spell" and type(id)=="number" and subtype~="pet" then
             local old=spell(id,known)
             local best=old.name and families[old.name]
             if best and not best.ambiguous and old.rank and best.rank>old.rank then
                 if replace(slot,old,best,api) then total=total+1 end
-                if waiting or not enabled() then break end
+                if waiting or not allowed() then break end
             end
         end
     end
     running=false
     if ns.isBlocked("spellRanks") then return total end
     message=total>0 and ("Updated "..total.." spell button"..(total==1 and "" or "s").." to the highest learned rank.") or "No confirmed lower-ranked spell buttons found."
-    if waiting then message=message.." Remaining updates are queued." end
+    if waiting and not enabled() then waiting=false;message=message.." Click Update ranks again to finish."
+    elseif waiting then message=message.." Remaining updates are queued." end
     if report or total>0 then ns.print(message) end
     return total
 end

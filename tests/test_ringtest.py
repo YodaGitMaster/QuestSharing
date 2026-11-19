@@ -95,12 +95,14 @@ def test_stop_and_a_fight_end_it(style):
     assert g.eval("NS.quickTestRunning()") is False and "stopped: a fight started" in report(g)
 
 
-def test_the_log_window_has_a_button_for_it(style):
+def test_settings_quick_chat_has_a_button_for_it_and_the_log_window_does_not(style):
     g = game(style)
     g.slash("debug on")
     g.slash("log")
-    win = g.eval("NS._reportWindow()")[0]
-    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.test)
+    assert g.eval("NS._reportWindow()")[0].test is None, "it emotes to nearby players: not in a bug report window"
+    i = g.eval("(function() for i, r in ipairs(NS.settingRows) do if r.button == 'Test the ring' then return i end end end)()")
+    assert g.eval(f"NS.settingRows[{i}].tab") == "quick"
+    g.eval("NS.settingsClick")(i, "LeftButton")
     assert g.eval("NS.quickTestRunning()") is True
 
 

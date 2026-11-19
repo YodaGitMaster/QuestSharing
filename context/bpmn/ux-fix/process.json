@@ -1,0 +1,901 @@
+{
+  "id": "ux-fix",
+  "name": "Fix the verified high and medium UX findings in five file-disjoint batches with reviews",
+  "runTimeout": 240,
+  "context": {
+    "prompt": "Record the UX fix round: update context/ux-review-2026-11-19.md (mark each high/medium id fixed / partly / skipped with the reason), add dated lines to state.md and decisions.md (one-name rule: Quest guide, Party quests window, Adventurer's Journal, Party finder, Zone levels, Fishing spots; destructive actions need a second click), update architecture.md only if files or flows changed. Do not edit code or tests."
+  },
+  "lanes": [
+    {
+      "id": "builder",
+      "name": "Builder",
+      "agent": "bpmn:worker",
+      "timeout": 60
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "agent": "bpmn:reviewer",
+      "timeout": 25
+    }
+  ],
+  "data": {
+    "patch_b1": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests",
+          "changelog"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "tests": {
+            "type": "string"
+          },
+          "changelog": {
+            "type": "string"
+          },
+          "readme": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "verdict_b1": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "fixes_b1": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "patch_b2": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests",
+          "changelog"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "tests": {
+            "type": "string"
+          },
+          "changelog": {
+            "type": "string"
+          },
+          "readme": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "verdict_b2": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "fixes_b2": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "patch_b3": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests",
+          "changelog"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "tests": {
+            "type": "string"
+          },
+          "changelog": {
+            "type": "string"
+          },
+          "readme": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "verdict_b3": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "fixes_b3": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "patch_b4": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests",
+          "changelog"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "tests": {
+            "type": "string"
+          },
+          "changelog": {
+            "type": "string"
+          },
+          "readme": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "verdict_b4": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "fixes_b4": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "patch_b5": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests",
+          "changelog"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "tests": {
+            "type": "string"
+          },
+          "changelog": {
+            "type": "string"
+          },
+          "readme": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "verdict_b5": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "fixes_b5": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "integration": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "suite",
+          "compile",
+          "summary"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "suite": {
+            "type": "string"
+          },
+          "compile": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "final": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues",
+          "summary"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "name": "Fixes requested"
+    },
+    {
+      "id": "split",
+      "type": "and",
+      "join": "join"
+    },
+    {
+      "id": "build_b1",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix B1 findings",
+      "out": "patch_b1",
+      "prompt": "Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/, run tests from tests/ with /tmp/qs-test-env/bin/python test_<name>.py). Findings: context/ux-review-2026-11-19.json (field 'findings'; each has id, title, where, evidence, suggestion). Verifier verdicts: context/ux-review-verdicts-2026-11-19.json — SKIP any id marked 'refuted', and for 'partly' follow the verifier's evidence. Read context/architecture.md first. Your batch: B1 - Settings window, slash commands and diagnostics. Fix these high and medium findings: UX-01, UX-04, UX-08, UX-11, UX-15, UX-25, UX-33, UX-34, UX-42, UX-43, UX-44, UX-46. Your files: QuestSharing/Settings.lua, QuestSharing/Core.lua, QuestSharing/MinimapButton.lua, QuestSharing/Diagnostics.lua, QuestSharing/LFGFinderUI.lua, tests/test_settings.py, tests/test_settings.py, tests/test_look.py, tests/test_log.py, tests/test_ringtest.py, tests/test_features.py, tests/test_ux_b1.py. RULES: (0) The Quest guide/optimizer plans for the player alone: never add party-aware behaviour, party goals or party data to QuestPlanner/QuestOptimizer (user decision 2026-11-19). (1) Fix exactly these ids, nothing else; no new features beyond what each finding's suggestion needs (UX-02, now medium and solo-only: show the quest ID in the guide row tooltip and accept quest names as well as IDs; no click-to-pick feature, nothing about the party). (2) Edit ONLY the files listed as yours; put new tests in your own tests/test_ux_<batch>.py if they do not fit an owned test file. Other sessions may be editing files in this repo right now: always re-read a file right before editing it, never overwrite someone else's change, and report any conflict. (3) Test first where behaviour changes (show it fails, then fix); wording-only changes need an assertion on the new visible text. (4) Use plain player wording (no 'provider', 'DB', 'enumerable', 'job', key names); one name per feature: 'Quest guide', 'Party quests window', 'Adventurer's Journal', 'Party finder', 'Zone levels', 'Fishing spots'. (5) Run ONLY your owned test files (other builders run in parallel) and compile your Lua files under lupa.lua51. (6) Do not edit CHANGELOG.md; README.md only if it is in your list — otherwise return README text changes as a snippet. Report: files changed, per id what changed with before/after evidence, test results, a CHANGELOG '## Unreleased' snippet, and any README snippet."
+    },
+    {
+      "id": "review_b1",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review B1 fixes",
+      "in": [
+        "patch_b1",
+        "fixes_b1?"
+      ],
+      "out": "verdict_b1",
+      "prompt": "Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/, run tests from tests/ with /tmp/qs-test-env/bin/python test_<name>.py). Findings: context/ux-review-2026-11-19.json (field 'findings'; each has id, title, where, evidence, suggestion). Verifier verdicts: context/ux-review-verdicts-2026-11-19.json — SKIP any id marked 'refuted', and for 'partly' follow the verifier's evidence. Read context/architecture.md first. Independent review of batch B1 - Settings window, slash commands and diagnostics (ids UX-01, UX-04, UX-05, UX-08, UX-11, UX-15, UX-25, UX-33, UX-34, UX-42, UX-43, UX-44, UX-46). Builder report: {{patch_b1.summary}} Files: {{patch_b1.files}}. For EACH id: reproduce the original evidence against the current tree and confirm it is gone, the fix follows the finding's suggestion (or a better documented one), and nothing else changed behaviour. Re-run the batch's owned test files yourself (only those: QuestSharing/Settings.lua, QuestSharing/Core.lua, QuestSharing/MinimapButton.lua, QuestSharing/Diagnostics.lua, QuestSharing/LFGFinderUI.lua, tests/test_settings.py, tests/test_settings.py, tests/test_look.py, tests/test_log.py, tests/test_ringtest.py, tests/test_features.py, tests/test_ux_b1.py), check new tests fail without the fix where behaviour changed, check wording is plain and uses the one-name rule, and check the diff stays inside the owned files (other modified files come from other sessions). Reject any change that makes the Quest guide/optimizer depend on the party. Do not modify files. Approve only if every id is fixed; otherwise list concrete issues with path:line."
+    },
+    {
+      "id": "ok_b1",
+      "type": "xor",
+      "name": "B1 approved?"
+    },
+    {
+      "id": "fix_b1",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix B1 review issues",
+      "in": [
+        "verdict_b1"
+      ],
+      "out": "fixes_b1",
+      "timeout": 30,
+      "prompt": "Fix these review issues for batch B1 - Settings window, slash commands and diagnostics, touching only QuestSharing/Settings.lua, QuestSharing/Core.lua, QuestSharing/MinimapButton.lua, QuestSharing/Diagnostics.lua, QuestSharing/LFGFinderUI.lua, tests/test_settings.py, tests/test_settings.py, tests/test_look.py, tests/test_log.py, tests/test_ringtest.py, tests/test_features.py, tests/test_ux_b1.py: {{verdict_b1.issues}}. Re-read files before editing (other sessions may edit this repo). Re-run the owned test files from tests/ with /tmp/qs-test-env/bin/python and report files and a summary."
+    },
+    {
+      "id": "build_b2",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix B2 findings",
+      "out": "patch_b2",
+      "prompt": "Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/, run tests from tests/ with /tmp/qs-test-env/bin/python test_<name>.py). Findings: context/ux-review-2026-11-19.json (field 'findings'; each has id, title, where, evidence, suggestion). Verifier verdicts: context/ux-review-verdicts-2026-11-19.json — SKIP any id marked 'refuted', and for 'partly' follow the verifier's evidence. Read context/architecture.md first. Your batch: B2 - Quest guide. Fix these high and medium findings: UX-02, UX-09, UX-13, UX-14, UX-18, UX-20, UX-21, UX-26, UX-27, UX-28. Your files: QuestSharing/QuestPlanner.lua, QuestSharing/QuestOptimizer.lua, tests/test_classic_style.py, tests/test_quest_planner_ui.py, tests/test_quest_planner_guide.py, tests/test_quest_planner_zone_steps.py, tests/test_quest_planner_path.py, tests/test_quest_optimizer.py, tests/test_planner_calibration.py, tests/test_classic_style.py, tests/test_ux_b2.py. RULES: (0) The Quest guide/optimizer plans for the player alone: never add party-aware behaviour, party goals or party data to QuestPlanner/QuestOptimizer (user decision 2026-11-19). (1) Fix exactly these ids, nothing else; no new features beyond what each finding's suggestion needs (UX-02, now medium and solo-only: show the quest ID in the guide row tooltip and accept quest names as well as IDs; no click-to-pick feature, nothing about the party). (2) Edit ONLY the files listed as yours; put new tests in your own tests/test_ux_<batch>.py if they do not fit an owned test file. Other sessions may be editing files in this repo right now: always re-read a file right before editing it, never overwrite someone else's change, and report any conflict. (3) Test first where behaviour changes (show it fails, then fix); wording-only changes need an assertion on the new visible text. (4) Use plain player wording (no 'provider', 'DB', 'enumerable', 'job', key names); one name per feature: 'Quest guide', 'Party quests window', 'Adventurer's Journal', 'Party finder', 'Zone levels', 'Fishing spots'. (5) Run ONLY your owned test files (other builders run in parallel) and compile your Lua files under lupa.lua51. (6) Do not edit CHANGELOG.md; README.md only if it is in your list — otherwise return README text changes as a snippet. Report: files changed, per id what changed with before/after evidence, test results, a CHANGELOG '## Unreleased' snippet, and any README snippet."
+    },
+    {
+      "id": "review_b2",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review B2 fixes",
+      "in": [
+        "patch_b2",
+        "fixes_b2?"
+      ],
+      "out": "verdict_b2",
+      "prompt": "Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/, run tests from tests/ with /tmp/qs-test-env/bin/python test_<name>.py). Findings: context/ux-review-2026-11-19.json (field 'findings'; each has id, title, where, evidence, suggestion). Verifier verdicts: context/ux-review-verdicts-2026-11-19.json — SKIP any id marked 'refuted', and for 'partly' follow the verifier's evidence. Read context/architecture.md first. Independent review of batch B2 - Quest guide (ids UX-02, UX-09, UX-13, UX-14, UX-18, UX-20, UX-21, UX-26, UX-27, UX-28). Builder report: {{patch_b2.summary}} Files: {{patch_b2.files}}. For EACH id: reproduce the original evidence against the current tree and confirm it is gone, the fix follows the finding's suggestion (or a better documented one), and nothing else changed behaviour. Re-run the batch's owned test files yourself (only those: QuestSharing/QuestPlanner.lua, QuestSharing/QuestOptimizer.lua, tests/test_classic_style.py, tests/test_quest_planner_ui.py, tests/test_quest_planner_guide.py, tests/test_quest_planner_zone_steps.py, tests/test_quest_planner_path.py, tests/test_quest_optimizer.py, tests/test_planner_calibration.py, tests/test_classic_style.py, tests/test_ux_b2.py), check new tests fail without the fix where behaviour changed, check wording is plain and uses the one-name rule, and check the diff stays inside the owned files (other modified files come from other sessions). Reject any change that makes the Quest guide/optimizer depend on the party. Do not modify files. Approve only if every id is fixed; otherwise list concrete issues with path:line."
+    },
+    {
+      "id": "ok_b2",
+      "type": "xor",
+      "name": "B2 approved?"
+    },
+    {
+      "id": "fix_b2",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix B2 review issues",
+      "in": [
+        "verdict_b2"
+      ],
+      "out": "fixes_b2",
+      "timeout": 30,
+      "prompt": "Fix these review issues for batch B2 - Quest guide, touching only QuestSharing/QuestPlanner.lua, QuestSharing/QuestOptimizer.lua, tests/test_classic_style.py, tests/test_quest_planner_ui.py, tests/test_quest_planner_guide.py, tests/test_quest_planner_zone_steps.py, tests/test_quest_planner_path.py, tests/test_quest_optimizer.py, tests/test_planner_calibration.py, tests/test_classic_style.py, tests/test_ux_b2.py: {{verdict_b2.issues}}. Re-read files before editing (other sessions may edit this repo). Re-run the owned test files from tests/ with /tmp/qs-test-env/bin/python and report files and a summary."
+    },
+    {
+      "id": "build_b3",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix B3 findings",
+      "out": "patch_b3",
+      "prompt": "Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/, run tests from tests/ with /tmp/qs-test-env/bin/python test_<name>.py). Findings: context/ux-review-2026-11-19.json (field 'findings'; each has id, title, where, evidence, suggestion). Verifier verdicts: context/ux-review-verdicts-2026-11-19.json — SKIP any id marked 'refuted', and for 'partly' follow the verifier's evidence. Read context/architecture.md first. Your batch: B3 - Party, chat and keys. Fix these high and medium findings (plus UX-47 from the verdicts file 'new' list): UX-03, UX-06, UX-22, UX-45. Your files: QuestSharing/Progress.lua, QuestSharing/Menu.lua, QuestSharing/Adventure.lua, QuestSharing/Share.lua, QuestSharing/LFGInvite.lua, QuestSharing/Panel.lua, QuestSharing/Quick.lua, QuestSharing/QuestItems.lua, QuestSharing/Ping.lua, tests/test_together.py, tests/test_ping.py, tests/test_quick.py, tests/test_menu.py, tests/test_lfg_invite.py, tests/test_adventure.py, tests/test_questsharing.py, tests/test_items.py, tests/test_team.py, tests/test_ux_b3.py. RULES: (0) The Quest guide/optimizer plans for the player alone: never add party-aware behaviour, party goals or party data to QuestPlanner/QuestOptimizer (user decision 2026-11-19). (1) Fix exactly these ids, nothing else; no new features beyond what each finding's suggestion needs (UX-02, now medium and solo-only: show the quest ID in the guide row tooltip and accept quest names as well as IDs; no click-to-pick feature, nothing about the party). (2) Edit ONLY the files listed as yours; put new tests in your own tests/test_ux_<batch>.py if they do not fit an owned test file. Other sessions may be editing files in this repo right now: always re-read a file right before editing it, never overwrite someone else's change, and report any conflict. (3) Test first where behaviour changes (show it fails, then fix); wording-only changes need an assertion on the new visible text. (4) Use plain player wording (no 'provider', 'DB', 'enumerable', 'job', key names); one name per feature: 'Quest guide', 'Party quests window', 'Adventurer's Journal', 'Party finder', 'Zone levels', 'Fishing spots'. (5) Run ONLY your owned test files (other builders run in parallel) and compile your Lua files under lupa.lua51. (6) Do not edit CHANGELOG.md; README.md only if it is in your list — otherwise return README text changes as a snippet. Report: files changed, per id what changed with before/after evidence, test results, a CHANGELOG '## Unreleased' snippet, and any README snippet."
+    },
+    {
+      "id": "review_b3",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review B3 fixes",
+      "in": [
+        "patch_b3",
+        "fixes_b3?"
+      ],
+      "out": "verdict_b3",
+      "prompt": "Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/, run tests from tests/ with /tmp/qs-test-env/bin/python test_<name>.py). Findings: context/ux-review-2026-11-19.json (field 'findings'; each has id, title, where, evidence, suggestion). Verifier verdicts: context/ux-review-verdicts-2026-11-19.json — SKIP any id marked 'refuted', and for 'partly' follow the verifier's evidence. Read context/architecture.md first. Independent review of batch B3 - Party, chat and keys (ids UX-03, UX-06, UX-22, UX-45). Builder report: {{patch_b3.summary}} Files: {{patch_b3.files}}. For EACH id: reproduce the original evidence against the current tree and confirm it is gone, the fix follows the finding's suggestion (or a better documented one), and nothing else changed behaviour. Re-run the batch's owned test files yourself (only those: QuestSharing/Progress.lua, QuestSharing/Menu.lua, QuestSharing/Adventure.lua, QuestSharing/Share.lua, QuestSharing/LFGInvite.lua, QuestSharing/Panel.lua, QuestSharing/Quick.lua, QuestSharing/QuestItems.lua, QuestSharing/Ping.lua, tests/test_together.py, tests/test_ping.py, tests/test_quick.py, tests/test_menu.py, tests/test_lfg_invite.py, tests/test_adventure.py, tests/test_questsharing.py, tests/test_items.py, tests/test_team.py, tests/test_ux_b3.py), check new tests fail without the fix where behaviour changed, check wording is plain and uses the one-name rule, and check the diff stays inside the owned files (other modified files come from other sessions). Reject any change that makes the Quest guide/optimizer depend on the party. Do not modify files. Approve only if every id is fixed; otherwise list concrete issues with path:line."
+    },
+    {
+      "id": "ok_b3",
+      "type": "xor",
+      "name": "B3 approved?"
+    },
+    {
+      "id": "fix_b3",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix B3 review issues",
+      "in": [
+        "verdict_b3"
+      ],
+      "out": "fixes_b3",
+      "timeout": 30,
+      "prompt": "Fix these review issues for batch B3 - Party, chat and keys, touching only QuestSharing/Progress.lua, QuestSharing/Menu.lua, QuestSharing/Adventure.lua, QuestSharing/Share.lua, QuestSharing/LFGInvite.lua, QuestSharing/Panel.lua, QuestSharing/Quick.lua, QuestSharing/QuestItems.lua, QuestSharing/Ping.lua, tests/test_together.py, tests/test_ping.py, tests/test_quick.py, tests/test_menu.py, tests/test_lfg_invite.py, tests/test_adventure.py, tests/test_questsharing.py, tests/test_items.py, tests/test_team.py, tests/test_ux_b3.py: {{verdict_b3.issues}}. Re-read files before editing (other sessions may edit this repo). Re-run the owned test files from tests/ with /tmp/qs-test-env/bin/python and report files and a summary."
+    },
+    {
+      "id": "build_b4",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix B4 findings",
+      "out": "patch_b4",
+      "prompt": "Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/, run tests from tests/ with /tmp/qs-test-env/bin/python test_<name>.py). Findings: context/ux-review-2026-11-19.json (field 'findings'; each has id, title, where, evidence, suggestion). Verifier verdicts: context/ux-review-verdicts-2026-11-19.json — SKIP any id marked 'refuted', and for 'partly' follow the verifier's evidence. Read context/architecture.md first. Your batch: B4 - Map and world. Fix these high and medium findings: UX-07, UX-10, UX-35, UX-36, UX-37, UX-38, UX-39, UX-40, UX-41. Your files: QuestSharing/Fishing.lua, QuestSharing/Marker.lua, QuestSharing/TravelMap.lua, QuestSharing/ZoneLevels.lua, QuestSharing/VendorMap.lua, QuestSharing/DataWork.lua, QuestSharing/GatherSources.lua, QuestSharing/ItemSources.lua, tests/test_vendor_map.py, tests/test_travel_map.py, tests/test_zone_levels.py, tests/test_where.py, tests/test_gather_sources.py, tests/test_questmap.py, tests/test_ux_b4.py. RULES: (0) The Quest guide/optimizer plans for the player alone: never add party-aware behaviour, party goals or party data to QuestPlanner/QuestOptimizer (user decision 2026-11-19). (1) Fix exactly these ids, nothing else; no new features beyond what each finding's suggestion needs (UX-02, now medium and solo-only: show the quest ID in the guide row tooltip and accept quest names as well as IDs; no click-to-pick feature, nothing about the party). (2) Edit ONLY the files listed as yours; put new tests in your own tests/test_ux_<batch>.py if they do not fit an owned test file. Other sessions may be editing files in this repo right now: always re-read a file right before editing it, never overwrite someone else's change, and report any conflict. (3) Test first where behaviour changes (show it fails, then fix); wording-only changes need an assertion on the new visible text. (4) Use plain player wording (no 'provider', 'DB', 'enumerable', 'job', key names); one name per feature: 'Quest guide', 'Party quests window', 'Adventurer's Journal', 'Party finder', 'Zone levels', 'Fishing spots'. (5) Run ONLY your owned test files (other builders run in parallel) and compile your Lua files under lupa.lua51. (6) Do not edit CHANGELOG.md; README.md only if it is in your list — otherwise return README text changes as a snippet. Report: files changed, per id what changed with before/after evidence, test results, a CHANGELOG '## Unreleased' snippet, and any README snippet."
+    },
+    {
+      "id": "review_b4",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review B4 fixes",
+      "in": [
+        "patch_b4",
+        "fixes_b4?"
+      ],
+      "out": "verdict_b4",
+      "prompt": "Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/, run tests from tests/ with /tmp/qs-test-env/bin/python test_<name>.py). Findings: context/ux-review-2026-11-19.json (field 'findings'; each has id, title, where, evidence, suggestion). Verifier verdicts: context/ux-review-verdicts-2026-11-19.json — SKIP any id marked 'refuted', and for 'partly' follow the verifier's evidence. Read context/architecture.md first. Independent review of batch B4 - Map and world (ids UX-07, UX-10, UX-35, UX-36, UX-37, UX-38, UX-39, UX-40, UX-41). Builder report: {{patch_b4.summary}} Files: {{patch_b4.files}}. For EACH id: reproduce the original evidence against the current tree and confirm it is gone, the fix follows the finding's suggestion (or a better documented one), and nothing else changed behaviour. Re-run the batch's owned test files yourself (only those: QuestSharing/Fishing.lua, QuestSharing/Marker.lua, QuestSharing/TravelMap.lua, QuestSharing/ZoneLevels.lua, QuestSharing/VendorMap.lua, QuestSharing/DataWork.lua, QuestSharing/GatherSources.lua, QuestSharing/ItemSources.lua, tests/test_vendor_map.py, tests/test_travel_map.py, tests/test_zone_levels.py, tests/test_where.py, tests/test_gather_sources.py, tests/test_questmap.py, tests/test_ux_b4.py), check new tests fail without the fix where behaviour changed, check wording is plain and uses the one-name rule, and check the diff stays inside the owned files (other modified files come from other sessions). Reject any change that makes the Quest guide/optimizer depend on the party. Do not modify files. Approve only if every id is fixed; otherwise list concrete issues with path:line."
+    },
+    {
+      "id": "ok_b4",
+      "type": "xor",
+      "name": "B4 approved?"
+    },
+    {
+      "id": "fix_b4",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix B4 review issues",
+      "in": [
+        "verdict_b4"
+      ],
+      "out": "fixes_b4",
+      "timeout": 30,
+      "prompt": "Fix these review issues for batch B4 - Map and world, touching only QuestSharing/Fishing.lua, QuestSharing/Marker.lua, QuestSharing/TravelMap.lua, QuestSharing/ZoneLevels.lua, QuestSharing/VendorMap.lua, QuestSharing/DataWork.lua, QuestSharing/GatherSources.lua, QuestSharing/ItemSources.lua, tests/test_vendor_map.py, tests/test_travel_map.py, tests/test_zone_levels.py, tests/test_where.py, tests/test_gather_sources.py, tests/test_questmap.py, tests/test_ux_b4.py: {{verdict_b4.issues}}. Re-read files before editing (other sessions may edit this repo). Re-run the owned test files from tests/ with /tmp/qs-test-env/bin/python and report files and a summary."
+    },
+    {
+      "id": "build_b5",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix B5 findings",
+      "out": "patch_b5",
+      "prompt": "Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/, run tests from tests/ with /tmp/qs-test-env/bin/python test_<name>.py). Findings: context/ux-review-2026-11-19.json (field 'findings'; each has id, title, where, evidence, suggestion). Verifier verdicts: context/ux-review-verdicts-2026-11-19.json — SKIP any id marked 'refuted', and for 'partly' follow the verifier's evidence. Read context/architecture.md first. Your batch: B5 - Journal, professions, bags and README (do last). Fix these high and medium findings: UX-12, UX-16, UX-17, UX-18, UX-19, UX-23, UX-24, UX-29, UX-30, UX-31, UX-32. Your files: QuestSharing/Rewards.lua, QuestSharing/Loot.lua, QuestSharing/EquipmentUI.lua, QuestSharing/DungeonQuests.lua, QuestSharing/Professions.lua, QuestSharing/QuestCleanup.lua, QuestSharing/SpellRanks.lua, QuestSharing/Bags.lua, README.md, tests/test_dungeon_quests.py, tests/test_loot.py, tests/test_equipment.py, tests/test_equipment_grouping.py, tests/test_optional.py, tests/test_professions.py, tests/test_quest_cleanup.py, tests/test_spell_ranks.py, tests/test_bags.py, tests/test_bagtools.py, tests/test_instance_focus.py, tests/test_usability.py, tests/test_ux_b5.py. RULES: (0) The Quest guide/optimizer plans for the player alone: never add party-aware behaviour, party goals or party data to QuestPlanner/QuestOptimizer (user decision 2026-11-19). (1) Fix exactly these ids, nothing else; no new features beyond what each finding's suggestion needs (UX-02, now medium and solo-only: show the quest ID in the guide row tooltip and accept quest names as well as IDs; no click-to-pick feature, nothing about the party). (2) Edit ONLY the files listed as yours; put new tests in your own tests/test_ux_<batch>.py if they do not fit an owned test file. Other sessions may be editing files in this repo right now: always re-read a file right before editing it, never overwrite someone else's change, and report any conflict. (3) Test first where behaviour changes (show it fails, then fix); wording-only changes need an assertion on the new visible text. (4) Use plain player wording (no 'provider', 'DB', 'enumerable', 'job', key names); one name per feature: 'Quest guide', 'Party quests window', 'Adventurer's Journal', 'Party finder', 'Zone levels', 'Fishing spots'. (5) Run ONLY your owned test files (other builders run in parallel) and compile your Lua files under lupa.lua51. (6) Do not edit CHANGELOG.md; README.md only if it is in your list — otherwise return README text changes as a snippet. Report: files changed, per id what changed with before/after evidence, test results, a CHANGELOG '## Unreleased' snippet, and any README snippet."
+    },
+    {
+      "id": "review_b5",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review B5 fixes",
+      "in": [
+        "patch_b5",
+        "fixes_b5?"
+      ],
+      "out": "verdict_b5",
+      "prompt": "Repo /Users/cozzolif/Desktop/cutpdf: WoW addon Quest Sharing (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/, run tests from tests/ with /tmp/qs-test-env/bin/python test_<name>.py). Findings: context/ux-review-2026-11-19.json (field 'findings'; each has id, title, where, evidence, suggestion). Verifier verdicts: context/ux-review-verdicts-2026-11-19.json — SKIP any id marked 'refuted', and for 'partly' follow the verifier's evidence. Read context/architecture.md first. Independent review of batch B5 - Journal, professions, bags and README (do last) (ids UX-12, UX-16, UX-17, UX-18, UX-19, UX-23, UX-24, UX-29, UX-30, UX-31, UX-32). Builder report: {{patch_b5.summary}} Files: {{patch_b5.files}}. For EACH id: reproduce the original evidence against the current tree and confirm it is gone, the fix follows the finding's suggestion (or a better documented one), and nothing else changed behaviour. Re-run the batch's owned test files yourself (only those: QuestSharing/Rewards.lua, QuestSharing/Loot.lua, QuestSharing/EquipmentUI.lua, QuestSharing/DungeonQuests.lua, QuestSharing/Professions.lua, QuestSharing/QuestCleanup.lua, QuestSharing/SpellRanks.lua, QuestSharing/Bags.lua, README.md, tests/test_dungeon_quests.py, tests/test_loot.py, tests/test_equipment.py, tests/test_equipment_grouping.py, tests/test_optional.py, tests/test_professions.py, tests/test_quest_cleanup.py, tests/test_spell_ranks.py, tests/test_bags.py, tests/test_bagtools.py, tests/test_instance_focus.py, tests/test_usability.py, tests/test_ux_b5.py), check new tests fail without the fix where behaviour changed, check wording is plain and uses the one-name rule, and check the diff stays inside the owned files (other modified files come from other sessions). Reject any change that makes the Quest guide/optimizer depend on the party. Do not modify files. Approve only if every id is fixed; otherwise list concrete issues with path:line."
+    },
+    {
+      "id": "ok_b5",
+      "type": "xor",
+      "name": "B5 approved?"
+    },
+    {
+      "id": "fix_b5",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix B5 review issues",
+      "in": [
+        "verdict_b5"
+      ],
+      "out": "fixes_b5",
+      "timeout": 30,
+      "prompt": "Fix these review issues for batch B5 - Journal, professions, bags and README (do last), touching only QuestSharing/Rewards.lua, QuestSharing/Loot.lua, QuestSharing/EquipmentUI.lua, QuestSharing/DungeonQuests.lua, QuestSharing/Professions.lua, QuestSharing/QuestCleanup.lua, QuestSharing/SpellRanks.lua, QuestSharing/Bags.lua, README.md, tests/test_dungeon_quests.py, tests/test_loot.py, tests/test_equipment.py, tests/test_equipment_grouping.py, tests/test_optional.py, tests/test_professions.py, tests/test_quest_cleanup.py, tests/test_spell_ranks.py, tests/test_bags.py, tests/test_bagtools.py, tests/test_instance_focus.py, tests/test_usability.py, tests/test_ux_b5.py: {{verdict_b5.issues}}. Re-read files before editing (other sessions may edit this repo). Re-run the owned test files from tests/ with /tmp/qs-test-env/bin/python and report files and a summary."
+    },
+    {
+      "id": "join",
+      "type": "and"
+    },
+    {
+      "id": "integrate",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Integrate and run suite",
+      "in": [
+        "patch_b1",
+        "verdict_b1",
+        "patch_b2",
+        "verdict_b2",
+        "patch_b3",
+        "verdict_b3",
+        "patch_b4",
+        "verdict_b4",
+        "patch_b5",
+        "verdict_b5"
+      ],
+      "out": "integration",
+      "timeout": 40,
+      "prompt": "Integrate the UX fix batches (context/ux-review-2026-11-19.json). Add the batches' CHANGELOG snippets under CHANGELOG.md '## Unreleased' (merge into short player-facing bullets, keep existing entries) and apply any README snippets to README.md without undoing batch B5's README edits. Snippets: B1: changelog {{patch_b1.changelog}} readme {{patch_b1.readme}} (review {{verdict_b1.status}}). B2: changelog {{patch_b2.changelog}} readme {{patch_b2.readme}} (review {{verdict_b2.status}}). B3: changelog {{patch_b3.changelog}} readme {{patch_b3.readme}} (review {{verdict_b3.status}}). B4: changelog {{patch_b4.changelog}} readme {{patch_b4.readme}} (review {{verdict_b4.status}}). B5: changelog {{patch_b5.changelog}} readme {{patch_b5.readme}} (review {{verdict_b5.status}}). Edit no Lua or test files. Then run EVERY tests/test_*.py from tests/ with /tmp/qs-test-env/bin/python and report the total and any failure, compile every QuestSharing/*.lua under lupa.lua51, and git diff --check. Re-read files before editing (other sessions may edit this repo). Report files changed, suite, compile and a summary including which batches ended with review status 'changes' and their open issues."
+    },
+    {
+      "id": "final_review",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review whole fix round",
+      "in": [
+        "integration"
+      ],
+      "out": "final",
+      "timeout": 30,
+      "prompt": "Final independent review of the UX fix round (context/ux-review-2026-11-19.json, verdicts in context/ux-review-verdicts-2026-11-19.json). Integration: {{integration.summary}} Suite: {{integration.suite}}. Re-run the full suite yourself. Spot-check every high id (UX-01..UX-07) end to end in the harness as a player would, plus 5 medium ids of your choice across different batches. Check the one-name rule holds in visible text (grep QuestSharing/*.lua and README for 'quest planner', 'quest optimizer', 'Optional', 'equipment explorer'). Confirm CHANGELOG/README match the code. Approve or list concrete issues with path:line."
+    },
+    {
+      "id": "done",
+      "type": "end",
+      "name": "UX fixes integrated"
+    }
+  ],
+  "flows": [
+    {
+      "from": "start",
+      "to": "split"
+    },
+    {
+      "from": "split",
+      "to": "build_b1"
+    },
+    {
+      "from": "build_b1",
+      "to": "review_b1"
+    },
+    {
+      "from": "review_b1",
+      "to": "ok_b1"
+    },
+    {
+      "from": "ok_b1",
+      "to": "join",
+      "name": "approved or 2nd round",
+      "when": {
+        "any": [
+          {
+            "path": "verdict_b1.status",
+            "eq": "approved"
+          },
+          {
+            "path": "$loop.ok_b1",
+            "gte": 2
+          }
+        ]
+      }
+    },
+    {
+      "from": "ok_b1",
+      "to": "fix_b1",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_b1",
+      "to": "review_b1"
+    },
+    {
+      "from": "split",
+      "to": "build_b2"
+    },
+    {
+      "from": "build_b2",
+      "to": "review_b2"
+    },
+    {
+      "from": "review_b2",
+      "to": "ok_b2"
+    },
+    {
+      "from": "ok_b2",
+      "to": "join",
+      "name": "approved or 2nd round",
+      "when": {
+        "any": [
+          {
+            "path": "verdict_b2.status",
+            "eq": "approved"
+          },
+          {
+            "path": "$loop.ok_b2",
+            "gte": 2
+          }
+        ]
+      }
+    },
+    {
+      "from": "ok_b2",
+      "to": "fix_b2",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_b2",
+      "to": "review_b2"
+    },
+    {
+      "from": "split",
+      "to": "build_b3"
+    },
+    {
+      "from": "build_b3",
+      "to": "review_b3"
+    },
+    {
+      "from": "review_b3",
+      "to": "ok_b3"
+    },
+    {
+      "from": "ok_b3",
+      "to": "join",
+      "name": "approved or 2nd round",
+      "when": {
+        "any": [
+          {
+            "path": "verdict_b3.status",
+            "eq": "approved"
+          },
+          {
+            "path": "$loop.ok_b3",
+            "gte": 2
+          }
+        ]
+      }
+    },
+    {
+      "from": "ok_b3",
+      "to": "fix_b3",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_b3",
+      "to": "review_b3"
+    },
+    {
+      "from": "split",
+      "to": "build_b4"
+    },
+    {
+      "from": "build_b4",
+      "to": "review_b4"
+    },
+    {
+      "from": "review_b4",
+      "to": "ok_b4"
+    },
+    {
+      "from": "ok_b4",
+      "to": "join",
+      "name": "approved or 2nd round",
+      "when": {
+        "any": [
+          {
+            "path": "verdict_b4.status",
+            "eq": "approved"
+          },
+          {
+            "path": "$loop.ok_b4",
+            "gte": 2
+          }
+        ]
+      }
+    },
+    {
+      "from": "ok_b4",
+      "to": "fix_b4",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_b4",
+      "to": "review_b4"
+    },
+    {
+      "from": "split",
+      "to": "build_b5"
+    },
+    {
+      "from": "build_b5",
+      "to": "review_b5"
+    },
+    {
+      "from": "review_b5",
+      "to": "ok_b5"
+    },
+    {
+      "from": "ok_b5",
+      "to": "join",
+      "name": "approved or 2nd round",
+      "when": {
+        "any": [
+          {
+            "path": "verdict_b5.status",
+            "eq": "approved"
+          },
+          {
+            "path": "$loop.ok_b5",
+            "gte": 2
+          }
+        ]
+      }
+    },
+    {
+      "from": "ok_b5",
+      "to": "fix_b5",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_b5",
+      "to": "review_b5"
+    },
+    {
+      "from": "join",
+      "to": "integrate"
+    },
+    {
+      "from": "integrate",
+      "to": "final_review"
+    },
+    {
+      "from": "final_review",
+      "to": "done"
+    }
+  ]
+}

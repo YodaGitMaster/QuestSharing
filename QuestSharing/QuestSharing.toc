@@ -3,7 +3,7 @@
 ## Notes: Shares your quests with a new party, says which ones you have in common, and posts friendly quest progress to chat when you click a tracked quest.
 ## Author: YodaGitMaster
 ## Version: 0.4.22
-## SavedVariables: QuestSharingDB, QuestSharingLog
+## SavedVariables: QuestSharingDB, QuestSharingLog, QuestSharingCache
 ## OptionalDeps: Questie, QuestieDB, ShortestPathForever, AnglerAtlas, AtlasLootClassic, AtlasLootContinued
 
 Compat.lua
@@ -21,6 +21,7 @@ QuestItems.lua
 Bags.lua
 BagTools.lua
 ChatLock.lua
+Aggro.lua
 Panel.lua
 Questie.lua
 OptionalUI.lua
@@ -30,6 +31,7 @@ QuestGuidance.lua
 QuestOptimizer.lua
 QuestCalibration.lua
 QuestPlanner.lua
+CampMap.lua
 ItemSources.lua
 VendorMap.lua
 TravelData.lua
@@ -48,6 +50,7 @@ Professions.lua
 ProfessionUI.lua
 Rewards.lua
 Loot.lua
+DungeonRoute.lua
 DungeonQuests.lua
 SpellRanks.lua
 Track.lua
@@ -55,6 +58,7 @@ Highlight.lua
 Friends.lua
 ItemLevel.lua
 LFGInvite.lua
+LFGFinderUI.lua
 Quick.lua
 Diagnostics.lua
 MinimapButton.lua

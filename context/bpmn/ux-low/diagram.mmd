@@ -1,0 +1,80 @@
+flowchart LR
+  %% Fix the 29 low UX findings in five file-disjoint batches with reviews · 11 agents: 6 × bpmn:worker, 5 × bpmn:reviewer · up to 21 with loop rounds
+  subgraph n_lane_builder["🤖 Builder · bpmn:worker · ⏱ 60 min"]
+    n_start(("Fixes requested"))
+    n_split{"+"}
+    n_build_b1["⚙ Fix B1 findings"]
+    n_fix_b1["⚙ Fix B1 review issues · ⏱ 30 min"]
+    n_build_b2["⚙ Fix B2 findings"]
+    n_fix_b2["⚙ Fix B2 review issues · ⏱ 30 min"]
+    n_build_b3["⚙ Fix B3 findings"]
+    n_fix_b3["⚙ Fix B3 review issues · ⏱ 30 min"]
+    n_build_b4["⚙ Fix B4 findings"]
+    n_fix_b4["⚙ Fix B4 review issues · ⏱ 30 min"]
+    n_build_b5["⚙ Fix B5 findings"]
+    n_fix_b5["⚙ Fix B5 review issues · ⏱ 30 min"]
+    n_integrate["⚙ Integrate and run suite · ⏱ 40 min"]
+    n_done((("Low findings integrated")))
+    n_review_b1__merge{"✕"}
+    n_review_b2__merge{"✕"}
+    n_review_b3__merge{"✕"}
+    n_review_b4__merge{"✕"}
+    n_review_b5__merge{"✕"}
+  end
+  subgraph n_lane_reviewer["🤖 Reviewer · bpmn:reviewer · ⏱ 25 min"]
+    n_review_b1["⚙ Review B1 fixes"]
+    n_ok_b1{"B1 approved?"}
+    n_review_b2["⚙ Review B2 fixes"]
+    n_ok_b2{"B2 approved?"}
+    n_review_b3["⚙ Review B3 fixes"]
+    n_ok_b3{"B3 approved?"}
+    n_review_b4["⚙ Review B4 fixes"]
+    n_ok_b4{"B4 approved?"}
+    n_review_b5["⚙ Review B5 fixes"]
+    n_ok_b5{"B5 approved?"}
+    n_join{"+"}
+  end
+  n_start --> n_split
+  n_split --> n_build_b1
+  n_build_b1 --> n_review_b1__merge
+  n_review_b1 --> n_ok_b1
+  n_ok_b1 -- "approved or 2nd round" --> n_join
+  n_ok_b1 -- "changes" --> n_fix_b1
+  n_fix_b1 --> n_review_b1__merge
+  n_split --> n_build_b2
+  n_build_b2 --> n_review_b2__merge
+  n_review_b2 --> n_ok_b2
+  n_ok_b2 -- "approved or 2nd round" --> n_join
+  n_ok_b2 -- "changes" --> n_fix_b2
+  n_fix_b2 --> n_review_b2__merge
+  n_split --> n_build_b3
+  n_build_b3 --> n_review_b3__merge
+  n_review_b3 --> n_ok_b3
+  n_ok_b3 -- "approved or 2nd round" --> n_join
+  n_ok_b3 -- "changes" --> n_fix_b3
+  n_fix_b3 --> n_review_b3__merge
+  n_split --> n_build_b4
+  n_build_b4 --> n_review_b4__merge
+  n_review_b4 --> n_ok_b4
+  n_ok_b4 -- "approved or 2nd round" --> n_join
+  n_ok_b4 -- "changes" --> n_fix_b4
+  n_fix_b4 --> n_review_b4__merge
+  n_split --> n_build_b5
+  n_build_b5 --> n_review_b5__merge
+  n_review_b5 --> n_ok_b5
+  n_ok_b5 -- "approved or 2nd round" --> n_join
+  n_ok_b5 -- "changes" --> n_fix_b5
+  n_fix_b5 --> n_review_b5__merge
+  n_join --> n_integrate
+  n_integrate --> n_done
+  n_review_b1__merge --> n_review_b1
+  n_review_b2__merge --> n_review_b2
+  n_review_b3__merge --> n_review_b3
+  n_review_b4__merge --> n_review_b4
+  n_review_b5__merge --> n_review_b5
+  classDef done fill:#e6f4ea,stroke:#1e8e3e,color:#0d3b1e
+  classDef running fill:#e8f0fe,stroke:#1a73e8,color:#0b2a5b
+  classDef ready fill:#fef7e0,stroke:#b06000,color:#4a3600
+  classDef failed fill:#fce8e6,stroke:#c5221f,color:#5f0d06
+  classDef cancelled fill:#f1f3f4,stroke:#80868b,color:#3c4043
+  class n_start,n_split,n_build_b1,n_review_b1,n_ok_b1,n_build_b2,n_review_b2,n_ok_b2,n_build_b3,n_review_b3,n_ok_b3,n_build_b4,n_review_b4,n_ok_b4,n_build_b5,n_review_b5,n_ok_b5,n_fix_b5,n_join,n_integrate,n_done,n_review_b1__merge,n_review_b2__merge,n_review_b3__merge,n_review_b4__merge,n_review_b5__merge done

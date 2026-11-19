@@ -788,7 +788,8 @@ local function paintMiddle()
         local ch = destination(q.hover)
         if refusedChannel(ch) then hintText:SetText("into your chat box - press Enter (the game does not let addons send this here)")
         elseif not sendsDirectly(ch) and not needsClick(q.hover) then hintText:SetText("release or click: it goes into your chat box - press Enter")
-        elseif q.sticky then hintText:SetText("click it (or press the key again) to say it")
+        elseif ch == "INVITE" and not targetWhisperName() then hintText:SetText("no target: target a player first")
+        elseif q.sticky then hintText:SetText("click it (or press the key again) to " .. (ch == "INVITE" and "invite" or "say it"))
         elseif needsClick(q.hover) and boxable(q.hover) then hintText:SetText("click: said at once - release: into your chat box (Enter)")
         elseif needsClick(q.hover) then hintText:SetText("release: keeps it open - click it")
         else hintText:SetText("release or click to send") end
@@ -1008,6 +1009,36 @@ function QuestSharing_QuickUp() ns.quickKey("up") end
 ns.PROTECTED_KEYS = { TOGGLESOUND = "toggle sound", TOGGLEMUSIC = "toggle music", MASTERVOLUMEUP = "volume up",
                       MASTERVOLUMEDOWN = "volume down", TOGGLEGAMEMENU = "game menu", TOGGLEAMBIENCE = "toggle ambience" }
 
+-- nil when a Quest Sharing key may take `key`; otherwise the message that says why not. Checked before anything is
+-- unbound, so a refused key really changes nothing.
+function ns.keyRefused(key)
+    local before = GetBindingAction and GetBindingAction(key) or ""
+    local what = ns.PROTECTED_KEYS[before]
+    return what and (key .. " is the game's \"" .. what .. "\" key - pick another one (nothing was changed)") or nil
+end
+
+-- what a key did, in plain words ("move forward", "the quest item key"), for the "X used to do: ..." warning
+local ACTION_WORDS = { MOVEFORWARD = "move forward", MOVEBACKWARD = "move backward", STRAFELEFT = "strafe left",
+                       STRAFERIGHT = "strafe right", TURNLEFT = "turn left", TURNRIGHT = "turn right", JUMP = "jump",
+                       TOGGLEAUTORUN = "auto run", SITORSTAND = "sit or stand",
+                       QUESTSHARING_QUICKCHAT = "the quick chat wheel", QUESTSHARING_LFGSCAN = "the party finder key",
+                       ["CLICK QuestSharingItemButton:LeftButton"] = "the quest item key",
+                       ["CLICK QuestSharingPingButton:LeftButton"] = "the ping key" }
+function ns.keyActionWords(action)
+    if ACTION_WORDS[action] then return ACTION_WORDS[action] end
+    local name = _G["BINDING_NAME_" .. action]                -- the game's own name, as in its Key Bindings window
+    if type(name) == "string" and name ~= "" then return name end
+    local button = string.match(action, "^CLICK ([^:]+)")
+    if button then return "a click on " .. button end
+    return string.lower((string.gsub(action, "_", " ")))
+end
+
+-- "W used to do: move forward" when `key` did something else before (`before`, read before binding it), or nil
+function ns.keyUsedToDo(key, before, own)
+    if not before or before == "" or before == own then return nil end
+    return key .. " used to do: " .. ns.keyActionWords(before)
+end
+
 -- the key that opens the ring, as the game names it ("E", "ALT-Q"), or nil
 function ns.quickKeyName()
     if not GetBindingKey then return nil end
@@ -1027,14 +1058,14 @@ function ns.setQuickKey(key)
     if key == "NONE" then
         for _, k in ipairs({ GetBindingKey(ACTION) }) do SetBinding(k) end
     else
+        local refused = ns.keyRefused(key)
+        if refused then return ns.print(refused) end
         local before = GetBindingAction and GetBindingAction(key) or ""
-        if ns.PROTECTED_KEYS[before] then
-            return ns.print(key .. " is the game's \"" .. ns.PROTECTED_KEYS[before] .. "\" key - pick another one (nothing was changed)")
-        end
         ns.trying("setting the quick chat key")
         if not SetBinding(key, ACTION) then return ns.print("could not bind " .. key .. " (is that a valid key name?)") end
-        if before ~= "" and before ~= ACTION then
-            ns.print(key .. " used to do: " .. before .. " (it now opens the quick chat wheel; /qs key none and rebind it in Key Bindings to undo)")
+        local was = ns.keyUsedToDo(key, before, ACTION)
+        if was then
+            ns.print(was .. " (it now opens the quick chat wheel; /qs key none and rebind it in Key Bindings to undo)")
         end
     end
     local save = SaveBindings or AttemptToSaveBindings

@@ -14,11 +14,30 @@ local function emptyCoverage()
 end
 local coverage = emptyCoverage()
 function P.coverage() return coverage end
+-- Camp and stop radii in yards, converted per map with C_Map.GetMapWorldSize. Map fractions are the fallback
+-- when a map has no known size: 0.045 of Dun Morogh is ~220 yd, which merged NPCs a player sees as two stops.
+local CLUSTER_YARDS, TAKEIN_YARDS = 100, 45
 local CLUSTER_DISTANCE, TAKEIN_DISTANCE = 0.065, 0.045
+local mapYards = {}
+local function yardScale(map)
+    if not map then return nil end
+    local cached = mapYards[map]
+    if cached == nil then
+        local w, h
+        if C_Map and type(C_Map.GetMapWorldSize) == "function" then
+            local ok, a, b = pcall(C_Map.GetMapWorldSize, map)
+            if ok then w, h = a, b end
+        end
+        cached = (type(w) == "number" and w > 0 and type(h) == "number" and h > 0 and w < math.huge and h < math.huge)
+            and { w, h } or false
+        mapYards[map] = cached
+    end
+    return cached or nil
+end
 local catalog, route, selected, frameMap, playerPoint, plannedMap, loading, generation = {}, {}, 1, nil, nil, nil, false, 0
 local selectionLocked = false
 local panel, message, planScroll, planRows, planContent, emptyText, followButton
-local previousButton, nextButton, stepCounter, modeButton, lockButton, waypointButton, guidePosition
+local previousButton, nextButton, stepCounter, modeButton, lockButton, waypointButton, guidePosition, busyButton
 local guideExpanded, guideLocked = true, false
 local sessionActive, zoneQuestIDs, zoneOrder = false, {}, {}
 local zoneScope = {}  -- per cached id list: the level it was scoped for (a level-up makes new quests reachable) and what it skipped
@@ -32,6 +51,17 @@ local panelMoved, lastLevelStats = false, { localCount = 0, below = 0, above = 0
 local lastPlanOptions
 
 local function questie() return ns.questie end
+
+-- What the guide says when Questie cannot list quests: what is wrong, what to do, and how to check.
+local function questieProblem()
+    local why = ns.questie and ns.questie.whyMissing and ns.questie.whyMissing()
+    local check = " Type /qs questie to check."
+    if not why then return "Update Questie: this version cannot list quests for the Quest guide." .. check end
+    if why:find("^needs the Questie addon") then
+        return "Install or enable Questie (both folders: Questie and QuestieDB), then /reload." .. check
+    end
+    return "The Quest guide cannot read Questie: " .. (why:gsub("%s*%- /qs questie.*$", "")) .. "." .. check
+end
 
 local function questLevelBand(level)
     level = tonumber(level)
@@ -59,10 +89,36 @@ end
 local function finite(n)
     return type(n) == "number" and n == n and n > -math.huge and n < math.huge
 end
+-- Classic-era XP needed to go from level i to i + 1. The current level uses UnitXPMax; later levels use this table,
+-- so the route can count on quests that unlock a few levels ahead while you quest (Coldridge Valley: level 1 -> 4).
+local XP_TO_NEXT = { 400, 900, 1400, 2100, 2800, 3600, 4500, 5400, 6500, 7600, 8800, 10100, 11400, 12900, 14400, 16000,
+    17700, 19400, 21300, 23200, 25200, 27300, 29400, 31700, 34000, 36400, 38900, 41400, 44300, 47400, 50800, 54500,
+    58600, 62800, 67100, 71600, 76100, 80800, 85700, 90700, 95800, 101000, 106300, 111800, 117500, 123200, 129100,
+    135100, 141200, 147500, 153900, 160400, 167100, 173900, 180800, 187900, 195000, 202300, 209800 }
+local LEVEL_AHEAD = 3 -- quests at most this many levels above you can join the route when quest XP reaches them
+-- The level reached after earning `gain` more XP from (level, xp of xpMax). Unknown XP: no level is assumed.
+local function levelAfter(level, xp, xpMax, gain)
+    if not (finite(level) and finite(xp) and finite(xpMax) and xpMax > 0) then return level end
+    xp = xp + gain
+    local need = xpMax
+    while need and xp >= need do
+        xp, level = xp - need, level + 1
+        need = XP_TO_NEXT[level]
+    end
+    return level
+end
 local function distance(a, b)
     if not (a and b and a.x and a.y and b.x and b.y and a.map == b.map) then return math.huge end
     local dx, dy = a.x - b.x, a.y - b.y
     return math.sqrt(dx * dx + dy * dy)
+end
+-- True when two points on one map are within `yards` (or `fraction` of the map when its size is unknown).
+local function within(a, b, yards, fraction)
+    if not (a and b and a.x and a.y and b.x and b.y and a.map == b.map) then return false end
+    local scale = yardScale(a.map)
+    if not scale then return distance(a, b) <= fraction end
+    local dx, dy = (a.x - b.x) * scale[1], (a.y - b.y) * scale[2]
+    return dx * dx + dy * dy <= yards * yards
 end
 
 local function project(map, x, y)
@@ -128,13 +184,13 @@ local function currentZone()
     frameMap = nil
     playerPoint = nil
     local map, x, y = ns.compat.playerPos()
-    if not map then return nil, "Open the quest planner outdoors, in a mapped zone." end
+    if not map then return nil, "Open the Quest guide outdoors, in a mapped zone." end
     local info = C_Map and U.call(C_Map.GetMapInfo, map)
     local isCity = C_Map and C_Map.IsCityMap and U.call(C_Map.IsCityMap, map)
-    if isCity then return nil, "The quest planner only works in outdoor zones, not towns or cities." end
+    if isCity then return nil, "The Quest guide only works in outdoor zones, not towns or cities." end
     local zoneType = Enum and Enum.UIMapType and Enum.UIMapType.Zone or 3
     if not info or info.mapType ~= zoneType then
-        return nil, "Open the quest planner in an outdoor zone, not on a town, dungeon, or continent map."
+        return nil, "Open the Quest guide in an outdoor zone, not on a town, dungeon, or continent map."
     end
     frameMap = map
     playerPoint = { map = map, x = x, y = y }
@@ -187,7 +243,12 @@ end
 local function zoneMembership(id, cache)
     local area = tonumber((questie().get("quest", id, "zoneOrSort")))
     if not area or area == 0 then return "unknown" end
-    if area < 0 then return "other", "Class, profession or event quest" end
+    if area < 0 then
+        -- Class quests are filed under the class, not a zone. One you can take (race/class gates ran already) is judged
+        -- by where its giver and hand-in are, like an unfiled quest: the gnome mage's Glyphic Memorandum is in Anvilmar.
+        if (tonumber((questie().get("quest", id, "requiredClasses"))) or 0) > 0 then return "unknown" end
+        return "other", "Class, profession or event quest"
+    end
     local map = questie().uiMapOf(area)
     if not map then return "unknown" end
     local known = cache and cache[map]
@@ -228,7 +289,7 @@ end
 -- One cheap read per quest, before any starter or spawn is read: ids this character, level or continent can't use
 -- never get their big tables loaded. Unknown data keeps the quest. Quests in the log are never skipped.
 local function scopeSkip(id, me, continents)
-    local why = questie().questGate(id, { raceMask = me.raceMask, classMask = me.classMask, level = me.level, slack = 1 })
+    local why = questie().questGate(id, { raceMask = me.raceMask, classMask = me.classMask, level = me.level, slack = LEVEL_AHEAD })
     if why then return why end
     local area = tonumber((questie().get("quest", id, "zoneOrSort")))
     if area and area > 0 then
@@ -286,12 +347,12 @@ local function newCandidate(id, starter, log, data, membership, zoneReason)
                 end
             end
             local currentXP, nextXP = U.call(UnitXP, "player"), U.call(UnitXPMax, "player")
-            if not (level and data.requiredLevel == level + 1 and finite(currentXP) and
+            if not (level and data.requiredLevel > level and data.requiredLevel <= level + LEVEL_AHEAD and finite(currentXP) and
                 finite(nextXP) and nextXP > currentXP and nextXP > 0) then
                 coverage.blocked[id] = reason .. "; recheck on level-up"
                 return
             end
-            coverage.unknown[id] = reason .. "; route depends on estimated quest XP"
+            coverage.unknown[id] = reason .. "; the route counts on reaching that level with earlier quests"
             status = "level"
         end
         if (data.requiredMaxLevel and level and level > data.requiredMaxLevel) or status == "overlevel" then
@@ -323,7 +384,7 @@ local function newCandidate(id, starter, log, data, membership, zoneReason)
             else
                 allWorkLocal = false
                 if nearestPoint(target.points) then
-                    coverage.blocked[id] = "No real local camp (only stray or zero-drop spawns): " .. (target.name or target.kind)
+                    coverage.blocked[id] = "No camp here for " .. (target.name or target.kind) .. ", only a few stray spawns"
                 elseif #target.points > 0 then coverage.external[id] = "Objective outside this zone: " .. (target.name or target.kind)
                 else coverage.unknown[id] = "Objective location unknown: " .. (target.name or target.kind) end
             end
@@ -333,9 +394,9 @@ local function newCandidate(id, starter, log, data, membership, zoneReason)
         if #data.turnIns > 0 then
             local mapped
             for _,source in ipairs(data.turnIns) do if #(source.spawns or {}) > 0 then mapped=true end end
-            if mapped then coverage.external[id] = "Turn-in outside this zone"
-            else coverage.unknown[id] = "Turn-in location unknown" end
-        else coverage.unknown[id] = "No known turn-in" end
+            if mapped then coverage.external[id] = "Hand-in is in another zone"
+            else coverage.unknown[id] = "Hand-in location unknown" end
+        else coverage.unknown[id] = "No known hand-in" end
     end
     data.canFinishHere = allWorkLocal and turnPoint ~= nil
     if data.entry then
@@ -344,7 +405,7 @@ local function newCandidate(id, starter, log, data, membership, zoneReason)
         return
     end
     if status ~= "ready" and status ~= "active" and status ~= "any" and status ~= "all" and status ~= "parent" and status ~= "level" and status ~= "reputation" then
-        if status == nil or status == "unknown" then coverage.unknown[id] = "Acceptance eligibility unknown"
+        if status == nil or status == "unknown" then coverage.unknown[id] = "Not known whether you can take it"
         else coverage.blocked[id] = detail or (status == "exclusive" and "Exclusive quest already chosen"
             or status == "character" and "Class, race or faction requirement" or "A character or world requirement is unmet") end
         return
@@ -374,7 +435,15 @@ local function scan(rediscover)
     local oldSelectedKey = keepSelection and route[selected] and stopIdentity(route[selected]) or nil
     local inZone, index = {}, 1
     local me, continents = q.me(), {}
+    -- A zone's quest list is saved to disk per character scope (race, class, level), so a new session skips the scan.
+    local savedKey = table.concat({ tostring(zoneMap), tostring(me.raceMask), tostring(me.classMask), tostring(me.level) }, "|")
     if rediscover or not (zoneScope[zoneMap] and zoneScope[zoneMap].level == me.level) then zoneQuestIDs[zoneMap] = nil end
+    if not rediscover and not zoneQuestIDs[zoneMap] then
+        local saved = Work.saved("guideZones", savedKey)
+        if saved and type(saved.ids) == "table" then
+            zoneQuestIDs[zoneMap], zoneScope[zoneMap] = saved.ids, { level = me.level, skipped = saved.skipped or {} }
+        end
+    end
     local discovered = zoneQuestIDs[zoneMap]
     if discovered then coverage.skipped = zoneScope[zoneMap].skipped end
     local discoveredIDs, sourceCache, zoneCache = {}, {}, {}
@@ -394,7 +463,7 @@ local function scan(rediscover)
         else
             ids = q.ids("quest")
         end
-        if type(ids) ~= "table" then clearPlan("Questie needs a recent QuestieDB with quest IDs."); return end
+        if type(ids) ~= "table" then clearPlan(questieProblem()); return end
         while index <= #ids do
             if index % 20 == 1 then
                 local currentName, locationError, currentMap = currentZone()
@@ -429,7 +498,7 @@ local function scan(rediscover)
                     end
                     if not data then coverage.unknown[id] = "Quest data missing"
                     elseif P.levelScope == "green-yellow" and not isInLevelRange(band) then
-                        coverage.filtered[id] = "Outside the green/yellow level filter"
+                        coverage.filtered[id] = "Not green or yellow for your level"
                     else
                         data.band = band
                         local candidate = newCandidate(id, starters or {}, log, data, membership, zoneReason)
@@ -449,24 +518,34 @@ local function scan(rediscover)
         end
         if not discovered then
             zoneQuestIDs[zoneMap], zoneScope[zoneMap] = discoveredIDs, { level = me.level, skipped = coverage.skipped }
+            Work.save("guideZones", savedKey, { ids = discoveredIDs, skipped = coverage.skipped }, 40)
             for i = #zoneOrder, 1, -1 do if zoneOrder[i] == zoneMap then table.remove(zoneOrder, i) end end
-            zoneOrder[#zoneOrder + 1] = zoneMap
-            while #zoneOrder > 2 do zoneQuestIDs[table.remove(zoneOrder, 1)] = nil end
+            zoneOrder[#zoneOrder + 1] = zoneMap -- every zone's quest list is kept for the session (Purge frees them)
         end
         if thisGeneration ~= generation then return end
-        local earned, currentXP, nextXP = 0, U.call(UnitXP, "player"), U.call(UnitXPMax, "player")
-        for _, candidate in pairs(inZone) do
-            if candidate.status ~= "level" then earned = earned + (tonumber(candidate.xp) or 0) end
-        end
+        local currentXP, nextXP = U.call(UnitXP, "player"), U.call(UnitXPMax, "player")
+        local level = tonumber(U.call(UnitLevel, "player"))
+        -- Quest XP opens later levels, whose quests add more XP: repeat until no new quest unlocks.
+        local reached, reachable = level, {}
+        repeat
+            local earned, grew = 0, false
+            for id, candidate in pairs(inZone) do
+                if candidate.status ~= "level" or reachable[id] then earned = earned + (tonumber(candidate.xp) or 0) end
+            end
+            reached = levelAfter(level, currentXP, nextXP, earned)
+            for id, candidate in pairs(inZone) do
+                if candidate.status == "level" and not reachable[id] and finite(reached)
+                    and (tonumber(candidate.requiredLevel) or 0) <= reached then reachable[id], grew = true, true end
+            end
+        until not grew
         for id, candidate in pairs(inZone) do
-            if candidate.status == "level" and (not finite(nextXP) or not finite(currentXP)
-                or earned < nextXP - currentXP) then
+            if candidate.status == "level" and not reachable[id] then
                 inZone[id] = nil
                 coverage.unknown[id] = nil
                 local need = finite(nextXP) and finite(currentXP) and nextXP > currentXP
                     and (" (" .. tostring(nextXP - currentXP) .. " XP to next level)") or ""
                 coverage.blocked[id] = "Requires level " .. tostring(candidate.requiredLevel)
-                    .. need .. "; known local quest XP does not establish the unlock"
+                    .. need .. "; the quests here do not give enough XP to reach it"
             end
         end
         catalog = inZone
@@ -583,7 +662,7 @@ buildGraph = function(log)
         Work.checkpoint()
     end
     for id in pairs(pending) do
-        coverage.blocked[id] = "Prerequisite unavailable in this zone or cyclic"
+        coverage.blocked[id] = "Needs an earlier quest that cannot be done in this zone"
         nodes[id] = nil
     end
 end
@@ -607,8 +686,12 @@ end
 
 local goal = { mode = "all", selectedIDs = {}, budgetSeconds = 1800 }
 local readSettings                      -- saved goal settings -> goal (defined with the other goal functions)
+local goalLine, resolveChosen          -- "Quest XP/hour • Every level"; chosen quest names -> IDs (same place)
 local report, previousPlan, previousMap, lastOrigin, plannedSpeed
 local waitingAt = {}
+-- Set by "Camp busy": { key = objective, point = busy camp, name = what is farmed there }. Printed once the new route
+-- shows which camp the guide uses instead.
+local busyNotice
 -- The camp each objective (stop.key) last used, per map. A camp forced by "Camp busy" is never recorded, so the
 -- camp chosen before the mark returns when the wait ends; "Clear camp wait" forgets them all.
 local siteMemory = { map = nil, sites = {} }
@@ -687,9 +770,15 @@ local REAL_CAMP = 3
 local MAX_CAMP_CHOICES = 4
 local IMPROVE_STEPS = 250000 -- local-search budget in simulated actions (background, after the first route shows)
 local function groupCamps(list)
-    local r2, cells = CLUSTER_DISTANCE * CLUSTER_DISTANCE, {}
+    -- Work in yards when the spawns' map has a known size, so a camp is the same size on a small and a large map.
+    local first = list[1] and list[1].point
+    local scale = first and yardScale(first.map)
+    local sx_, sy_, radius = 1, 1, CLUSTER_DISTANCE
+    if scale then sx_, sy_, radius = scale[1], scale[2], CLUSTER_YARDS end
+    local r2, cells = radius * radius, {}
     for i, s in ipairs(list) do
-        s.cx, s.cy = math.floor(s.x / CLUSTER_DISTANCE), math.floor(s.y / CLUSTER_DISTANCE)
+        s.ux, s.uy = s.x * sx_, s.y * sy_
+        s.cx, s.cy = math.floor(s.ux / radius), math.floor(s.uy / radius)
         local key = s.cx .. ":" .. s.cy
         cells[key] = cells[key] or {}
         table.insert(cells[key], i)
@@ -699,7 +788,7 @@ local function groupCamps(list)
         for cx = s.cx - 1, s.cx + 1 do
             for cy = s.cy - 1, s.cy + 1 do
                 for _, j in ipairs(cells[cx .. ":" .. cy] or {}) do
-                    local dx, dy = list[j].x - s.x, list[j].y - s.y
+                    local dx, dy = list[j].ux - s.ux, list[j].uy - s.uy
                     if dx * dx + dy * dy <= r2 then found[#found + 1] = j end
                 end
             end
@@ -795,7 +884,7 @@ targetLocation = function(target)
             local real = #row.camp.members >= math.min(REAL_CAMP, largest)
             for _, mark in ipairs(mixed) do
                 if real then break end
-                real = distance(mark, row.camp.mark.point) <= CLUSTER_DISTANCE
+                real = within(mark, row.camp.mark.point, CLUSTER_YARDS, CLUSTER_DISTANCE)
             end
             if real then
                 target.camps[#target.camps + 1] = { point = row.camp.mark.point, source = row.source }
@@ -814,6 +903,79 @@ targetLocation = function(target)
     end)
     if not ranked[1] then return nil end
     return ranked[1].point, ranked[1].source, ranked
+end
+
+-- Shared-camps view (Settings > Quest guide > "Show shared camps on the world map" and the camps table).
+-- The planned quests' unfinished kill and collect objectives, their spawns on this map grouped into the guide's
+-- 100-yard camps; a camp of at least CAMP_VIEW_MIN spawns is shown, "shared" when it serves 2+ quests.
+-- Returns { map, camps = { { id, point, total, counts[col], quests[qid], questCount, shared } }, columns = { { name, quest, qid } } }.
+local CAMP_VIEW_MIN = 5
+local campCache
+function P.campView()
+    if not (sessionActive and frameMap and route and route[1]) then return nil end
+    if campCache and campCache.route == route then return campCache.view end
+    local planned, ids = (report and report.plannedIDs) or {}, {}
+    for id in pairs(planned) do if catalog[id] then ids[#ids + 1] = id end end
+    table.sort(ids)
+    local list, columns = {}, {}
+    for _, id in ipairs(ids) do
+        local q = catalog[id]
+        for _, target in ipairs(q.targets or {}) do
+            if not objectiveIsDone(q.entry, target) then
+                for _, source in ipairs(target.sources or {}) do
+                    local col
+                    for _, spawn in ipairs(source.spawns or {}) do
+                        local point = pointForSpawn(spawn)
+                        if point then
+                            if not col then
+                                columns[#columns + 1] = { name = source.name or "?", quest = q.name, qid = id }
+                                col = #columns
+                            end
+                            list[#list + 1] = { point = point, x = point.x, y = point.y, col = col }
+                        end
+                    end
+                end
+            end
+        end
+    end
+    local camps = {}
+    for _, camp in ipairs(#list > 0 and groupCamps(list) or {}) do
+        if #camp.members >= CAMP_VIEW_MIN then
+            local row = { point = camp.mark.point, total = #camp.members, counts = {}, quests = {}, questCount = 0, members = camp.members }
+            for _, m in ipairs(camp.members) do
+                row.counts[m.col] = (row.counts[m.col] or 0) + 1
+                local qid = columns[m.col].qid
+                if not row.quests[qid] then row.quests[qid], row.questCount = true, row.questCount + 1 end
+            end
+            row.shared = row.questCount >= 2
+            camps[#camps + 1] = row
+        end
+    end
+    table.sort(camps, function(a, b)
+        if a.total ~= b.total then return a.total > b.total end
+        if a.point.x ~= b.point.x then return a.point.x < b.point.x end
+        return a.point.y < b.point.y
+    end)
+    local points = {}
+    for i, camp in ipairs(camps) do
+        camp.id = "A" .. i
+        for _, m in ipairs(camp.members or {}) do m.camp = camp.id end
+    end
+    for _, m in ipairs(list) do points[#points + 1] = { x = m.x, y = m.y, col = m.col, camp = m.camp } end
+    -- quest givers on the route (pickups and hand-ins), one per name, for the window's map and camp names
+    local givers, seen = {}, {}
+    for _, group in ipairs(route) do
+        for _, a in ipairs(group.atoms or {}) do
+            local name = a.destination
+            if (a.kind == "pickup" or a.kind == "turnin") and name and a.point and a.point.map == frameMap and not seen[name] then
+                seen[name] = true
+                givers[#givers + 1] = { name = name, x = a.point.x, y = a.point.y }
+            end
+        end
+    end
+    local view = { map = frameMap, camps = camps, columns = columns, points = points, givers = givers }
+    campCache = { route = route, view = view }
+    return view
 end
 
 local function questActions()
@@ -903,9 +1065,10 @@ end
 local function visibleStops(ordered, reasons)
     local grouped, last = {}, nil
     for _, stop in ipairs(ordered) do
-        local radius = stop.kind == "objective" and CLUSTER_DISTANCE or TAKEIN_DISTANCE
+        local yards, fraction = TAKEIN_YARDS, TAKEIN_DISTANCE
+        if stop.kind == "objective" then yards, fraction = CLUSTER_YARDS, CLUSTER_DISTANCE end
         -- Only collapse consecutive instructions. Their physical actions still run in scheduled order.
-        if not last or last.kind ~= stop.kind or distance(last.point, stop.point) > radius then
+        if not last or last.kind ~= stop.kind or not within(last.point, stop.point, yards, fraction) then
             last = { point = stop.point, kind = stop.kind, phase = stop.phase, destination = stop.destination,
                 quests = {}, tasks = {}, questTasks = {}, reasons = {}, atoms = {} }
             grouped[#grouped + 1] = last
@@ -1010,7 +1173,7 @@ local function planOptions(stops, origin)
         reputation = reputation,
         skillRanks = skillRanks,
         level = U.call(UnitLevel, "player"), currentXP = U.call(UnitXP, "player"),
-        nextLevelXP = U.call(UnitXPMax, "player") }, estimatedScale, speed, forced
+        nextLevelXP = U.call(UnitXPMax, "player"), levelXPTable = XP_TO_NEXT }, estimatedScale, speed, forced
 end
 
 buildRoute = function()
@@ -1018,6 +1181,7 @@ buildRoute = function()
     nextStopID = 0
     local stops, origin = questActions(), playerPoint
     if not origin then route = {}; return end
+    if goal.mode == "selected" then resolveChosen() end
     local opts, estimatedScale, speed, forced = planOptions(stops, origin)
     local token = generation
     local keys, selection, busy = {}, {}, {}
@@ -1055,7 +1219,23 @@ buildRoute = function()
         end
         -- The step the player chose is read now, not when a background job started: the search takes many slices.
         local key = selectionLocked and route[selected] and stopIdentity(route[selected])
-        route = visibleStops(ordered or {}, report.reasons)
+        route = visibleStops(ordered or {}, report.stepNotes)
+        for _, group in ipairs(route) do
+            for _, atom in ipairs(group.atoms) do if forced[atom.key] then group.busyCamp = true end end
+        end
+        if busyNotice then
+            local notice, camp = busyNotice, nil
+            busyNotice = nil
+            for _, group in ipairs(route) do
+                for _, atom in ipairs(group.atoms) do if atom.key == notice.key then camp = group.point end end
+            end
+            local line = "Quest guide: " .. notice.name .. " camp marked busy for 5 min; "
+            if camp and campKey(camp) ~= campKey(notice.point) then
+                line = line .. string.format("next free camp %.1f, %.1f", camp.x * 100, camp.y * 100)
+            elseif camp then line = line .. "every camp is busy, so the route waits for this one"
+            else line = line .. "the route leaves it out until then" end
+            ns.print(line)
+        end
         selected = 1
         if key then
             for i, stop in ipairs(route) do if stopIdentity(stop) == key then selected = i; break end end
@@ -1108,36 +1288,43 @@ end
 local function ensurePanel()
     if panel then return true end
     if not (CreateFrame and UIParent) then return false end
-    panel = S.window("QuestSharingPlannerPanel", PLAN_WIDTH, 380, "Quest plan", "hud")
+    panel = S.window("QuestSharingPlannerPanel", PLAN_WIDTH, 380, "Quest guide", "hud")
     if not panel then return false end
-    S.fill(panel, "BACKGROUND", 0.035, 0.032, 0.027, 1):SetAllPoints(panel)
     panel.title:ClearAllPoints()
     panel.title:SetPoint("TOP", panel, "TOP", 0, -8)
-    panel.title:SetText(S.GOLD .. "QUEST SHARING|r")
+    panel.title:SetText(S.GOLD .. "QUEST GUIDE|r")
     panel.onMoved = function() panelMoved = true end
     panel:SetScript("OnDragStart", function(self) if not guideLocked then self:StartMoving() end end)
     panel:SetScript("OnDragStop", function(self)
         if not guideLocked then self:StopMovingOrSizing(); panelMoved = true end
     end)
     panel:EnableMouse(true)
-    local function smallButton(label, width, x, y, action, tip)
+    -- Word buttons keep the classic button art; symbol buttons ("...", "?", arrows, minus) stay bare text.
+    local function smallButton(label, width, x, y, action, tip, art)
         local b = S.button(panel, label, width, action, tip)
         b:SetPoint("TOPLEFT", panel, "TOPLEFT", x, -y)
-        b.bg:Hide(); b.edge:Hide()
+        if not art then b.bg:Hide(); b.edge:Hide() end
         return b
     end
-    smallButton("...", 20, 7, 6, function() ns.toggleSettings(true, "optional") end, "Quest Sharing settings")
-    smallButton("Plan", 38, 28, 6, function() P.options() end, "Choose the objective and review route estimates")
+    smallButton("...", 20, 7, 6, function() ns.settingsTab("guide") end, "Quest guide settings")
+    local planButton = smallButton("Plan", 38, 28, 6, function() P.options() end, nil, true)
+    planButton:SetScript("OnEnter", function(self)
+        self.label:SetText(S.WHITE .. tostring(self.text or "") .. "|r")
+        U.tip(self, "Quest guide goal", { goalLine(), "Click: change the goal and see the report in Settings > Quest guide." })
+    end)
     smallButton("?", 20, 68, 6, function(self)
         U.tip(self, "Quest guide", { "Follow the highlighted step, then use the arrows to review the next step.",
-            "Quest progress updates the guide automatically. Click a step to mark its location.",
+            "Quest progress updates the guide automatically. Click a step to set a waypoint there.",
             "Lock keeps the guide in place. Minus shows only the current step." })
-    end, "How to use the quest guide")
+    end, "How to use the Quest guide")
+    busyButton = smallButton("Busy", 38, PLAN_WIDTH - 120, 6, function() P.markCampBusy() end,
+        "Camp busy: other players are farming here. The route uses another camp for 5 minutes, then comes back.")
+    busyButton:Hide()
     lockButton = smallButton("Lock", 46, PLAN_WIDTH - 80, 6, function(self)
         guideLocked = not guideLocked
         panel:SetMovable(not guideLocked)
         self:SetLabel(guideLocked and "Unlock" or "Lock")
-    end, "Lock or unlock the guide position")
+    end, "Lock or unlock the guide position", true)
     local headerLine = S.fill(panel, "ARTWORK", 0.56, 0.39, 0.14, 1)
     headerLine:SetPoint("TOPLEFT", panel, "TOPLEFT", 7, -29)
     headerLine:SetWidth(PLAN_WIDTH - 14); headerLine:SetHeight(1)
@@ -1215,9 +1402,38 @@ local function sortedQuestIDs(stop)
     return ids
 end
 
+-- Pickup and hand-in steps name each giver once in a heading, then list the quests: "Pick up from X:" / "[1] Quest".
+local function takeInText(stop, numbers)
+    local giverOf = {}
+    for _, a in ipairs(stop.atoms or {}) do
+        for id in pairs(a.quests) do giverOf[id] = giverOf[id] or a.destination or false end
+    end
+    local groups, byGiver = {}, {}
+    local verb = stop.kind == "pickup" and "Pick up from " or "Hand in to "
+    for _, id in ipairs(sortedQuestIDs(stop)) do
+        local giver = giverOf[id] or false
+        local group = byGiver[giver]
+        if not group then
+            group = { giver and (verb .. giver .. ":") or (stop.kind == "pickup" and "Pick up these quests:" or "Hand in these quests:") }
+            byGiver[giver] = group
+            groups[#groups + 1] = group
+        end
+        group[#group + 1] = string.format("[%d] %s", numbers[id], stop.quests[id])
+    end
+    local out = {}
+    for _, group in ipairs(groups) do
+        for _, line in ipairs(group) do out[#out + 1] = line end
+    end
+    return out
+end
+
 local function rowDetailsText(stop, numbers)
-    local tasks = { stop.kind == "pickup" and "Take these quests:" or stop.kind == "turnin"
-        and "Hand in these quests:" or "Complete these quests here:" }
+    if stop.kind == "pickup" or stop.kind == "turnin" then
+        local tasks = takeInText(stop, numbers)
+        if stop.reasons and stop.reasons[1] then tasks[#tasks + 1] = stop.reasons[1] end
+        return table.concat(tasks, "\n")
+    end
+    local tasks = { "Complete these quests here:" }
     for _, id in ipairs(sortedQuestIDs(stop)) do
         local questTasks = stop.questTasks[id] or {}
         if stop.kind == "objective" or #questTasks == 0 then
@@ -1228,6 +1444,7 @@ local function rowDetailsText(stop, numbers)
         end
     end
     if stop.reasons and stop.reasons[1] then tasks[#tasks + 1] = stop.reasons[1] end
+    if stop.busyCamp then tasks[#tasks + 1] = "A camp for this step is marked busy; the route uses this one for now." end
     return table.concat(tasks, "\n")
 end
 
@@ -1238,18 +1455,6 @@ local function destinationName(stop)
     if type(info) == "table" and type(info.name) == "string" and info.name ~= ""
         and (not zone or info.name ~= zone.name) then return info.name end
     return stop.destination or "the marked location"
-end
-
-local function showStopOnMap(index)
-    if not selectStop(index) then return false end
-    local stop = route[selected]
-    if not (stop and stop.point) then return ns.print("this stop has no map location") end
-    if InCombatLockdown and InCombatLockdown() then return ns.print("mark this location after combat") end
-    local p = stop.point
-    if not ns.compat.setWaypoint(p.map, p.x, p.y) then
-        return ns.print("the game cannot mark this location on the map")
-    end
-    return true
 end
 
 showPlanRows = function()
@@ -1309,13 +1514,18 @@ showPlanRows = function()
             row.edge:SetVertexColor(0.18, 0.16, 0.12, 1)
         end
         local rowIndex = i
+        -- One click action (any button, in or out of combat): select the step and set its waypoint.
         row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-        row:SetScript("OnClick", function(_, button)
-            if button == "RightButton" then showStopOnMap(rowIndex)
-            elseif selectStop(rowIndex) then P.pin() end
+        row:SetScript("OnClick", function()
+            if selectStop(rowIndex) then P.pin() end
         end)
         row:SetScript("OnEnter", function(self)
-            U.tip(self, "Quest location", { "Left-click: set a waypoint.", "Right-click: mark this location on the map." })
+            local lines = {}
+            for _, id in ipairs(sortedQuestIDs(stop)) do
+                lines[#lines + 1] = string.format("%s - Quest ID %d", tostring(stop.quests[id]), id)
+            end
+            lines[#lines + 1] = "Click: set a waypoint here."
+            U.tip(self, "Quest location", lines)
         end)
         row:SetScript("OnLeave", function() U.hideTip() end)
         row:SetEnabled(stop.point ~= nil)
@@ -1331,6 +1541,9 @@ showPlanRows = function()
     if guidePosition then guidePosition:SetWidth(math.max(1, (PLAN_WIDTH - 16) * (#route > 0 and selected / #route or 0))) end
     if waypointButton then
         if #route > 0 and not (Path and Path.available()) then waypointButton:Show() else waypointButton:Hide() end
+    end
+    if busyButton then
+        if route[selected] and route[selected].kind == "objective" then busyButton:Show() else busyButton:Hide() end
     end
     local stop = route[selected]
     if stop and not loading then
@@ -1370,8 +1583,12 @@ render = function(zone)
             elseif (stats.localCount or 0) > 0 and stats.eligible == 0 then
                 reason = "No quests here are green or yellow for your level."
             elseif active + ready + future == 0 then
-                reason = (stats.localCount or 0) == 0 and "Questie has no mapped quest givers here."
-                    or "No active or ready quests found here."
+                local open = next(coverage.blocked) or next(coverage.unknown) or next(coverage.external)
+                    or next(coverage.filtered)
+                if (stats.localCount or 0) == 0 then reason = "Questie has no mapped quest givers here."
+                elseif next(coverage.completed) and not open then
+                    reason = "You have done every quest the guide knows in " .. (zone or "this zone") .. "."
+                else reason = "No quest can be planned here yet - Plan > Show report says why." end
             else
                 reason = "Quest data was found, but no route locations are mapped here."
             end
@@ -1408,11 +1625,11 @@ function P.navigate(direction)
 end
 
 function P.pin()
-    if loading then return ns.print("the quest guide is updating") end
-    if not plannedMap and #route == 0 then return ns.print("there is no quest plan yet; use /qs plan") end
+    if loading then return ns.print("the Quest guide is updating") end
+    if not plannedMap and #route == 0 then return ns.print("the Quest guide has no route yet; use /qs plan") end
     local zone, reason, map = currentZone()
     if not zone then clearPlan(reason); return end
-    if plannedMap and map ~= plannedMap then scan(); return ns.print("you changed zones; rebuilding the quest plan") end
+    if plannedMap and map ~= plannedMap then scan(); return ns.print("you changed zones; the Quest guide is planning the new zone") end
     local stop = route[selected]
     if not stop or not stop.point then return ns.print("this stop has no map location") end
     local p = stop.point
@@ -1422,14 +1639,14 @@ function P.pin()
 end
 
 function P.follow()
-    if loading then return ns.print("the quest guide is updating") end
+    if loading then return ns.print("the Quest guide is updating") end
     local stop = route[selected]
     if not stop or not stop.point then return ns.print("this stop has no map location") end
     local zone, reason, map = currentZone()
     if not zone then clearPlan(reason); return end
     if plannedMap and map ~= plannedMap then
         scan()
-        return ns.print("you changed zones; rebuilding the quest plan")
+        return ns.print("you changed zones; the Quest guide is planning the new zone")
     end
     if not (Path and Path.available()) then
         return ns.print("Shortest Path Forever is not ready; click a stop for a regular map pin")
@@ -1441,7 +1658,7 @@ function P.follow()
 end
 
 function P.refresh()
-    if not ns.db.questPlanner then return ns.print("turn on the Quest route guide in Settings > Quest guide first") end
+    if not ns.db.questPlanner then return ns.print("turn on the Quest guide in Settings > Quest guide first") end
     if not panel or not panel:IsShown() then return P.open() end
     sessionActive = true
     scan(true)
@@ -1452,7 +1669,7 @@ function P.open()
     panelDismissed = false
     sessionActive = true
     readSettings()
-    if not ensurePanel() then return ns.print("this client cannot open the quest plan panel") end
+    if not ensurePanel() then return ns.print("this client cannot open the Quest guide") end
     dockPanel()
     panel:Show()
     local elapsed = 0
@@ -1483,10 +1700,12 @@ function P.settingChanged(enabled)
         zoneQuestIDs, zoneOrder, zoneScope = {}, {}, {}
         generation = generation + 1
         loading = false
-        clearPlan("Quest planner is off.")
+        clearPlan("Quest guide is off.")
         if panel then panel:Hide() end
     end
 end
+
+Work.onPurge("Quest guide zone lists", function() Work.forget("guideZones"); zoneQuestIDs, zoneScope, zoneOrder = {}, {}, {} end)
 
 function P.masterChanged(enabled)
     if enabled then return end
@@ -1520,7 +1739,7 @@ rebuildProgress = function(log, zone)
     end, function()
         return token == generation and ns.db.enabled and ns.db.questPlanner and sessionActive
             and not panelDismissed and panel and panel:IsShown()
-    end, function(ok) if not ok and token == generation then clearPlan("Refresh the quest guide to try again.") end end)
+    end, function(ok) if not ok and token == generation then clearPlan("Refresh the Quest guide to try again.") end end)
 end
 
 scheduleRefresh = function(force, zoneEntry)
@@ -1580,7 +1799,10 @@ ns.on("SKILL_LINES_CHANGED", function() scheduleRefresh(true, false) end)
 ns.on("QUEST_WATCH_UPDATE", function() scheduleRefresh(false, false) end)
 ns.on("UNIT_QUEST_LOG_CHANGED", function() scheduleRefresh(false, false) end)
 
-local modeNames = {all="Complete the zone", xp="Fastest quest XP/hour", selected="Selected quests", budget="Quest count within time"}
+-- One name per goal and level choice: the labels in Settings > Quest guide, shared by the report, chat and tooltips.
+P.goalNames = { all = "Complete zone", xp = "Quest XP/hour", selected = "Chosen quests", budget = "Time limit" }
+P.scopeNames = { all = "Every level", ["green-yellow"] = "Green and yellow only" }
+local modeNames = P.goalNames
 function P.report() return report end
 
 local function debugIDs(values, array)
@@ -1639,7 +1861,8 @@ function P.debugText()
             "; exhausted=" .. tostring(report.searchExhausted) .. "; uncertain=" .. tostring(report.uncertain) ..
             "; nearest=" .. tostring(report.nearestSeconds or "unknown") .. " sec/" ..
             tostring(report.nearestCoverage or "unknown") .. " hand-ins; same-work baseline=" ..
-            tostring(report.baselineSeconds or "unknown") .. " sec; comparable=" .. tostring(report.baselineComparable))
+            tostring(report.baselineSeconds or "unknown") .. " sec; comparable=" .. tostring(report.baselineComparable) ..
+            (report.estimatedScale and "; scale=estimated 3000x2000" or ""))
         add("Planned quest IDs: " .. debugIDs(report.plannedIDs) ..
             "; completed quest IDs: " .. debugIDs(report.completedIDs) ..
             "; missing quest IDs: " .. debugIDs(report.missingIDs))
@@ -1712,55 +1935,179 @@ end
 
 function P.debug()
     if ns.reportWindow then
-        ns.reportWindow("Quest Sharing - plan debug", {P.debugText()}, "planner", nil, nil, P.debug)
-    else ns.print("Plan debug report is unavailable; try /reload.") end
+        ns.reportWindow("Quest guide - debug", {P.debugText()}, "planner", nil, nil, P.debug)
+    else ns.print("the Quest guide debug report is unavailable; try /reload.") end
+end
+
+-- "Green Quest (8100)": the name from this zone's quests, your log, or one name read; the ID alone if none is known.
+local function questLabel(id, titles)
+    local name = catalog[id] and catalog[id].name or titles and titles[id]
+    if type(name) ~= "string" or name == "" then
+        local q = questie()
+        name = q and q.get and U.call(q.get, "quest", id, "name")
+    end
+    if type(name) ~= "string" or name == "" then return "Quest " .. tostring(id) end
+    return name .. " (" .. tostring(id) .. ")"
+end
+
+-- Why a quest the goal wanted is not handed in on this route, when no zone check already said why.
+local function missingReason(id, labelOf)
+    if report.plannedIDs and report.plannedIDs[id] then return "taken on this route, but not handed in on it" end
+    local q = catalog[id]
+    if not q then return "not a quest the Quest guide can plan in this zone" end
+    for _, other in ipairs(q.exclusiveTo or {}) do
+        if report.plannedIDs and report.plannedIDs[other] then
+            return "only one of it and " .. labelOf(other) .. " can be done; the route takes that one"
+        end
+    end
+    if goal.mode == "xp" then return "left out: too little XP for the time it takes" end
+    if goal.mode == "budget" then return "left out: it does not fit in the time limit" end
+    if q.status == "future" then return "needs an earlier quest this route does not finish" end
+    return "does not fit in this route (a full quest log can cause this)"
 end
 
 local function explainPlan()
-    local lines = {modeNames[goal.mode] .. " • " .. (P.levelScope == "all" and "All acceptance levels" or "Green/yellow only")}
+    local lines = {modeNames[goal.mode] .. " • " .. P.scopeNames[P.levelScope]}
+    local titles = {}
+    for id, entry in pairs(ns.compat.entryMap()) do titles[id] = entry.title end
+    local function labelOf(id) return questLabel(id, titles) end
     if report then
-        lines[#lines+1] = string.format("Estimated %.1f min • travel %.1f min • %.1f kills • %d hand-ins",
-            (report.expectedSeconds or 0)/60, (report.travelSeconds or 0)/60, report.expectedKills or 0, report.coverage or 0)
+        local parts = { string.format("Estimated %.1f min", (report.expectedSeconds or 0)/60),
+            string.format("travel %.1f min", (report.travelSeconds or 0)/60) }
+        local kills = math.floor((report.expectedKills or 0) + 0.5)
+        if kills > 0 then parts[#parts+1] = "about " .. kills .. (kills == 1 and " kill" or " kills") end
+        parts[#parts+1] = (report.coverage or 0) .. ((report.coverage or 0) == 1 and " hand-in" or " hand-ins")
+        lines[#lines+1] = table.concat(parts, " • ")
         lines[#lines+1] = "Times use estimated combat and interaction costs. Map distances approximate travel."
-        if report.estimatedScale then lines[#lines+1] = "Map dimensions unavailable. Travel uses an illustrative 3000 × 2000 yard zone scale." end
+        if report.estimatedScale then lines[#lines+1] = "Travel times are rough guesses: this map's size is unknown." end
         if report.uncertain then lines[#lines+1] = "Some quantities, drop rates or task durations are unknown or estimated." end
         if report.baselineComparable then
-            lines[#lines+1] = string.format("Same-work nearest-first estimate %.1f min. Best route found by bounded search.", (report.baselineSeconds or 0)/60)
+            lines[#lines+1] = string.format("Always going to the nearest quest first would take %.1f min.",
+                (report.baselineSeconds or 0)/60)
         end
     else lines[#lines+1] = "Open the guide and wait for the zone scan." end
-    local pending = {}
-    for id in pairs(report and report.missingIDs or {}) do pending[#pending+1]=id end
-    table.sort(pending)
-    for _,id in ipairs(pending) do
-        lines[#lines+1] = string.format("Quest %d • unfinished, excluded by this goal, incompatible branch or missing data",id)
-    end
+    -- One reason per quest: the zone check's own reason first, then why the route leaves it out.
+    local seen = {}
     for _, category in ipairs({"external","unknown","blocked","filtered","repeatable"}) do
         local ids = {}
-        for id in pairs(coverage[category]) do ids[#ids+1]=id end
+        for id in pairs(coverage[category]) do if not seen[id] then ids[#ids+1]=id end end
         table.sort(ids)
-        for _,id in ipairs(ids) do lines[#lines+1] = string.format("%d • %s",id,coverage[category][id]) end
+        for _,id in ipairs(ids) do
+            seen[id] = true
+            local taken = report and report.plannedIDs and report.plannedIDs[id] and "taken on this route; " or ""
+            local why = tostring(coverage[category][id])
+            why = string.lower(why:sub(1, 1)) .. why:sub(2)
+            lines[#lines+1] = labelOf(id) .. ": " .. taken .. why
+        end
     end
-    if skippedText() then lines[#lines+1] = skippedText() end
+    local pending = {}
+    for id in pairs(report and report.missingIDs or {}) do if not seen[id] then pending[#pending+1]=id end end
+    table.sort(pending)
+    for _,id in ipairs(pending) do lines[#lines+1] = labelOf(id) .. ": " .. missingReason(id, labelOf) end
+    if goal.mode == "selected" then
+        for _, name in ipairs(goal.missingNames or {}) do
+            lines[#lines+1] = string.format('"%s": no quest with this name in your quest log or this zone', name)
+        end
+    end
+    local skipped = {}
+    for _, reason in ipairs({ "character", "level", "overlevel", "continent" }) do
+        local n = coverage.skipped[reason]
+        if n and n > 0 then skipped[#skipped + 1] = n .. " " .. SKIP_TEXT[reason] end
+    end
+    if #skipped > 0 then lines[#lines+1] = "Quests left out at once: " .. table.concat(skipped, ", ") end
     local K = ns.questCalibration
     if K and K.describe then lines[#lines+1] = "Times used: " .. K.describe() .. "." end
     lines[#lines+1] = "Unknown future levels, inventory restrictions, flight routes and world conditions need live confirmation."
     return table.concat(lines,"\n\n")
 end
+P.reportText = explainPlan
 
--- Goal, time limit, chosen quest IDs and level scope are saved settings (Settings > Quest guide). This reads them.
--- Returns false when the goal asks for quest IDs and none are typed; the previous goal then stays.
+-- Chosen quests: "9000, Local Harvest, 9001 9002" -> { [9000]=true, ... } and { "Local Harvest" }. Names are
+-- separated by commas; "Name (9000)", as the guide prints it, counts as the ID.
+local function parseQuestList(text)
+    local ids, names = {}, {}
+    for part in tostring(text or ""):gmatch("[^,;]+") do
+        part = part:gsub("^%s+", ""):gsub("%s+$", "")
+        if part:match("^[%d%s]+$") then
+            for token in part:gmatch("%d+") do ids[tonumber(token)] = true end
+        elseif part ~= "" then
+            local id = tonumber(part:match("%((%d+)%)%s*$"))
+            if id then ids[id] = true else names[#names + 1] = part end
+        end
+    end
+    return ids, names
+end
+
+-- The text the Settings box keeps: IDs and names, comma-separated.
+function P.cleanQuestList(text)
+    local ids, names = parseQuestList(text)
+    local out = {}
+    for id in pairs(ids) do out[#out + 1] = id end
+    table.sort(out)
+    for i, id in ipairs(out) do out[i] = tostring(id) end
+    for _, name in ipairs(names) do out[#out + 1] = name end
+    return table.concat(out, ", ")
+end
+
+-- A quest name (any case) -> ID: your quest log, then the quests of the zones the guide planned (one name read each).
+local function questByName(name)
+    local want = string.lower(name)
+    for _, entry in ipairs(ns.compat.entries()) do
+        if type(entry.title) == "string" and string.lower(entry.title) == want then return entry.questID end
+    end
+    for id, q in pairs(catalog) do
+        if type(q.name) == "string" and string.lower(q.name) == want then return id end
+    end
+    local q = questie()
+    if not (q and q.get) then return nil end
+    for _, ids in pairs(zoneQuestIDs) do
+        for _, id in ipairs(ids) do
+            local n = U.call(q.get, "quest", id, "name")
+            if type(n) == "string" and string.lower(n) == want then return id end
+        end
+    end
+end
+
+-- Names typed for Chosen quests become IDs as soon as the guide knows them; the rest wait for the zone's quests.
+resolveChosen = function()
+    local missing = {}
+    for _, name in ipairs(goal.selectedNames or {}) do
+        local id = questByName(name)
+        if id then goal.selectedIDs[id] = true else missing[#missing + 1] = name end
+    end
+    goal.missingNames = missing
+end
+
+local BUDGET_MIN, BUDGET_MAX = 5, 240 -- the Settings stepper's range, used everywhere
+local function budgetMinutes(value)
+    value = tonumber(value)
+    if not finite(value) or value <= 0 then return nil end
+    return math.max(BUDGET_MIN, math.min(BUDGET_MAX, math.floor(value + 0.5)))
+end
+
+-- "Quest XP/hour • Every level", "Time limit 45 min • Green and yellow only"
+goalLine = function()
+    local text = modeNames[goal.mode] or modeNames.all
+    if goal.mode == "budget" then text = text .. " " .. math.floor(goal.budgetSeconds / 60 + 0.5) .. " min" end
+    return text .. " • " .. (P.scopeNames[P.levelScope] or P.scopeNames.all)
+end
+
+-- Goal, time limit, chosen quests and level scope are saved settings (Settings > Quest guide). This reads them.
+-- Returns false when the goal asks for chosen quests and none are typed; the previous goal then stays.
 readSettings = function()
     local d = ns.db or {}
     local mode = d.questPlannerGoal
     if modeNames[mode] == nil then mode = "all" end
-    local ids, hint = {}, nil
+    local ids, names, hint = {}, {}, nil
     if mode == "selected" then
-        for token in tostring(d.questPlannerSelected or ""):gmatch("%d+") do ids[tonumber(token)] = true end
-        if not next(ids) then mode, hint = goal.mode, "type quest IDs in Settings > Quest guide for the Chosen quests goal" end
+        ids, names = parseQuestList(d.questPlannerSelected)
+        if not next(ids) and #names == 0 then
+            mode, hint = goal.mode, "type quest names or IDs in Settings > Quest guide for the Chosen quests goal"
+        end
     end
-    if mode == "selected" then goal.selectedIDs = ids end
-    local minutes = tonumber(d.questPlannerBudget)
-    if finite(minutes) and minutes > 0 then goal.budgetSeconds = math.min(minutes, 1440) * 60 end
+    if mode == "selected" then goal.selectedIDs, goal.selectedNames = ids, names; resolveChosen() end
+    local minutes = budgetMinutes(d.questPlannerBudget)
+    if minutes then goal.budgetSeconds = minutes * 60 end
     goal.mode = mode
     P.levelScope = d.questPlannerScope == "green-yellow" and "green-yellow" or "all"
     return hint == nil, hint
@@ -1783,27 +2130,50 @@ end
 -- A goal chosen by command is saved like one chosen in the settings, so both always agree.
 local function saveGoal(mode, value)
     ns.db.questPlannerGoal = mode
-    if mode == "selected" then ns.db.questPlannerSelected = tostring(value or "")
-    elseif mode == "budget" then ns.db.questPlannerBudget = math.max(5, math.min(240, math.floor((tonumber(value) or 30) + 0.5))) end
+    if mode == "selected" then ns.db.questPlannerSelected = P.cleanQuestList(value)
+    elseif mode == "budget" then ns.db.questPlannerBudget = budgetMinutes(value) or 30 end
     if ns.refreshSettings then ns.refreshSettings() end
+end
+
+-- One chat line per goal change, naming what the guide now plans.
+local function confirmGoal(note)
+    local line = goalLine()
+    if goal.mode == "selected" then
+        local ids, labels = {}, {}
+        for id in pairs(goal.selectedIDs) do ids[#ids + 1] = id end
+        table.sort(ids)
+        local titles = {}
+        for id, entry in pairs(ns.compat.entryMap()) do titles[id] = entry.title end
+        for _, id in ipairs(ids) do labels[#labels + 1] = questLabel(id, titles) end
+        for _, name in ipairs(goal.missingNames or {}) do labels[#labels + 1] = '"' .. name .. '" (not found yet)' end
+        line = modeNames.selected .. ": " .. table.concat(labels, ", ") .. " • " .. P.scopeNames[P.levelScope]
+    end
+    ns.print("Quest guide: " .. line .. (note or ""))
 end
 
 function P.setGoal(mode, value)
     if modeNames[mode] == nil then return false end
+    local note
     if mode == "selected" then
-        local ids={}
-        for token in tostring(value or ""):gmatch("%d+") do ids[tonumber(token)]=true end
-        if not next(ids) then ns.print("enter quest IDs for the Selected quests goal"); return false end
-        goal.selectedIDs=ids
+        local ids, names = parseQuestList(value)
+        if not next(ids) and #names == 0 then
+            ns.print("enter quest names or IDs for the Chosen quests goal, e.g. /qs plan selected Local Harvest, 9001")
+            return false
+        end
+        goal.selectedIDs, goal.selectedNames = ids, names
+        resolveChosen()
     elseif mode == "budget" then
-        value=tonumber(value)
-        if not finite(value) or value <= 0 or value > 1440 then ns.print("enter a time budget from 1 to 1440 minutes"); return false end
-        goal.budgetSeconds=value*60
+        local minutes = budgetMinutes(value)
+        if not minutes then ns.print("enter a time limit from 5 to 240 minutes"); return false end
+        if tonumber(value) > BUDGET_MAX then note = " (" .. BUDGET_MAX .. " min is the most it plans)"
+        elseif tonumber(value) < BUDGET_MIN then note = " (" .. BUDGET_MIN .. " min is the least it plans)" end
+        goal.budgetSeconds = minutes * 60
     end
-    goal.mode=mode
+    goal.mode = mode
     saveGoal(mode, value)
-    selectionLocked=false
-    previousPlan=nil
+    confirmGoal(note)
+    selectionLocked = false
+    previousPlan = nil
     if sessionActive then scan() else P.open() end
     return true
 end
@@ -1814,13 +2184,17 @@ function P.options() ns.settingsTab("guide") end
 -- "Camp busy": the selected objective's camp is skipped for 5 minutes, then the route comes back to it.
 function P.markCampBusy()
     local stop = route[selected]
-    if stop and stop.kind == "objective" then
+    if stop and stop.kind == "objective" and stop.point then
         waitingAt[campKey(stop.point)] = GetTime() + 300
+        local atom = stop.atoms and stop.atoms[1]
+        local row = atom and atom.objectives and atom.objectives[1]
+        local name = row and row.target and row.target.name
+        busyNotice = { key = atom and atom.key, point = stop.point, name = type(name) == "string" and name or "This" }
         selectionLocked = false
         scan()
         return true
     end
-    ns.print("select an objective step (kill or collect) in the quest guide first")
+    ns.print("select a kill or collect step in the Quest guide first, then mark its camp busy")
     return false
 end
 
@@ -1833,15 +2207,21 @@ end
 
 function P.showReport()
     if ns.reportWindow then
-        ns.reportWindow("Quest Sharing - quest guide report", {explainPlan()}, "planner", nil, nil, P.showReport)
-    else ns.print("The plan report is unavailable; try /reload.") end
+        ns.reportWindow("Quest guide report", {explainPlan()}, "planner", nil, nil, P.showReport)
+    else ns.print("the Quest guide report is unavailable; try /reload.") end
 end
 
 function P.active() return sessionActive end
 
+local COMMANDS = "/qs plan (open), /qs plan on, /qs plan all, /qs plan xp, /qs plan selected <quest names or IDs>, "
+    .. "/qs plan budget <5-240 minutes>, /qs plan range, /qs plan unrestricted, /qs plan next, /qs plan busy, "
+    .. "/qs plan follow, /qs plan report, /qs plan options, /qs plan refresh, /qs plan debug, /qs plan hide (or close), /qs plan off"
+
 function P.command(arg)
-    arg = string.lower(arg or "")
-    local mode, value = arg:match("^(%S+)%s*(.-)$")
+    local raw = tostring(arg or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    arg = string.lower(raw)
+    local mode = arg:match("^(%S+)")
+    local value = raw:match("^%S+%s*(.-)$") or ""
     if mode == "all" or mode == "xp" or mode == "selected" or mode == "budget" then P.setGoal(mode,value)
     elseif arg == "options" then P.options()
     elseif arg == "why" or arg == "report" then P.showReport()
@@ -1850,6 +2230,7 @@ function P.command(arg)
         P.levelScope=arg=="range" and "green-yellow" or "all"
         ns.db.questPlannerScope=P.levelScope
         if ns.refreshSettings then ns.refreshSettings() end
+        ns.print("Quest guide: " .. goalLine())
         selectionLocked=false; previousPlan=nil
         if sessionActive then scan() else P.open() end
     elseif arg == "off" then ns.setSetting("questPlanner", false)
@@ -1857,9 +2238,18 @@ function P.command(arg)
         Guidance.clear(); panelDismissed = true; sessionActive = false
         Work.cancel("quest-plan"); P.cancelEstimate(); generation = generation + 1; loading = false
         if panel then panel:SetScript("OnUpdate", nil); panel:Hide() end
-    elseif arg == "on" then ns.setSetting("questPlanner", true); ns.print("quest planner is on")
-    elseif arg == "next" then if selectStop(selected + 1) then P.pin() end
+    elseif arg == "on" then ns.setSetting("questPlanner", true); ns.print("Quest guide is on")
+    elseif arg == "next" then
+        if #route > 0 and selected >= #route then ns.print("this is the last step of the Quest guide")
+        elseif selectStop(selected + 1) then P.pin() end
+    elseif arg == "busy" then P.markCampBusy()
+    elseif arg == "camps" or arg == "camps on" or arg == "camps off" then
+        local on = arg == "camps on" or (arg == "camps" and not ns.db.campMap)
+        ns.setSetting("campMap", on)
+        ns.print("Shared camps on the world map: " .. (on and "on" or "off") .. " (Settings > Quest guide)")
+    elseif arg == "camps table" then if ns.campMap then ns.campMap.openTable() end
     elseif arg == "follow" then P.follow()
     elseif arg == "refresh" then P.refresh()
-    else P.open() end
+    elseif arg == "" or arg == "open" or arg == "show" then P.open()
+    else ns.print('no Quest guide command "' .. raw .. '". Try: ' .. COMMANDS) end
 end

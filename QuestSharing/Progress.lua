@@ -77,7 +77,8 @@ function ns.onQuestCompleted(e)
     -- finishing together is common (the last kill counts for everybody): only the first one says it
     ns.after(ns.turnDelay and ns.turnDelay() or 0, function()
         if alreadySaid(e.questID) or not C.inGroup() then return end
-        ns.say(string.format("%s %s - %s%s", ICON, C.link(e), ns.pick(LINES), ns.spotText(e)))
+        -- its own switch (announce): it does not also need "Announce quests in common" (chat) to be on
+        ns.say(string.format("%s %s - %s%s", ICON, C.link(e), ns.pick(LINES), ns.spotText(e)), true)
     end)
 end
 

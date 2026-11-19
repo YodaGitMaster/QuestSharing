@@ -152,7 +152,7 @@ def test_the_key_command(style):
     g.slash("key E")
     assert g.eval('BINDINGS.E') == "QUESTSHARING_QUICKCHAT" and g.eval("SAVED_BINDINGS") == 1
     text = "\n".join(g.printed())
-    assert "E used to do: STRAFERIGHT" in text and "quick chat key: E" in text
+    assert "E used to do: strafe right" in text and "quick chat key: E" in text
     g.run("PRINTED = {}")
     g.slash("key")
     assert "quick chat key: E" in "\n".join(g.printed())

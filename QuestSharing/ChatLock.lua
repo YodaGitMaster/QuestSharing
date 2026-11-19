@@ -19,7 +19,7 @@ end
 
 local function say()
     local now = GetTime and GetTime() or 0
-    if lastSaid and now - lastSaid < SAY_EVERY then return end
+    if lastSaid and now - lastSaid < (tonumber(ns.db.chatLockNotice) or SAY_EVERY) then return end
     lastSaid = now
     ns.print("the chat box is locked while you fight (Settings > General > Block the chat box during combat)")
 end

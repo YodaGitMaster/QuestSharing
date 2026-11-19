@@ -20,15 +20,16 @@ D.stops = {
     iftram    = { name = "Deeprun Tram (Ironforge)", zone = "Ironforge",  map = 1455, x = 76.2, y = 51.3 },
 }
 
+-- seconds: rough ride time in Classic Era (the wait for the next ship is added by DungeonRoute.lua)
 D.routes = {
-    { kind = "Boat",     faction = "Alliance", a = "auberdine", b = "menethil" },
-    { kind = "Boat",     faction = "Alliance", a = "auberdine", b = "ruttheran" },
-    { kind = "Boat",     faction = "Alliance", a = "menethil",  b = "theramore" },
-    { kind = "Boat",     faction = "Both",     a = "ratchet",   b = "bootybay" },
-    { kind = "Zeppelin", faction = "Horde",    a = "orgtower",  b = "uctower" },
-    { kind = "Zeppelin", faction = "Horde",    a = "orgtower",  b = "gromgol" },
-    { kind = "Zeppelin", faction = "Horde",    a = "uctower",   b = "gromgol" },
-    { kind = "Tram",     faction = "Alliance", a = "swtram",    b = "iftram" },
+    { kind = "Boat",     faction = "Alliance", a = "auberdine", b = "menethil", seconds = 150 },
+    { kind = "Boat",     faction = "Alliance", a = "auberdine", b = "ruttheran", seconds = 150 },
+    { kind = "Boat",     faction = "Alliance", a = "menethil",  b = "theramore", seconds = 150 },
+    { kind = "Boat",     faction = "Both",     a = "ratchet",   b = "bootybay", seconds = 150 },
+    { kind = "Zeppelin", faction = "Horde",    a = "orgtower",  b = "uctower", seconds = 120 },
+    { kind = "Zeppelin", faction = "Horde",    a = "orgtower",  b = "gromgol", seconds = 120 },
+    { kind = "Zeppelin", faction = "Horde",    a = "uctower",   b = "gromgol", seconds = 120 },
+    { kind = "Tram",     faction = "Alliance", a = "swtram",    b = "iftram", seconds = 60 },
 }
 
 -- One pin per entrance; `inside` lists every instance reached from it with its level span.

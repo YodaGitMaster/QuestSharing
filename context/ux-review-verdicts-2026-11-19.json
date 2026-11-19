@@ -1,0 +1,76 @@
+{
+ "source": "verify@1 of run r-20261119-095449-ea8e; ids UX-16..UX-46 were not checked (use the review evidence, re-check before fixing)",
+ "verdicts": {
+  "UX-01": {
+   "verdict": "confirmed",
+   "note": ""
+  },
+  "UX-02": {
+   "verdict": "confirmed",
+   "note": "Solo-only scope (user 2026-11-19): show the quest ID in the step tooltip, accept names."
+  },
+  "UX-03": {
+   "verdict": "confirmed",
+   "note": "ALSO fix UX-76 in the same functions: run the protected-key check before the unbind loop."
+  },
+  "UX-04": {
+   "verdict": "confirmed",
+   "note": "README line is :858; the Settings row already mentions quick chat messages; /qs reset does not."
+  },
+  "UX-05": {
+   "verdict": "refuted",
+   "note": "Already fixed in the working tree (LFGFinderUI.lua:135, MinimapButton.lua:98 use 'finder'); test_lfg_invite.py:382 passes."
+  },
+  "UX-06": {
+   "verdict": "confirmed",
+   "note": ""
+  },
+  "UX-07": {
+   "verdict": "partly",
+   "note": "Severity medium: wrong 'Optional' tab name is real; use ns.settingPath('fishingMap')."
+  },
+  "UX-08": {
+   "verdict": "confirmed",
+   "note": ""
+  },
+  "UX-09": {
+   "verdict": "confirmed",
+   "note": ""
+  },
+  "UX-10": {
+   "verdict": "confirmed",
+   "note": ""
+  },
+  "UX-11": {
+   "verdict": "partly",
+   "note": "Keep the confirmation (second click); the tooltip already says both lists are emptied and the button is not next to Copy all."
+  },
+  "UX-12": {
+   "verdict": "confirmed",
+   "note": "Do NOT auto re-scan (context/decisions.md:138 'no background scans', test_quest_cleanup.py:151); only skip the BAG_UPDATE the addon itself caused."
+  },
+  "UX-13": {
+   "verdict": "confirmed",
+   "note": ""
+  },
+  "UX-14": {
+   "verdict": "confirmed",
+   "note": "Saved and session values already differ on reopen in the same session; use one range 5-240 everywhere."
+  },
+  "UX-15": {
+   "verdict": "confirmed",
+   "note": ""
+  }
+ },
+ "new": [
+  {
+   "id": "UX-76",
+   "batch": "B3",
+   "severity": "medium",
+   "title": "Choosing a protected key (e.g. Escape) for the item, ping or party-finder key removes the old binding while printing 'nothing was changed'",
+   "where": "QuestSharing/QuestItems.lua:298, QuestSharing/Ping.lua:250, QuestSharing/LFGInvite.lua:451",
+   "evidence": "Item key on F, setItemKey('ESCAPE') printed 'ESCAPE is the game's \"game menu\" key - pick another one (nothing was changed)', yet BINDINGS['F'] was nil afterwards.",
+   "suggestion": "Run the protected-key check before the loop that unbinds the old key; add a test."
+  }
+ ]
+}

@@ -103,7 +103,7 @@ def test_only_equipment_drops_are_included_from_valid_source_tables(style):
     ids={r[0] for r in results(g)}
     assert 10005 in ids and 10004 not in ids
     assert not ids.intersection({123,99999,99998,-99})
-    assert "unavailable or not item lists" in g.eval("NS.loot._window().note.text")
+    assert "1 table could not be read" in g.eval("NS.loot._window().note.text")  # debug logging is on in the tests
 
 
 def test_search_matches_item_name_id_boss_instance_and_plain_percent(style):
@@ -133,7 +133,7 @@ def test_click_source_details_identifies_supplier_without_fake_drop_rates(style)
     click(row(g,10003).frame)
     w=g.eval("NS.loot._window()")
     assert w.details.shown and "Source: Cookie" in w.detailsText.text
-    assert "Instance: The Deadmines" in w.detailsText.text and "Drop chance is not supplied" in w.detailsText.text
+    assert "Instance: The Deadmines" in w.detailsText.text and "Drop chances are not shown in the Adventurer's Journal" in w.detailsText.text
 
 
 def test_native_tooltip_and_equipped_comparison_are_used(style):

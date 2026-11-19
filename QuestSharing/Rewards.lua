@@ -8,17 +8,20 @@ local loading, ready, generation, pending = false, false, 0, false
 local page, PAGE, scanDone, scanTotal = 1, 7, 0, 0
 local unknownItems = 0
 local filters, selectedKey
--- Memory: a closed window keeps its catalogue for GRACE seconds (reopening is instant), then frees it; the next open rescans.
-local OWNER, GRACE = "rewards", 120
+-- Memory: the catalogue is read once and kept for the session (a half-read one pauses on close and continues on reopen);
+-- Purge (ns.dataWork.purge) or switching the browser off frees it.
+local OWNER = "rewards"
+local resumeScan -- the paused batch of a half-read scan, run again by R.open
 local function release()
     ns.dataWork.keep(OWNER)
-    generation = generation + 1
+    generation = generation + 1; resumeScan = nil
     index, quests, results = {}, {}, {}
     loading, ready, scanDone, scanTotal, selectedKey = false, false, 0, 0, nil
     if window then for _, row in ipairs(window.rows or {}) do row.result = nil end end
 end
 local function resultKey(r) return r.key end
-local catalogueError = "Needs a recent QuestieDB with an enumerable item catalogue."
+local NO_CATALOGUE = "No quest reward list yet. Install or update QuestieDB (see /qs questie)."
+local catalogueError = NO_CATALOGUE
 local function get(kind, id, key) return ns.questie.get(kind, id, key) end
 local function num(v) return tonumber(v) or 0 end
 local function enums() return type(LibQuestieDB) == "table" and LibQuestieDB.Enum or {} end
@@ -132,6 +135,9 @@ local function defaults()
         slot = "All slots", near = true, completed = false, text = "" }
 end
 
+-- Extra quest conditions, in player words (the quest data's own field names never reach the window).
+local NEEDS = { { "requiredSkill", "Needs a profession skill" }, { "requiredMinRep", "Needs reputation" },
+    { "requiredMaxRep", "Needs reputation below a set standing" }, { "requiredSpell", "Needs a spell" } }
 local function detail(r)
     local q = ns.questie
     local lines = { r.name .. " — item level " .. r.itemLevel,
@@ -139,18 +145,18 @@ local function detail(r)
     for _,line in ipairs(E.versionLines(r,function(v) return v.info end)) do lines[#lines+1]=line end
     for _,s in ipairs(r.routes) do
         local before,any=q.before(s.questID)
-        lines[#lines+1]="\n"..s.questName.." (quest "..s.questLevel..", requires level "..s.requiredLevel..")"
+        lines[#lines+1]="\n"..s.questName.." (quest level "..s.questLevel..", requires level "..s.requiredLevel..")"
         lines[#lines+1]=q.whereText(s.questID) or "Quest starting location unknown."
         if #r.itemIDs>1 then lines[#lines+1]="Reward items: "..table.concat(s.itemIDs,", ") end
         if #before>0 then lines[#lines+1]="Prerequisites ("..(any and "any" or "all").."): "..table.concat(before,", ") end
-        for _,key in ipairs({ "requiredSkill", "requiredMinRep", "requiredMaxRep", "requiredSpell" }) do
-            local v=get("quest",s.questID,key)
+        for _,need in ipairs(NEEDS) do
+            local v=get("quest",s.questID,need[1])
             if (type(v)=="table" and next(v)) or (type(v)=="number" and v~=0) then
-                lines[#lines+1]="Additional "..key.." requirement; check the quest before travelling."
+                lines[#lines+1]=need[2].."; check the quest before travelling."
             end
         end
     end
-    if #r.routes>1 then lines[#lines+1]="\nMap directions refer to the first quest listed above." end
+    if #r.routes>1 then lines[#lines+1]="\nMark quest giver uses the first quest listed above." end
     lines[#lines + 1] = "Quest chains and other requirements may still block acceptance."
     lines[#lines + 1] = "Reward choices are alternatives; not every listed item is guaranteed together."
     return lines, q.starter(r.routes[1].questID)
@@ -234,15 +240,16 @@ local function paint()
         local r = results[(page - 1) * PAGE + i]
         row.result = r
         if r then
-            E.paintRow(row, r.info, r.name .. " · iLvl " .. r.itemLevel .. " · req " .. tostring(r.info and r.info.required or "?"),
+            local req = r.info and r.info.required
+            E.paintRow(row, r.info, r.name .. " · iLvl " .. r.itemLevel .. ((type(req) ~= "number" or req > 1) and (" · req " .. tostring(req or "?")) or ""),
                 routeSummary(r))
             row.frame:Show()
         else row.frame:Hide() end
     end
     if not E.focusRows(window.rows,selectedKey,resultKey) then
-        selectedKey,window.routeMap=nil,nil
+        selectedKey,window.routeMap,window.routeStarter=nil,nil,nil
         window.setRoute((loading or unknownItems>0) and "Loading equipment details… Eligible blue+ items appear as the game supplies their data." or (not ready and catalogueError)
-            or "No matching blue-or-better equipment.\n\nClear filters or broaden your search. Your character's class, faction and quest requirements still apply.")
+            or (E.RARE_ONLY.."; most quest rewards at this level are green.\n\nA search, slot, level or stat filter can also hide rewards: Clear filters removes those. Your character's class, faction and quest requirements still apply."))
     end
 end
 
@@ -253,7 +260,7 @@ function R.go(delta)
 end
 
 function R.refresh()
-    if not (window and E.visible("quests") and ns.db.enabled and ns.db.rewardBrowser) then return end
+    if not (window and E.visible("quests") and ns.db.enabled) then return end
     R.search(); paint()
 end
 
@@ -263,7 +270,8 @@ local function schedule()
     ns.after(0.2, function() pending = false; R.refresh() end)
 end
 
-function R.scan()
+-- full: read the whole item catalogue (Refresh data); otherwise the IDs saved by the last full scan are enough.
+function R.scan(full)
     E.dismissMenu()
     generation = generation + 1
     local token = generation
@@ -271,23 +279,31 @@ function R.scan()
     loading, ready, scanDone = false, false, 0
     local db = type(ItemDB) == "table" and type(ItemDB.GetAllIds) == "function" and ItemDB
         or (type(LibQuestieDB) == "table" and LibQuestieDB.Item)
-    local ids = db and U.call(db.GetAllIds)
-    catalogueError = "Needs a recent QuestieDB with an enumerable item catalogue."
+    local saved = db and full ~= true and ns.dataWork.saved("questRewards")
+    local ids = saved or (db and U.call(db.GetAllIds))
+    catalogueError = NO_CATALOGUE
     if type(ids) ~= "table" then paint(); return false end
     local e = enums()
     if type(e.classKeys) ~= "table" or type(e.factionRaceMasks) ~= "table" or type(e.raceMaskById) ~= "table" then
-        catalogueError = "Update QuestieDB: class, faction or race mappings are unavailable."
+        catalogueError = "This QuestieDB cannot tell classes, factions and races apart. Install or update QuestieDB (see /qs questie)."
         paint(); return false
     end
     loading, scanTotal = true, #ids
     local cursor = 1
     local function batch()
         if token ~= generation then return end
-        if not ns.db.enabled or not ns.db.rewardBrowser or not E.visible("quests") then loading = false; return end
+        if not ns.db.enabled then loading = false; return end
+        if not E.visible("quests") then resumeScan = batch; return end
+        resumeScan = nil
         for _ = 1, 100 do
             local id = ids[cursor]
             if not id then
                 loading, ready = false, true
+                if not saved then
+                    local keep = {}
+                    for i, row in ipairs(index) do keep[i] = row.id end
+                    ns.dataWork.save("questRewards", "", keep)
+                end
                 R.refresh(); paint()
                 return
             end
@@ -309,6 +325,22 @@ function R.scan()
     return true
 end
 
+-- Same as Dungeon quests: a native waypoint at the quest giver, then the player opens the map with M.
+function R.markGiver(starter)
+    local map = starter and starter.area and ns.questie.uiMapOf(starter.area)
+    if not map then ns.print("this quest has no known map for its starting zone"); return false end
+    local x, y = tonumber(starter.x), tonumber(starter.y)
+    local text = (starter.who or "quest giver") .. " — " .. (starter.zone or "unknown zone")
+    if not starter.dungeon and x and y and x >= 0 and x <= 100 and y >= 0 and y <= 100 then
+        text = text .. string.format(" %.1f, %.1f", x, y)
+        if ns.compat.setWaypoint(map, x / 100, y / 100) then
+            ns.print("map pin: " .. text); U.mapHint(map); return true
+        end
+    end
+    ns.print(text); U.mapHint(map)
+    return false
+end
+
 local function choice(parent,label,x,y,width,choices,key)
     return E.dropdown(parent,label,x,y,width,choices,function() return filters[key] end,function(value)
         filters[key]=value;page=1;R.updateControls();R.refresh()
@@ -319,7 +351,7 @@ function R.updateControls()
     if not window then return end
     for _, b in ipairs(window.controls) do b.refresh() end
     window.near:SetLabel("Quest levels: " .. (filters.near and ("near "..filters.level) or "all"))
-    window.completed:SetLabel(filters.completed and "Showing completed quests" or "Hiding completed quests")
+    window.completed.refresh()
 end
 
 local function build()
@@ -358,8 +390,15 @@ local function build()
     mine:SetPoint("TOPLEFT", f, "TOPLEFT", 470, -18)
     window.near = E.button(f, "", 165, function() E.dismissMenu();filters.near = not filters.near; page = 1; R.updateControls(); R.refresh() end)
     window.near:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -54)
-    window.completed = E.button(f, "", 165, function() E.dismissMenu();filters.completed = not filters.completed; page = 1; R.updateControls(); R.refresh() end)
-    window.completed:SetPoint("TOPLEFT", f, "TOPLEFT", 175, -54)
+    -- the same "Hide completed quests" checkbox as Dungeon quests (filters.completed = completed quests are shown)
+    local hide = CreateFrame("Button", nil, f)
+    hide:SetPoint("TOPLEFT", f, "TOPLEFT", 175, -54); hide:SetWidth(170); hide:SetHeight(24)
+    hide.box, hide.tick = S.checkBox(hide); hide.box:SetPoint("LEFT", hide, "LEFT", 0, 0)
+    hide.text = E.text(hide, "Hide completed quests", 28, 6, 140)
+    hide.refresh = function() if filters.completed then hide.tick:Hide() else hide.tick:Show() end end
+    hide:RegisterForClicks("LeftButtonUp")
+    hide:SetScript("OnClick", function() E.dismissMenu();filters.completed = not filters.completed; page = 1; R.updateControls(); R.refresh() end)
+    window.completed = hide
     window.search,window.clearSearch = E.searchBox(f,"Search item, quest or zone",350,42,300,"quests",function(text)
         filters.text=text;page=1;R.refresh()
     end)
@@ -398,6 +437,7 @@ local function build()
             E.select(window.rows, row)
             window.setRoute(table.concat(lines, "\n"))
             window.routeMap = starter and starter.area and ns.questie.uiMapOf(starter.area)
+            window.routeStarter = starter
         end
         b:SetScript("OnClick",row.choose)
         window.rows[i] = row
@@ -406,13 +446,11 @@ local function build()
     window.prev:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -500)
     window.next = E.button(f, "Next", 100, function() R.go(1) end)
     window.next:SetPoint("TOPLEFT", f, "TOPLEFT", 110, -500)
-    window.reload = E.button(f, "Refresh data", 120, function() R.scan() end)
+    window.reload = E.button(f, "Refresh data", 120, function() R.scan(true) end)
     window.reload:SetPoint("TOPLEFT", f, "TOPLEFT", 530, -500)
     E.text(f, "Compare stats for your build. Quest chains, reputation and skills may affect availability.", 0, 536, 650)
     window.routeFrame, window.route, window.setRoute = E.details(f, 674, 358, "Quest routes")
-    local map = E.button(window.routeFrame, "Map directions (open M)", 260, function()
-        if not U.mapHint(window.routeMap) then ns.print("this quest has no known map for its starting zone") end
-    end)
+    local map = E.button(window.routeFrame, "Mark quest giver (then press M)", 260, function() R.markGiver(window.routeStarter) end)
     map:SetPoint("BOTTOMLEFT", window.routeFrame, "BOTTOMLEFT", 14, 18)
     E.navigation(window.search,window.rows,R.go)
     f.clear=function()
@@ -422,28 +460,32 @@ local function build()
         page=1;R.updateControls();R.refresh()
     end
     f.refresh = function() page=1; R.refresh() end
-    f.suspend = function()
-        generation = generation + 1
-        if loading then loading, ready = false, false end
-        ns.dataWork.releaseLater(OWNER, GRACE, function() if not E.visible("quests") then release() end end)
-    end
+    f.suspend = function() end -- the scan pauses by itself while hidden; the catalogue is kept
     f:SetScript("OnHide", f.suspend)
     return true
 end
 
 function R.open()
     if not ns.db.enabled then ns.print("switch Quest Sharing on first (/qs on)"); return end
-    if not ns.db.rewardBrowser then ns.setSetting("rewardBrowser", true) end
     filters = filters or defaults()
     ns.dataWork.keep(OWNER)
     if not build() then return end
     R.updateControls(); E.show("quests")
     for _,box in ipairs({window.search,window.level}) do if box.dirty then box.flush() end end
-    if not ready and not loading then R.scan() else R.refresh() end
+    if not ready and not loading then R.scan()
+    elseif loading and resumeScan then local run = resumeScan; resumeScan = nil; run()
+    else R.refresh() end
 end
 
+function R.purge()
+    ns.dataWork.forget("questRewards"); release()
+    if window and E.visible("quests") then R.scan() end
+end
+ns.dataWork.onPurge("Quest rewards", R.purge)
+
+-- No switch of its own: only the master switch going off closes the tab and frees the catalogue.
 function R.settingChanged()
-    if not ns.db.enabled or not ns.db.rewardBrowser then
+    if not ns.db.enabled then
         generation = generation + 1; loading = false
         if window then E.close("quests") end
         release()

@@ -174,7 +174,7 @@ function ns.pingReport()
     line(ns.db.ping and not ns.isBlocked("ping"), "the ping feature: " .. (ns.isBlocked("ping") and "switched off after the game refused it (/reload)" or (ns.db.ping and "on" or "off (/qs ping on)")))
     line(btn ~= nil, "the ping button: " .. (btn and "ready" or "not made (needs the ping system, outside combat)"))
     local key = ns.pingKeyName()
-    line(key ~= nil, "ping key: " .. (key or "NOT SET - Settings > Pings & items > Ping key, or /qs pingkey G"))
+    line(key ~= nil, "ping key: " .. (key or "NOT SET - " .. (ns.settingPath and ns.settingPath("Key to target and ping a quest enemy") or "Settings") .. ", or /qs pingkey G"))
     local api = C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest
     local names = 0
     for _ in pairs(C.questMobNames()) do names = names + 1 end
@@ -247,14 +247,16 @@ function ns.setPingKey(key)
     if not build() then return ns.print("the ping button could not be made") end
     key = string.upper(key or "")
     if key == "" then return ns.print("ping key: " .. (ns.pingKeyName() or "not set") .. "  (/qs pingkey <KEY>, /qs pingkey none)") end
+    -- a refused key changes nothing: checked before the old key is unbound
+    local refused = key ~= "NONE" and ns.keyRefused and ns.keyRefused(key)
+    if refused then return ns.print(refused) end
+    local before = key ~= "NONE" and GetBindingAction and GetBindingAction(key) or ""
     for _, k in ipairs({ GetBindingKey(CLICK) }) do SetBinding(k) end
     if key ~= "NONE" then
-        local before = GetBindingAction and GetBindingAction(key) or ""
-        if ns.PROTECTED_KEYS and ns.PROTECTED_KEYS[before] then
-            return ns.print(key .. " is the game's \"" .. ns.PROTECTED_KEYS[before] .. "\" key - pick another one (nothing was changed)")
-        end
         ns.trying("setting the ping key")
         if not SetBindingClick(key, BUTTON, "LeftButton") then return ns.print("could not bind " .. key) end
+        local was = ns.keyUsedToDo and ns.keyUsedToDo(key, before, "CLICK " .. BUTTON .. ":LeftButton")
+        if was then ns.print(was .. " (it now pings your nearest quest target; /qs pingkey none and rebind it in Key Bindings to undo)") end
     end
     local save = SaveBindings or AttemptToSaveBindings
     if save then save(GetCurrentBindingSet and GetCurrentBindingSet() or 1) end

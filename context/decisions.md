@@ -1,12 +1,48 @@
 # Decisions
 
+## 2026-11-19 — Speed pass 1 (tools/lua-optimization-prompt.md)
+- Rule: apply only with a Lua 5.1 benchmark saving >= 20 %, identical behaviour, small local diff; else report only.
+- Applied: (1) `VendorMap.lua` matchesWords splits the query once per new query (one-entry cache), not once per item name. (2) `Questie.lua` questieModule keeps the found QuestieDB module while the same QuestieLoader table is installed; a failed/not-started lookup is not kept. (3) `DungeonQuests.lua` scan: prerequisite and breadcrumb loops unrolled, no `ipairs({a or {}, b or {}})` / `{number(x)}` tables per quest.
+- Report only: per-frame handlers are already throttled (0.04-3 s); QuestGuidance drawMap already skips unchanged views; DataWork `table.remove(queue,1)` and Core timer list have n < ~10; `ns.after` calls `debugstack` per timer (WoW API, cannot benchmark outside the game); ItemSources tooltip reads are per new item only; QuestOptimizer/QuestPlanner work is step-budgeted, so a cheaper step buys more search, not less CPU - left alone without in-game profiling; hud `SetText` every 0.1 s could skip unchanged text (unmeasurable here).
+
 ## 2026-11-18 — Party finder auto-invite
 - One search per click/key (C_LFGList.Search HasRestrictions in classic_era source), no timer scan; invite solo players (numMembers==1) by lfgRoles via C.invite; healers on by default, own-window watching (lfgWatch) off by default so browsing never invites by surprise. Rows live in the Party window tab (no 16th tab fits). Gear number not built: no ilvl in LFG data; only addon-message (Quest Sharing users) or inspect (nearby) possible, waiting on user.
+
+## 2026-11-19 — Role need vs supercharge
+- Normal mode now respects a dungeon party shape (1/1/3) so a healer-only search invites one healer; user asked for an opt-in "supercharge" that invites all matches because one may not answer. Supercharge capped at 10 per click (chat + invite throttles) and does not count open invites as taken spots; no auto-kick of extra accepters (rude, and protected/uncertain) - the tooltip warns instead.
+
+## 2026-11-19 — Invite whisper
+- Default ON (user asked for it); editable text with {dungeon}/{role}; reuses `ns.chatAllowed` + `ns.trying("chat")` so a refused automatic message switches chat off once and is logged, instead of erroring on every invite.
+
+## 2026-11-19 — Party finder needs a listing; picker on the spyglass
+- Hard prerequisite (user): own active listing with an activity; no toggle. Mirrors Blizzard `LFGBrowseMixin:SearchActiveEntry` (category of first activity, only that category's activities) + client-side activity intersection because Blizzard's list also re-checks results (`matchesFilters`).
+- Classes saved as an exclusion set (`lfgClassOff`) so the default is "all classes" and new roles need no migration; kept out of ns.defaults (table defaults break reset and the every-default-has-a-control test).
+- Order = highest level first (user default), then known item level. Spyglass left click opens the picker instead of searching; the key binding keeps the instant search.
 
 ## 2026-11-18 — Item levels for the party finder
 - GearScore/TacoTip model (inspect nearby + cache + share between users of the addon) chosen; armory query rejected: addons have no network, SavedVariables only sync on /reload/logout, so an external Battle.net API script cannot answer in time (and Forever coverage unknown).
 - Ask-first waits only when a minimum item level is set (no delay for "any"). Unknown default = invite (never silently lose a healer); user can pick skip.
 - Separate prefix QSILVL (works outside a party, independent of the `sync` switch); answering is behind `ilvlShare` (default on).
+
+## 2026-11-19 — Save QuestieDB ID lists to disk (QuestSharingCache) so a new session skips the full scans
+- User approved after the options table: persist only the IDs each full scan kept, not the records (tens of KB, not MB; records stay fresh and localized).
+- Invalidation: stamp = game build + Quest Sharing/Questie/QuestieDB versions (GetAddOnMetadata "Version"); mismatch wipes all. "Refresh data" buttons (D.scan(true), R.scan(true), L.scan(true)) do a full scan and overwrite; Purge deletes the whole file; each module purge forgets its own list.
+- Dungeon quests save records PLUS any quest linked to/from a record (prereqs, nextQuestInChain, breadcrumbs, availableUntilCompleted, inferred lead-ins): with records only, chain names to non-dungeon quests would be lost (`linkedIDs`).
+- Abandoned: saving map-search vendor items (learning pass read every item's vendor list on the first search, breaking test_data_budget's "vendor links only for matching names" rule). NPC role list is saved instead (the expensive pass). Gather sources not saved (per-item, already cheap).
+- Planner zone lists keyed by zone+race+class+level, keep 40 (level change = new key, same as the in-memory rule).
+- Not checked in game: SavedVariables write size, real QuestieDB version strings.
+
+## 2026-11-19 — All QuestieDB catalogues: load once per session, one Purge (supersedes the 2026-11-18 120 s grace entirely)
+- User: "do the same for all other database operations (the db is always one QuestieDB)" -> one shared Purge, not one per module.
+- Registry `ns.dataWork.onPurge(name, fn)` / `W.purge()` / `W.purgeNames()` in DataWork.lua; `ns.purgeData()` (Diagnostics.lua) runs it + garbage pass; Settings row "Free the loaded quest database data" (browser tab, button Purge) and `/qs memory purge|free`.
+- Registered: Dungeon quests (D.purge), Quest rewards (R.purge), Dungeon loot (L.purge), Map search (V.purge = resetIndex), Trainers (I._reset + revision), Where to gather (cache), Quest guide zone lists (zoneQuestIDs/zoneScope/zoneOrder).
+- Pause instead of discard on hide: Rewards `batch` and Loot `step`/`pumpNames` store a `resumeScan`/`resumeLoot` closure when hidden; R.open/L.open run it. VendorMap `releaseWhenIdle` removed. Planner 2-zone cap removed (ID lists are small).
+- Kept as is: planner route is still recomputed per open (depends on position and log, not a DB read); gather cache still cleared on PLAYER_LEVEL_UP and zone lists re-read on a level change (results depend on level). Switching a feature or the addon off still frees its catalogue.
+
+## 2026-11-19 — Dungeon quests: load once per session, purge from Settings (first step; generalised by the entry above)
+- User: reopening the dungeon finder re-read the DB every time; wants "load it once and purge in settings".
+- Chosen: `DungeonQuests.lua` no longer calls `releaseLater`; hide (`f.suspend`) pauses both `OWNER` and `REWARDS_OWNER` jobs (rewards were cancelled+wiped before). `D.open` resumes rewards when ready. `D.purge()` = `release()` + rescan if visible. Settings row `browser` tab, button "Purge". `D.close` (addon switched off) still frees.
+- Scope: session only (Lua memory is wiped on /reload/logout). Not persisted to SavedVariables: large, and goes stale when Questie updates. Quest rewards (Rewards.lua) and map search (VendorMap.lua) keep the 120 s grace below.
 
 ## 2026-11-18 — Memory: free the big catalogues after 2 minutes closed
 - Problem: Dungeon quests (`records`, chain tables), Quest rewards (`index`) and map search (`vendors`, `itemRows`) were built on demand and never freed; a paused half-read dungeon scan even kept its coroutine locals alive.
@@ -24,6 +60,8 @@
 - Ctrl+right-click via `GLOBAL_MOUSE_DOWN` + the item GameTooltip currently shown, so it works in bags and the Professions window alike (`HandleModifiedItemClick` would miss custom frames). Deduped within 0.3 s.
 - Abandoned: opening the map/jumping to the zone from code (`ToggleWorldMap`, `WorldMapFrame:SetMapID`): taint risk, `test_box` forbids it. We print "open your world map (M)" and set the game waypoint instead.
 - 2026-11-18 follow-up (user: Light Leather showed nothing): QuestieDB `foreverItemDB` has NO skinning loot (Light Hide 783: npcDrops nil, objectDrops = Battered Chests; Light Leather 2318 likewise), so hides/leather can never come from Questie. Added bundled `SkinningData.lua` (45 items, 3,059 creature links, 27 KB) generated by `tools/build_skinning_data.py` from CMaNGOS classic-db `creature_template.SkinningLootId` -> `skinning_loot_template`, chance >= 1%, stored as tenths of a percent. Creature names, levels and spawns still come from Questie. Data is factual drop tables from a GPL project; attributed in README/script header. `objectDrops` only count for metal/stone, herb and elemental (otherwise they are chests/bags). Ctrl OR Cmd (Mac). `/qs gather` + one-time chat hints replace silent failure.
+- 2026-11-19: SUPERSEDES the subclass 5-10 gate above. Classic item data uses 7/0 for leather/hides/cloth/ore/meat and 5/0 for elementals; gathering = skinning-table entry, 7/0, 7/5-10 or 5/0. Object sources are filtered by container NAME (chest, strongbox, crate, box, locker, coffer, cache, barrel, sack, bag, trunk), not by subclass. Rejected: a hand list of item IDs (hundreds, goes stale).
+- 2026-11-19: Gather ranking (user: top 3 with name, location, %, by my level and faction). Fit = creature minLevel <= level+3 (low creatures are fine for gathering) AND zone not a home zone of the other faction. HOME is a short hand list (Elwynn, Dun Morogh, Teldrassil, Westfall, Loch Modan, Darkshore / Durotar, Mulgore, Tirisfal, Barrens, Silverpine): contested zones stay open because their status is not certain from memory. Score = spawns x chance. Non-fitting zones are never mixed with fitting ones; they show only when nothing fits (empty tooltip judged worse). Rejected: hiding non-fitting entirely; ranking by level distance (low mobs are good for leather).
 - ItemSources.lua itself moved to the `TooltipDataProcessor` post-call (the old `OnTooltipSetItem` script is not fired for Professions window tooltips on Interface 16001).
 
 ## 2026-11-17 — Foreground budget for the Dungeon quests scan (user choice)
@@ -36,7 +74,7 @@
 - **Scope = this zone's quests.** Membership comes from Questie `zoneOrSort` -> `uiMapOf()`, accepting the current map or a descendant of it. A spawn that happens to be here does not make a quest belong here. Negative sorts (class, profession, event) and other zones are left out even with a local giver or mob; reasons go to `coverage.external` for `/qs plan why`.
 - **Exception:** an active quest from another zone appears only for its local hand-in, once it is ready (log `complete`, or a breadcrumb with no objectives in the log or in Questie).
 - **Fallback:** `zoneOrSort` missing, 0, or not mapped (e.g. old Questie without ZoneDB) -> keep the pre-change location rules, so quests don't silently vanish.
-- **Objective place = nearest real camp.** Group the target's spawns per map into camps: the densest unassigned spawn seeds a camp of the spawns within `CLUSTER_DISTANCE` (0.065); the camp's point is the member nearest its centroid. A camp is real when its size >= min(3, the target's largest camp on any map). Choose the real local camp nearest the player. The chosen camp depends on the player only through "which camp is nearest", so a step switches only when another camp gets closer.
+- **Objective place = nearest real camp.** Group the target's spawns per map into camps: the densest unassigned spawn seeds a camp of the spawns within `CLUSTER_YARDS` 100 yd (2026-11-19; `CLUSTER_DISTANCE` 0.065 map fraction only when the map size is unknown); the camp's point is the member nearest its centroid. A camp is real when its size >= min(3, the target's largest camp on any map). Choose the real local camp nearest the player. The chosen camp depends on the player only through "which camp is nearest", so a step switches only when another camp gets closer.
 - Rejected: biggest camp (stable, but can send you far past a nearby camp); nearest single spawn (old behaviour: step 1 lands on the player and follows them).
 
 ## 2026-11-17 — WoW-style search journal
@@ -559,6 +597,25 @@
 - Still avoided: a map pin data provider/pool (kept out for secure gamepad paths, see "Selected-step arrow and route positioning"). The OnShow hook is installed lazily, so login cost stays zero.
 - Open risk (review_d3, non-blocking): the overlay may now cover the player arrow or map overlay buttons in the same strata; pins grew to min 32x26 but the 26x22 grouping cell did not. Bug report: `BUGS/2026-11-17-guidance-map-numbers-hidden.md`.
 
+## D9 — 2026-11-19 — One name per feature, second click for destructive actions (ux-fix run r-20261119-104206-0145)
+- One-name rule (UX-27/29/45/62/63): player-visible text (windows, Settings labels, chat, help, README, CHANGELOG) uses exactly one name per feature: **Quest guide**, **Party quests window**, **Adventurer's Journal**, **Party finder**, **Zone levels**, **Fishing spots** (plus **Quest invitation** for the `/qs adventure` window). Not "quest planner/optimizer/route guide", "equipment explorer", "Seek fellow adventurers", "Optional" tab. Goal/level names come from one table: `QuestPlanner.lua` `P.goalNames` / `P.scopeNames` (= Settings labels). Leftovers still open: see `context/ux-review-2026-11-19.md` "Still open".
+- Destructive actions need a second click (UX-04/11): Settings action rows with `confirm` (Reset settings, Clear errors, Clear logs) and the report window's Clear records arm on the first click ("Click again to reset/clear") and run only on a second click within 5 s; the label/hint go back after 5 s. Chosen over a StaticPopup: no new frame/taint path, testable in the harness, same pattern for all rows.
+- Exception kept: `/qs reset` slash command resets at once (typing it is explicit; `tests/test_friends.py` depends on it).
+- Settings toggles that have no effect in the current mode are greyed with `inactiveNote` and print one line when switched on (UX-01), instead of silently doing nothing.
+- Every on/off slash command prints one line `ns.settingLine(key)` = Settings label + state + `ns.settingPath`; the key-style dump is only for `/qs status` (other tests pin its text).
+- Key choice for item/ping/party finder/quick chat keys: warn in plain words what the key used to do (`ns.keyUsedToDo`), protected check BEFORE unbinding the old key. Not done: refusing movement keys or asking for a second press (beyond the suggestion; left for the user).
+- Bag cleanup (UX-12): keep the list by ignoring the self-caused BAG_UPDATE for 2 s, NOT an automatic re-scan (keeps the "no background scans" rule above, `tests/test_quest_cleanup.py:151`).
+- Process lesson: batches were file-disjoint, so any text owned by a file outside a batch (mostly `Settings.lua`/`Core.lua`, B1) was left as an orchestrator TODO; the final review then found those leftovers. Next time give the label/help-text owner (B1) a second pass after B2-B5 report their splits.
+
+## D10 — 2026-11-19 — Low UX round choices (ux-low run r-20261119-113937-c955)
+- Quest guide step clicks (UX-47): one action for both buttons (select + waypoint, also in combat); separate right-click "mark on map" (`showStopOnMap`) dropped instead of giving right-click a new job.
+- Quest rewards tab (UX-54): opening it (button, tab, `/qs rewards`) no longer writes `rewardBrowser`, like Dungeon loot / Dungeon quests. `Rewards.lua` keeps `lastBrowser` and closes/frees only on master off or a true->false change, so a repeated `/qs on` does not close an open tab (review_b5@1 regression). Cost: `/qs rewards off` while already false does nothing. Settings row + `/qs rewards on|off` kept for now: removing them is the user's call.
+- Chat prefix (UX-75): gold `|cffffd100` hard-coded in `Core.lua` with a comment, because `Style.lua` (S.GOLD) loads after Core.lua.
+- Guide step notes (UX-60): `report.stepNotes` (actionable only: shared kill credit, wait time) is a separate field; `report.reasons` keeps every note for the report/debug text.
+- Not changed on purpose: `travelFaction` default stays "all" (UX-49) - changing a default needs the user.
+- 2026-11-19 SUPERSEDED by the user ("can u fix them?" = yes to both decisions): `travelFaction` default is now "mine" (own faction, a 4th choice "My faction"; existing saved "all" stays). `rewardBrowser` switch removed entirely: Quest rewards is a plain action card like Instance drops; only the master switch off closes the tab, so `lastBrowser` is gone.
+- Finding ids: the key-unbind bug found in verification is UX-76 (renamed from a clashing "UX-47"); new ids continue after UX-76.
+
 ## 2026-11-18 — Tuning run stopped; trade-off choices (user)
 - Stability margin capped: keep the previous route unless the new one saves >= max(12 s, min(5 %, 60 s)) or hands in more quests. Why: uncapped 5 % meant 90-180 s on long plans and discarded real improvements.
 - Whole-route polish up to 40 actions, 12-action horizon beyond. Why: removing the beam made a 36-action zone 7 % slower (= nearest-first); whole-route local search at that size costs well under 1 s CPU.
@@ -637,3 +694,59 @@
 - Dropped the one-time upgrade steps for saves older than 0.4.12 (user asked to remove the "legacy" list items 1 and 2). Consequence: an ancient save keeps its old `near/panel/chat/announce/pickup/zoneLevels/debug` values; `dbVersion` is still stored for any future migration.
 - Progressive versions (same day): the build refuses a version that already has a git tag `vX.Y.Z`, skips ahead of or goes back from the last tag (allowed next: patch+1, minor+1.0, major+1.0.0), a CHANGELOG not newest-first (`Unreleased` first), or a newer zip in `dist/`. `python build_release.py --bump [patch|minor|major]` raises `## Version` in the .toc and turns the CHANGELOG `## Unreleased` notes into the new section; it refuses while the current version has no tag. Without git, the previous release is taken from the CHANGELOG. Tests build with `policy=False` so they never depend on release state.
 
+
+## 2026-11-19 Tank aggro: mark, not auto-target
+- User asked to auto-select the lowest-aggro mob. Addons cannot call TargetUnit in combat and secure buttons cannot be re-pointed in combat, so Aggro.lua marks the pick (`>> N% <<`) and the user Tabs/clicks.
+- Pick only when 2+ enemies are within ~10 yd ("pulling many"); far enemies still show their %.
+- Rejected: auto raid marks with SetRaidTarget (would overwrite the group's marks). Possible follow-up if the user wants it.
+- 2026-11-19 user picked option 1 (of: auto nameplates / target-only list / both): the aggro setting switches enemy nameplates on itself. Rejected the nameplate-free list, which misses untargeted mobs (the ones a tank needs). Aggro keeps its own saved CVar copy, separate from Highlight's `cvarSaved`, so turning one helper off never hides the other's nameplates.
+- 2026-11-19 review round: no mark when the lowest near enemy is already at 100 % (every mob on you = nothing to fix, a red mark would be a false alarm). Red is reserved for the marked mob; not-on-you mobs are orange so the mark stands out.
+- 2026-11-19 round 3: user asked for heat colours (green = little aggro, red = you hold it) and always-visible numbers; supersedes the earlier green = on-you / red = mark scheme. Marked enemy keeps its heat colour, stands out by large font + `>> <<`. Flame = Spell_Fire_Fire icon (border trimmed) beside the number at 100 %, not a portrait.
+- 2026-11-19 round 5: the marked lowest-aggro enemy is white (user), no longer its heat colour.
+- 2026-11-19 review round: idle enemies grey (still always shown, as the user asked) so green keeps meaning 'leaving you'; white mark keeps its enemy unless another candidate is 10+ points lower (anti-flicker). Long lines kept: the codebase already has many >120.
+- 2026-11-19: several white marks (user picked 'close to the lowest'): lowest + every near in-fight enemy <100 % within 10 points. The band also removes flicker, so the SWITCH_BY sticky-mark rule was dropped.
+
+## 2026-11-19 — Quest guide plans for the player alone (user)
+- User: "quest optimizer should not care about party." The Quest guide / QuestOptimizer never uses party members' quests, progress or goals; no party goal, no party-aware planning.
+- Why: keeps the guide focused and predictable; party coordination lives in the Party quests window, sharing and the party finder.
+- How to apply: reviews must not raise party stories against the guide (UX-02 re-scoped to the solo problem: quest IDs are never shown, names not accepted; severity high -> medium). The earlier "party-aware planning" idea (2026-11-17) is dropped, not deferred.
+- 2026-11-19 room story (user): white = untouched/idle (replaces grey), then red/green/orange follow the fight. The lowest-near marks keep the big `>> <<` but use the heat colour, so white only ever means 'not fighting yet'. My reading: the arrows were kept since the user's original goal was finding the mob to grab.
+- 2026-11-19 alarm (user: lowest grey, portrait, 'losing aggro', pulsing red border, 'not confusing'): one mark type only (arrows removed); alarm only below 50 % so orange keeps meaning 'coming back' (resolves the clash with the room story); red ring pulses while the 'on you' red number is steady and they never share a mob (marked < 50 %).
+- 2026-11-19 group marks: 'significantly lower' = 20 health points (constant SKULL_BY, only the wait is a setting as asked). X moves only when no living visible enemy carries an X (also respects a hand-placed X). Others' marks are never taken; the tank's own mob may take OUR skull (one mark per mob). Separate switch, default off, because it is outward-facing (party sees it).
+- 2026-11-19 (user): group marks wait 10 s into each fight (a setting, like the skull wait) and are placed only in a party or raid.
+- 2026-11-19 ABANDONED: automatic group marks (X on my target, skull on lowest health). SetRaidTarget is #protected (secure code only); a secure macro could only mark target/mouseover. User chose to discard the feature entirely, not a one-key or hint-only version. Do not re-explore unless Blizzard lifts the protection.
+
+## 2026-11-19 — Dungeon 'get them all' route
+- Separate pure module `DungeonRoute.lua` instead of extending `QuestOptimizer` (zone-local, farming model). Costs are estimates (ground 1.25 terrain factor, flight 30 yd/s x1.3 + 10 s, ride + 60 s wait, hearth 30 s).
+- User choices: route pickups + talk-only lead-ins; kill/collect prerequisites only listed. Flights: learned at flight masters; unknown set = assume all; check box forces assume all.
+- Pickups at the same NPC are grouped into one step; walk hops < 5 s dropped.
+
+
+
+## D11 — Optimizer reference case: Coldridge Valley (2026-11-19, user request)
+User: "first zone gnome ... loop until you find the optimized solution, and then use this as usecase how should behave the optimizer in general". Test: `tests/test_coldridge_valley.py` on real Classic QuestieDB rows (`tools/build_coldridge_fixture.py`). Solo only (party rule above).
+Loop (each round = run the guide, read the route as a player, fix the model):
+1. Mock lacked `IsDoableVerbose` -> 7 chain quests "unknown". Fixed the test mock (real Questie reports the block reason), not the addon.
+2. 10 quests, 1,017 s: Thalos (33.5,71.8) hand-in shown at Balir's spot -> radii in map fractions (0.045 of Dun Morogh ~220 yd). Fix: yards (E4). BUGS/2026-11-19-planner-steps-merged-in-map-fractions.md.
+3. Level 3-4 quests (A Refugee's Quandary, Mornbrew pair) skipped at level 1. Fix: `LEVEL_AHEAD` 3 + XP closure + multi-level XP table. 13 quests, 1,541 s, but walked back from Kharanos.
+4. Back-walk cause: level forecast counted quest XP only. Fix: kill XP. 1,250 s, valley finished first.
+5. Class quest Glyphic Memorandum excluded ("Class, profession or event"). Fix: a class quest you can take is judged by where its giver is. 14 quests, 1,260 s first route / 1,211 s refined.
+6. Optimality: local search converges at ~37.5k moves whatever the budget; independent simulated annealing (4 x 300k random or-opt / 2-opt / swap on `_evaluate`) best 1,201.9 s = 0.8 % better, under the 12 s stability margin. Accepted as optimized for this cost model.
+**Rules the optimizer must keep in every zone (each guarded by a test that fails without its fix):**
+- R1 Distances that group things (camps, merged steps) are yards, not map fractions.
+- R2 The level forecast uses quest XP + kill XP over several levels; quests up to 3 levels ahead join where you reach them.
+- R3 A class quest you can take is local when its giver is here.
+- R4 Finish the zone's local work before hand-ins that leave it (no walk back in).
+- R5 A follow-up at the same NPC is taken in the same visit.
+- R6 Pickups and hand-ins point at the NPC's real spot.
+- R7 The refined route is within 2 % of an independent search with the same cost model.
+Not done (needs data): mob level per objective for kill XP (assumes your own level); real cost calibration in-game.
+
+## D12 — Shared camps view in the addon (2026-11-19, user choices)
+- Shows camps of the Quest guide's planned quests only (not every zone quest): matches what the player will do.
+- Switch `campMap` in Settings > Quest guide (off by default) + `/qs plan camps [on|off|table]`; key avoids the `questPlanner*` prefix so toggling it never triggers a replan.
+- Map + camps table window (the HTML's matrix). The network graph stays in the camp label tooltip (mobs x spawns - quest); a full node-link graph does not fit WoW's map UI.
+- Camp = the guide's `groupCamps` (100 yd) on all planned objectives' spawns together, shown when >= 5 spawns (less clutter than the guide's 3). Blue = 2+ quests, grey = 1 (colour + the label tooltip, never colour alone).
+- Only the small labels take the mouse; circles never block map clicks. Hidden in combat. Table: <= 14 rows, <= 8 columns (rest fold into "Other", no spawn dropped).
+- Unverified: the circle texture's look in the real client.
+- 2026-11-19 (user: "this is what i wanna see but in wow style inside"): the camps table became the full Shared camps window mirroring tools/coldridge-network.html (buttons, network, map, matrix). Network curves = 8 straight CreateLine pieces per link; map background = the zone's own map art (dimmed), plain inset when the client gives no art; givers within 14 px share one label; "Mountaineer" title dropped from short names.

@@ -116,7 +116,7 @@ def test_doctor_lists_recorded_errors(style):
     win, box = g.eval("NS._reportWindow()")
     assert "Recorded errors: 1" in box.text and "it broke" in box.text
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.selectAll)
-    assert "[--] 1 error(s) recorded" in box.text and "  Source: x" in box.text and "it broke" in box.text
+    assert "[--] 1 error recorded" in box.text and "  Source: x" in box.text and "it broke" in box.text
 
 
 def test_the_report_text_cannot_be_edited_by_accident(style):

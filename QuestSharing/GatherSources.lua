@@ -1,6 +1,7 @@
 -- Gathering items (hides, leather, cloth, meat, herbs, ore...): hover one in your bags or in the Professions window to see
 -- the three best places to get it, and Ctrl+right-click it to mark those places on the world map with the item's icon.
--- "Best" = the most known spawn points of one creature (or node) in one zone, from QuestieDB; one zone is listed once.
+-- "Best" = fits your level and faction, then the most items per visit (known spawns x chance) of one creature or node in
+-- one zone; one zone is listed once. Each tooltip line: name · zone · chance. The map pins add level and spawn count.
 local ADDON, ns = ...
 local Q, U, S, V, W = ns.questie, ns.optionalUI, ns.style, ns.vendorMap, ns.dataWork
 local G = {}
@@ -28,11 +29,29 @@ local function itemFacts(id)
     return class, sub, icon or call(GetItemIcon, id)
 end
 
+-- Classic item data files leather, hides, cloth, ore, stone and meat under 7/0 "Trade Goods" (only herbs get their own
+-- subclass) and elementals under 5 "Reagent": those count too, and anything the bundled skinning table knows.
+-- A crafted trade good (a bar, a bolt) has no creature or node, so it simply shows nothing.
 function G.isGathering(id)
     if type(id) ~= "number" then return false end
+    if ns.skinningData and ns.skinningData[id] then return true end
     local class, sub = itemFacts(id)
-    return class == 7 and GATHERED[sub] == true
+    if class == 7 then return sub == 0 or GATHERED[sub] == true end
+    return class == 5 and sub == 0
 end
+
+-- objectDrops also lists chests, crates and lockboxes that happen to hold the item: those are not places to gather
+local CONTAINER_WORDS = { "chest", "strongbox", "crate", "box", "lockbox", "locker", "footlocker", "coffer", "cache",
+    "barrel", "sack", "bag", "trunk" }
+local function isContainer(name)
+    if type(name) ~= "string" then return true end
+    local lower = string.lower(name)
+    for _, w in ipairs(CONTAINER_WORDS) do
+        if string.find(lower, "%f[%a]" .. w .. "%f[%A]") then return true end
+    end
+    return false
+end
+G._isContainer = isContainer                                            -- for the tests
 
 local function zoneName(area)
     local name = call(C_Map and C_Map.GetAreaInfo, area) or (GetAreaInfo and call(GetAreaInfo, area))
@@ -76,38 +95,66 @@ local function collect(id)
     -- { creature, tenths of a percent, ... }
     local skins = ns.skinningData and ns.skinningData[id]
     for i = 1, math.min(#(skins or {}), MAX_SOURCES * 2), 2 do add("npc", skins[i], skins[i + 1] / 10) end
-    -- objectDrops of leather, cloth or meat are chests and bags, not places to gather: only real nodes count
-    local _, sub = itemFacts(id)
-    if sub == 7 or sub == 9 or sub == 10 then
-        for i, sourceID in ipairs(type(nodes) == "table" and nodes or {}) do
-            if i > MAX_SOURCES then break end
-            add("object", sourceID)
-        end
+    -- only real nodes (veins, deposits, herbs) count: by the object's name, not the item subclass (Classic files ore under 0)
+    for i, sourceID in ipairs(type(nodes) == "table" and nodes or {}) do
+        if i > MAX_SOURCES then break end
+        if not isContainer(Q.get("object", sourceID, "name")) then add("object", sourceID) end
     end
     return groups
 end
 
--- the best group of each zone, then the TOP zones by spawn count
+-- Ranking: what fits me first (creatures at most LEVEL_SLACK levels above me, not in the other faction's home zones),
+-- then the most items per visit (spawns x chance). Only zones that fit are shown, unless none does.
+local LEVEL_SLACK = 3
+local UNKNOWN_DROP, NODE_CHANCE = 0.1, 1
+-- UI map ids of the faction home zones (starting zones and the zones right after them); everything else counts as open
+local HOME = { [1429] = "A", [1426] = "A", [1438] = "A", [1436] = "A", [1432] = "A", [1439] = "A",
+    [1411] = "H", [1412] = "H", [1420] = "H", [1413] = "H", [1421] = "H" }
+G._HOME = HOME
+
+local function fits(g, me)
+    if me.level and g.lo and g.lo > me.level + LEVEL_SLACK then return false end
+    local owner = HOME[g.map]
+    return not (me.faction and owner and owner ~= me.faction)
+end
+
+local function better(a, b)
+    if a.fits ~= b.fits then return a.fits end
+    if a.score ~= b.score then return a.score > b.score end
+    if a.name ~= b.name then return a.name < b.name end
+    return a.area < b.area
+end
+
 local function rank(groups, itemID)
+    local me = Q.me()
+    for _, g in ipairs(groups) do
+        if g.kind == "npc" and not g.rate then g.rate = Q.itemDropRate(itemID, g.id) end
+        local chance = g.rate and g.rate / 100 or (g.kind == "object" and NODE_CHANCE or UNKNOWN_DROP)
+        g.score, g.fits = #g.points * chance, fits(g, me)
+        W.checkpoint()
+    end
     local bestInZone = {}
     for _, g in ipairs(groups) do
         local cur = bestInZone[g.area]
-        if not cur or #g.points > #cur.points or (#g.points == #cur.points and g.name < cur.name) then bestInZone[g.area] = g end
+        if not cur or better(g, cur) then bestInZone[g.area] = g end
     end
     local list = {}
     for _, g in pairs(bestInZone) do list[#list + 1] = g end
-    table.sort(list, function(a, b)
-        if #a.points ~= #b.points then return #a.points > #b.points end
-        if a.name ~= b.name then return a.name < b.name end
-        return a.area < b.area
-    end)
-    local out = {}
+    table.sort(list, better)
+    -- out.fallback: nothing fits me, these are the best known anyway; out.leftOut: zones skipped, for /qs gather
+    local out = { fallback = list[1] ~= nil and not list[1].fits, leftOut = { level = 0, faction = 0 } }
+    for _, g in ipairs(list) do
+        if not g.fits then
+            if me.level and g.lo and g.lo > me.level + LEVEL_SLACK then out.leftOut.level = out.leftOut.level + 1
+            else out.leftOut.faction = out.leftOut.faction + 1 end
+        end
+    end
     for i = 1, math.min(TOP, #list) do
         local g = list[i]
+        if not g.fits and list[1].fits then break end          -- never pad the fitting zones with ones that do not fit
         g.count = #g.points
-        if g.kind == "npc" and not g.rate then g.rate = Q.itemDropRate(itemID, g.id) end
         while #g.points > MAX_POINTS do table.remove(g.points) end
-        out[i] = g
+        out[#out + 1] = g
     end
     return out
 end
@@ -133,22 +180,28 @@ local function levelText(g)
     return " (level " .. g.lo .. ((g.hi and g.hi ~= g.lo) and ("-" .. g.hi) or "") .. ")"
 end
 
+local function percent(rate)
+    return (rate >= 10 and string.format("%.0f", rate) or string.format("%.1f", rate)) .. "%"
+end
+
+-- Cmd stands in for Ctrl on a Mac: name the key the player actually has
+local function clickKey() return ((IsMacClient and IsMacClient()) and "Cmd" or "Ctrl") .. "+right-click" end
+
 function G.lines(sources)
     local out = {}
     for i, g in ipairs(sources) do
-        local rate = g.rate and string.format(" · %s%% %s", g.rate >= 10 and string.format("%.0f", g.rate) or string.format("%.1f", g.rate),
-            g.skin and "skinning" or "drop") or ""
-        out[i] = i .. ". " .. g.name .. levelText(g) .. " · " .. zoneName(g.area) .. " · " .. g.count
-            .. " known spawn" .. (g.count == 1 and "" or "s") .. rate
+        local chance = g.rate and percent(g.rate) or (g.kind == "object" and "node" or "chance unknown")
+        out[i] = i .. ". " .. g.name .. " · " .. zoneName(g.area) .. " · " .. chance
     end
     return out
 end
 
 local function addToTooltip(tooltip, sources)
     if #sources == 0 then return end
-    tooltip:AddLine("Where to gather (most spawns first)", 0.95, 0.78, 0.30)
+    tooltip:AddLine(sources.fallback and "Where to gather (none for your level and faction; best known)"
+        or "Where to gather (for your level and faction)", 0.95, 0.78, 0.30)
     for _, line in ipairs(G.lines(sources)) do tooltip:AddLine(line, 1, 1, 1, true) end
-    tooltip:AddLine("Ctrl+right-click this item to mark them on the map", 0.62, 0.62, 0.62, true)
+    tooltip:AddLine(clickKey() .. " this item to mark them on the map", 0.62, 0.62, 0.62, true)
     tooltip:Show()
 end
 
@@ -169,7 +222,8 @@ local function pinTip(pin)
     local g = pin.source
     if not g then return end
     local lines = { zoneName(g.area) .. " · " .. g.count .. " known spawn" .. (g.count == 1 and "" or "s"),
-        (g.skin and "Skin it for " or "Drops ") .. (active and active.name or "the item") .. (g.rate and string.format(" (%.1f%%)", g.rate) or ""),
+        (g.kind == "object" and "Gather it here for " or g.skin and "Skin it for " or "Drops ") .. (active and active.name or "the item")
+            .. (g.rate and (" (" .. percent(g.rate) .. ")") or ""),
         S.GREY .. "Click to set a waypoint.|r" }
     U.tip(pin, g.name .. levelText(g), lines)
 end
@@ -300,7 +354,7 @@ local function onMouseDown(_, button)
     local id = itemID(link)
     if not id or not G.isGathering(id) then return end
     if not ns.db.itemSources then
-        hintOnce("setting", "turn on Settings > Look up > \"Show where items come from when I hover over them\" to see where this is gathered")
+        hintOnce("setting", "turn on " .. (ns.settingPath and ns.settingPath("itemSources") or "Settings") .. " to see where this is gathered")
         return
     end
     if not enabled() then return end
@@ -311,21 +365,34 @@ local function onMouseDown(_, button)
     G.mark(id)
 end
 
--- /qs gather [item id or link]: say why an item does or does not show sources (defaults to the last item you hovered)
+-- /qs gather [item id or link]: one plain sentence on why an item does or does not show places (defaults to the last
+-- item you hovered). The item class, subclass and drop counts go to the debug log (/qs log, /qs doctor), not to chat.
 function G.command(arg)
     local id = tonumber(arg) or itemID(arg) or G.lastItem
-    ns.print("where to gather: setting " .. (ns.db.itemSources and "on" or "OFF (Settings > Look up)")
-        .. ", QuestieDB " .. (Q.available() and "found" or "NOT found") .. ", " .. (ns.skinningData and "skinning table loaded" or "skinning table MISSING"))
-    if not id then ns.print("hover an item first, or type /qs gather <item id>"); return end
+    if not ns.db.itemSources then
+        ns.print("where to gather is off: turn on " .. (ns.settingPath and ns.settingPath("itemSources") or "Settings") .. ".")
+        return
+    end
+    if not Q.available() then ns.print("where to gather needs QuestieDB: install or enable it, then /reload."); return end
+    if not id then ns.print("hover an item first, or type /qs gather followed by the item number or a shift-clicked item"); return end
+    local name = call(GetItemInfo, id) or Q.get("item", id, "name") or ("Item " .. id)
     local class, sub = itemFacts(id)
-    ns.print("item " .. id .. ": class " .. tostring(class) .. ", subclass " .. tostring(sub) .. " -> "
-        .. (G.isGathering(id) and "counts as a gathering item" or "NOT a gathering item (needs trade goods: cloth, leather, metal/stone, meat, herb, elemental)"))
-    if not G.isGathering(id) or not Q.available() then return end
-    ns.print("QuestieDB: " .. #(Q.get("item", id, "npcDrops") or {}) .. " creature drops, " .. #(Q.get("item", id, "objectDrops") or {})
-        .. " object drops; skinning table: " .. math.floor(#((ns.skinningData or {})[id] or {}) / 2) .. " creatures")
+    if ns.log then
+        ns.log("gather", "item " .. id .. ": class " .. tostring(class) .. ", subclass " .. tostring(sub) .. ", "
+            .. #(Q.get("item", id, "npcDrops") or {}) .. " creature drops, " .. #(Q.get("item", id, "objectDrops") or {})
+            .. " object drops, " .. math.floor(#((ns.skinningData or {})[id] or {}) / 2) .. " skinned creatures")
+    end
+    if not G.isGathering(id) then ns.print(name .. " is not something you gather, so no places are listed."); return end
     G.load(id, function(sources)
-        if #sources == 0 then ns.print("no usable spawn found for this item"); return end
+        if #sources == 0 then ns.print(name .. ": no known creature or node gives it, so no places are listed."); return end
+        ns.print(name .. ": shown. " .. #sources .. (#sources == 1 and " zone" or " zones") .. " known.")
         for _, line in ipairs(G.lines(sources)) do ns.print(line) end
+        local left = sources.leftOut
+        if left and (left.level > 0 or left.faction > 0) then
+            local other = Q.me().faction == "H" and "Alliance" or "Horde"
+            ns.print("left out: " .. left.level .. " zone(s) with creatures more than " .. LEVEL_SLACK .. " levels above you, "
+                .. left.faction .. " in " .. other .. " home zones" .. (sources.fallback and " (nothing fits, so the best known are shown)" or ""))
+        end
     end)
 end
 
@@ -346,11 +413,15 @@ function G.refresh()
     if not enabled() then G.clear() end
 end
 
+-- true when this tooltip will carry the ranked "Where to gather" block (the Professions tooltip then leaves its drops out)
+function G.covers(id) return enabled() and Q.available() and G.isGathering(id) or false end
 function G._active() return active end
 function G._reset() cache, running = {}, {}; G.clear() end
 
 ns.on("PLAYER_LOGIN", install)
 ns.on("ADDON_LOADED", install)
 ns.on("GLOBAL_MOUSE_DOWN", onMouseDown)
+ns.on("PLAYER_LEVEL_UP", function() cache = {} end)                    -- the ranking depends on my level
+W.onPurge("Where to gather", function() cache = {} end)
 ns.on("WORLD_MAP_UPDATE", function() if active then G.draw() end end)
 ns.on("PLAYER_REGEN_DISABLED", function() if active then G.draw() end end)

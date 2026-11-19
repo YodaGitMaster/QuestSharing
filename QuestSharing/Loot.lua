@@ -11,6 +11,9 @@ local itemQueue, queueAt, page, instancePage = {}, 1, 1, 1
 local deferredAtlas = false
 local unresolved, selectedKey = 0, nil
 local focusTarget
+-- Memory: the loot catalogue is read once and kept for the session. Hiding the window pauses a half-read scan or item
+-- detail load; resumeLoot continues it on reopen. Purge (ns.dataWork.purge) frees it all.
+local resumeLoot
 local function resultKey(r) return r.key end
 local PAGE, INSTANCE_PAGE = 7, 9
 local paint, refresh
@@ -177,7 +180,8 @@ local function bosses()
 end
 
 local function pumpNames(token)
-    if token ~= generation or not shown() then return end
+    if token ~= generation then return end
+    if not shown() then resumeLoot = function() pumpNames(token) end; return end
     for _ = 1, 10 do
         local id = itemQueue[queueAt]
         if not id then refresh(); return end
@@ -292,7 +296,8 @@ local function questieSources(kind, id, cache)
     return found
 end
 
-function L.scan()
+-- full: read the whole item catalogue again (Refresh data); otherwise the IDs saved by the last full QuestieDB scan.
+function L.scan(full)
     E.dismissMenu()
     generation = generation + 1
     local token = generation
@@ -302,16 +307,18 @@ function L.scan()
     local jobs = atlasJobs()
     deferredAtlas = not jobs and atlas() and U.call(InCombatLockdown) and true or false
     if not jobs then loadAtlas(); jobs = atlasJobs() end
-    local ids
+    local ids, saved
+    local found = {} -- item IDs that gave at least one source (saved after a full QuestieDB scan)
     if jobs then
         source, note = "AtlasLoot", "Classic and Forever dungeon equipment from AtlasLoot. Raids and world bosses excluded."
     else
         local db = type(ItemDB) == "table" and type(ItemDB.GetAllIds) == "function" and ItemDB
             or (type(LibQuestieDB) == "table" and LibQuestieDB.Item)
-        ids = db and U.call(db.GetAllIds)
+        saved = db and full ~= true and ns.dataWork.saved("dungeonLoot")
+        ids = saved or (db and U.call(db.GetAllIds))
         if type(ids) ~= "table" then
             loading = false
-            note = "Install compatible AtlasLoot with DungeonsAndRaids, or QuestieDB for partial drop sources."
+            note = "Install compatible AtlasLoot (with its dungeons and raids loot), or install or update QuestieDB for some drop sources (see /qs questie)."
             if atlas() and U.call(InCombatLockdown) then note = "Leave combat to load AtlasLoot's dungeon catalogue, then Refresh data." end
             if paint then paint() end
             return false
@@ -321,7 +328,8 @@ function L.scan()
     end
     local jobAt, rowAt, rows, mode, cache = 1, 1, nil, nil, {}
     local function step()
-        if token ~= generation or not shown() then return end
+        if token ~= generation then return end
+        if not shown() then resumeLoot = step; return end
         local budget = 100
         while budget > 0 do
             if jobs then
@@ -351,7 +359,7 @@ function L.scan()
                     local drops = field("item", id, kind == "npc" and "npcDrops" or "objectDrops")
                     for _, from in ipairs(type(drops) == "table" and drops or {}) do
                         if positive(from) then
-                            for _, s in ipairs(questieSources(kind, from, cache)) do add(id, s.place, s.who, "", source, s.id, s.kind) end
+                            for _, s in ipairs(questieSources(kind, from, cache)) do add(id, s.place, s.who, "", source, s.id, s.kind); found[id] = true end
                         end
                     end
                 end
@@ -362,6 +370,7 @@ function L.scan()
         local done = jobs and not jobs[jobAt] or not jobs and not ids[jobAt]
         if done then
             loading, ready = false, true
+            if not jobs and not saved then ns.dataWork.save("dungeonLoot", "", ns.dataWork.sortedKeys(found)) end
             if chosen and not instances[chosen] then chosen, encounter = nil, nil end
             focusCurrentDungeon()
             refresh(); pumpNames(token)
@@ -381,7 +390,8 @@ paint = function()
     for i, b in ipairs(W.instances) do
         local place = places[(instancePage - 1) * INSTANCE_PAGE + i]
         b.place = place
-        if place then b:SetLabel((chosen == place.key and "> " or "") .. place.name); b:Show() else b:Hide() end
+        -- gold marks the chosen dungeon, as in the dropdowns ("> " there is the keyboard cursor)
+        if place then b:SetLabel(chosen == place.key and (S.GOLD .. place.name .. "|r") or place.name); b:Show() else b:Hide() end
     end
     page = math.max(1, math.min(page, math.max(1, math.ceil(#results / PAGE))))
     local title = chosen and instances[chosen] and instances[chosen].name or "All dungeons"
@@ -389,17 +399,20 @@ paint = function()
     W.selection:SetWordWrap(false)
     W.boss.refresh()
     W.status:SetText(loading and ("Reading " .. tostring(source or "loot") .. " tables: " .. progress)
+        or (not source and note ~= "" and note) -- no loot catalogue at all: say what to install, not "no matches"
         or E.pageStatus((page-1)*PAGE+1,PAGE,#results))
     E.pageButtons(W.prev,W.next,#results,page,PAGE)
     E.pageButtons(W.instancePrev,W.instanceNext,#places,instancePage,INSTANCE_PAGE)
-    W.note:SetText(note .. (skipped > 0 and (" " .. skipped .. " tables unavailable or not item lists.") or "")
+    W.note:SetText(note .. ((skipped > 0 and ns.logging()) and (" " .. skipped .. (skipped == 1 and " table could not be read" or " tables could not be read") .. " (debug).") or "")
         .. (queueAt <= #itemQueue and (" Loading item details " .. (queueAt - 1) .. "/" .. #itemQueue .. ".")
             or (unresolved > 0 and (" " .. unresolved .. " items await equipment details and remain hidden.") or "")))
     for i, row in ipairs(W.rows) do
         local r = results[(page - 1) * PAGE + i]
         row.result = r
         if r then
-            E.paintRow(row, r.item.info, r.item.name .. " · iLvl " .. tostring(r.item.info.level or "?") .. " · req " .. tostring(r.item.info.required or "?"),
+            local req = r.item.info.required
+            E.paintRow(row, r.item.info, r.item.name .. " · iLvl " .. tostring(r.item.info.level or "?")
+                .. ((type(req) ~= "number" or req > 1) and (" · req " .. tostring(req or "?")) or ""),
                 sourceSummary(r))
             row.frame:Show()
         else row.frame:Hide() end
@@ -407,7 +420,7 @@ paint = function()
     if not E.focusRows(W.rows,selectedKey,resultKey) then
         selectedKey=nil
         W.setDetails((loading or unresolved>0) and "Loading dungeon equipment details… Eligible blue+ drops appear as the game supplies their data." or
-            (#index==0 and note) or "No matching blue-or-better equipment.\n\nTry Clear filters, another dungeon, or a broader search.")
+            (#index==0 and note) or (E.RARE_ONLY.."; many dungeon drops are green.\n\nA search, slot, level or stat filter can also hide drops: try Clear filters, another dungeon, or a broader search."))
     end
 end
 
@@ -515,7 +528,7 @@ local function build()
             W.setDetails(r.item.name .. " (item " .. r.itemID .. ")\n\nEquipment: " .. r.item.info.slot
                 .. "\nItem level: " .. tostring(r.item.info.level or "unknown")
                 .. "\nRequired level: " .. tostring(r.item.info.required or "unknown")
-                .. "\n\n"..table.concat(lines,"\n").."\n\nDrop chance is not supplied by this browser."
+                .. "\n\n"..table.concat(lines,"\n").."\n\nDrop chances are not shown in the Adventurer's Journal."
                 .. "\nEncounter groups such as Trash refer to a shared loot table, not a specific boss."
                 .. (r.provider == "QuestieDB" and "\nQuestieDB lists known sources only; this is not a complete instance loot table." or ""))
         end
@@ -529,7 +542,7 @@ local function build()
     W.instanceNext = pager("Next", 100, function() L.goInstances(1) end)
     W.prev = pager("Previous", 210, function() L.go(-1) end)
     W.next = pager("Next", 310, function() L.go(1) end)
-    W.reload = pager("Refresh data", 570, function() L.scan() end)
+    W.reload = pager("Refresh data", 570, function() L.scan(true) end)
     W.note = E.text(f, "", 0, 536, 660)
     W.details, W.detailsText, W.setDetails = E.details(f, 684, 348, "Drop sources")
     E.navigation(W.search,W.rows,L.go)
@@ -539,10 +552,7 @@ local function build()
         W.search:SetText("");W.search.cancel();W.instanceSearch:SetText("");W.instanceSearch.cancel();refresh()
     end
     f.refresh = function() page=1; refresh() end
-    f.suspend = function()
-        focusTarget=nil
-        if loading or queueAt <= #itemQueue then generation = generation + 1; loading, ready = false, false end
-    end
+    f.suspend = function() focusTarget=nil end -- a running scan pauses by itself while hidden (resumeLoot)
     f:SetScript("OnHide", f.suspend)
     return true
 end
@@ -555,6 +565,10 @@ function L.open(text)
     for _,box in ipairs({W.search,W.instanceSearch}) do if box.dirty then box.flush() end end
     focusTarget=currentDungeon(text and text~="" and text or nil)
     if not ready and not loading then L.scan()
+    elseif resumeLoot then
+        local run = resumeLoot; resumeLoot = nil
+        if ready then focusCurrentDungeon() end
+        refresh(); run()
     else
         if ready then focusCurrentDungeon() end
         refresh()
@@ -568,6 +582,14 @@ function L.open(text)
 end
 
 function L.close() if W then E.close("dungeons") end end
+function L.purge()
+    ns.dataWork.forget("dungeonLoot")
+    generation = generation + 1; resumeLoot = nil
+    index, results, instances, items, itemQueue = {}, {}, {}, {}, {}
+    queueAt, progress, skipped, unresolved, ready, loading = 1, 0, 0, 0, false, false
+    if shown() then L.scan() end
+end
+ns.dataWork.onPurge("Dungeon loot", L.purge)
 function L._window() return W end
 function L._results() return results end
 function L._state() return ready, loading, source, #index end

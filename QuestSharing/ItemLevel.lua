@@ -10,7 +10,8 @@ local I = {}
 ns.itemLevel = I
 
 local PREFIX = "QSILVL"
-local KEEP = 14 * 86400                 -- seconds a remembered number stays valid
+-- seconds a remembered number stays valid (Settings > Party finder > Days to remember item levels)
+local function keep() return (tonumber(ns.db.ilvlKeepDays) or 14) * 86400 end
 local MAX_KEEP = 2000                   -- names kept at most (the oldest go first)
 local FRESH = 3600                      -- no new inspect of a player inspected within the last hour
 local INSPECT_GAP = 2                   -- seconds between two inspects (the game throttles them)
@@ -88,7 +89,7 @@ function I.known(name)
     local e = name and seen()[name]
     if not e then return nil end
     local age = now() - (e.at or 0)
-    if age > KEEP then return nil end
+    if age > keep() then return nil end
     return e.i, math.max(age, 0)
 end
 
@@ -99,7 +100,7 @@ function I.forget() ns.db.ilvlSeen = {}; return true end
 local function prune()
     local s, t, list = seen(), now(), {}
     for k, e in pairs(s) do
-        if type(e) ~= "table" or t - (e.at or 0) > KEEP then s[k] = nil else list[#list + 1] = k end
+        if type(e) ~= "table" or t - (e.at or 0) > keep() then s[k] = nil else list[#list + 1] = k end
     end
     if #list > MAX_KEEP then
         table.sort(list, function(a, b) return (s[a].at or 0) < (s[b].at or 0) end)
@@ -136,8 +137,13 @@ ns.on("INSPECT_READY", function(_, guid)
     local p = pending
     if not p or (guid and p.guid and guid ~= p.guid) then return end
     pending = nil
-    if UnitGUID and p.guid and UnitGUID(p.unit) ~= p.guid then return end        -- the unit changed meanwhile
-    local v = I.averageOf(p.unit)
+    -- the mouse may have moved on: read the gear through any unit that is still this player
+    local unit
+    for _, u in ipairs({ p.unit, "target", "mouseover", "party1", "party2", "party3", "party4" }) do
+        if not unit and UnitGUID and p.guid and UnitGUID(u) == p.guid then unit = u end
+    end
+    if not unit then return end
+    local v = I.averageOf(unit)
     if v then I.remember(p.name, v); ns.log("ilvl", p.name .. " " .. v .. " (inspected)") end
 end)
 ns.on("PLAYER_TARGET_CHANGED", function() tryInspect("target") end)

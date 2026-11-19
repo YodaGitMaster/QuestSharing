@@ -65,6 +65,24 @@ local function mapInfo(id)
 end
 local function clean(s) return type(s)=="string" and string.gsub(string.gsub(s,"|c%x%x%x%x%x%x%x%x",""),"|r","") or "Unknown zone" end
 local function span(lo,hi) return lo==hi and tostring(lo) or (lo.."–"..hi) end
+local function myLevel()
+    local level=U.call(UnitLevel,"player")
+    return finite(level) and level>0 and level or nil
+end
+-- The quest-difficulty colour of a range for my level: yellow when my level is inside it, orange/red above me,
+-- green/grey below me. The game's own GetQuestDifficultyColor when present, else its usual thresholds.
+local function rangeColor(lo,hi)
+    local me=myLevel()
+    if not (me and lo and hi) then return S.GREY end
+    local level=me<lo and lo or (me>hi and hi or me)
+    local ok,c=pcall(function() return GetQuestDifficultyColor and GetQuestDifficultyColor(level) end)
+    if ok and type(c)=="table" and finite(c.r) and finite(c.g) and finite(c.b) then return S.hex(c.r,c.g,c.b) end
+    local d=level-me
+    if d>=5 then return "|cffff1919" elseif d>=3 then return "|cffff8040" elseif d>=-2 then return "|cffffff00"
+    elseif d>=-(math.floor(me/10)+5) then return "|cff40c040" end
+    return S.GREY
+end
+local function coloured(lo,hi) return rangeColor(lo,hi)..span(lo,hi).."|r" end
 function Z.range(id)
     if not finite(id) or id<=0 or id%1~=0 then return end
     if places[id] then return nil,nil,places[id] end
@@ -91,7 +109,7 @@ local function viewFor(canvas,scroll)
     v.panel:SetWidth(290);v.panel:SetHeight(48);v.panel:SetPoint("TOPLEFT",scroll,"TOPLEFT",12,-12)
     v.panel:EnableMouse(false)
     S.panel(v.panel)
-    v.heading=U.text(v.panel,S.GOLD.."Questing levels|r",8,6,274)
+    v.heading=U.text(v.panel,S.GOLD.."Zone levels|r",8,6,274)
     v.text=U.text(v.panel,"",8,25,274);v.text:SetWordWrap(false)
     views[canvas]=v;return v
 end
@@ -136,7 +154,7 @@ local function describe(info)
     if not info then return "Zone level data is unavailable on this client." end
     if info.mapType==zoneType() then
         local lo,hi,source=Z.range(info.mapID)
-        return (lo and ((source and (source.." ") or "")..span(lo,hi)) or source or "range unavailable").." · "..clean(info.name)
+        return (lo and ((source and (source.." ") or "")..coloured(lo,hi)) or source or "range unavailable").." · "..clean(info.name)
     end
     local world=Enum and Enum.UIMapType and Enum.UIMapType.World or 1
     if type(info.mapType)=="number" and info.mapType<=world then return "Choose a continent or zone to see its ranges." end
@@ -166,7 +184,7 @@ function Z.draw()
         for i,zone in ipairs(v.zones) do
             count=i
             local p=labelFor(v,i);p.zone=zone
-            p.text:SetText(zone.min and (S.GOLD..span(zone.min,zone.max).."|r") or (S.GREY..(zone.source or "?").."|r"))
+            p.text:SetText(zone.min and coloured(zone.min,zone.max) or (S.GREY..(zone.source or "?").."|r"))
             p:ClearAllPoints();p:SetScale(1/scale)
             p:SetPoint("CENTER",canvas,"TOPLEFT",zone.x*width*scale,-zone.y*height*scale)
             p:Show()
@@ -181,6 +199,8 @@ function Z.draw()
             if type(hit)=="table" and hit.mapType==zoneType() then hovered=hit end
         end
     end
+    local me=myLevel()
+    v.heading:SetText(S.GOLD.."Zone levels|r"..(me and (" · you are level "..me) or ""))
     v.text:SetText(describe(hovered or info));v.panel:Show()
 end
 function Z.refresh()

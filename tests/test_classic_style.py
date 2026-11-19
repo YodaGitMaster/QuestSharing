@@ -33,6 +33,23 @@ def test_every_opened_window_is_opaque_stone(style):
     g = opened(style)
     for name in ("QuestSharingEquipment", "QuestSharingSettings", "QuestSharingReport"):
         stone(g, name)
+    g.eval("NS.lfgFinder.toggle")(True)                       # the party finder picker
+    stone(g, "QuestSharingFinder")
+
+
+def test_hud_windows_are_opaque_stone(style):
+    # The fill hook goes in before the world loads, so windows built at login (Party quests window) are recorded too.
+    from harness import Game
+    g = Game(style, fresh=True)
+    g.run(RECORD)
+    g.start()
+    g.eval("NS.setSetting")("questPlanner", True); g.advance(5)   # Quest guide
+    g.slash("adventure 100")                                      # Adventurer's Journal invitation
+    g.run("local any; for _, e in pairs(NS.compat.entryMap()) do any = e break end; NS.openQuestMenu(any)")
+    g.eval("NS.lfgFinder.toggle")(True)                           # Party finder
+    for name in ("QuestSharingPlannerPanel", "QuestSharingPanel", "QuestSharingFinder", "QuestSharingMenu",
+                 "QuestSharingAdventure"):
+        stone(g, name)
 
 
 def test_buttons_use_classic_panel_art_and_hidden_art_stays_hidden_after_click(style):

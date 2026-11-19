@@ -113,6 +113,8 @@ local function setCVar(name, value)
     return f and (pcall(f, name, value)) or false
 end
 
+ns.getCVar, ns.setCVar = getCVar, setCVar                   -- also used by Aggro.lua
+
 function ns.enemyNameplatesOn() return getCVar("nameplateShowEnemies") == "1" end
 
 function ns.setHighlightCVars(on)

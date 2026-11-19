@@ -56,11 +56,11 @@ def test_an_explicit_off_survives_a_reload(style):
 
 def test_the_saved_variable_is_declared_and_the_settings_have_the_switch(style):
     toc = (pathlib.Path(__file__).resolve().parent.parent / "QuestSharing" / "QuestSharing.toc").read_text()
-    assert re.search(r"^## SavedVariables: QuestSharingDB, QuestSharingLog$", toc, re.M)
+    assert re.search(r"^## SavedVariables: QuestSharingDB, QuestSharingLog, QuestSharingCache$", toc, re.M)
     g = quick_game(style)
     keys = [g.eval(f"NS.settingRows[{i}].key") for i in range(1, int(g.eval("#NS.settingRows")) + 1)]
     labels = [g.eval(f"NS.settingRows[{i}].label") for i in range(1, int(g.eval("#NS.settingRows")) + 1)]
-    assert "debug" in keys and "Copy logs, errors and setup" in labels
+    assert "debug" in keys and "Check my setup, errors and logs" in labels
 
 
 # ---- what goes in -------------------------------------------------------------------------------------------------------
@@ -213,6 +213,8 @@ def test_the_window_scrolls_and_has_select_all_refresh_clear_and_close(style):
     assert "something broke" in box.text and "diagnostics" in win.title.text and win.clear.shown is True
     assert "a long log, line 900" in box.text
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.clear)
+    assert len(g.eval("NS.db.errors")) == 1, "the first click only asks for a second one"
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.clear)
     assert len(g.eval("NS.db.errors")) == 0 and "No addon errors have been recorded" in box.text
     assert "a long log, line 900" not in box.text
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.refresh)
@@ -226,8 +228,9 @@ def test_the_window_scrolls_and_has_select_all_refresh_clear_and_close(style):
 def test_the_settings_have_one_combined_report_button(style):
     g = quick_game(style)
     labels = [g.eval(f"NS.settingRows[{i}].label") for i in range(1, int(g.eval("#NS.settingRows")) + 1)]
-    assert "Copy logs, errors and setup" in labels and "Show the errors" in labels and "Show the logs" in labels
-    row = next(i for i in range(1, len(labels) + 1) if labels[i - 1] == "Copy logs, errors and setup")
+    assert "Check my setup, errors and logs" in labels
+    assert "Show the errors" not in labels and "Show the logs" not in labels and "Check my setup" not in labels
+    row = next(i for i in range(1, len(labels) + 1) if labels[i - 1] == "Check my setup, errors and logs")
     g.eval(f"NS.settingRows[{row}].action")()
     win, box = g.eval("NS._reportWindow()")
     assert win.shown is True and "No addon errors have been recorded" in box.text
@@ -341,6 +344,21 @@ def test_memory_command_reports_addon_memory_catalogues_and_log_size(style):
     assert "QuestSharing: 2.0 MB" in text, text
     assert "Dungeon quests catalogue: free" in text and "Quest rewards catalogue: free" in text, text
     assert "Map search index: free" in text and "debug log: " in text and "/ 1000 lines" in text, text
+
+
+def test_a_target_name_the_game_keeps_secret_is_logged_as_hidden_without_an_error(style):
+    """v0.4.26 report: comparing a secret target name raised 'attempt to compare ... secret string value'"""
+    g = on(style)
+    target(g, "Lia")
+    g.run("""SECRET = UnitName("target")
+        function issecretvalue(v) return v == SECRET end""")
+    g.run("IN_COMBAT = true")
+    g.fire("PLAYER_TARGET_CHANGED")
+    g.run("IN_COMBAT = false; issecretvalue = nil")
+    t = text(g)
+    assert "event: target: (hidden by the game in combat)" in t, t
+    assert "Lia" not in t.split("hidden by the game")[0].splitlines()[-1], "the secret name is not written down"
+    assert not g.eval("#(NS.db.errors or {})"), "no error recorded"
 
 
 if __name__ == "__main__":

@@ -115,6 +115,21 @@ def test_lines_that_cannot_be_used_are_grey_and_say_why(style):
     assert where.tipText.startswith("needs the Questie addon"), where.tipText
 
 
+def test_hovering_a_grey_line_says_why(style):
+    g = party(style, on_quest={"party1": [100]})
+    menu, lines = open_menu(g)
+    g.run("TOOLTIP = {}")
+    where = next(b for b in lines if "where to get it" in plain(b.text))
+    g.eval("function(b) b.scripts.OnEnter(b) end")(where)
+    assert g.eval("TOOLTIP.shown") is True and (g.eval("TOOLTIP.text") or "").startswith("needs the Questie addon"), g.eval("TOOLTIP.text")
+    g.eval("function(b) b.scripts.OnLeave(b) end")(where)
+    assert g.eval("TOOLTIP.shown") is False
+    g.run("TOOLTIP = {}")
+    usable = next(b for b in lines if "Tell the party how I am doing" in plain(b.text))
+    g.eval("function(b) b.scripts.OnEnter(b) end")(usable)
+    assert g.eval("TOOLTIP.text") is None, "a line you can use needs no reason"
+
+
 def test_focus_it_on_my_map(style):
     g = party(style)
     menu, lines = open_menu(g)

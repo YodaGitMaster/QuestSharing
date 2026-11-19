@@ -73,7 +73,7 @@ def save(g, extra=""):
 
 def test_optional_is_off_and_does_not_scan_on_login(style):
     g=game(style)
-    assert not g.eval("NS.db.fishingMap") and not g.eval("NS.db.rewardBrowser")
+    assert not g.eval("NS.db.fishingMap") and g.eval("NS.db.rewardBrowser") is None
     assert g.eval("ENUMERATIONS")==0 and g.eval("ITEM_READS")==0
     assert g.eval("#NS.fishing._pins()")==0
 
@@ -141,7 +141,7 @@ def test_angleratlas_zone_data_does_not_become_water_data(style):
 def test_druid_reward_eligibility_and_sorting(style):
     g=game(style); g.slash("rewards")
     assert ids(g)==[(800,8000),(801,8001)],ids(g)
-    assert g.eval("NS.db.rewardBrowser") and g.eval("NS.rewards._window().frame.shown")
+    assert g.eval("NS.rewards._window().frame.shown")
 
 
 def test_completed_race_and_max_level_restrictions(style):
@@ -197,17 +197,17 @@ def test_switch_off_cancels_scan_and_reopen_restarts(style):
     g=game(style,'''ItemDB.GetAllIds=function() local t={}; for i=1,500 do t[i]=800 end; return t end''')
     g.slash("rewards")
     assert g.eval("NS.rewards._state()")[1]
-    g.slash("rewards off"); g.advance(1)
+    g.run('NS.setSetting("enabled",false)'); g.advance(1)
     ready,loading,count=g.eval("NS.rewards._state()")
     assert not ready and not loading and count==0, "switching off frees the half-read index"
     assert not g.eval("NS.rewards._window().frame.shown")
-    g.slash("rewards"); g.advance(1)
+    g.run('NS.setSetting("enabled",true)'); g.slash("rewards"); g.advance(1)
     assert g.eval("NS.rewards._state()")[0]
 
 
 def test_missing_catalogue_has_clear_empty_state(style):
     g=game(style,"ItemDB.GetAllIds=nil"); g.slash("rewards")
-    assert "Needs a recent QuestieDB" in g.eval("NS.rewards._window().status.text") and ids(g)==[]
+    assert "Install or update QuestieDB (see /qs questie)" in g.eval("NS.rewards._window().status.text") and ids(g)==[]
 
 
 def test_optional_tabs_fit_window(style):
@@ -239,7 +239,7 @@ def test_alt_click_adds_water_at_viewed_map_without_opening_game_map(style):
 
 def test_missing_enum_mappings_have_explicit_update_message(style):
     g=game(style,"LibQuestieDB.Enum=nil"); g.slash("rewards")
-    assert "class, faction or race mappings" in g.eval("NS.rewards._window().status.text")
+    assert "cannot tell classes, factions and races apart" in g.eval("NS.rewards._window().status.text")
     assert ids(g)==[]
 
 
@@ -265,7 +265,7 @@ def test_reward_browser_pages_and_never_opens_or_redraws_world_map(style):
     g.run('for _,f in ipairs(FRAMES) do if f.text=="Next" then f.scripts.OnClick(f,"LeftButton"); break end end')
     assert w.rows[1].result.questID!=first
     w.rows[1].frame.scripts.OnClick(w.rows[1].frame)
-    g.run('for _,f in ipairs(FRAMES) do if f.text=="Map directions (open M)" then f.scripts.OnClick(f,"LeftButton"); break end end')
+    g.run('for _,f in ipairs(FRAMES) do if f.text=="Mark quest giver (then press M)" then f.scripts.OnClick(f,"LeftButton"); break end end')
     assert g.eval("#MAP_OPENS")==0 and "open your world map (M)" in "\n".join(g.printed())
 
 

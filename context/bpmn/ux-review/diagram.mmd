@@ -1,0 +1,23 @@
+flowchart LR
+  %% Usability, user-story and style review of the whole addon, ranked and independently verified · 7 agents: 6 × bpmn:reviewer, 1 × bpmn:planner
+  subgraph n_lane_reviewer["🤖 Area reviewer · bpmn:reviewer · ⏱ 30 min"]
+    n_start(("Review requested"))
+    n_review["⚙ Review one area ∥ ×5"]
+  end
+  subgraph n_lane_synth["🤖 Synthesizer · bpmn:planner · ⏱ 15 min"]
+    n_synthesize["⚙ Rank and batch findings"]
+  end
+  subgraph n_lane_verifier["🤖 Verifier · bpmn:reviewer · ⏱ 25 min"]
+    n_verify["⚙ Verify top findings"]
+    n_done((("Review ready")))
+  end
+  n_start --> n_review
+  n_review --> n_synthesize
+  n_synthesize --> n_verify
+  n_verify --> n_done
+  classDef done fill:#e6f4ea,stroke:#1e8e3e,color:#0d3b1e
+  classDef running fill:#e8f0fe,stroke:#1a73e8,color:#0b2a5b
+  classDef ready fill:#fef7e0,stroke:#b06000,color:#4a3600
+  classDef failed fill:#fce8e6,stroke:#c5221f,color:#5f0d06
+  classDef cancelled fill:#f1f3f4,stroke:#80868b,color:#3c4043
+  class n_start,n_review,n_synthesize,n_verify,n_done done

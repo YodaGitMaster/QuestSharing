@@ -93,7 +93,9 @@ def test_filters_follow_tabs_and_closing_cancels_background_scans(style):
         ItemDB.GetAllIds=function()local t={};for i=1,500 do t[i]=800 end;return t end''')
     g.slash("rewards");assert g.eval("NS.rewards._state()")[1]
     g.slash("loot");g.advance(1)
-    assert not g.eval("NS.rewards._state()")[1]
+    ready,loading,count=g.eval("NS.rewards._state()")
+    g.advance(5)
+    assert not ready and loading and g.eval("NS.rewards._state()")[2]==count, "another tab pauses the scan, it does not run hidden"
     choose(g,"Weapons","Swords",mode="Item level",low="25",high="25")
     g.slash("rewards");g.advance(1);g.slash("loot")
     assert {r[0] for r in loot_results(g)}=={10001}
@@ -214,17 +216,55 @@ def test_partial_questie_dungeon_sources_respect_the_same_quality_floor(style):
     assert {r[0] for r in loot_results(g)}=={10002}
 
 
-def test_closed_quest_rewards_catalogue_is_freed_after_two_minutes(style):
+def test_closed_quest_rewards_catalogue_is_kept_for_the_session_until_purged(style):
     g=quest_game(style);g.slash("rewards");g.advance(5)
     assert quest_ids(g) and g.eval("NS.rewards._state()")[0]
-    g.eval("NS.equipmentUI.close")();g.advance(60)
-    assert g.eval("NS.rewards._state()")[0], "kept inside the grace period"
+    g.eval("NS.equipmentUI.close")();g.advance(3600)
+    assert g.eval("NS.rewards._state()")[0], "kept long after closing"
     g.slash("rewards");g.advance(5);assert quest_ids(g)
-    g.eval("NS.equipmentUI.close")();g.advance(130)
+    g.eval("NS.equipmentUI.close")();g.slash("memory purge")
     ready,loading,count=g.eval("NS.rewards._state()")
-    assert not ready and not loading and count==0
+    assert not ready and not loading and count==0, "purge frees it"
     g.slash("rewards");g.advance(5)
     assert quest_ids(g) and g.eval("NS.rewards._state()")[0]
+
+
+def test_a_half_read_quest_rewards_scan_continues_on_reopen(style):
+    g=loot_game(style,'''LibQuestieDB.Enum={classKeys={WARRIOR=1},factionRaceMasks={Alliance=1},raceMaskById={}}
+        ItemDB.GetAllIds=function()local t={};for i=1,500 do t[i]=800 end;return t end''')
+    g.run("READS=0;local get=NS.questie.get;NS.questie.get=function(...) READS=READS+1;return get(...) end")
+    g.slash("rewards");g.eval("NS.equipmentUI.close")();g.advance(600)
+    ready,loading,_=g.eval("NS.rewards._state()")
+    assert not ready and loading, "paused, not dropped"
+    before=g.eval("READS")
+    g.slash("rewards");g.advance(30)
+    assert g.eval("NS.rewards._state()")[0]
+    assert g.eval("READS")-before < 500*3, "continued where it stopped, not read again from the start"
+
+
+def test_a_half_read_loot_scan_pauses_while_closed_and_continues_on_reopen(style):
+    g=loot_game(style,'''local m=AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids
+        for i=1,30 do m['D'..i]={name='Dungeon '..i,InstanceID=36,ContentType=1,items={{name='Boss',[1]={{1,10001},{2,10002},{3,10001},{4,10002},{5,10001}}}}} end''')
+    g.slash("loot");ready,loading,_,count=g.eval("NS.loot._state()")
+    assert loading and not ready
+    g.eval("NS.equipmentUI.close")();g.advance(600)
+    assert tuple(g.eval("NS.loot._state()"))[1:]==(True,"AtlasLoot",count), "paused where it was, not dropped"
+    g.slash("loot");g.advance(30)
+    assert g.eval("NS.loot._state()")[0] and g.eval("NS.loot._state()")[3]>count
+    g.eval("NS.loot.purge")();g.advance(30)
+    assert g.eval("NS.loot._state()")[0], "purge with the window open reads it again"
+    assert not g.eval("NS.db.errors")
+
+
+def test_one_purge_frees_every_questiedb_catalogue(style):
+    g=quest_game(style)
+    names=list(g.eval("NS.dataWork.purgeNames()").values())
+    for name in ("Dungeon quests","Quest rewards","Dungeon loot","Map search","Trainers","Where to gather","Quest guide zone lists"):
+        assert name in names, name
+    g.slash("rewards");g.advance(5);assert g.eval("NS.rewards._state()")[0]
+    g.eval("NS.equipmentUI.close")();g.eval("NS.purgeData")()
+    assert not g.eval("NS.rewards._state()")[0]
+    assert not g.eval("NS.db.errors")
 
 
 if __name__=="__main__":

@@ -207,6 +207,8 @@ def test_the_reset_row_puts_everything_back(style):
     g.slash("near off")
     g.run("PRINTED = {}")
     g.eval("NS.settingsClick")(idx(g, label="Reset everything"), "LeftButton")
+    assert g.eval("NS.db.sync") is False, "the first click only asks for a second one"
+    g.eval("NS.settingsClick")(idx(g, label="Reset everything"), "LeftButton")
     for key in BOOLS:
         assert g.eval(f"NS.db.{key}") is True, key
     assert (g.eval("NS.db.area"), g.eval("NS.db.gap")) == ("zone", 4)
@@ -255,7 +257,7 @@ def test_every_setting_is_on_exactly_one_tab(style):
     n = int(g.eval("#NS.settingRows"))
     tabs = [g.eval("NS.settingRows[%d].tab" % i) for i in range(1, n + 1)]
     ids = [g.eval("NS.settingTabs[%d].id" % i) for i in range(1, int(g.eval("#NS.settingTabs")) + 1)]
-    assert ids == ["general", "objectives", "tracker", "dialogs", "items", "bags", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional", "support"]
+    assert ids == ["general", "objectives", "tracker", "dialogs", "items", "bags", "sharing", "party", "finder", "actions", "quick", "maps", "guide", "browser", "optional", "support"]
     assert all(t in ids for t in tabs)
     assert all(tabs.count(t) >= 1 for t in ids), "no empty tab"
     keys = [g.eval("NS.settingRows[%d].key" % i) for i in range(1, n + 1) if g.eval("NS.settingRows[%d].key" % i)]
@@ -399,14 +401,14 @@ def test_map_overlays_have_switches_in_the_map_tab_that_work(style):
         assert g.eval(f"NS.db.{key}") is True, f"{key} turns back on"
 
 
-def test_travel_faction_choice_cycles_all_alliance_horde(style):
+def test_travel_faction_choice_cycles_mine_all_alliance_horde(style):
     g = fresh(style)
-    assert g.eval("NS.db.travelFaction") == "all" and g.eval(f"NS.settingRows[{idx(g, 'travelFaction')}].tab") == "maps"
+    assert g.eval("NS.db.travelFaction") == "mine" and g.eval(f"NS.settingRows[{idx(g, 'travelFaction')}].tab") == "maps"
     seen = []
-    for _ in range(4):
+    for _ in range(5):
         click(g, "travelFaction")
         seen.append(g.eval("NS.db.travelFaction"))
-    assert seen == ["Alliance", "Horde", "all", "Alliance"]
+    assert seen == ["all", "Alliance", "Horde", "mine", "all"]
 
 
 def test_settings_does_not_drop_rows_after_eighteen_and_last_row_is_reachable(style):
@@ -456,18 +458,18 @@ def test_quest_marker_checkbox_changes_the_visible_enemy_marker():
 def test_tool_cards_keep_primary_action_separate_from_persistent_switch(style):
     g = fresh(style)
     g.slash("settings")
-    g.eval("NS.settingsTab")("browser")
+    g.eval("NS.settingsTab")("optional")
     W = window(g)
-    reward = visible_by_key(g, W, "rewardBrowser")
-    g.run("REWARD_OPENS=0; NS.rewards.open=function() REWARD_OPENS=REWARD_OPENS+1 end")
-    press(g, reward.button)
-    assert g.eval("REWARD_OPENS") == 1 and not g.eval("NS.db.rewardBrowser")
-    g.eval('function(r) r.toggle.scripts.OnMouseUp(r.toggle,"LeftButton") end')(reward)
-    assert g.eval("NS.db.rewardBrowser") and g.eval("REWARD_OPENS") == 1
-    assert reward.tick.shown and "On" in reward.toggleText.text
+    spots = visible_by_key(g, W, "fishingMap")
+    g.run("FISH_OPENS=0; NS.fishing.open=function() FISH_OPENS=FISH_OPENS+1 end")
+    press(g, spots.button)
+    assert g.eval("FISH_OPENS") == 1 and not g.eval("NS.db.fishingMap")
+    g.eval('function(r) r.toggle.scripts.OnMouseUp(r.toggle,"LeftButton") end')(spots)
+    assert g.eval("NS.db.fishingMap") and g.eval("FISH_OPENS") == 1
+    assert spots.tick.shown and "On" in spots.toggleText.text
     # The card body is informational, so clicking the description cannot toggle it.
-    g.eval('function(r) r.frame.scripts.OnMouseUp(r.frame,"LeftButton") end')(reward)
-    assert g.eval("NS.db.rewardBrowser")
+    g.eval('function(r) r.frame.scripts.OnMouseUp(r.frame,"LeftButton") end')(spots)
+    assert g.eval("NS.db.fishingMap")
     g.eval("NS.settingsTab")("general")
     assert all(not r.card.shown and not r.toggle.shown and not r.note.shown for r in visible_rows(W))
 
@@ -479,19 +481,20 @@ def test_browser_db_contains_all_reference_launchers_and_extra_tools_stays_focus
     W = window(g)
     assert "Items & dungeons" in W.heading.text
     cards = [r for r in W.rows.values() if r.index and r.frame.shown and r.card.shown]
-    assert len(cards) == 5
-    expected = {"Browse rewards", "Browse drops", "Dungeon quests"}
+    assert len(cards) == 7
+    expected = {"Browse rewards", "Browse drops", "Dungeon quests", "Purge"}
     assert {r.button.text for r in cards if r.button.shown} == expected
     assert all(r.desc.text and r.note.shown for r in cards)
     # Exercise the actual shared button dispatcher for every reference launcher.
     g.run("""OPENED_TOOLS={}; NS.rewards.open=function() table.insert(OPENED_TOOLS,'rewards') end
        NS.loot.open=function() table.insert(OPENED_TOOLS,'loot') end
        NS.dungeonQuests.open=function() table.insert(OPENED_TOOLS,'dungeons') end
+       NS.purgeData=function() table.insert(OPENED_TOOLS,'purge') end
        NS.professions.open=function() table.insert(OPENED_TOOLS,'cooking') end""")
     for r in cards:
         if r.button.shown:
             press(g, r.button)
-    assert list(g.eval("OPENED_TOOLS").values()) == ["rewards", "loot", "dungeons"]
+    assert list(g.eval("OPENED_TOOLS").values()) == ["rewards", "loot", "dungeons", "purge"]
     g.eval("NS.settingsScroll")(100000)
     assert W.rowScroll.vscroll == W.contentHeight - W.rowScroll.height
     g.eval("NS.settingsTab")("optional")
@@ -504,11 +507,11 @@ def test_browser_db_contains_all_reference_launchers_and_extra_tools_stays_focus
     for r in cards:
         if r.button.text == "Cooking recipes":
             press(g, r.button)
-    assert list(g.eval("OPENED_TOOLS").values()) == ["rewards", "loot", "dungeons", "cooking"]
+    assert list(g.eval("OPENED_TOOLS").values()) == ["rewards", "loot", "dungeons", "purge", "cooking"]
     # the leftover-items review lives with the other quest item settings, the invitation with quest sharing
     by_label = {r.label: r.tab for r in g.eval("NS.settingRows").values() if r.kind == "action"}
     assert by_label["Review quest items left in my bags"] == "items"
-    assert by_label["Seek fellow adventurers"] == "sharing"
+    assert by_label["Quest invitation"] == "sharing"
 
 
 def test_errors_and_logs_have_their_own_tab_with_check_errors_logs_and_reset(style):
@@ -521,17 +524,22 @@ def test_errors_and_logs_have_their_own_tab_with_check_errors_logs_and_reset(sty
     g.eval("NS.settingsTab")("support")
     W = window(g)
     buttons = {r.button.text: r for r in visible_rows(W) if r.button.shown}
-    assert set(buttons) >= {"Run check", "Show errors", "Clear errors", "Show logs", "Clear logs", "Open report", "Reset settings"}
+    assert set(buttons) >= {"Clear errors", "Clear logs", "Open report", "Reset settings"}
+    assert not set(buttons) & {"Run check", "Show errors", "Show logs"}, "one button opens the report"
     info = next(r for r in visible_rows(W) if "Errors recorded" in r.text.text)
     assert "1 recorded" in info.desc.text or "1 recorded" in info.text.text
-    press(g, buttons["Show errors"].button)
+    press(g, buttons["Open report"].button)
     assert g.eval("NS._reportWindow()")[0].shown is True, "the report with the errors opened"
     press(g, buttons["Clear errors"].button)
+    assert g.eval("#NS.db.errors") == 1, "clearing asks for a second click"
+    press(g, buttons["Clear errors"].button)
     assert g.eval("#NS.db.errors") == 0
+    press(g, buttons["Clear logs"].button)
     press(g, buttons["Clear logs"].button)
     assert "debug log cleared" in "\n".join(g.printed())
     assert [r.tab for r in g.eval("NS.settingRows").values() if r.key == "debug"] == ["support"], "the recording switch is with the logs"
     g.run("NS.db.sound = false")
+    press(g, buttons["Reset settings"].button)
     press(g, buttons["Reset settings"].button)
     assert g.eval("NS.db.sound") is True, "reset restores the defaults"
 
@@ -557,6 +565,7 @@ GUIDE_ROWS = [
     ("header", None, "Camps"),
     ("action", None, "Mark selected camp busy (5 min)"),
     ("action", None, "Clear camp waits"),
+    ("bool", "campMap", None),
     ("header", None, "Learned pace"),
     ("info", None, None),
     ("action", None, "Reset learned pace"),
@@ -638,7 +647,7 @@ def test_guide_controls_save_their_setting_and_update_the_guide(style):
     assert box.shown and box.kind == "EditBox" and box.text == ""
     assert box.font[2] and box.font[3] is not None, "EditBox:SetFont needs flags"
     before = len(guide_calls(g))
-    box.SetText(box, "12, abc 345")
+    box.SetText(box, "12 345")
     g.eval("function(b) b.scripts.OnEnterPressed(b) end")(box)
     assert g.eval("NS.db.questPlannerSelected") == "12, 345" and box.text == "12, 345"
     assert guide_calls(g)[before:] == ["applySettings"]
@@ -650,6 +659,9 @@ def test_guide_controls_save_their_setting_and_update_the_guide(style):
     box.SetText(box, "77")
     g.eval("function(b) b.scripts.OnEditFocusLost(b) end")(box)
     assert g.eval("NS.db.questPlannerSelected") == "77", "clicking away saves too"
+    box.SetText(box, "12, Local Harvest")
+    g.eval("function(b) b.scripts.OnEnterPressed(b) end")(box)
+    assert g.eval("NS.db.questPlannerSelected") == "12, Local Harvest", "quest names are kept, not stripped"
     scope = visible_by_key(g, W, "questPlannerScope")
     press(g, scope.choices[2])
     assert g.eval("NS.db.questPlannerScope") == "green-yellow" and guide_calls(g)[-1] == "applySettings"
@@ -741,6 +753,122 @@ def test_the_item_button_move_back_row_clears_its_saved_position(style):
     g.eval("(function() NS.db.itemButtonPos = { 'TOPLEFT', 10, -10 } end)()")
     g.eval("NS.settingRows[%d].action" % idx(g, label="Move the item button back"))()
     assert g.eval("NS.db.itemButtonPos") is None
+
+
+def test_tunable_waits_are_settings_rows_and_change_behaviour(style):
+    g = fresh(style)
+    for key, default in (("sortDelay", 3), ("chatLockNotice", 20), ("friendsReserve", 5), ("lfgReinvite", 5), ("ilvlKeepDays", 14)):
+        assert g.eval(f"NS.db.{key}") == default, key
+        assert idx(g, key), f"{key} has no Settings row"
+        click(g, key)
+        assert g.eval(f"NS.db.{key}") > default, f"{key} row does not step up"
+
+
+def test_party_finder_classes_have_a_switch_each_and_follow_the_finder(style):
+    g = fresh(style)
+    i = idx(g, label="Invite Priest healers")
+    assert i, "no class switch for priest healers"
+    assert g.eval("NS.rowText(NS.settingRows[%d])" % i).find("Invite Priest healers") >= 0
+    assert g.eval("NS.lfgInvite.classAllowed('healer', 'PRIEST')") is True
+    g.eval("NS.settingsClick")(i, "LeftButton")
+    assert g.eval("NS.lfgInvite.classAllowed('healer', 'PRIEST')") is False
+    assert g.eval("NS.settingOn(NS.settingRows[%d])" % i) is False
+    g.eval("NS.lfgInvite.setClass")("healer", "PRIEST", True)
+    assert g.eval("NS.settingOn(NS.settingRows[%d])" % i) is True
+    n = g.eval("(function() local n = 0 for _, r in ipairs(NS.settingRows) do if r.lfgClass then n = n + 1 end end return n end)()")
+    roles = g.eval("(function() local n = 0 for _, l in pairs(NS.lfgInvite.ROLE_CLASSES) do n = n + #l end return n end)()")
+    assert n == roles
+
+
+def test_party_finder_key_has_a_set_key_row(style):
+    g = fresh(style)
+    i = idx(g, label="Key to search the party finder")
+    assert i and g.eval("NS.settingRows[%d].kind" % i) == "key"
+    g.eval("NS.setLfgKey")("F9")
+    assert g.eval("NS.lfgKeyName()") == "F9"
+    assert "F9" in g.eval("NS.rowText(NS.settingRows[%d])" % i)
+
+
+def plain(t):
+    import re
+    return re.sub(r"\|c[0-9a-fA-F]{8}|\|r", "", t or "")
+
+
+def all_rows(W):
+    out, n = [], 1
+    while W.rows[n] is not None:
+        if W.rows[n].frame.shown:
+            out.append(W.rows[n])
+        n += 1
+    return out
+
+
+def test_search_finds_settings_on_every_page_with_their_page_and_section(style):
+    g = fresh(style)
+    g.slash("settings")
+    W = window(g)
+    g.eval("NS.settingsSearch")("sort")
+    texts = [plain(r.text.text) for r in all_rows(W)]
+    assert any(t.startswith("Bags  >  ") for t in texts), texts
+    assert any("Arrange my bags automatically" in t for t in texts)
+    assert "Search:" in plain(W.heading.text) and "match" in plain(W.intro.text)
+    g.eval("NS.settingsSearch")("party key")                  # every word must match
+    texts = [plain(r.text.text) for r in all_rows(W)]
+    assert any("Key to search the party finder" in t for t in texts) and not any("Arrange my bags" in t for t in texts)
+    g.eval("NS.settingsSearch")("zzzz")
+    assert "Nothing matches" in plain(W.intro.text)
+    g.eval("NS.settingsSearch")("sound")
+    i = next(n for n, r in enumerate(all_rows(W)) if "Play a sound" in plain(r.text.text))
+    before = g.eval("NS.db.sound")
+    g.eval("NS.settingsClick")(all_rows(W)[i].index, "LeftButton")
+    assert g.eval("NS.db.sound") is (not before), "a found row works like on its page"
+    g.eval("NS.settingsTab")("bags")                          # picking a page leaves the search
+    assert W.query is None and W.tab == "bags"
+
+
+def test_rows_that_need_another_switch_say_so_while_it_is_off(style):
+    g = fresh(style)
+    g.eval("(function() NS.db.autoSortBags = false end)()")
+    assert g.eval("NS.settingNeedsOff(NS.settingRows[%d])" % idx(g, "sortDelay")) == "Arrange my bags automatically"
+    g.eval("(function() NS.db.autoSortBags = true end)()")
+    assert g.eval("NS.settingNeedsOff(NS.settingRows[%d])" % idx(g, "sortDelay")) is None
+    for i in range(1, int(g.eval("#NS.settingRows")) + 1):
+        need = g.eval("NS.settingRows[%d].needs" % i)
+        if need:
+            assert idx(g, need), f"row {i} needs unknown setting {need}"
+
+
+def test_every_settings_path_in_the_code_names_a_real_page(style):
+    import re
+    g = fresh(style)
+    titles = {g.eval("NS.settingTabs[%d].title" % i) for i in range(1, int(g.eval("#NS.settingTabs")) + 1)}
+    root = pathlib.Path(__file__).resolve().parent.parent / "QuestSharing"
+    bad = []
+    for f in root.glob("*.lua"):
+        for m in re.finditer(r"Settings > ([A-Z][A-Za-z&' ]+?)(?= >|[.,:)\"]| \(|$| Show| for| first| changed)", f.read_text(), re.M):
+            name = m.group(1).strip()
+            if name not in titles:
+                bad.append(f"{f.name}: {name}")
+    assert not bad, bad
+    assert g.eval("(NS.settingPath('sortBy'))") == "Settings > Bags > Order items by"
+
+
+def test_search_understands_everyday_words(style):
+    g = fresh(style)
+    for word, label in (("keybind", "Key to target and ping a quest enemy"), ("hotkey", "Quick chat key"),
+                        ("junk", "Sell gray items when I open a vendor"), ("threat", "Show my aggro on enemies"),
+                        ("sort", "Arrange my bags automatically")):
+        out, n = g.eval("NS.settingsResults")(word)
+        labels = [g.eval("NS.settingRows[%d].label" % out[i]) for i in range(1, n + 20) if isinstance(out[i], (int, float))]
+        assert any(label in l for l in labels), (word, labels)
+
+
+def test_item_level_rows_are_dimmed_until_a_minimum_is_set(style):
+    g = fresh(style)
+    g.eval("(function() NS.db.lfgMinIlvl = 0 end)()")
+    assert g.eval("NS.settingRows[%d].inactive(NS.db)" % idx(g, "lfgUnknown")) is True
+    g.eval("(function() NS.db.lfgMinIlvl = 50 end)()")
+    assert g.eval("NS.settingRows[%d].inactive(NS.db)" % idx(g, "lfgAskIlvl")) is False
 
 if __name__ == "__main__":
     import inspect

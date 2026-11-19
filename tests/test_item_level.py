@@ -75,6 +75,23 @@ def test_inspecting_a_nearby_target_remembers_its_item_level_and_shares_it(style
     assert any(t.startswith("S:Tess:21:") for t in g.addon_sent())
 
 
+def test_inspect_still_counts_when_the_mouse_moved_on_but_the_player_is_targeted(style):
+    g = game(style)
+    g.run("""TARGET_PLAYER = { name = 'Tess', guid = 'G1', near = true }; HOVER = true
+        local e, p, gu, n, c, d = UnitExists, UnitIsPlayer, UnitGUID, UnitName, CanInspect, CheckInteractDistance
+        local function hov(u) return u == 'mouseover' and HOVER end
+        UnitExists = function(u) return hov(u) or e(u) end
+        UnitIsPlayer = function(u) return hov(u) or p(u) end
+        UnitGUID = function(u) if hov(u) then return 'G1' end return gu(u) end
+        UnitName = function(u) if hov(u) then return 'Tess' end return n(u) end
+        CheckInteractDistance = function(u, i) return hov(u) or d(u, i) end""")
+    g.fire("UPDATE_MOUSEOVER_UNIT")
+    assert list(g.eval("INSPECTED").values()) == ["mouseover"]
+    g.run("HOVER = false")                                       # the mouse moved on; Tess is still the target
+    g.fire("INSPECT_READY", "G1")
+    assert g.eval("(NS.itemLevel.known('Tess'))") == 21
+
+
 def test_min_item_level_waits_for_the_answer_and_invites_when_high_enough(style):
     g = game(style)
     g.run("NS.setSetting('lfgMinIlvl', 30)")
@@ -82,7 +99,7 @@ def test_min_item_level_waits_for_the_answer_and_invites_when_high_enough(style)
     assert g.invited() == [] and "Q" in g.addon_sent(), "asked Lia first"
     addon(g, "M:33", "Lia")
     assert g.invited() == ["Lia"]
-    assert any("invited Lia 24 Priest (healer, ilvl 33)" in p for p in g.printed())
+    assert any("invited Lia 24 Priest (healer, item level 33)" in p for p in g.printed())
 
 
 def test_a_low_answer_is_skipped(style):

@@ -56,7 +56,8 @@ function I.state() return state end
 function I.entries() return entries end
 
 local function scan()
-    local ids = Q.ids("npc") or {}
+    local saved = Work.saved("trainers")
+    local ids = saved or Q.ids("npc") or {}
     local mine = token
     for i, id in ipairs(ids) do
         local title = Q.get("npc", id, "subName")
@@ -68,6 +69,11 @@ local function scan()
             end
         end
         if i % 400 == 0 then Work.yield(); if mine ~= token then return end end
+    end
+    if not saved and mine == token then
+        local keep = {}
+        for i, e in ipairs(entries) do keep[i] = e.id end
+        Work.save("trainers", "", keep)
     end
 end
 
@@ -141,3 +147,8 @@ function I.faction()
 end
 
 function I._reset() Work.cancel("trainer-index"); entries, state, token = {}, "idle", token + 1 end
+-- Kept for the session; Purge frees it and the next open map reads the trainers again.
+Work.onPurge("Trainers", function()
+    Work.forget("trainers"); I._reset(); I.revision = I.revision + 1
+    if ns.travelMap then ns.travelMap.refresh() end
+end)

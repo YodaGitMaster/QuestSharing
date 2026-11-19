@@ -26,6 +26,20 @@ local function range(map)
     if lo then return "zone levels "..lo.."-"..hi..(kind and " ("..kind..")" or "") end
     return kind or "zone levels unknown"
 end
+-- Faction home zones of the example waters (uiMapID); other zones are shared and get no tag.
+local WATER_SIDE={[1429]="Alliance",[1453]="Alliance",[1411]="Horde",[1456]="Horde"}
+local function waterText(s)
+    local side=WATER_SIDE[s.map]
+    return s.water..(side and (" ("..side.." area)") or "")
+end
+local function fishSkillText(s)
+    local parts={}
+    if s.minSkill then parts[#parts+1]="Fish bite from fishing skill "..s.minSkill end
+    -- safeSkill counts pole and lure bonuses (ProfessionReference.lua)
+    if s.safeSkill then parts[#parts+1]="Fish stay hooked from skill "..s.safeSkill.." (pole and lure bonuses count)" end
+    if #parts==0 then return "Fishing skill needed: not known." end
+    return table.concat(parts,"; ").."."
+end
 local function location(s)
     if not s then return "location unknown" end
     local name=U.call(C_Map and C_Map.GetAreaInfo,s.area) or U.call(GetAreaInfo,s.area)
@@ -51,9 +65,19 @@ function P.materialLines(id)
     local fish=D.fish[id]
     if fish then
         known=true
-        for _,s in ipairs(fish.locations) do
-            out[#out+1]="Fish: "..s.water.."; "..range(s.map)
-            out[#out+1]="Fishing minimum: "..tostring(s.minSkill or "unknown").."; no-getaway: "..tostring(s.safeSkill or "unknown").." (effective skill, including bonuses)."
+        -- waters of your own faction first, the other faction's tagged
+        local side=U.call(UnitFactionGroup,"player")
+        local list={}
+        local order={}
+        for i,s in ipairs(fish.locations) do list[i]=s; order[s]=i end
+        table.sort(list,function(a,b)
+            local ao,bo=WATER_SIDE[a.map]==side,WATER_SIDE[b.map]==side
+            if ao~=bo then return ao end
+            return order[a]<order[b]
+        end)
+        for _,s in ipairs(list) do
+            out[#out+1]="Fish: "..waterText(s).."; "..range(s.map)
+            out[#out+1]=fishSkillText(s)
             if s.note then out[#out+1]=s.note end
         end
         out[#out+1]="Example waters from the Forever guide; catches vary by water/time."
@@ -72,7 +96,7 @@ function P.materialLines(id)
     end
     local item=C.items[id]
     if item and item.vendor and not (type(vendors)=="table" and #vendors>0) then
-        known=true;out[#out+1]="Vendor supply in the client reference; specific seller unknown."
+        known=true;out[#out+1]="Sold by vendors (seller not known)."
     end
     -- AnglerAtlas is a zone estimate, never a verified individual-water catch list.
     local a=AnglerAtlas
@@ -289,14 +313,30 @@ local function shown()
     end
     ns.after(0.1,ready)
 end
+-- materialLines without its creature drops: "Drops from:" with its indented spawn lines and the two drop notes
+local function withoutDrops(lines)
+    local out,skipping={},false
+    for _,l in ipairs(lines) do
+        if l:find("^Drops from: ") then skipping=true
+        elseif not (skipping and l:find("^  ")) then
+            skipping=false
+            if not (l:find("^More drop sources") or l:find("^Loot this ingredient")) then out[#out+1]=l end
+        end
+    end
+    return out
+end
+P._withoutDrops=withoutDrops                                           -- for the tests
 local function tooltip(self,data)
     if not enabled() then return end
     local _,link=U.call(self.GetItem,self)
     local id=type(data)=="table" and data.id or type(link)=="string" and tonumber(link:match("item:(%d+)"))
     if type(id)~="number" or self.questSharingFarmID==id or not ingredientIDs[id] then return end
     self.questSharingFarmID=id
+    local lines=P.materialLines(id)
+    if ns.gatherSources and ns.gatherSources.covers(id) then lines=withoutDrops(lines) end  -- one ranked drop list, from GatherSources
+    if #lines==0 then return end
     self:AddLine("Where to gather",0.95,0.78,0.30)
-    for _,line in ipairs(P.materialLines(id)) do self:AddLine(line,1,1,1,true) end
+    for _,line in ipairs(lines) do self:AddLine(line,1,1,1,true) end
     self:Show()
 end
 local tooltipHooked=false

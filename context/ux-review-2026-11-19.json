@@ -1,0 +1,1346 @@
+{
+ "findings": [
+  {
+   "id": "UX-01",
+   "area": "Party, sharing and party finder",
+   "lens": "story",
+   "severity": "high",
+   "title": "With the default 'Draft in chat' mode, automatic party messages are dropped and nothing says so",
+   "where": "QuestSharing/Core.lua:367-371 (ns.say returns false when mode ~= 'send'); QuestSharing/Core.lua:16 (mode = 'box' default); QuestSharing/Settings.lua:207-212 (rows chat, announce, pickup)",
+   "evidence": "Fresh install, '/qs chat on' + '/qs announce on' + '/qs pickup on', party with Anna sharing quests 100 and 101: sent=[] after 40 s. There is no line, no greyed row and no warning, and the confirmation dump shows 'chat on | announce on | ... mode box'. Only the chat row's description mentions 'Requires General > Send immediately'. After '/qs mode send' the 'Hey Anna! Looks like we have these quests in common...' message goes out at once.",
+   "suggestion": "Give the chat, announce and pickup rows an inactive() check (mode ~= 'send') so they turn grey with 'Has no effect until How to send quest progress messages is Send immediately'. When one is switched on while mode is box or print, print one line saying why nothing will be sent.",
+   "effort": "S",
+   "batch": "B1"
+  },
+  {
+   "id": "UX-02",
+   "area": "Quest guide",
+   "lens": "story",
+   "severity": "medium",
+   "title": "The 'Chosen quests' goal needs quest IDs that the addon never shows (solo planning; the guide ignores the party by design)",
+   "where": "QuestSharing/Settings.lua:358-360; QuestSharing/QuestPlanner.lua:1220-1230 (rowDetailsText), 1796",
+   "evidence": "Settings asks 'Type quest IDs separated by spaces or commas'. Guide rows show '[1] Local Harvest', where [1] is a route-local number, not the ID. '/qs plan selected Local Harvest' prints 'enter quest IDs for the Selected quests goal'. No guide row, tooltip or chat line shows a quest ID, so the story 'plan only the three quests we share' is broken without an outside website.",
+   "suggestion": "Let players pick quests by clicking them, e.g. shift/ctrl-click a guide row or a quest-log entry to add it to Chosen quests. At minimum show 'Quest ID 9000' in the row tooltip and accept quest names in the box and in '/qs plan selected'.",
+   "effort": "M",
+   "batch": "B2",
+   "split": "Settings.lua:358-360 box label/help text -> B1",
+   "note": "2026-11-19 user: the quest guide/optimizer must not care about the party. Party-based story dropped; the solo problem stays: a player cannot pick quests by name or see their IDs."
+  },
+  {
+   "id": "UX-03",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "usability",
+   "severity": "high",
+   "title": "The quest item key and ping key replace whatever the key did before, even movement, without a warning",
+   "where": "QuestSharing/QuestItems.lua:293-310 (ns.setItemKey); QuestSharing/Ping.lua:250-262 (setPingKey); compare QuestSharing/Quick.lua:1036-1038",
+   "evidence": "With W bound to MOVEFORWARD, Set key followed by W prints only 'quest item key: W - uses the item of your nearest quest', and BINDINGS['W'] becomes 'CLICK QuestSharingItemButton:LeftButton'. Nothing says 'move forward' was lost. The quick chat key does warn: 'V used to do: MOVEFORWARD (...)'.",
+   "suggestion": "Use the quick chat 'X used to do: ...' warning for the item, ping and party-finder keys too, with a readable action name ('move forward', not MOVEFORWARD). Better still, refuse movement keys or ask for a second press to confirm.",
+   "effort": "S",
+   "batch": "B3"
+  },
+  {
+   "id": "UX-04",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics; Party, sharing and party finder",
+   "lens": "usability",
+   "severity": "high",
+   "title": "One click resets every setting and the player's own quick chat messages, with no confirmation and a wrong '(everything on)' message",
+   "where": "QuestSharing/Settings.lua:452-453; QuestSharing/Core.lua:437-447 (message at :445); QuestSharing/Core.lua:520-522 (help line); README.md:834",
+   "evidence": "The 'Reset settings' button runs ns.resetSettings() at once, which also replaces ns.db.quickItems. It then prints 'all settings are back to their defaults (everything on)', but after the reset chat, announce, pickup, friends, aggro, the finder roles and autoSellGray are all off. '/qs reset' does the same. Confirmed on disk: Core.lua:445 and :522 still say '(everything on)'.",
+   "suggestion": "Ask for confirmation (a StaticPopup, or a second click on 'Click again to reset'). Keep the custom quick chat messages, or say they will be reset. Change the message and help line to 'all settings are back to their defaults' without '(everything on)'.",
+   "effort": "S",
+   "batch": "B1",
+   "split": "README.md:834 wording -> B5",
+   "merged_from": "Settings area 'Reset settings' (high) + Party area 'Documented defaults are wrong' (reset-message part)"
+  },
+  {
+   "id": "UX-05",
+   "area": "Party, sharing and party finder; Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "usability",
+   "severity": "high",
+   "title": "The party finder's 'Settings' button and the spyglass right-click open the Party window page, not Party finder",
+   "where": "QuestSharing/LFGFinderUI.lua:135; QuestSharing/MinimapButton.lua:97-98; tooltip at QuestSharing/LFGInvite.lua:479-480 ('Right click: all party finder settings')",
+   "evidence": "In the harness, both the spyglass right-click and the picker's Settings button gave NS._settingsWindow().tab == 'party', heading 'Party window', which has no level range or item level rows. The button tooltip promises 'Level range, unknown item level and more'. NOTE: during synthesis the working tree shows both calls already changed to ns.toggleSettings(true, \"finder\") (LFGFinderUI.lua:135, MinimapButton.lua:98), so this may be fixed by a concurrent edit. Verify it, and the regression test is still missing.",
+   "suggestion": "Use the 'finder' tab id in both calls (confirm the on-disk change). Add a harness test that the spyglass right-click and the picker Settings button land on the 'Party finder' heading.",
+   "effort": "S",
+   "batch": "B1",
+   "merged_from": "Party area (high) + Settings area (high), same root cause"
+  },
+  {
+   "id": "UX-06",
+   "area": "Party, sharing and party finder",
+   "lens": "story",
+   "severity": "high",
+   "title": "'Tell the party when I finish a shared quest' only works if the 'Announce quests in common' switch is also on, and nothing shows that",
+   "where": "QuestSharing/Progress.lua:80 (ns.say(...) without always=true, so Core.lua:367-368 gates it on db.chat); QuestSharing/Settings.lua:209-210",
+   "evidence": "With mode send, announce on and chat off, finishing shared quest 100 sends nothing. With chat on it sends '{rt1} [Wolves Among Us] - I'm done with this one, ready to turn in!'. The row description says only 'Turn on to announce once when you finish all objectives of a quest you share with the party.' Confirmed on disk: Progress.lua:80 calls ns.say(string.format(...)) with no second argument.",
+   "suggestion": "Call ns.say(msg, true) in Progress.lua, as Team.lua:65 already does for pickup, so each switch works on its own. If the dependency is intended, add needs = 'chat' to the announce row so it shows.",
+   "effort": "S",
+   "batch": "B3"
+  },
+  {
+   "id": "UX-07",
+   "area": "Map and world",
+   "lens": "usability",
+   "severity": "high",
+   "title": "The fishing save message points to an 'Optional' settings tab that does not exist",
+   "where": "QuestSharing/Fishing.lua:222",
+   "evidence": "After Save water the player sees 'Saved. Enable fishing in Optional to show markers.' (confirmed on disk). No tab is called 'Optional' (Settings.lua:69-86). The switch is 'Show saved spots on the world map' on Professions & character. Markers are off by default (Core.lua:35), so a player who follows the message cannot get their water onto the map.",
+   "suggestion": "Build the hint from ns.settingPath('fishingMap'), or add a 'Show on map' button that turns fishingMap on.",
+   "effort": "S",
+   "batch": "B4"
+  },
+  {
+   "id": "UX-08",
+   "area": "Party, sharing and party finder; Settings, minimap, bags, quest helpers and diagnostics; Adventurer's Journal and professions; Map and world",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "Slash on/off commands answer with an unrelated status dump or with nothing, so the player cannot tell what changed",
+   "where": "QuestSharing/Core.lua:455-461 (status()), :571-578 (BOOLS), :574, :542, :558, :563-569 (professions/rewards/fishing)",
+   "evidence": "'/qs pickup on', '/qs sellgray on', '/qs chatlock on', '/qs bagmarks off', '/qs items off', '/qs aggro on' and '/qs debug off' each print only 'ON | auto-share on | new-quest on | area zone | gap 4s | ... | friends(beta) off', a line that has no field for those settings. '/qs sort on', '/qs bookmarks', '/qs professions off', '/qs rewards on|off' and '/qs fishing on|off' print nothing at all.",
+   "suggestion": "After every toggle, print one line naming the setting with its Settings label and new state, for example 'Sell gray items when I open a vendor: on (Settings > Bags)', using ns.settingPath. Keep the full dump for '/qs status' only.",
+   "effort": "S",
+   "batch": "B1",
+   "merged_from": "Party 'status dump', Settings 'slash toggles', Journal 'No feedback when switching tools', Map '/qs fishing on|off gives no confirmation'"
+  },
+  {
+   "id": "UX-09",
+   "area": "Quest guide",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "The guide's '...' settings button opens Professions & character instead of Quest guide",
+   "where": "QuestSharing/QuestPlanner.lua:1129",
+   "evidence": "smallButton(\"...\", ..., function() ns.toggleSettings(true, \"optional\") end, \"Quest Sharing settings\") (confirmed on disk). Clicking it gives W.tab='optional' and the heading 'Professions & character'. This is left over from when the guide options lived in the optional tab (Settings.lua:82 now has tab 'guide').",
+   "suggestion": "Open the guide tab (ns.settingsTab(\"guide\")), or open General with an accurate tooltip. Add a harness assertion that clicking '...' gives W.tab == 'guide'.",
+   "effort": "S",
+   "batch": "B2"
+  },
+  {
+   "id": "UX-10",
+   "area": "Map and world",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "A teammate's item spot silently replaces the player's own waypoint",
+   "where": "QuestSharing/Marker.lua:120-129",
+   "evidence": "With my own waypoint at (1429, 0.9, 0.9), the peer message S|100|1429|0.3|0.4|Wolf Pelt sets WAYPOINT.x to 0.3 at once. The only feedback is 'Anna found Wolf Pelt for [Wolves Among Us] at 30.0, 40.0 - there is a pin on your map', which has no zone name and no way back. It also overrides waypoints set from vendor search, trainer pins or the quest guide.",
+   "suggestion": "Do not replace a waypoint the player set in the last few minutes; print a clickable 'set waypoint' line instead. Add the zone name to the message.",
+   "effort": "M",
+   "batch": "B4"
+  },
+  {
+   "id": "UX-11",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "Clearing errors and logs has no confirmation, and the report window's Clear wipes both",
+   "where": "QuestSharing/Diagnostics.lua:236-240; QuestSharing/Settings.lua:433-435, 444-446",
+   "evidence": "One click on 'Clear records' set #NS.db.errors to 0 and emptied QuestSharingLog. It sits next to 'Copy all' in the window a player opens to report a bug. (Related story evidence: Bags 'Remove all' also clears every bookmark without confirmation.)",
+   "suggestion": "Ask for confirmation or a second click ('Click again to clear'). Move Clear away from Copy all, or show it only after copying.",
+   "effort": "S",
+   "batch": "B1"
+  },
+  {
+   "id": "UX-12",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "story",
+   "severity": "medium",
+   "title": "The bag cleanup list empties after every delete, so the player must click Refresh each time",
+   "where": "QuestSharing/QuestCleanup.lua:268-275 (invalidate on BAG_UPDATE), :199",
+   "evidence": "After 'Delete stack', the BAG_UPDATE the game fires after a deletion leaves 0 rows and the text 'Bags or quests changed. Click Refresh bags to check again.' Deleting N stacks takes 3N clicks (Review, Delete, Refresh).",
+   "suggestion": "Skip the invalidation for the bag change the addon itself caused, or re-scan automatically after a short delay when the window is open and out of combat. Keep the manual Refresh for outside changes.",
+   "effort": "M",
+   "batch": "B5"
+  },
+  {
+   "id": "UX-13",
+   "area": "Quest guide",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "Goal changes and '/qs plan' subcommands give no feedback, and the guide never shows the active goal",
+   "where": "QuestSharing/QuestPlanner.lua:1790-1810 (P.setGoal), 1840-1864 (P.command range/unrestricted/next/fallthrough); header at 1142-1149",
+   "evidence": "'/qs plan xp', '/qs plan all', '/qs plan range' and '/qs plan unrestricted' print nothing. The header still shows only 'Westfall' and '1/3'. '/qs plan bogus' just opens the guide with no hint. '/qs plan next' on the last step prints nothing.",
+   "suggestion": "Print one line per change (e.g. 'Quest guide: Quest XP/hour, green and yellow quests only') and show the goal in the header or the Plan button tooltip. Answer unknown words with the subcommand list, and say 'this is the last step' at the end.",
+   "effort": "S",
+   "batch": "B2",
+   "merged_from": "Guide 'No confirmation after a goal change' + the QuestPlanner part of Guide '/qs help hides most guide commands'"
+  },
+  {
+   "id": "UX-14",
+   "area": "Quest guide",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "The command and Settings use different time-limit ranges, and out-of-range values are clamped silently",
+   "where": "QuestSharing/QuestPlanner.lua:1787, 1800; QuestSharing/Settings.lua:355",
+   "evidence": "'/qs plan budget 600' prints nothing, plans 600 min this session but saves NS.db.questPlannerBudget=240, so the next session differs. '/qs plan budget 2' saves 5. The error text says 'enter a time budget from 1 to 1440 minutes', while the Settings stepper is min=5 max=240.",
+   "suggestion": "Use one range (5-240) in setGoal, readSettings and the error text, and confirm the value actually used, e.g. 'Quest guide: Time limit 240 min (the most it plans)'.",
+   "effort": "S",
+   "batch": "B2"
+  },
+  {
+   "id": "UX-15",
+   "area": "Quest guide; Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "A 'Test the ring' button, which emotes to nearby players, appears in the guide report and the bug report window",
+   "where": "QuestSharing/Diagnostics.lua:242-245 and 280-285 (ns.reportWindow)",
+   "evidence": "After '/qs plan why', the 'Quest Sharing - quest guide report' window shows 'Copy all', 'Refresh', 'Test the ring' (shown=True) and 'Close'. In diagnostics it sits next to 'Clear records'. f.test is never hidden by kind, unlike f.clear (confirmed: Diagnostics.lua:242). Clicking it runs every quick-chat slot, and nearby players see the emotes.",
+   "suggestion": "Move it to Settings > Quick chat next to 'Preview ring' (or '/qs quick test'). If it stays, show it only for the diagnostics kind, like f.clear.",
+   "effort": "S",
+   "batch": "B1",
+   "merged_from": "Guide area (medium) + Settings area (low), same button"
+  },
+  {
+   "id": "UX-16",
+   "area": "Adventurer's Journal and professions",
+   "lens": "story",
+   "severity": "medium",
+   "title": "Quest rewards at levelling levels show an empty list whose suggested fixes cannot help, and the README promises green-tier results",
+   "where": "QuestSharing/Rewards.lua:245; QuestSharing/Loot.lua:410; QuestSharing/EquipmentUI.lua:116; README.md:684",
+   "evidence": "Rare+ is a deliberate decision (context/decisions.md:328). With all rewards green (quality=2) the player sees 'No matching equipment' / 'No matching blue-or-better equipment. Clear filters or broaden your search\u2026'. Clear filters keeps the Rare+ floor, so it cannot help. README.md:684 says 'a level-20 Alliance Druid can find staffs, leather and cloth rewards from ordinary quests', but those are almost all green.",
+   "suggestion": "Keep Rare+. When the list is empty, say 'Only blue (rare) and better items are listed; most quest rewards at this level are green.' Reword the README example.",
+   "effort": "S",
+   "batch": "B5"
+  },
+  {
+   "id": "UX-17",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "story",
+   "severity": "medium",
+   "title": "The 'Update ranks' button does nothing unless the automatic mode is on",
+   "where": "QuestSharing/SpellRanks.lua:144; QuestSharing/Settings.lua:393-396",
+   "evidence": "Clicking 'Update ranks' with the toggle off prints 'Auto-update spell ranks is off.' The card note says 'Enable below before updating.'",
+   "suggestion": "Let the button run a one-time update whatever the toggle says; only the event-driven auto-update should need autoSpellRanks.",
+   "effort": "S",
+   "batch": "B5",
+   "split": "Settings.lua:393-396 card note -> B1"
+  },
+  {
+   "id": "UX-18",
+   "area": "Adventurer's Journal and professions",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "Dungeon quest row markers are confusing: gold means both 'selected' and 'still to take', and yellow '!' means 'already in your log'",
+   "where": "QuestSharing/DungeonQuests.lua:788 (todo border 1,0.82,0), :711 (AvailableQuestIcon on in-log quests), :682 (legend); QuestSharing/EquipmentUI.lua:563 (selection edge 0.95,0.7,0.2)",
+   "evidence": "README says 'a gold border the ones you still have to pick up' and also 'gold selection highlights', so a selected to-take row carries two gold marks. Quests already in the log get Interface\\GossipFrame\\AvailableQuestIcon, the yellow '!' WoW shows over NPCs with a quest to pick up, and the status line has to explain '!: in your log'.",
+   "suggestion": "Keep gold for selection (the Style.lua convention). Mark to-take quests with the yellow '!' and in-log quests with an active-quest icon (Interface\\GossipFrame\\ActiveQuestIcon). Update the legend and README.",
+   "effort": "M",
+   "batch": "B5",
+   "merged_from": "Journal 'Gold marks both' + 'Yellow ! icon', same row-marker scheme"
+  },
+  {
+   "id": "UX-19",
+   "area": "Adventurer's Journal and professions",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "Missing loot or quest data looks like 'no results' and is explained in developer wording",
+   "where": "QuestSharing/Loot.lua:391-392, 314; QuestSharing/Rewards.lua:21, 279; QuestSharing/DungeonQuests.lua:114, 252",
+   "evidence": "With neither AtlasLoot nor QuestieDB, Instance drops shows 'No matching equipment' and '0 dungeons \u2014 page 1/1'; only the small note says what to install. Rewards and Dungeon quests say 'Needs a recent QuestieDB with an enumerable item catalogue.' and 'Update QuestieDB: class/faction mappings are unavailable\u2026'.",
+   "suggestion": "When no catalogue is loaded, put the install hint in the status line instead of 'No matching equipment'. Replace 'enumerable catalogue' and 'mappings' with 'Install or update QuestieDB (see /qs questie)'.",
+   "effort": "S",
+   "batch": "B5"
+  },
+  {
+   "id": "UX-20",
+   "area": "Quest guide",
+   "lens": "story",
+   "severity": "medium",
+   "title": "A finished or empty zone gets a vague message with no next step",
+   "where": "QuestSharing/QuestPlanner.lua:1360-1378 (render empty reasons)",
+   "evidence": "After the last turn-in the guide shows '0/0' and 'No active or ready quests found here.' The same text appears whether every quest is done or none could be planned, and it does not point to the report.",
+   "suggestion": "Split the cases: 'You have done every quest the guide knows in Westfall.' versus 'No quest can be planned here yet - Plan > Show report says why.' Optionally suggest a zone in level range.",
+   "effort": "S",
+   "batch": "B2"
+  },
+  {
+   "id": "UX-21",
+   "area": "Quest guide",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "Camp busy is buried in Settings, gives no feedback and has no command",
+   "where": "QuestSharing/QuestPlanner.lua:1815-1824 (P.markCampBusy), 1840-1864 (P.command); QuestSharing/Settings.lua:366-369; README.md:471",
+   "evidence": "From the guide it takes four actions: select the step, 'Plan', find 'Camps', click 'Camp busy'. The step moves from '30.0, 30.0' to '80.0, 80.0' with no chat line and no 'busy' note on the row. README describes '**Camp busy 5 min**' as if it were a guide control.",
+   "suggestion": "Add a small 'Busy' button or right-click entry on objective rows, plus '/qs plan busy'. Print 'Quest guide: Harvest Watcher camp marked busy for 5 min; next free camp 80, 80'.",
+   "effort": "M",
+   "batch": "B2",
+   "split": "README.md:471 -> B5"
+  },
+  {
+   "id": "UX-22",
+   "area": "Party, sharing and party finder",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "Grey lines in the right-click quest menu do not say why on hover",
+   "where": "QuestSharing/Menu.lua:176, 202 (S.button without a tip), :211 (b.tipText set but never read); README.md:145-146",
+   "evidence": "Hovering the grey 'Tell them where to get it' shows no tooltip (TOOLTIP.text = None). The reason appears in chat only after a click: 'How to do it: needs the Questie addon (both folders: Questie and QuestieDB)'. The README and the Menu.lua header both promise 'a grey line says why'.",
+   "suggestion": "Set an OnEnter on the menu lines that shows the why text in GameTooltip, or have S.button fall back to self.tipText.",
+   "effort": "S",
+   "batch": "B3"
+  },
+  {
+   "id": "UX-23",
+   "area": "Party, sharing and party finder; Settings, minimap, bags, quest helpers and diagnostics; Adventurer's Journal and professions",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "The README does not cover the party finder, miscounts the minimap shortcuts and is missing commands",
+   "where": "README.md:362 ('Two shortcut buttons'), :369 ('General > Copy logs...'), :425, :979-980, commands table :786-835 (no /qs lfg, /qs ilvl, /qs dungeons)",
+   "evidence": "grep for 'spyglass' and 'party finder' in README.md finds only the settings table row and the file list. README says two shortcut buttons, but there are three (the spyglass, MinimapButton.lua:91). The report row is on Errors & logs (Settings.lua:448, tab 'support'), not General. The commands table lists /qs cooking, professions, rewards and loot but not /qs dungeons, /qs lfg or /qs ilvl.",
+   "suggestion": "Add a numbered Party finder section (list your group in the game's party finder, then spyglass > tick roles > Find, what gets whispered, supercharge). Say three shortcut buttons, point to Errors & logs, and add /qs lfg, /qs ilvl and /qs dungeons rows.",
+   "effort": "S",
+   "batch": "B5",
+   "merged_from": "Party 'party finder not described', Settings 'README wrong number of shortcut buttons', README part of Journal 'reward toggle / /qs dungeons'"
+  },
+  {
+   "id": "UX-24",
+   "area": "Party, sharing and party finder; Quest guide",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "The README names settings that no longer exist, describes old behaviour and gives wrong defaults",
+   "where": "README.md:135, 172, 279-287, 330, 465, 471, 473, 475; commands table rows /qs chat and /qs announce; QuestSharing/Diagnostics.lua:432",
+   "evidence": "README names 'Show it when I am not in a party too', 'Send the message at once' and 'Auto messages go to', but the real labels are 'Also show the Party quests window when playing alone', 'Send quick chat messages without pressing Enter' and 'Who receives messages set to Automatic' (Diagnostics.lua:432 also says 'tick Send the message at once'). README:172 says 'Tell the party how I am doing' sends at once, but with defaults it only fills the /p chat box. README:465 says the Plan button chooses the goal, but it opens Settings, and the camp labels differ ('Clear camp wait' vs 'Clear waits'). The commands table says chat and announce are '(default on)', but Core.lua:13/:18 default them to off and README:62-63 says 'off by default'.",
+   "suggestion": "Copy the current Settings row labels into the README and Diagnostics.lua:432. Say quick status goes into the chat box (press Enter) unless Send immediately is on, that Plan opens Settings > Quest guide, and change chat and announce to '(default off)'.",
+   "effort": "S",
+   "batch": "B5",
+   "split": "Diagnostics.lua:432 -> B1",
+   "merged_from": "Party 'README and in-game messages name settings that do not exist', Party 'README says Tell the party sends at once', Party 'Documented defaults' (table part), Guide 'README contradicts the guide'"
+  },
+  {
+   "id": "UX-25",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics; Map and world; Quest guide; Party, sharing and party finder",
+   "lens": "style",
+   "severity": "medium",
+   "title": "'/qs' prints internal key names, an unknown command dumps all 58 help lines, and the help list is missing commands",
+   "where": "QuestSharing/Core.lua:458-460 (status), :463-521 (help list, guide line :471), :594-597 (fallthrough)",
+   "evidence": "'/qs' prints 'mode box | sync on | near on | quick on | friends(beta) off', while the window calls these 'Draft in chat', 'Automatically track nearby quests' and so on. '/qs autoaccept on', '/qs travel', '/qs trainers' and '/qs where' each print the whole help list. Help shows only '/qs plan [refresh|next|on|off]' (all, xp, selected, budget, range, unrestricted, why, options, follow and hide are missing), and /qs lfg, /qs ilvl, /qs sound and /qs itembutton are absent. There is no command for zone levels, travel pins, trainers or map search.",
+   "suggestion": "Make '/qs' open the settings, or print 3-4 plain lines pointing to '/qs settings'. For an unknown command print 'unknown command - /qs help lists them'. Add the missing commands and the guide subcommands to the help. Optionally add '/qs map' to list the map switches and their settings path.",
+   "effort": "M",
+   "batch": "B1",
+   "merged_from": "Settings '/qs status line and unknown command', Map 'map overlays have no slash commands', Core part of Guide '/qs help hides most guide commands', help-list part of Party 'party finder not described'"
+  },
+  {
+   "id": "UX-26",
+   "area": "Quest guide",
+   "lens": "style",
+   "severity": "medium",
+   "title": "The quest guide report uses developer wording and lists quests by ID only, even ones the guide plans",
+   "where": "QuestSharing/QuestPlanner.lua:248, 326, 586, 1720-1749",
+   "evidence": "Visible lines: 'Best route found by bounded search', 'Same-work nearest-first estimate 3.7 min', 'Map dimensions unavailable. Travel uses an illustrative 3000 \u00d7 2000 yard zone scale.', 'Quest 8100 \u2022 unfinished, excluded by this goal, incompatible branch or missing data', 'Not read (one cheap check each): ...', '0.0 kills'. Quests 8100/8101/8104 are called excluded while the guide shows 'Pick up Green Quest'.",
+   "suggestion": "Show the name with the ID ('Green Quest (8100): no known hand-in'). Give one specific reason per quest, and don't list planned pickups as excluded. Use plain words ('Travel times are rough guesses: this map's size is unknown'), and move search and scale details to 'Copy debug'.",
+   "effort": "M",
+   "batch": "B2"
+  },
+  {
+   "id": "UX-27",
+   "area": "Quest guide; Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "The quest guide goes by six names",
+   "where": "QuestSharing/QuestPlanner.lua:131-137, 1116, 1444, 1455, 1860; QuestSharing/Settings.lua:344-347; QuestSharing/MinimapButton.lua:85; QuestSharing/Core.lua:471; README.md:463",
+   "evidence": "Panel title 'QUEST SHARING'. '?' tooltip 'Quest guide'. Settings 'Quest route guide', 'Enable the quest guide', 'Open plan'. Chat lines 'quest planner is on' and 'this client cannot open the quest plan panel'. Empty state 'The quest planner only works in outdoor zones'. Minimap tooltip 'Click: open the quest optimizer (route for this zone).' README '**Quest planner.**'.",
+   "suggestion": "Use 'Quest guide' everywhere visible: window title, chat lines, empty states, minimap tooltip, help line and README. Rename the Settings button 'Open guide'.",
+   "effort": "S",
+   "batch": "B2",
+   "split": "Settings.lua:344-347, MinimapButton.lua:85, Core.lua:471 -> B1; README.md:463 -> B5",
+   "merged_from": "Guide 'six names' + minimap 'quest optimizer' part of Settings 'same features have different names'"
+  },
+  {
+   "id": "UX-28",
+   "area": "Quest guide",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "Goal and level filter names differ between Settings, the report, chat and the README",
+   "where": "QuestSharing/QuestPlanner.lua:1583, 1720, 1761, 1796; QuestSharing/Settings.lua:349, 362; README.md:465",
+   "evidence": "Settings: 'Complete zone', 'Quest XP/hour', 'Chosen quests', 'Time limit', 'Every level', 'Green and yellow only'. Report: 'Complete the zone', 'Fastest quest XP/hour', 'Selected quests', 'Quest count within time', 'All acceptance levels', 'Green/yellow only'. Chat uses both 'Selected quests' and 'Chosen quests'.",
+   "suggestion": "Have modeNames and the report's level label read one shared names table (the Settings labels). Change both chat hints and the README to 'Chosen quests' and 'Time limit'.",
+   "effort": "S",
+   "batch": "B2",
+   "split": "exporting the Settings names table, if needed -> B1; README.md:465 -> B5"
+  },
+  {
+   "id": "UX-29",
+   "area": "Adventurer's Journal and professions",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "The journal window and its tabs have different names in the title, Settings, chat help and README",
+   "where": "QuestSharing/EquipmentUI.lua:378, 449; QuestSharing/Settings.lua:403-414; QuestSharing/Core.lua:464-470; README.md:633, 735",
+   "evidence": "Window title 'Quest Sharing \u2014 Adventurer's Journal'. README 'Quest and equipment explorer' / 'equipment explorer'. Tab 'Instance drops'. Settings row 'Dungeon loot', label 'Search instance loot and who drops it', button 'Browse drops'. Rewards toggle 'Enable quest reward browser'.",
+   "suggestion": "Use 'Adventurer's Journal' everywhere for the window, and the tab names (Quest rewards / Instance drops / Dungeon quests) for the Settings titles, buttons and README.",
+   "effort": "S",
+   "batch": "B5",
+   "split": "Settings.lua:403-414, Core.lua:464-470 -> B1"
+  },
+  {
+   "id": "UX-30",
+   "area": "Adventurer's Journal and professions",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "'(quest N)' means quest level in Quest rewards but quest ID in Dungeon quests",
+   "where": "QuestSharing/Rewards.lua:142; QuestSharing/DungeonQuests.lua:600",
+   "evidence": "Rewards: 'Reward Quest 8000 (quest 20, requires level 15)', where 20 is the level. Dungeon quests: 'Outdoor preparation (quest 1)', where 1 is the ID. Both appear in the same window.",
+   "suggestion": "Write 'quest level 20, requires level 15' in Rewards and '(quest ID n)' for IDs in both tabs.",
+   "effort": "S",
+   "batch": "B5"
+  },
+  {
+   "id": "UX-31",
+   "area": "Adventurer's Journal and professions",
+   "lens": "style",
+   "severity": "medium",
+   "title": "Raw Questie field names in player-facing journal text",
+   "where": "QuestSharing/DungeonQuests.lua:633-640; QuestSharing/Rewards.lua:146-150",
+   "evidence": "Dungeon quest details end with 'Questie data: preQuestSingle=1  nextQuestInChain=3', or 'Questie data: no chain links' directly under 'Next chain quests: A dungeon job (2)'. Rewards can show 'Additional requiredSkill requirement; check the quest before travelling.' (also requiredMinRep, requiredMaxRep, requiredSpell).",
+   "suggestion": "Move the link dump to /qs doctor or debug only. Map the keys to plain words: 'Needs a profession skill', 'Needs reputation', 'Needs a spell'.",
+   "effort": "S",
+   "batch": "B5"
+  },
+  {
+   "id": "UX-32",
+   "area": "Adventurer's Journal and professions",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "The journal's two map buttons behave differently, and '(open M)' is cryptic",
+   "where": "QuestSharing/Rewards.lua:413-415; QuestSharing/DungeonQuests.lua:567-575, 781",
+   "evidence": "'Show pickup on map (open M)' in Dungeon quests sets a waypoint and prints 'Marshal McBride \u2014 Elwynn Forest 48.9, 41.6'. 'Map directions (open M)' in Quest rewards only prints 'open your world map (M) and choose \u2026' and sets no waypoint, although its details show '(48.9, 41.6)'.",
+   "suggestion": "Use the same waypoint logic for the reward's quest giver (Q.starter coordinates), and give both buttons one name, e.g. 'Mark quest giver (then press M)'.",
+   "effort": "M",
+   "batch": "B5"
+  },
+  {
+   "id": "UX-33",
+   "area": "Map and world",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "Map features are spread over three Settings tabs, and the Map tab intro lists only some of them",
+   "where": "QuestSharing/Settings.lua:81, 397, 416-419; README.md:457",
+   "evidence": "The Map tab intro reads 'Show zone level guides and party locations on the world map.' It leaves out the dungeon, boat, zeppelin and trainer pins on the same tab, which are on by default. The map search box is under Items & dungeons, gathering marks under Item source tooltips, and fishing markers under Professions & character.",
+   "suggestion": "Name dungeons, transports and trainers in the intro (and README:457). On the Map tab, add a line pointing to the other tabs for the search box, gathering marks and fishing spots, or move those switches there.",
+   "effort": "S",
+   "batch": "B1",
+   "split": "README.md:457 -> B5"
+  },
+  {
+   "id": "UX-34",
+   "area": "Map and world; Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "Settings search misses the words players use ('gather', 'junk')",
+   "where": "QuestSharing/Settings.lua:419-421 (itemSources row text), :581-585 (search)",
+   "evidence": "NS.settingsResults('gather') returns only 'Bags > How to arrange my bags' ('Where items gather'), although the tooltip, README and '/qs gather' all say 'Where to gather'. Searching 'junk' shows 'Nothing matches. Try one word, such as bags, key, map, party, chat or sound.'",
+   "suggestion": "Add 'where to gather' to the itemSources description, and a small synonym list to the search text (junk/trash -> gray, keybind -> key, sell -> vendor).",
+   "effort": "S",
+   "batch": "B1",
+   "merged_from": "Map 'Searching settings for gather' + Settings 'search does not know common player words'"
+  },
+  {
+   "id": "UX-35",
+   "area": "Map and world",
+   "lens": "story",
+   "severity": "medium",
+   "title": "Dungeon and transport pins cannot set a waypoint, unlike every other pin",
+   "where": "QuestSharing/TravelMap.lua:250-271",
+   "evidence": "makePin builds a Button with a waypoint OnClick only for kind 'trainer'. Dungeon skulls and B/Z/T stops are plain Frames. Vendor, gather and trainer pins all end with 'Click to set a waypoint.', but the 'Wailing Caverns' tooltip has no click line and clicking does nothing.",
+   "suggestion": "Make dungeon and stop pins Buttons that call ns.compat.setWaypoint(entry.map, x/100, y/100), and add the 'Click to set a waypoint.' line.",
+   "effort": "S",
+   "batch": "B4"
+  },
+  {
+   "id": "UX-36",
+   "area": "Map and world",
+   "lens": "story",
+   "severity": "medium",
+   "title": "Zone level badges are not coloured by the player's level",
+   "where": "QuestSharing/ZoneLevels.lua:169, 135-147",
+   "evidence": "Every range is S.GOLD ('1\u201310', '10\u201320', '45\u201360') whatever the player's level. The panel says only '1\u201310 \u00b7 Elwynn Forest', so a level 23 player has to compare every badge. Elsewhere gold means a heading or a selection.",
+   "suggestion": "Colour each badge with the quest-difficulty colours relative to UnitLevel('player'), keep '?' grey, and add the player's level to the panel line.",
+   "effort": "M",
+   "batch": "B4"
+  },
+  {
+   "id": "UX-37",
+   "area": "Map and world",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "'Elsewhere' needs three clicks, and the status text does not explain it",
+   "where": "QuestSharing/VendorMap.lua:960-975, 648-657",
+   "evidence": "The status reads '0 locations for \"Silken Thread\" in Elwynn Forest. Known matches exist elsewhere or have no usable map coordinates.' next to a button 'Elsewhere'. Clicking it only changes the text to 'Closest by map distance: Tailor \u00b7 ... (60.0, 70.0)' and relabels the button 'Waypoint'. A third click sets the waypoint, and no pin is drawn.",
+   "suggestion": "End the status with 'Click Elsewhere to find the closest one.' and have Elsewhere set the waypoint right away, with the status naming the zone.",
+   "effort": "S",
+   "batch": "B4"
+  },
+  {
+   "id": "UX-38",
+   "area": "Map and world",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "Search suggestions list single title words as 'Vendor type' and call trainers 'Vendor'",
+   "where": "QuestSharing/VendorMap.lua:732-746",
+   "evidence": "'vendor' suggests 'Vendor type: General', 'Vendor type: Goods', 'Vendor type: Supplies', 'Vendor type: Trade' before 'Vendor: General Goods'. 'pala' gives 'Vendor type: Paladin' and 'Vendor: Paladin Trainer'; 'trainer' gives 'Vendor: Druid Trainer'.",
+   "suggestion": "Offer word completions only while the typed word is unfinished, and label NPC titles by kind ('Trainer: Paladin Trainer', 'Vendor: General Goods').",
+   "effort": "M",
+   "batch": "B4"
+  },
+  {
+   "id": "UX-39",
+   "area": "Map and world",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "In combat the map search shows 'Indexing' with no sign that it is paused",
+   "where": "QuestSharing/VendorMap.lua:299-313; QuestSharing/DataWork.lua:74",
+   "evidence": "With InCombatLockdown true, typing 'General Goods' leaves 'Indexing QuestieDB NPCs\u2026 Suggestions appear as soon as matches are found.' with 0 pins until PLAYER_REGEN_ENABLED, then 3 pins appear.",
+   "suggestion": "In combat, show 'Search waits until the fight ends.' and replace 'Indexing QuestieDB NPCs' with 'Reading the NPC list'.",
+   "effort": "S",
+   "batch": "B4"
+  },
+  {
+   "id": "UX-40",
+   "area": "Map and world",
+   "lens": "style",
+   "severity": "medium",
+   "title": "'/qs gather' prints developer terms to players",
+   "where": "QuestSharing/GatherSources.lua:323-335",
+   "evidence": "Output: 'where to gather: setting on, QuestieDB found, skinning table loaded' / 'item 1000: class 7, subclass 6 -> counts as a gathering item' / 'QuestieDB: 7 creature drops, 0 object drops; skinning table: 0 creatures', and in other states 'OFF', 'NOT found', 'MISSING', 'NOT a gathering item (needs trade goods: ...)'.",
+   "suggestion": "Print one plain sentence per state ('Light Hide: shown. 3 zones known.' / 'Copper Bar is not something you gather, so no places are listed.'). Keep class and subclass for /qs debug or /qs doctor.",
+   "effort": "S",
+   "batch": "B4"
+  },
+  {
+   "id": "UX-41",
+   "area": "Map and world",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "The fishing editor asks for a numeric Map ID and lists waters by map number",
+   "where": "QuestSharing/Fishing.lua:186, 209, 232-234",
+   "evidence": "The field is labelled 'Map ID', the list reads 'Crystal Lake \u2014 map 1429' and the pin reads 'Crystal Lake (?)'. 'Map location' only prints 'open your world map (M) and choose <zone>'.",
+   "suggestion": "Show the zone name (C_Map.GetMapInfo(map).name) in the list, pin and next to the Map ID field. Rename 'Map location' or have it print the zone and coordinates.",
+   "effort": "S",
+   "batch": "B4"
+  },
+  {
+   "id": "UX-42",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "Four differently named buttons on Errors & logs open the same window",
+   "where": "QuestSharing/Settings.lua:424-450",
+   "evidence": "'Run check' calls ns.doctor() (= ns.diagnostics()), 'Show errors' and 'Show logs' both call ns.diagnostics(true), and 'Open report' calls ns.diagnostics(). The harness showed 'Quest Sharing - diagnostics' for all four.",
+   "suggestion": "Keep one 'Open report' card (overview with a Show full report toggle) plus the Clear actions, or make Show errors and Show logs scroll to their sections.",
+   "effort": "S",
+   "batch": "B1"
+  },
+  {
+   "id": "UX-43",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "SETUP NOTES list raw check fragments that do not say what is wrong",
+   "where": "QuestSharing/Diagnostics.lua:472-488 (fallback 'return text')",
+   "evidence": "The overview shows '- quest icons above creatures that are part of your quests' and '- pin the nearest quest in the world (the game's waypoint marker)', which do not say the features are unavailable.",
+   "suggestion": "Add a plain note for every [--] check ('Quest ! marks above enemies are not available on this client.'), or prefix the fallback with 'Not available here: '.",
+   "effort": "S",
+   "batch": "B1"
+  },
+  {
+   "id": "UX-44",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "The 'Arrange bags' card says 'all your bags by topic' but uses the chosen order and bags",
+   "where": "QuestSharing/Settings.lua:185-187",
+   "evidence": "The card says 'Order all your bags by topic once, right now.' With 'Order items by: Name' and 'Bags to arrange: Backpack only', the click printed 'bags arranged by name (2 moves)' and arranged only the backpack.",
+   "suggestion": "Reword to 'Arrange the chosen bags once, right now, with the order set above.'",
+   "effort": "S",
+   "batch": "B1"
+  },
+  {
+   "id": "UX-45",
+   "area": "Party, sharing and party finder",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "The quest invitation window makes players type the chat channel by hand, and the feature has four names",
+   "where": "QuestSharing/Adventure.lua:147-148 (U.box 'Chat channel'), :60-79 (A.route errors)",
+   "evidence": "Free-text 'Chat channel' explained as 'current, say, yell, party, raid, guild, officer, instance, whisper Name, or a joined channel number/name'. A typo gives 'Choose current, say, yell, ...'. The feature is also called 'Seek fellow adventurers', 'Quest invitation', 'Write invite' and '/qs adventure'.",
+   "suggestion": "Replace the field with S.button choices (Current, Say, Party, Guild, World/1, Whisper target) and use one name everywhere.",
+   "effort": "M",
+   "batch": "B3"
+  },
+  {
+   "id": "UX-46",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "usability",
+   "severity": "medium",
+   "title": "The 'what's new' message after an update is stale",
+   "where": "QuestSharing/Core.lua:308, 321",
+   "evidence": "Every version change shows 'Quest Sharing updated to X: your messages now go into the chat box - just press Enter ...'. CHANGELOG 'Unreleased' lists the Bags page, Party finder page, settings search and aggro instead.",
+   "suggestion": "Tie WHATS_NEW to the release, or show one short line about the newest features and /qs settings. Add a release-checklist step to update it.",
+   "effort": "S",
+   "batch": "B1"
+  },
+  {
+   "id": "UX-47",
+   "area": "Quest guide",
+   "lens": "usability",
+   "severity": "low",
+   "title": "Left-click and right-click on a guide step do the same thing but are described as different, and only one is blocked in combat",
+   "where": "QuestSharing/QuestPlanner.lua:1244-1253 (showStopOnMap), 1312-1318; README.md:475",
+   "evidence": "The tooltip says 'Left-click: set a waypoint.' / 'Right-click: mark this location on the map.', but both (and the 'Waypoint' button) call ns.compat.setWaypoint at the same point. In combat, right-click prints 'mark this location after combat', while left-click sets the waypoint at once.",
+   "suggestion": "Give right-click a different job (e.g. the busy-camp menu from UX-21) or drop it. Use one combat rule, and fix the tooltip and README.",
+   "effort": "S",
+   "batch": "B2",
+   "split": "README.md:475 -> B5"
+  },
+  {
+   "id": "UX-48",
+   "area": "Party, sharing and party finder; Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "usability",
+   "severity": "low",
+   "title": "The Party quests window is hard to close and reopen: no close button, '/qs panel' toggles, and the minimap right-click hides it silently for good",
+   "where": "QuestSharing/Panel.lua:350 (only the '-' fold button); QuestSharing/Core.lua:450-453 (onoff toggles with no argument); QuestSharing/MinimapButton.lua:121; README.md:801",
+   "evidence": "The window shows solo by default (panelSolo = true) and can only be folded. '/qs panel' typed while it was shown switched it off. A minimap right-click sets NS.db.panel=false with no message, and it stays off across sessions.",
+   "suggestion": "Add S.closeButton that sets panel=false and prints how to bring it back, make '/qs panel' without an argument show it, and print a line after the minimap right-click.",
+   "effort": "S",
+   "batch": "B3",
+   "split": "Core.lua:450-453, MinimapButton.lua:121 -> B1",
+   "merged_from": "Party 'no close button' + Settings 'Minimap right-click turns off the Party quests window'"
+  },
+  {
+   "id": "UX-49",
+   "area": "Map and world",
+   "lens": "usability",
+   "severity": "low",
+   "title": "The dungeon tooltip shows both factions by default and calls the enemy town one 'you can use'",
+   "where": "QuestSharing/TravelMap.lua:217-227; QuestSharing/Core.lua:43",
+   "evidence": "With travelFaction='all' (the default), an Alliance player hovering Wailing Caverns sees 'Closest town you can use:' then 'Horde: The Crossroads (The Barrens)', with a red line drawn to it. 'flight master' never appears, although README:530 says these are flight-master towns.",
+   "suggestion": "Default to UnitFactionGroup('player'), say 'Closest flight master town:', and drop 'you can use' when both factions are shown.",
+   "effort": "S",
+   "batch": "B4",
+   "split": "Core.lua:43 default -> B1"
+  },
+  {
+   "id": "UX-50",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics; Party, sharing and party finder",
+   "lens": "usability",
+   "severity": "low",
+   "title": "'/qs gap' does not match the Settings range and never says when it changes the value",
+   "where": "QuestSharing/Core.lua:576",
+   "evidence": "'/qs gap 500' stores NS.db.gap = 500 and prints 'gap 500s'. '/qs gap 1' is clamped to 2 with no message (only 'gap 2s' inside the dump). The Settings row 'Seconds between shared quests' allows 2-30.",
+   "suggestion": "Clamp to the row's 2-30 range and say so when the value is clamped.",
+   "effort": "S",
+   "batch": "B1"
+  },
+  {
+   "id": "UX-51",
+   "area": "Quest guide",
+   "lens": "usability",
+   "severity": "low",
+   "title": "The missing-Questie message in the guide is wrong and gives no next step",
+   "where": "QuestSharing/QuestPlanner.lua:397",
+   "evidence": "With no Questie installed, the guide reads 'Questie needs a recent QuestieDB with quest IDs.', as if Questie were present. It does not mention '/qs questie' (README.md:489).",
+   "suggestion": "Use ns.questie.whyMissing() to say 'Install or enable Questie, then /reload' or 'Update QuestieDB', and add 'Type /qs questie to check'.",
+   "effort": "S",
+   "batch": "B2"
+  },
+  {
+   "id": "UX-52",
+   "area": "Adventurer's Journal and professions",
+   "lens": "story",
+   "severity": "low",
+   "title": "Dungeon quests does not focus the dungeon you are in",
+   "where": "QuestSharing/DungeonQuests.lua (D.open); compare QuestSharing/Loot.lua:134-166",
+   "evidence": "Inside Wailing Caverns, '/qs dungeons' opens on 'Dungeon: All dungeons' with '1\u20135 of 14 quests'. The Instance drops tab auto-selects the current dungeon. DungeonQuests.lua has no GetInstanceInfo/IsInInstance call.",
+   "suggestion": "On open, if the player is in a party instance listed in places, preselect it, using Loot's focusCurrentDungeon no-tie rule.",
+   "effort": "M",
+   "batch": "B5"
+  },
+  {
+   "id": "UX-53",
+   "area": "Adventurer's Journal and professions",
+   "lens": "usability",
+   "severity": "low",
+   "title": "Dungeon quest details go stale after the dungeon filter changes",
+   "where": "QuestSharing/DungeonQuests.lua:803",
+   "evidence": "After choosing The Deadmines, the row says 'Chain quest: prerequisite' but the details still say 'Chain quest'. row.choose(true) skips setDetails when the same quest stays selected.",
+   "suggestion": "Re-render the details when the dungeon filter changes or on every auto-focus.",
+   "effort": "S",
+   "batch": "B5"
+  },
+  {
+   "id": "UX-54",
+   "area": "Adventurer's Journal and professions",
+   "lens": "usability",
+   "severity": "low",
+   "title": "The reward-browser switch in Settings is undone silently by the button, tab and command",
+   "where": "QuestSharing/Settings.lua:403-406; QuestSharing/Rewards.lua:436",
+   "evidence": "'Enable quest reward browser' defaults off, but 'Browse rewards', the 'Quest rewards' tab or '/qs rewards' turn it back on silently. Dungeon loot and Dungeon quests have no such switch.",
+   "suggestion": "Remove the redundant switch, or stop R.open from overriding it.",
+   "effort": "S",
+   "batch": "B5",
+   "split": "Settings.lua:403-406 row removal -> B1"
+  },
+  {
+   "id": "UX-55",
+   "area": "Party, sharing and party finder",
+   "lens": "usability",
+   "severity": "low",
+   "title": "'Sharing in progress' is worded two ways, and one points a button user to a slash command",
+   "where": "QuestSharing/Share.lua:322 vs :385",
+   "evidence": "During a round, a row click prints 'quests are being shared right now - try again in a few seconds'. The Share button prints 'already sharing (/qs stop to cancel)', but the window has no Stop button.",
+   "suggestion": "Use one sentence for both, and relabel the Share button 'Stop' (ns.stopShare) while a round runs.",
+   "effort": "S",
+   "batch": "B3"
+  },
+  {
+   "id": "UX-56",
+   "area": "Party, sharing and party finder",
+   "lens": "usability",
+   "severity": "low",
+   "title": "The ring's Invite slot hint says 'say it'",
+   "where": "QuestSharing/Quick.lua:791",
+   "evidence": "After releasing on Invite, the hint reads 'click it (or press the key again) to say it'. With no target the player only learns 'target a player ...' after clicking.",
+   "suggestion": "For @invite slots, use '... to invite', and show 'no target: target a player first' while nobody is picked.",
+   "effort": "S",
+   "batch": "B3"
+  },
+  {
+   "id": "UX-57",
+   "area": "Party, sharing and party finder",
+   "lens": "style",
+   "severity": "low",
+   "title": "Party finder picker: two toggles use different 'on' colours, and the Find tooltip undersells what it does",
+   "where": "QuestSharing/LFGFinderUI.lua:169-171, 133",
+   "evidence": "'Supercharge: invite every match at once' turns gold when on, 'Whisper them which dungeon the invite is for' turns white, and gold elsewhere in the picker means 'selected role'. The Find tip says 'invite the best match', but normal mode fills every open role.",
+   "suggestion": "Use the same on-colour for both, and change the tip to 'Search your listing's dungeon and invite players for the open roles (highest level first)'.",
+   "effort": "S",
+   "batch": "B1"
+  },
+  {
+   "id": "UX-58",
+   "area": "Party, sharing and party finder",
+   "lens": "style",
+   "severity": "low",
+   "title": "'ilvl' and 'bytes' in finder and invitation messages",
+   "where": "QuestSharing/LFGInvite.lua:204; QuestSharing/Adventure.lua:87, 97",
+   "evidence": "'party finder: invited Lia 24 Priest (healer, ilvl ?) for The Deadmines'. 'Your invitation must be 1\u2013255 bytes; ...' / '... exceeds 255 bytes; ...'.",
+   "suggestion": "Write 'item level unknown' / 'item level 52' and '255 letters' (as README line 79 already does).",
+   "effort": "S",
+   "batch": "B3"
+  },
+  {
+   "id": "UX-59",
+   "area": "Quest guide; Party, sharing and party finder",
+   "lens": "style",
+   "severity": "low",
+   "title": "The guide panel covers the classic stone with a flat fill, and the style test checks only three windows",
+   "where": "QuestSharing/QuestPlanner.lua:1115 (S.fill full-panel BACKGROUND), 1121-1126 (b.bg:Hide(); b.edge:Hide()); tests/test_classic_style.py:32-35",
+   "evidence": "S.window(..., 'hud') builds the stone, then S.fill(panel,'BACKGROUND',0.035,0.032,0.027,1) draws over it. '...', 'Plan', '?', 'Lock', '<', '>' and '-' are bare text. test_classic_style checks only QuestSharingEquipment, QuestSharingSettings and QuestSharingReport. QuestSharingPanel, QuestSharingFinder, QuestSharingMenu and QuestSharingAdventure are stone today but nothing guards them.",
+   "suggestion": "Drop the flat fill (or S.inset just the list), and give 'Plan' and 'Lock' S.button art. Add QuestSharingPlannerPanel, QuestSharingPanel, QuestSharingFinder, QuestSharingMenu and QuestSharingAdventure to the stone() loop.",
+   "effort": "S",
+   "batch": "B2",
+   "merged_from": "Guide 'panel hides the classic stone' + Party 'Classic-style test does not cover this area's windows' (same test file)"
+  },
+  {
+   "id": "UX-60",
+   "area": "Quest guide",
+   "lens": "style",
+   "severity": "low",
+   "title": "Route-search notes are shown on guide steps",
+   "where": "QuestSharing/QuestOptimizer.lua:204, 236-237, 417-418; QuestSharing/QuestPlanner.lua:1231",
+   "evidence": "Under 'Kill Harvest Watcher' the row shows 'Work time estimated; the quantity or drop rate is unknown.' Others: 'Separate quest drops may overlap; their joint rate is unknown.', 'Large drop counts use a conservative estimate.'",
+   "suggestion": "Keep these in the report, and show only actionable advice on steps (e.g. 'Shared kills: this camp counts for 2 quests').",
+   "effort": "S",
+   "batch": "B2"
+  },
+  {
+   "id": "UX-61",
+   "area": "Quest guide",
+   "lens": "style",
+   "severity": "low",
+   "title": "Pickup and hand-in rows repeat themselves",
+   "where": "QuestSharing/QuestPlanner.lua:1218-1231 (rowDetailsText)",
+   "evidence": "'Take these quests:' then '[1] Pick up Local Harvest from Sentinel Hill Giver'; 'Hand in these quests:' then '[1] Turn in Local Harvest to Sentinel Hill Giver'.",
+   "suggestion": "Use the heading or the verb, e.g. 'Take from Sentinel Hill Giver:' then '[1] Local Harvest'.",
+   "effort": "S",
+   "batch": "B2"
+  },
+  {
+   "id": "UX-62",
+   "area": "Party, sharing and party finder",
+   "lens": "style",
+   "severity": "low",
+   "title": "The Party quests window has several names",
+   "where": "QuestSharing/Settings.lua:225-235; QuestSharing/Panel.lua:423; QuestSharing/Core.lua:510; README.md:361",
+   "evidence": "Settings 'Party quests window', '/qs help' 'show / hide the \"quests in common\" panel', README section 13 'quests-in-common panel', and the minimap tooltip 'Right click: Party quests'. README also shows the header '(2 of 5 shared)', which the window never displays.",
+   "suggestion": "Call it 'Party quests window' everywhere (help line, README section 13) and fix the README header example.",
+   "effort": "S",
+   "batch": "B1",
+   "split": "README.md:361 -> B5"
+  },
+  {
+   "id": "UX-63",
+   "area": "Map and world",
+   "lens": "usability",
+   "severity": "low",
+   "title": "Zone levels and fishing spots each go by three names",
+   "where": "QuestSharing/Settings.lua:323-325; QuestSharing/ZoneLevels.lua:94; QuestSharing/Fishing.lua (window title); README.md:543",
+   "evidence": "Zone levels: header 'Zone level guides', toggle 'Show zone questing level ranges', map panel 'Questing levels', source 'Zone guide'. Fishing: 'Saved fishing spots' / 'Edit spots' in Settings, window title 'Fishing waters', 'water editor' in help and README.",
+   "suggestion": "Pick one name per feature ('Zone levels', 'Fishing spots') for the header, toggle, window title, help line and README.",
+   "effort": "S",
+   "batch": "B4",
+   "split": "Settings.lua:323-325 and help line -> B1; README.md:543 -> B5"
+  },
+  {
+   "id": "UX-64",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "style",
+   "severity": "low",
+   "title": "Bag marks and bag cleanup are described differently in Settings and in their windows",
+   "where": "QuestSharing/Settings.lua:146-147 vs QuestSharing/Bags.lua:2-3; QuestSharing/Settings.lua:159 vs QuestSharing/QuestCleanup.lua:58",
+   "evidence": "Bag marks are 'gold marks on items needed by nearby quests', but the code and help ('gold for quests here') mean the current zone. The cleanup card says 'Requires QuestieDB', and the window says 'Questie data is required. Load Questie, then refresh.'",
+   "suggestion": "Say 'quests in this zone' and use one dependency name ('QuestieDB') in both places.",
+   "effort": "S",
+   "batch": "B5",
+   "split": "Settings.lua:146-147, 159 -> B1"
+  },
+  {
+   "id": "UX-65",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics; Party, sharing and party finder",
+   "lens": "style",
+   "severity": "low",
+   "title": "Hand-written 'Needs ...' sentences repeat the automatic dependency note, sometimes with a different name or the role key",
+   "where": "QuestSharing/Settings.lua:181-182, 472",
+   "evidence": "'Needs Arrange my bags automatically. Has no effect until \"Arrange my bags by topic automatically\" is on.' and 'Turn off to skip Warrior players signed up as dps. Needs Invite damage dealers. Has no effect until \"Invite damage dealers\" is on.'",
+   "suggestion": "Drop the hand-written 'Needs ...' sentences (needsOff() already adds the note), and use 'damage dealer' instead of the role key 'dps'.",
+   "effort": "S",
+   "batch": "B1",
+   "merged_from": "Settings 'Help text repeats itself' + Party 'Finder class rows say dps and repeat the dependency'"
+  },
+  {
+   "id": "UX-66",
+   "area": "Map and world",
+   "lens": "style",
+   "severity": "low",
+   "title": "One item tooltip uses two different headings for its two parts",
+   "where": "QuestSharing/ItemSources.lua:51; QuestSharing/GatherSources.lua:164",
+   "evidence": "Copper Ore shows 'Questie sources: Mining, Vendor' then 'Where to gather (most spawns first)', both from the one 'Item source tooltips' setting.",
+   "suggestion": "Use 'Sold by: General Goods, Trade Supplies' and 'Mined from veins', and keep 'Where to gather' as the only location heading.",
+   "effort": "S",
+   "batch": "B4"
+  },
+  {
+   "id": "UX-67",
+   "area": "Map and world",
+   "lens": "style",
+   "severity": "low",
+   "title": "The map search suggestion box has a blue-grey border instead of the classic stone and bronze rim",
+   "where": "QuestSharing/VendorMap.lua:659-669",
+   "evidence": "Drawn with S.fill(0.38,0.43,0.52) as border and S.fill(0.035,0.045,0.065) as background. Other map overlays use S.panel or S.inset (Style.lua:53-76).",
+   "suggestion": "Use S.panel(suggestionBox) or S.inset, keeping TOOLTIP strata.",
+   "effort": "S",
+   "batch": "B4"
+  },
+  {
+   "id": "UX-68",
+   "area": "Map and world",
+   "lens": "style",
+   "severity": "low",
+   "title": "The two map panels style their headings differently",
+   "where": "QuestSharing/VendorMap.lua:623, 859; QuestSharing/ZoneLevels.lua:94",
+   "evidence": "'Search this map: Elwynn Forest' is white GameFontHighlightSmall, while 'Questing levels' is S.GOLD.",
+   "suggestion": "Use S.GOLD (or GameFontNormal) for the vendor panel heading.",
+   "effort": "S",
+   "batch": "B4"
+  },
+  {
+   "id": "UX-69",
+   "area": "Adventurer's Journal and professions",
+   "lens": "style",
+   "severity": "low",
+   "title": "Ingredient tooltips use jargon and show the other faction's waters",
+   "where": "QuestSharing/Professions.lua:56, 59, 75",
+   "evidence": "An Alliance character sees 'Fish: Coast south of Sen'jin Village, Durotar', 'no-getaway: unknown (effective skill, including bonuses)' and 'Vendor supply in the client reference; specific seller unknown.'",
+   "suggestion": "Say 'Fish stay hooked from skill N' and 'Sold by vendors (seller not known)'. Tag waters '(Horde area)' / '(Alliance area)', or list your own faction first.",
+   "effort": "S",
+   "batch": "B5"
+  },
+  {
+   "id": "UX-70",
+   "area": "Adventurer's Journal and professions",
+   "lens": "style",
+   "severity": "low",
+   "title": "Journal rows and status lines show meaningless or awkward values",
+   "where": "QuestSharing/Rewards.lua:237; QuestSharing/Loot.lua:395, 402; QuestSharing/EquipmentUI.lua:364",
+   "evidence": "'Healing Robe \u00b7 iLvl 24 \u00b7 req 0', 'Cookie's Ladle \u00b7 iLvl 20 \u00b7 req 0', '1 tables unavailable or not item lists.', and '1\u20131 of 1 items \u2022 scroll to browse' on a single page.",
+   "suggestion": "Leave out 'req' at level 0 or 1, move the skipped-tables count to debug, show 'scroll to browse' only with more than one page, and fix the plural.",
+   "effort": "S",
+   "batch": "B5"
+  },
+  {
+   "id": "UX-71",
+   "area": "Adventurer's Journal and professions",
+   "lens": "style",
+   "severity": "low",
+   "title": "In the journal, grey and '> ' each mean two things",
+   "where": "QuestSharing/EquipmentUI.lua:220, 583; QuestSharing/Loot.lua:384; QuestSharing/DungeonQuests.lua:695-705",
+   "evidence": "Every source line ('Edwin VanCleef \u2014 The Deadmines') is S.GREY, the same grey as done or not-needed quests. '> The Deadmines' marks the selected dungeon, but in dropdowns '> ' is the keyboard cursor and gold is the selection.",
+   "suggestion": "Use the parchment tan (0.8,0.72,0.56) for source lines and keep grey for done or disabled. Mark the selected dungeon in gold.",
+   "effort": "S",
+   "batch": "B5"
+  },
+  {
+   "id": "UX-72",
+   "area": "Adventurer's Journal and professions",
+   "lens": "usability",
+   "severity": "low",
+   "title": "The same filters use different controls and wording in two journal tabs",
+   "where": "QuestSharing/Rewards.lua:321-322, 339-340; QuestSharing/DungeonQuests.lua:672, 734-735, 760",
+   "evidence": "Dungeon quests has a checkbox 'Hide completed quests'; Rewards has a toggle button 'Hiding completed quests' / 'Showing completed quests'. Level filter: 'Available at level 20' / 'All levels' vs 'Quest levels: near 20' / 'Quest levels: all'. Only Rewards labels 'Class:' and 'Faction:'.",
+   "suggestion": "Use the S.checkBox 'Hide completed quests' in both tabs, one wording for the level toggle, and labels on both dropdown sets.",
+   "effort": "S",
+   "batch": "B5"
+  },
+  {
+   "id": "UX-73",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "style",
+   "severity": "low",
+   "title": "Spell rank messages use developer terms and a different tone",
+   "where": "QuestSharing/SpellRanks.lua:108, 112, 125, 147, 151",
+   "evidence": "'This client does not expose the spell-book/action-bar APIs needed for rank updates.', 'The client could not confirm that the cursor is clear. Auto-update is paused until /reload; /qs errors has any client errors.'",
+   "suggestion": "Use plain lower-case lines ('this game version cannot change action bar spells', 'spell ranks paused until /reload - your cursor was busy').",
+   "effort": "S",
+   "batch": "B5"
+  },
+  {
+   "id": "UX-74",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "style",
+   "severity": "low",
+   "title": "Chat and window text use '(s)' plurals, key=value wording and raw bag numbers",
+   "where": "QuestSharing/Core.lua:547, 554; QuestSharing/Settings.lua:190; QuestSharing/MinimapButton.lua:158; QuestSharing/QuestCleanup.lua:124, 250",
+   "evidence": "'1 bookmark(s) removed', '1 problem(s) recorded - /qs errors', '2 possible leftover stack(s)', 'bag arrangement: by = name', 'Quest item 300 x3  (bag 0, slot 1)'.",
+   "suggestion": "Use proper singular and plural forms, 'bags are now arranged by name', and 'Backpack, slot 1' / 'Bag 2, slot 1'.",
+   "effort": "S",
+   "batch": "B1",
+   "split": "QuestCleanup.lua:124, 250 -> B5"
+  },
+  {
+   "id": "UX-75",
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "lens": "style",
+   "severity": "low",
+   "title": "The chat prefix is light blue, which the addon's palette says to avoid",
+   "where": "QuestSharing/Core.lua:171 vs QuestSharing/Settings.lua:9",
+   "evidence": "ns.print prefixes '|cff55ccffQuest Sharing:|r'. Settings.lua says 'Classic WoW options palette: gold titles ... No blue anywhere.', and blue also means 'quest elsewhere' for bag marks.",
+   "suggestion": "Use a deliberate chat colour (e.g. S.GOLD) and note it in Style.lua, so blue means only 'elsewhere'.",
+   "effort": "S",
+   "batch": "B1"
+  }
+ ],
+ "stories": [
+  {
+   "area": "Quest guide",
+   "story": "As a new classic player, I want to open the quest guide with one command so that I see my next quest stop without hunting through settings.",
+   "status": "works",
+   "evidence": "One '/qs plan' turns it on and opens the panel: 'Westfall', '1/3', 'Step 1: Go to Sentinel Hill / 55.0, 45.0 / Take these quests: / [1] Pick up Local Harvest from Sentinel Hill Giver'. Minor: the window title is 'QUEST SHARING' (QuestPlanner.lua:1116), and the minimap tooltip says 'the quest optimizer' (MinimapButton.lua:85)."
+  },
+  {
+   "area": "Quest guide",
+   "story": "As a quester in Westfall, I want the guide to move on by itself as I accept, progress, finish and hand in quests so that I only follow the gold step.",
+   "status": "friction",
+   "evidence": "The steps advance correctly (accept -> 'Kill Harvest Watcher (0/8)' -> '(4/8)' -> 'Hand in these quests'), and left-click sets WAYPOINT {map=1436,x=0.55,y=0.45}. After the last turn-in it shows '0/0' and only 'No active or ready quests found here.' (QuestPlanner.lua:1374), with no 'zone done' or next step."
+  },
+  {
+   "area": "Quest guide",
+   "story": "As a player with 30 minutes before raid, I want to switch the guide to a time limit or XP/hour goal so that the route fits my session.",
+   "status": "friction",
+   "evidence": "Plan opens Settings tab 'guide', and changing the goal replans. '/qs plan xp', '/qs plan all' and '/qs plan budget 2' print nothing, and the header never shows the goal. '/qs plan budget 600' is silently saved as 240. The error text says 1-1440, but the stepper allows 5-240."
+  },
+  {
+   "area": "Quest guide",
+   "story": "As a party member, I want to plan only the three quests my friends and I share so that we do them together.",
+   "status": "out of scope",
+   "evidence": "The goal needs numeric quest IDs, but the guide shows only route-local '[1] Local Harvest'. '/qs plan selected Local Harvest' prints 'enter quest IDs for the Selected quests goal'. No row, tooltip or chat line shows an ID. | Out of scope: the quest guide plans for the player alone (user, 2026-11-19)."
+  },
+  {
+   "area": "Quest guide",
+   "story": "As a player in a group at a contested camp, I want to mark the camp busy so that the guide sends me to a free camp.",
+   "status": "friction",
+   "evidence": "It takes select step > Plan > 'Camps' > 'Camp busy'. The step moves from '30.0, 30.0' to '80.0, 80.0' silently. There is no '/qs plan' subcommand or guide button. On a pickup step it says 'select an objective step (kill or collect) in the quest guide first'."
+  },
+  {
+   "area": "Quest guide",
+   "story": "As a player who cannot find a quest in my route, I want the guide to tell me why so that I know whether to level up, go elsewhere or ignore it.",
+   "status": "friction",
+   "evidence": "'/qs plan why' lists quests by ID only ('Quest 8100 \u2022 unfinished, excluded by this goal, incompatible branch or missing data'). Quests 8100/8101/8104 are listed as excluded but appear as pickups. It uses developer wording ('bounded search', 'illustrative 3000 \u00d7 2000 yard zone scale') and shows a 'Test the ring' button."
+  },
+  {
+   "area": "Quest guide",
+   "story": "As a player standing in Stormwind, I want the guide to tell me why it shows no route so that I know to go outdoors.",
+   "status": "works",
+   "evidence": "Header 'Quest guide', body 'The quest planner only works in outdoor zones, not towns or cities.' The message is clear but uses two names."
+  },
+  {
+   "area": "Quest guide",
+   "story": "As a player, I want to reach the guide's settings from the guide window so that I can change what it plans.",
+   "status": "friction",
+   "evidence": "The '...' button (tooltip 'Quest Sharing settings') opens tab 'optional', 'Professions & character' (QuestPlanner.lua:1129). Only 'Plan' reaches tab 'guide'."
+  },
+  {
+   "area": "Party, sharing and party finder",
+   "story": "As a questing player who just grouped up, I want my quests of this zone offered to the newcomers automatically so that we can start the same quests without typing anything.",
+   "status": "works",
+   "evidence": "Quest 100 is pushed after the settle wait with 0 clicks, then 'shared 1 quest with the party' (about 15 s). While the round runs, a row click and the Share button give two different 'busy' messages."
+  },
+  {
+   "area": "Party, sharing and party finder",
+   "story": "As a party member, I want to see at a glance which of my nearby quests each member has so that I know what we can do together.",
+   "status": "works",
+   "evidence": "'Party quests' opens by itself: '(0 shared, 2 here)', class-coloured columns Anna/Bob, rows 'Wolves Among Us 3/8 +1', red X while unknown, and the note 'Nobody in the party has these quests yet.  Share offers them.' The README shows a '(2 of 5 shared)' header the window never displays."
+  },
+  {
+   "area": "Party, sharing and party finder",
+   "story": "As a party member, I want to right-click a quest and tell the party how far I am so that we can coordinate who still needs what.",
+   "status": "friction",
+   "evidence": "With defaults, 'Tell the party how I am doing' only fills the /p chat box ('[Wolves Among Us] - I still need Wolf slain 3/8, Wolf Pelt 0/4. What about you?'), although README:172 says 'sends at once'. Grey lines show no tooltip; the reason appears in chat only after a click."
+  },
+  {
+   "area": "Party, sharing and party finder",
+   "story": "As a chatty player, I want the addon to tell the party which quests we have in common and when I finish a shared quest so that nobody has to ask.",
+   "status": "broken",
+   "evidence": "'/qs chat on', '/qs announce on' and '/qs pickup on' in default mode box: sent=[] after 40 s, with no hint. With '/qs mode send' the 'in common' message goes out. With mode send, announce on and chat off, finishing quest 100 sends nothing; it works only with chat on."
+  },
+  {
+   "area": "Party, sharing and party finder",
+   "story": "As a dungeon group leader, I want to find a healer from the party finder with one click so that I do not have to scroll through listings.",
+   "status": "friction",
+   "evidence": "The spyglass tooltip and picker are clear. Find invites Lia with 'invited Lia 24 Priest (healer, ilvl ?) for The Deadmines' in 2 clicks. The picker's 'Settings' button and the spyglass right-click opened tab 'party', not 'finder' (the working tree now shows 'finder', see UX-05)."
+  },
+  {
+   "area": "Party, sharing and party finder",
+   "story": "As a player looking for company, I want to say 'Team up?' to people nearby with one key so that I can find a group while questing.",
+   "status": "friction",
+   "evidence": "No key at first. After '/qs key V' the ring has 8 slots. Releasing on 'Team up?' only puts 'Doing [Wolves Among Us] here - anyone want to group up?' into /s and prints a two-sentence explanation; only a click sends at once."
+  },
+  {
+   "area": "Party, sharing and party finder",
+   "story": "As a player, I want to invite the player I am targeting from the ring so that I can grow the party without typing /invite.",
+   "status": "works",
+   "evidence": "With a target, the Invite click invites Lia and whispers. Without a target, release shows 'click it (or press the key again) to say it' (wrong verb), and the no-target message comes only after a click."
+  },
+  {
+   "area": "Party, sharing and party finder",
+   "story": "As a party member, I want to ping the nearest quest enemy with one key so that my party knows what to kill.",
+   "status": "works",
+   "evidence": "'/qs ping' lists the checks, including '[--] ping key: NOT SET - ... /qs pingkey G'. Presses report 'ping: Kobold Worker (attack)' and 'ping held back: ...'. With no creature: 'ping: the quest object in front of you, if there is one (look here)', which is vague."
+  },
+  {
+   "area": "Map and world",
+   "story": "As a questing player low on food, I want to find the nearest General Goods vendor on the map I am looking at, so that I can restock without asking in chat.",
+   "status": "friction",
+   "evidence": "Off by default (Core.lua:41), with no hint on the map. After turning it on (Settings > Items & dungeons), 'gene' suggests 'Vendor type: General' / 'Vendor: General Goods', and clicking gives '3 locations for \"General Goods\"' with waypoint pins. About 7 actions from a fresh install."
+  },
+  {
+   "area": "Map and world",
+   "story": "As a tailor in Elwynn, I want to find who sells Silken Thread even if they are in another zone, so that I can get there.",
+   "status": "friction",
+   "evidence": "'0 locations ... Known matches exist elsewhere or have no usable map coordinates.' plus 'Elsewhere', which the text never explains. Elsewhere -> 'Closest by map distance: Tailor \u00b7 <zone> (60.0, 70.0)' -> 'Waypoint' takes a third click, and no pin is drawn."
+  },
+  {
+   "area": "Map and world",
+   "story": "As a druid with Mining and Fishing, I want my own trainers marked on the zone map, so that I know where to train when I level up.",
+   "status": "works",
+   "evidence": "On by default. With QuestieDB, the Barrens shows a gold-rimmed pin, 'Your trainers / Gorn \u00b7 Mining Trainer ... / Click to set a waypoint.', and clicking sets a waypoint on map 1413. Without QuestieDB nothing on the map says why."
+  },
+  {
+   "area": "Map and world",
+   "story": "As an Alliance player in a party heading to Wailing Caverns, I want to see the entrance and the closest flight town, so that the group can meet there.",
+   "status": "friction",
+   "evidence": "The tooltip lists 'Horde: The Crossroads' as a 'town you can use' for an Alliance player (default 'Both factions') and never says flight master. The skull is a plain Frame with no click (TravelMap.lua:250-271)."
+  },
+  {
+   "area": "Map and world",
+   "story": "As a level 23 player, I want the world map to show which zones suit my level, so that I pick my next questing zone.",
+   "status": "friction",
+   "evidence": "Off by default (Core.lua:39). Badges '1\u201310', '10\u201320', '45\u201360' and '?' are all the same gold (ZoneLevels.lua:169), with no comparison to the player's level."
+  },
+  {
+   "area": "Map and world",
+   "story": "As a fisher, I want to save the lake I am standing at and see it on the big map later, so that I can come back to it.",
+   "status": "friction",
+   "evidence": "'/qs fishing' prefills Map ID 1429 and X/Y. Save shows 'Saved. Enable fishing in Optional to show markers.', but there is no Optional tab. '/qs fishing on' prints nothing. The list reads 'Crystal Lake \u2014 map 1429' and the pin 'Crystal Lake (?)'."
+  },
+  {
+   "area": "Map and world",
+   "story": "As a skinner, I want to hover Light Hide and see where to farm it, then mark those spots on the map, so that I know where to go.",
+   "status": "works",
+   "evidence": "With the setting off, Ctrl+right-click gives a clear hint. With it on, the tooltip shows 'Where to gather (most spawns first) ...'. Ctrl+right-click marks the spots, sets a waypoint and toggles them off again."
+  },
+  {
+   "area": "Map and world",
+   "story": "As a party member, I want to see where my teammate found the quest items I still need, so that I can go to the same spot.",
+   "status": "friction",
+   "evidence": "'Anna found Wolf Pelt for [Wolves Among Us] at 30.0, 40.0 - there is a pin on your map' has no zone. My own waypoint (x 0.9) was silently replaced by Anna's (x 0.3) (Marker.lua:120-129). The pin tooltip 'Anna (Quest Sharing)' works."
+  },
+  {
+   "area": "Adventurer's Journal and professions",
+   "story": "As a level-20 Night Elf Druid who quests, I want to find quest reward equipment for my class and level, so that I know which quests give me an upgrade.",
+   "status": "friction",
+   "evidence": "'/qs rewards' lists 'Druid Staff \u00b7 iLvl 25 \u00b7 req 18' with details. '(quest 20, requires level 15)' uses 'quest' for the level. 'Map directions (open M)' sets no waypoint. With all-green rewards the list is empty, and Clear filters cannot help."
+  },
+  {
+   "area": "Adventurer's Journal and professions",
+   "story": "As a party member about to run The Deadmines, I want every quest for that dungeon, including the outdoor pickups, so that I can collect them all before we zone in.",
+   "status": "friction",
+   "evidence": "The Deadmines (14) gives 13 nested-chain quests with pickup and turn-in lines, and 'Show pickup on map (open M)' sets a waypoint. Only 5 rows per page. Details go stale after the filter changes, and end with 'Questie data: no chain links'. DungeonQuests.lua changed on disk during the review."
+  },
+  {
+   "area": "Adventurer's Journal and professions",
+   "story": "As a player already inside The Deadmines, I want to see what each boss drops, so that I know what to roll on.",
+   "status": "works",
+   "evidence": "'/qs loot' auto-selects The Deadmines and shows 'Captain's Blade \u00b7 iLvl 25 \u00b7 req 18 | Edwin VanCleef \u2014 The Deadmines \u00b7 Heroic, Normal'. Polish only: 'req 0' and '1 tables unavailable or not item lists.'"
+  },
+  {
+   "area": "Adventurer's Journal and professions",
+   "story": "As a player who just zoned into Wailing Caverns with my party, I want /qs dungeons to show that dungeon's quests right away, so that I can check what I still need without searching.",
+   "status": "friction",
+   "evidence": "It opens on 'Dungeon: All dungeons' with '1\u20135 of 14 quests'. Instance drops focuses the current dungeon (Loot.lua:134-166); DungeonQuests.lua does not."
+  },
+  {
+   "area": "Adventurer's Journal and professions",
+   "story": "As a healer, I want to keep only gear with Intellect >= 10, so that I can skip items without caster stats.",
+   "status": "works",
+   "evidence": "Stat 'Intellect' leaves 'Druid Staff' (INT 12), min 20 gives none, and 'x' and min>max give clear errors. Clear filters resets, and filters survive a tab round trip."
+  },
+  {
+   "area": "Adventurer's Journal and professions",
+   "story": "As a cook, I want to see recipes I have not learned and where to learn them, so that I can level Cooking without leaving the game.",
+   "status": "works",
+   "evidence": "The embedded list shows '133 recipes  -  1 learned'. Unlearned 'Slitherskin Mackerel' shows 'Not learned', 'Requires Cooking 1' and a faction-filtered source. With the window closed, '/qs cooking' says to open K."
+  },
+  {
+   "area": "Adventurer's Journal and professions",
+   "story": "As a cook, I want to hover an ingredient and learn where to farm or fish it, so that I can gather materials for a recipe.",
+   "status": "friction",
+   "evidence": "An Alliance character sees 'Fish: Coast south of Sen'jin Village, Durotar' with no faction note, plus jargon: 'no-getaway: unknown (effective skill, including bonuses)' and 'Vendor supply in the client reference; specific seller unknown.'"
+  },
+  {
+   "area": "Adventurer's Journal and professions",
+   "story": "As a player without AtlasLoot or QuestieDB, I want the journal to tell me plainly what to install, so that I am not left with an empty window.",
+   "status": "friction",
+   "evidence": "The status shows 'No matching equipment' and '0 dungeons \u2014 page 1/1'. Only the note explains what to install. Other tabs say '...enumerable item catalogue.'"
+  },
+  {
+   "area": "Adventurer's Journal and professions",
+   "story": "As a player who does not want the cooking overlay, I want to switch it off by chat command and see that it worked.",
+   "status": "friction",
+   "evidence": "'/qs professions off', '/qs rewards on|off' and '/qs fishing on|off' print nothing, while '/qs sellgray on' prints the status line."
+  },
+  {
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "story": "As a new classic player, I want to find where to change the addon's options so that I can turn things on or off without learning commands.",
+   "status": "friction",
+   "evidence": "The welcome lines point to the map button. Left-click opens General, Esc closes, and search works. '/qs' alone prints internal key names ('mode box | sync on | ...'), and a typo prints all 58 help lines."
+  },
+  {
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "story": "As a questing player, I want gray items sold when I open a vendor so that I don't have to sell junk by hand.",
+   "status": "friction",
+   "evidence": "With selling off, a vendor visit gives a clear hint. Turning it on sells grays and keeps the bookmarked Gray Fang. '/qs sellgray on' replies with a status line that has no sell-gray field, and searching 'junk' finds nothing."
+  },
+  {
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "story": "As a player with full bags, I want to bookmark my keepers and arrange my bags so that nothing important gets sold and I can find things.",
+   "status": "friction",
+   "evidence": "Space bookmarks with a clear message. Arrange prints 'bags arranged by name (2 moves)' and refuses in combat. The card text 'Order all your bags by topic' is wrong. '/qs sort on' and '/qs bookmarks' are silent. 'Remove all' has no confirmation."
+  },
+  {
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "story": "As a player on a quest that needs an item used (torch, flare), I want one key for my nearest quest item so that I can use it quickly.",
+   "status": "friction",
+   "evidence": "Set key + F works and Esc cancels. Binding W (MOVEFORWARD) silently replaces movement with 'CLICK QuestSharingItemButton:LeftButton', with no warning (the quick chat key does warn)."
+  },
+  {
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "story": "As a player who hit an addon error, I want to copy a report for the author so that the bug gets fixed.",
+   "status": "friction",
+   "evidence": "The chat and minimap hints lead to a readable diagnostics window, and 'Copy all' explains Cmd/Ctrl+C. Four Settings buttons open the same window, SETUP NOTES show unexplained fragments, 'Clear records' wipes errors and log without confirmation, and 'Test the ring' sits beside them."
+  },
+  {
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "story": "As a player whose bags fill with leftover quest items, I want to review and delete them safely so that I free space without losing anything I need.",
+   "status": "friction",
+   "evidence": "Review > confirm > Delete works, but the BAG_UPDATE that follows empties the list ('Bags or quests changed. Click Refresh bags to check again.'), so each stack takes 3 clicks. Without Questie the window and card name the dependency differently."
+  },
+  {
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "story": "As a group leader, I want to reach the party finder settings from the minimap spyglass so that I can set roles and level filters.",
+   "status": "broken",
+   "evidence": "The tooltip promised 'Right click: all party finder settings', but the harness opened tab 'party' ('Party window'). The working tree now passes 'finder' (MinimapButton.lua:98); this needs verifying (UX-05)."
+  },
+  {
+   "area": "Settings, minimap, bags, quest helpers and diagnostics",
+   "story": "As a leveling player who just trained new spell ranks, I want my action bars updated to the new ranks so that I don't cast old ranks.",
+   "status": "friction",
+   "evidence": "'Update ranks' with the toggle off prints only 'Auto-update spell ranks is off.' Other replies use developer wording ('does not expose the spell-book/action-bar APIs')."
+  }
+ ],
+ "batches": [
+  {
+   "name": "B1 - Settings window, slash commands and diagnostics",
+   "files": [
+    "QuestSharing/Settings.lua",
+    "QuestSharing/Core.lua",
+    "QuestSharing/MinimapButton.lua",
+    "QuestSharing/Diagnostics.lua",
+    "QuestSharing/LFGFinderUI.lua",
+    "tests/test_settings.py"
+   ],
+   "ids": [
+    "UX-01",
+    "UX-04",
+    "UX-05",
+    "UX-08",
+    "UX-11",
+    "UX-15",
+    "UX-25",
+    "UX-33",
+    "UX-34",
+    "UX-42",
+    "UX-43",
+    "UX-44",
+    "UX-46",
+    "UX-50",
+    "UX-57",
+    "UX-62",
+    "UX-65",
+    "UX-74",
+    "UX-75"
+   ],
+   "also_takes_split_parts": "UX-02 (Settings.lua:358-360 text), UX-17 (Settings.lua:393-396 note), UX-24 (Diagnostics.lua:432), UX-27 (Settings.lua:344-347, MinimapButton.lua:85, Core.lua:471), UX-28 (shared names table if exported from Settings), UX-29 (Settings.lua:403-414, Core.lua:464-470), UX-48 (Core.lua:450-453, MinimapButton.lua:121), UX-49 (Core.lua:43 default), UX-54 (Settings.lua:403-406), UX-63 (Settings.lua:323-325), UX-64 (Settings.lua:146-147, 159)",
+   "why": "Holds the two highest-impact silent failures (UX-01 dropped party messages, UX-04 one-click reset). It owns every Settings label, slash reply, help line and settings link, so all the label and command text changes happen in one place without merge conflicts."
+  },
+  {
+   "name": "B2 - Quest guide",
+   "files": [
+    "QuestSharing/QuestPlanner.lua",
+    "QuestSharing/QuestOptimizer.lua",
+    "tests/test_classic_style.py"
+   ],
+   "ids": [
+    "UX-02",
+    "UX-09",
+    "UX-13",
+    "UX-14",
+    "UX-18",
+    "UX-20",
+    "UX-21",
+    "UX-26",
+    "UX-27",
+    "UX-28",
+    "UX-47",
+    "UX-51",
+    "UX-59",
+    "UX-60",
+    "UX-61"
+   ],
+   "why": "Makes the broken 'Chosen quests' story work, sends '...' to the right tab, and adds feedback for goals, time limits, camps and empty states. Almost all of it is in QuestPlanner.lua, so one builder can rework the guide's text and commands in one pass."
+  },
+  {
+   "name": "B3 - Party, chat and keys",
+   "files": [
+    "QuestSharing/Progress.lua",
+    "QuestSharing/Menu.lua",
+    "QuestSharing/Adventure.lua",
+    "QuestSharing/Share.lua",
+    "QuestSharing/LFGInvite.lua",
+    "QuestSharing/Panel.lua",
+    "QuestSharing/Quick.lua",
+    "QuestSharing/QuestItems.lua",
+    "QuestSharing/Ping.lua"
+   ],
+   "ids": [
+    "UX-03",
+    "UX-06",
+    "UX-22",
+    "UX-45",
+    "UX-48",
+    "UX-55",
+    "UX-56",
+    "UX-58"
+   ],
+   "why": "Fixes the hidden chat dependency on finish announcements (a one-line ns.say(msg, true)) and the silent overwrite of movement keys. The rest polishes the party menu, the invitation window and the ring, all in party modules no other batch touches."
+  },
+  {
+   "name": "B4 - Map and world",
+   "files": [
+    "QuestSharing/Fishing.lua",
+    "QuestSharing/Marker.lua",
+    "QuestSharing/TravelMap.lua",
+    "QuestSharing/ZoneLevels.lua",
+    "QuestSharing/VendorMap.lua",
+    "QuestSharing/DataWork.lua",
+    "QuestSharing/GatherSources.lua",
+    "QuestSharing/ItemSources.lua"
+   ],
+   "ids": [
+    "UX-07",
+    "UX-10",
+    "UX-35",
+    "UX-36",
+    "UX-37",
+    "UX-38",
+    "UX-39",
+    "UX-40",
+    "UX-41",
+    "UX-49",
+    "UX-63",
+    "UX-66",
+    "UX-67",
+    "UX-68"
+   ],
+   "why": "Fixes the dead-end fishing hint and the waypoint overwrite. It also makes all map pins, search and badges behave alike (click to set a waypoint, one heading style, player-relative colours) inside the map-overlay files."
+  },
+  {
+   "name": "B5 - Journal, professions, bags and README (do last)",
+   "files": [
+    "QuestSharing/Rewards.lua",
+    "QuestSharing/Loot.lua",
+    "QuestSharing/EquipmentUI.lua",
+    "QuestSharing/DungeonQuests.lua",
+    "QuestSharing/Professions.lua",
+    "QuestSharing/QuestCleanup.lua",
+    "QuestSharing/SpellRanks.lua",
+    "QuestSharing/Bags.lua",
+    "README.md"
+   ],
+   "ids": [
+    "UX-12",
+    "UX-16",
+    "UX-17",
+    "UX-18",
+    "UX-19",
+    "UX-23",
+    "UX-24",
+    "UX-29",
+    "UX-30",
+    "UX-31",
+    "UX-32",
+    "UX-52",
+    "UX-53",
+    "UX-54",
+    "UX-64",
+    "UX-69",
+    "UX-70",
+    "UX-71",
+    "UX-72",
+    "UX-73"
+   ],
+   "also_takes_split_parts": "README.md edits for UX-04 (:834), UX-21 (:471), UX-27 (:463), UX-28 (:465), UX-33 (:457), UX-47 (:475), UX-48 (:801), UX-62 (:361), UX-63 (:543); QuestCleanup.lua:124, 250 for UX-74",
+   "why": "Clears up the journal's mixed meanings (quest N, gold, '!', grey, two map buttons) and the cleanup and spell-rank dead ends. README.md is owned here and should be done after B1-B4, so the docs copy the final labels and behaviour."
+  }
+ ],
+ "patterns": [
+  "Settings links broke when the tabs were reorganised: code hard-codes old tab ids or names ('optional' at QuestPlanner.lua:1129, 'party' for the finder in UX-05, the 'Optional' tab in Fishing.lua:222, 'General > Copy logs' in README:369, 'Send the message at once' in Diagnostics.lua:432). Build every pointer from ns.settingPath / tab constants and add a harness test that each 'open settings' control lands on the expected heading.",
+  "One feature or signal has many names: Quest guide has six names (UX-27), the goal and level filters differ (UX-28), the journal (UX-29), Party quests window (UX-62), zone levels and fishing (UX-63), invitation (UX-45), Selected vs Chosen quests. Colours and icons are reused for different meanings too: gold for selected, to-take and heading; yellow '!' meaning in-log; grey for both source and done; a blue chat prefix (UX-18, UX-36, UX-71, UX-75). One glossary of player-facing names and one colour/icon legend in Style.lua would fix most of these.",
+  "Actions fail or change things silently: auto messages are dropped in Draft mode (UX-01), finish announcements need a hidden switch (UX-06), toggles reply with an unrelated dump or nothing (UX-08), values are clamped without a message (UX-14, UX-50), goal and camp changes print nothing (UX-13, UX-21), and the panel is hidden with no message (UX-48). Every state change should print one line with the Settings label and the effective value.",
+  "Destructive or overriding actions happen without confirmation or undo: reset of all settings and quick chat messages (UX-04), Clear records next to Copy all (UX-11), bookmark 'Remove all', key rebinding over movement (UX-03), a teammate overwriting the player's waypoint (UX-10), and an emote test button in report windows (UX-15). Use a second click or a StaticPopup, and protect what the player set.",
+  "Empty and unavailable states look like 'no results' and use developer wording: finished zone vs unplannable zone (UX-20), missing AtlasLoot/QuestieDB shown as 'No matching equipment' (UX-19), Rare+ empty list (UX-16), missing Questie (UX-51), SETUP NOTES fragments (UX-43), combat-paused search (UX-39). Developer terms leak into player text: bounded search, enumerable catalogue, preQuestSingle, requiredSkill, ilvl, bytes, no-getaway, class/subclass, MOVEFORWARD, bag 0 (UX-26, UX-31, UX-40, UX-58, UX-69, UX-73, UX-74). Each empty state should say why, in plain words, and give one next step."
+ ]
+}

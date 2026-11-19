@@ -117,13 +117,67 @@ ns.on("PLAYER_LOGIN", hookMap)
 ns.on("ADDON_LOADED", hookMap)                 -- the world map can load after us
 
 -- A teammate found the quest items here --------------------------------------------------------------------------------
+-- A waypoint set in the last few minutes by me (the map, map search, trainer pins, the Quest guide...) is mine: a
+-- teammate's spot never replaces it, the chat line offers a "Set waypoint" link instead.
+local OWN_FOR, ownAt, teamSetting = 300, nil, false
+if C_Map and type(C_Map.SetUserWaypoint) == "function" and hooksecurefunc then
+    pcall(hooksecurefunc, C_Map, "SetUserWaypoint", function() if not teamSetting then ownAt = GetTime() end end)
+end
+
+local function ownWaypoint()
+    if not ownAt or GetTime() - ownAt >= OWN_FOR then return false end
+    if C_Map and C_Map.HasUserWaypoint then
+        local ok, has = pcall(C_Map.HasUserWaypoint)
+        if ok and has == false then return false end                -- I cleared it since
+    end
+    return true
+end
+
+local function zoneOf(map)
+    local ok, info = pcall(function() return C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(map) end)
+    return ok and type(info) == "table" and type(info.name) == "string" and info.name ~= "" and info.name or nil
+end
+
+-- the clickable chat link (the game's "addon" link type); without it the line only says where the spot is
+local LINK = "addon:QuestSharing:spot:"
+local linkable = false
+local function onLink(...)
+    for i = 1, select("#", ...) do
+        local link = select(i, ...)
+        local map, x, y
+        if type(link) == "string" then map, x, y = string.match(link, "^addon:QuestSharing:spot:(%d+):([%d%.]+):([%d%.]+)") end
+        if map then
+            map, x, y = tonumber(map), tonumber(x), tonumber(y)
+            if C.setWaypoint(map, x, y) then
+                ns.print(string.format("waypoint set: %s %.1f, %.1f", zoneOf(map) or ("map " .. map), x * 100, y * 100))
+            else
+                ns.print("the game could not set a waypoint here")
+            end
+            return
+        end
+    end
+end
+if type(EventRegistry) == "table" and type(EventRegistry.RegisterCallback) == "function" then
+    linkable = (pcall(EventRegistry.RegisterCallback, EventRegistry, "SetItemRef", onLink, ns))
+end
+
 function ns.onPeerSpot(peer, id, map, x, y, what)
     local d = ns.db
     if not (d.enabled and d.teamWaypoint) then return false end
     local e = C.findEntry(id)
     if not e or e.complete then return false end                      -- not my quest, or I am done with it
-    if not C.setWaypoint(map, x, y) then return false end
-    ns.print(string.format("%s found %s for %s at %.1f, %.1f - there is a pin on your map", peer.name,
-        (what and what ~= "") and what or "the items", C.link(e), x * 100, y * 100))
+    local zone = zoneOf(map)
+    local found = string.format("%s found %s for %s%s at %.1f, %.1f", peer.name,
+        (what and what ~= "") and what or "the items", C.link(e), zone and (" in " .. zone) or "", x * 100, y * 100)
+    if ownWaypoint() then
+        ns.print(found .. ". Your own waypoint stays" .. (linkable and string.format(": |cff55ccff|H%s%d:%.4f:%.4f|h[Set waypoint]|h|r",
+            LINK, map, x, y) or "."))
+        return true
+    end
+    teamSetting = true
+    local set = C.setWaypoint(map, x, y)
+    teamSetting = false
+    if not set then return false end
+    ns.print(found .. " - there is a pin on your map")
     return true
 end

@@ -138,6 +138,19 @@ def test_finishing_alone_is_still_said(style):
     assert len(chat(g)) == 1 and "Wolves Among Us" in chat(g)[0]
 
 
+def test_finishing_is_said_even_with_quests_in_common_announcements_off(style):
+    # "Tell the party when I finish a shared quest" works on its own, not only when "Announce quests in common" is on
+    g = party(style, ("Anna",), on_quest={"party1": [100]})
+    g.advance(40)
+    g.slash("chat off")
+    g.run("SENT = {}")
+    g.run("""local q = BYID(100); q.complete = true
+             for _, o in ipairs(q.objectives) do o.finished = true; o.numFulfilled = o.numRequired end""")
+    g.fire("QUEST_LOG_UPDATE")
+    g.advance(5)
+    assert len(chat(g)) == 1 and "Wolves Among Us" in chat(g)[0], chat(g)
+
+
 # ---- your own chat window ---------------------------------------------------------------------------------------------------
 def test_an_automatic_round_leaves_one_short_line(style):
     g = party(style, ("Anna", "Bob"))
@@ -147,7 +160,7 @@ def test_an_automatic_round_leaves_one_short_line(style):
     g.reply("Bob has declined your quest.")
     g.advance(30)
     lines = g.printed()
-    assert lines == ["|cff55ccffQuest Sharing:|r shared 2 quests with the party: Anna took 1, 1 declined"], lines
+    assert lines == ["|cffffd100Quest Sharing:|r shared 2 quests with the party: Anna took 1, 1 declined"], lines
 
 
 def test_a_round_that_shared_nothing_says_nothing(style):

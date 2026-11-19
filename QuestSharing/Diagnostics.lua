@@ -145,6 +145,13 @@ ns.on("ADDON_ACTION_BLOCKED", blocked)
 -- A window with text you can select and copy ---------------------------------------------------------------------
 local win, box
 
+-- the normal line above the report; the Clear records button borrows it while armed and gives it back
+local function defaultHint()
+    win.hint:SetText(win.kind == "planner"
+        and "Copy all selects this plan snapshot. Then press Ctrl+C (Windows) or Cmd+C (Mac)."
+        or "Copy all includes every issue, error stack, setting and log line. Then press Ctrl+C (Windows) or Cmd+C (Mac).")
+end
+
 local function reportView(details)
     win.showingDetails = details or win.overviewText == nil
     box.reportText = win.showingDetails and win.fullText or win.overviewText
@@ -153,12 +160,11 @@ local function reportView(details)
     if box.SetCursorPosition then box:SetCursorPosition(0) end
     win.scroll:SetVerticalScroll(0)
     win.details:SetText(win.showingDetails and "Show overview" or "Show full report")
-    win.hint:SetText(win.kind == "planner"
-        and "Copy all selects this plan snapshot. Then press Ctrl+C (Windows) or Cmd+C (Mac)."
-        or "Copy all includes every issue, error stack, setting and log line. Then press Ctrl+C (Windows) or Cmd+C (Mac).")
+    defaultHint()
 end
 
--- kind: "diagnostics" shows Clear all; other reports keep their own snapshot and optional refresh.
+-- kind: "diagnostics" shows Clear records; other reports keep their own snapshot and optional refresh.
+-- (The ring test is in Settings > Quick chat: it emotes to nearby players, so it does not belong in a bug report window.)
 local W_WIDTH, W_HEIGHT = 720, 500
 function ns.reportWindow(title, lines, kind, overview, details, refreshAction)
     local text = table.concat(lines, "\n")
@@ -233,16 +239,26 @@ function ns.reportWindow(title, lines, kind, overview, details, refreshAction)
             if win.refreshAction then win.refreshAction() else ns.diagnostics(win.showingDetails) end
         end, "Refresh this report from current information")
         f.refresh:SetPoint("LEFT", f.details, "RIGHT", 8, 0)
-        f.clear = button("Clear records", 110, function()
+        -- Clearing cannot be undone: the first click arms the button, a second one within 5 seconds clears.
+        f.clear = button("Clear records", 130, function(self)
+            local now = GetTime()
+            if not (self.armedAt and now - self.armedAt <= 5) then
+                self.armedAt = now
+                self:SetLabel("Click again to clear")
+                win.hint:SetText("Click again within 5 seconds to empty the recorded errors and the debug log.")
+                ns.after(5.2, function()
+                    if self.armedAt == now then self.armedAt = nil; self:SetLabel("Clear records"); defaultHint() end
+                end)
+                return
+            end
+            self.armedAt = nil
+            self:SetLabel("Clear records")
+            defaultHint()
             QuestSharingLog, ns.db.errors = {}, {}
             ns.logSession("logs and errors cleared")
             ns.diagnostics()
-        end, "Empties both saved lists, then refreshes the combined report")
+        end, "Empties both saved lists (click twice), then refreshes the combined report")
         f.clear:SetPoint("LEFT", f.refresh, "RIGHT", 8, 0)
-        f.test = button("Test the ring", 110, function() ns.quickTest() end,
-            "Runs every slot of every ring and shows what the game really did (/qs quick test). Emotes are seen by " ..
-            "players near you; messages are whispered to yourself.")
-        f.test:SetPoint("LEFT", f.clear, "RIGHT", 8, 0)
         f.close = button("Close", 70, function() f:Hide() end)
         f.close:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 12)
         if UISpecialFrames then table.insert(UISpecialFrames, "QuestSharingReport") end
@@ -253,6 +269,8 @@ function ns.reportWindow(title, lines, kind, overview, details, refreshAction)
     win.refreshAction = refreshAction
     win.fullText = text
     win.overviewText = overview and table.concat(overview, "\n") or nil
+    win.clear.armedAt = nil
+    win.clear:SetLabel("Clear records")
     if kind == "diagnostics" then win.clear:Show() else win.clear:Hide() end
     if kind == "diagnostics" or refreshAction then win.refresh:Show() else win.refresh:Hide() end
     if overview then win.details:Show() else win.details:Hide() end
@@ -313,13 +331,19 @@ ns.on("GROUP_ROSTER_UPDATE", function()
 end)
 ns.on("PLAYER_TARGET_CHANGED", function()
     if not ns.logging() then return end
+    -- the game can hand out "secret" unit values in a fight: they may not be compared or tested by addon code
+    local function secret(v) return type(issecretvalue) == "function" and issecretvalue(v) and true or false end
     local t = "nothing"
-    if UnitExists and UnitExists("target") then
-        local n = UnitName("target") or "?"
-        local kind = (UnitIsPlayer and UnitIsPlayer("target")) and "player" or "creature"
-        local side = (UnitIsFriend and UnitIsFriend("player", "target")) and "friendly" or "not friendly"
-        t = n .. " (" .. kind .. ", " .. side .. ")"
-    end
+    local ok = pcall(function()
+        if UnitExists and UnitExists("target") then
+            local n = UnitName("target") or "?"
+            local player = UnitIsPlayer and UnitIsPlayer("target")
+            local friend = UnitIsFriend and UnitIsFriend("player", "target")
+            if secret(n) or secret(player) or secret(friend) then t = "(hidden by the game in combat)"; return end
+            t = n .. " (" .. (player and "player" or "creature") .. ", " .. (friend and "friendly" or "not friendly") .. ")"
+        end
+    end)
+    if not ok or secret(t) then t = "(hidden by the game in combat)" end
     if t ~= lastTarget then lastTarget = t; ns.log("event", "target: " .. t) end
 end)
 ns.on("QUEST_ACCEPTED", function(_, a, b) ns.log("event", "quest accepted: " .. questName(b or a)) end)
@@ -413,7 +437,7 @@ function ns.doctorLines()
     add(src ~= nil, "Questie: " .. (src and ("found (" .. src .. ") - \"where to get it\" works; /qs questie tests it")
         or ("not found - " .. tostring(ns.questie and ns.questie.whyMissing() or "/qs questie says why"))))
     local errs = d.errors or {}
-    out[#out + 1] = (#errs == 0) and "[OK] no errors recorded" or ("[--] " .. #errs .. " error(s) recorded - see below")
+    out[#out + 1] = (#errs == 0) and "[OK] no errors recorded" or ("[--] " .. #errs .. (#errs == 1 and " error" or " errors") .. " recorded - see below")
     local flags = {}
     for _, k in ipairs({ "enabled", "auto", "shareNew", "chat", "announce", "click", "link", "sync", "markers", "panel", "near", "quick", "minimap", "friends" }) do
         flags[#flags + 1] = k .. "=" .. (d[k] and "on" or "off")
@@ -423,7 +447,7 @@ function ns.doctorLines()
     for ch in pairs(type(d.chatRefused) == "table" and d.chatRefused or {}) do refused[#refused + 1] = ch end
     table.sort(refused)
     out[#out + 1] = "chat the game refused for addons: " .. (#refused > 0 and (table.concat(refused, ", ") ..
-        " (into the chat box instead; tick Send the message at once again to retry)") or "none")
+        " (into the chat box instead; turn on Send quick chat messages without pressing Enter again to retry)") or "none")
     out[#out + 1] = "debug log: " .. (ns.logging() and "on" or "off") .. ", " ..
         tostring(type(QuestSharingLog) == "table" and #QuestSharingLog or 0) .. " lines (/qs log)"
     return out
@@ -463,11 +487,28 @@ local featureNames = {
     items = "Quest item buttons", ping = "Pings", emote = "Quick chat emotes",
 }
 
+-- A plain sentence for each setup check that failed ([--] lines of ns.doctorLines, matched by how they start).
+local SETUP_NOTES = {
+    { "share quests:", "Sharing quests may not work here: the game lacks the share call or its replies are not recognised." },
+    { "ask the game who has a quest", "The game cannot say who has a quest here; the replies to your shares decide instead." },
+    { "sync with other Quest Sharing users", "Syncing quest lists with other Quest Sharing users is not available on this client." },
+    { "shift-click a quest link", "Shift-clicking a quest link into chat does not add your progress on this client." },
+    { "tracker follows you", "Automatically tracking nearby quests is not available on this client." },
+    { "quest icons above creatures", "Quest ! marks above enemies are not available on this client." },
+    { "pin the nearest quest", "The waypoint that follows your nearest quest is not available on this client." },
+    { "friends (beta)", "Adding party members as friends is not available on this client." },
+    { "invite a player from the wheel", "Inviting a player from the quick chat ring is not available on this client." },
+    { "entry in the game's options", "The game's AddOns options have no Quest Sharing entry here; use /qs settings or the minimap button." },
+    { "minimap button", "The minimap button could not be added; use /qs settings to open the settings." },
+    { "game sound:", "Game sound or sound effects are off, so the good-news sound cannot be heard." },
+    { "pings:", "Quest pings are not available on this client." },
+}
+
 local function setupNote(line)
     if string.find(line, "BUT enemy nameplates are off", 1, true) then
         return "Enemy health bars are reported off. Check Quest markers settings to enable them."
     end
-    if string.sub(line, 1, 5) ~= "[--] " or string.find(line, "error(s) recorded", 1, true) then return nil end
+    if string.sub(line, 1, 5) ~= "[--] " or string.find(line, " recorded - see below", 1, true) then return nil end
     local text = string.sub(line, 6)
     if string.find(text, "click a tracked quest", 1, true) == 1 then
         return "Quest tracker clicks are not active. Use the Party quests window or shift-click quest links."
@@ -478,7 +519,10 @@ local function setupNote(line)
     elseif string.find(text, "Questie:", 1, true) == 1 then
         return "Extra quest information is unavailable. /qs questie explains the optional data source."
     end
-    return text
+    for _, n in ipairs(SETUP_NOTES) do
+        if string.find(text, n[1], 1, true) == 1 then return n[2] end
+    end
+    return "Not available here: " .. text
 end
 
 function ns.diagnosticOverview(checks)
@@ -595,8 +639,8 @@ function ns.doctor()
     ns.diagnostics()
 end
 
--- /qs memory: what the game says each addon holds, and which of our on-demand catalogues are loaded (they free
--- themselves two minutes after their window closes). Memory is in KB as the game reports it, after a garbage pass.
+-- /qs memory: what the game says each addon holds, and which of our on-demand catalogues are loaded (they are kept
+-- for the session; /qs memory purge or Settings > Items & dungeons > Purge frees them). Memory is in KB as the game reports it, after a garbage pass.
 local function kb(n) return n >= 1024 and string.format("%.1f MB", n / 1024) or string.format("%d KB", n) end
 function ns.memoryLines()
     local out = {}
@@ -615,10 +659,27 @@ function ns.memoryLines()
     if ns.dungeonQuests then loaded("Dungeon quests catalogue", (ns.dungeonQuests._state())) end
     if ns.rewards then loaded("Quest rewards catalogue", (ns.rewards._state())) end
     if ns.vendorMap and ns.vendorMap._state then loaded("Map search index", ns.vendorMap._state()) end
+    if ns.loot and ns.loot._state then loaded("Dungeon loot catalogue", (ns.loot._state())) end
+    local lists, ids = 0, 0
+    local saved = type(QuestSharingCache) == "table" and type(QuestSharingCache.lists) == "table" and QuestSharingCache.lists or {}
+    for _, entry in pairs(saved) do
+        for _, value in pairs(type(entry) == "table" and type(entry.scopes) == "table" and entry.scopes or {}) do
+            lists = lists + 1
+            ids = ids + (type(value) == "table" and #(type(value.ids) == "table" and value.ids or value) or 0)
+        end
+    end
+    out[#out + 1] = string.format("saved ID lists on disk: %d (%d IDs); /qs memory purge deletes them", lists, ids)
     out[#out + 1] = "debug log: " .. (type(QuestSharingLog) == "table" and #QuestSharingLog or 0) .. " / " .. ns.LOG_MAX .. " lines"
     return out
 end
 
-function ns.memoryCommand()
+function ns.purgeData()
+    local n = ns.dataWork.purge()
+    if type(collectgarbage) == "function" then pcall(collectgarbage) end
+    ns.print(string.format("quest database data freed (%d catalogues); each reads again when you next use it", n))
+end
+
+function ns.memoryCommand(arg)
+    if arg == "purge" or arg == "free" then ns.purgeData(); return end
     for _, line in ipairs(ns.memoryLines()) do ns.print(line) end
 end

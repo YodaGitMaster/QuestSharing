@@ -47,20 +47,20 @@ def printed(g):
 def test_every_tab_has_a_short_intro_and_sections(style):
     g = game(style)
     W = window(g)
-    for t in ("general", "objectives", "tracker", "dialogs", "items", "bags", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional", "support"):
+    for t in ("general", "objectives", "tracker", "dialogs", "items", "bags", "sharing", "party", "finder", "actions", "quick", "maps", "guide", "browser", "optional", "support"):
         g.eval("NS.settingsTab")(t)
         assert len(plain(W.intro.text)) > 20, t
     g.eval("NS.settingsTab")("sharing")
     headers = [plain(r.text.text) for r in rows(W) if r.line.shown]
     assert headers == ["Offering quests to your party", "Messages in party chat", "Quest information between addon users", "Find people to quest with"]
     g.eval("NS.settingsTab")("party")
-    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["The separate Party quests window", "Posting progress by clicking", "Adding party members as friends",
-                                                                         "Party finder: invite players who list themselves",
-                                                                         "Item levels of other players"]
+    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["The separate Party quests window", "Posting progress by clicking", "Adding party members as friends"]
+    g.eval("NS.settingsTab")("finder")
+    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Roles", "Invite whisper", "Level and item level filters", "Picker and key", "Classes to invite", "Item levels of other players"]
     g.eval("NS.settingsTab")("general")
     assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Start here", "Messages and sounds", "During a fight"]
     g.eval("NS.settingsTab")("support")
-    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Is something wrong?", "Errors", "Logs", "Copy everything", "Reset"]
+    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Is something wrong?", "Errors", "Logs", "Reset"]
     g.eval("NS.settingsTab")("guide")
     assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Quest guide", "Camps", "Learned pace", "Report"]
 
@@ -68,7 +68,7 @@ def test_every_tab_has_a_short_intro_and_sections(style):
 def test_rows_are_laid_out_top_to_bottom_without_overlapping_and_fit_in_the_window(style):
     g = game(style)
     W = window(g)
-    for t in ("general", "objectives", "tracker", "dialogs", "items", "bags", "sharing", "party", "actions", "quick", "maps", "guide", "browser", "optional", "support"):
+    for t in ("general", "objectives", "tracker", "dialogs", "items", "bags", "sharing", "party", "finder", "actions", "quick", "maps", "guide", "browser", "optional", "support"):
         g.eval("NS.settingsTab")(t)
         tops = [-r.frame.point[5] for r in rows(W)]
         heights = [r.frame.height for r in rows(W)]
@@ -89,7 +89,7 @@ def test_rows_are_laid_out_top_to_bottom_without_overlapping_and_fit_in_the_wind
 def test_the_quest_guide_tab_fits_the_sidebar_and_its_quest_id_box_sits_inside_its_row(style):
     g = game(style)
     W = window(g, "guide")
-    # Fourteen categories still sit above the "Changes save automatically." note at the bottom of the sidebar.
+    # Sixteen categories still sit above the "Changes save automatically." note at the bottom of the sidebar.
     last = W.tabs.guide.frame
     for tab in W.tabs.values():
         last = tab.frame if -tab.frame.point[5] > -last.point[5] else last
@@ -99,7 +99,7 @@ def test_the_quest_guide_tab_fits_the_sidebar_and_its_quest_id_box_sits_inside_i
     assert -W.tabs.guide.frame.point[5] == -W.tabs.maps.frame.point[5] + 26, "right after Map, same group"
     box_row = next(r for r in rows(W) if r.edit and r.edit.shown)
     box = box_row.edit
-    assert "Quest IDs" in plain(box_row.text.text)
+    assert "Quests for the Chosen quests goal" in plain(box_row.text.text)
     top = -box.point[5]
     assert g.eval("function(a, b) return a == b end")(box.point[2], box_row.frame), "anchored in its own row"
     assert box.point[1] == "TOPLEFT" and top >= 20, "below the label"
@@ -157,8 +157,8 @@ def test_the_size_setting_moves_in_steps_of_ten(style):
 def test_action_lines_have_a_button(style):
     g = game(style)
     W = window(g, "support")
-    check = row(W, "Check my setup")
-    assert check.button.shown and check.button.text == "Run check"
+    check = row(W, "Check my setup, errors and logs")
+    assert check.button.shown and check.button.text == "Open report"
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(check.button)
     assert g.eval("NS._reportWindow()")[0].shown is True, "the setup report opened"
     W = window(g, "quick")

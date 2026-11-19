@@ -340,20 +340,26 @@ local function ensurePanel()
     local link = CreateFrame("Frame", nil, f)
     link:SetWidth(50)
     link:SetHeight(14)
-    link:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -9)
+    link:SetPoint("TOPRIGHT", f, "TOPRIGHT", -28, -9)
     link:EnableMouse(true)
     link:SetScript("OnMouseUp", function() if ns.toggleSettings then ns.toggleSettings(true, "party") end end)
     local linkText = link:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     linkText:SetPoint("RIGHT", link, "RIGHT", 0, 0)
     linkText:SetText("|cff55ccffSettings|r")
     f.settingsLink = link
+    -- the close button turns the window off (it stays off) and says how to bring it back
+    f.close = S.closeButton(f, function() ns.closePanel() end, -2, -2)
+    f.close:SetWidth(24)
+    f.close:SetHeight(24)
     f.collapse = headerButton(f, "-", 18, function() ns.togglePanelCollapsed() end, "Fold the window to its title (click again to open it)")
-    f.collapse:SetPoint("TOPRIGHT", f, "TOPRIGHT", -62, -7)
+    f.collapse:SetPoint("TOPRIGHT", f, "TOPRIGHT", -82, -7)
     f.post = headerButton(f, "Post all", 62, function() ns.postAllProgress() end,
         "Put my progress on these quests (the ones someone in the party has) in the chat box, in one message")
     f.post:SetPoint("RIGHT", f.collapse, "LEFT", -4, 0)
-    f.share = headerButton(f, "Share", 48, function() ns.shareClick() end,
-        "Offer my quests of this area to the party now (once per person; one quest per click where the game only allows that)")
+    f.share = headerButton(f, "Share", 48, function()                -- reads Stop while a round is offering quests
+            if ns.shareBusy and ns.shareBusy() then ns.stopShare("you clicked Stop") else ns.shareClick() end
+        end,
+        "Offer my quests of this area to the party now (once per person; one quest per click where the game only allows that). Reads Stop while quests are being offered: click it to stop.")
     f.share:SetPoint("RIGHT", f.post, "LEFT", -4, 0)
     -- the column titles: "Quest", then a class icon and the name of each party member
     f.questHead = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -397,6 +403,12 @@ function ns.scrollPanel(step)
     ns.refreshPanel()
 end
 
+function ns.closePanel()
+    ns.db.panel = false
+    if panel then panel:Hide() end
+    ns.print("Party quests window hidden - type /qs panel on, or turn it on in Settings > Party window, to bring it back")
+end
+
 function ns.togglePanelCollapsed()
     ns.db.panelCollapsed = not ns.db.panelCollapsed
     ns.refreshPanel()
@@ -422,6 +434,7 @@ function ns.refreshPanel()
     local solo = grid and #members == 0
     panel.title:SetText(solo and "Quests here" or "Party quests")
     if solo then panel.share:Hide(); panel.post:Hide() else panel.share:Show(); panel.post:Show() end   -- party-only
+    panel.share:SetLabel((ns.shareBusy and ns.shareBusy()) and "Stop" or "Share")            -- a round is running: Stop
     panel.count:SetText(grid and (S.GREY .. (solo and ("(" .. #rows .. " in " .. C.zone() .. ")") or ("(" .. grid.shared .. " shared, " .. #rows .. " here)")) .. "|r") or "")
     panel.collapse:SetLabel(folded and "+" or "-")
     if folded then panel.questHead:Hide(); panel.headLine:Hide() else panel.questHead:Show(); panel.headLine:Show() end
@@ -496,7 +509,7 @@ end
 function ns.showPanel(show)
     local f = ensurePanel()
     if not f then
-        if show then ns.print("this client does not allow the panel (frame creation failed)") end
+        if show then ns.print("this client cannot show the Party quests window") end
         return
     end
     if show then f:Show(); ns.refreshPanel(); ns.after(4, tick) else f:Hide() end

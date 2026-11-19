@@ -11,6 +11,7 @@ local function font(text,size,r,g,b)
     if text.SetFont then text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF",size,"") end
     if r and text.SetTextColor then text:SetTextColor(r,g,b) end
 end
+E.font=font -- shared with the Dungeon quests details panel
 function E.text(parent,value,x,y,width)
     local text=U.text(parent,value,x,y,width)
     font(text,12,0.91,0.84,0.67)
@@ -359,9 +360,12 @@ function E.versionLines(r,infoOf)
     end
     return lines
 end
+-- Rare+ is deliberate (context/decisions.md); an empty list must say so, since Clear filters keeps the floor.
+E.RARE_ONLY="Only blue (rare) and better items are listed"
 function E.pageStatus(first,count,total)
-    if total==0 then return "No matching equipment" end
-    return first.."–"..math.min(total,first+count-1).." of "..total.." items • scroll to browse"
+    if total==0 then return "No matching equipment. "..E.RARE_ONLY.."." end
+    if total==1 then return "1 item" end
+    return first.."–"..math.min(total,first+count-1).." of "..total.." items"..(total>count and " • scroll to browse" or "")
 end
 function E.pageButtons(prev,next,total,page,count)
     for _,pair in ipairs({{prev,page>1},{next,page*count<total}}) do
@@ -553,7 +557,7 @@ function E.details(parent, x, width, title,height)
         write(value)
     end
     set("Select an item to see its source and details here.")
-    return panel, text, set
+    return panel, text, set, scroll
 end
 function E.row(parent, x, y, width, i)
     local row = { frame = CreateFrame("Button", nil, parent) }
@@ -580,7 +584,8 @@ function E.paintRow(row, info, name, subtitle)
     row.item:SetText((readableQuality[info and info.quality] or S.WHITE)..(title or name).."|r"..S.GREY..(stats or "").."|r")
     local hex=quality[info and info.quality] or S.WHITE
     row.rarity:SetVertexColor(tonumber(string.sub(hex,5,6),16)/255,tonumber(string.sub(hex,7,8),16)/255,tonumber(string.sub(hex,9,10),16)/255)
-    row.from:SetText(S.GREY .. subtitle .. "|r")
+    -- parchment tan (as the row font colour): grey stays for done or unavailable things
+    row.from:SetText("|cffccb88f" .. subtitle .. "|r")
 end
 function E.select(rows, selected)
     for _,r in ipairs(rows) do

@@ -349,7 +349,7 @@ ns.on("PLAYER_ENTERING_WORLD", function()
     end)
 end)
 
--- Hiding the game's quest tracker (Settings > Tracker, /qs hidetracker on|off) ----------------------------------------
+-- Hiding the game's quest tracker (Settings > Quest list, /qs hidetracker on|off) ----------------------------------------
 -- The tracker holds the game's secure item buttons, so the game lets it be hidden or shown only outside a fight: in a
 -- fight it waits, and happens right after. When the game shows it again (a new quest, a zone), it is hidden again.
 local TRACKERS = { "ObjectiveTrackerFrame", "WatchFrame", "QuestWatchFrame" }

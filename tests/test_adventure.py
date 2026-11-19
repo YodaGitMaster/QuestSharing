@@ -90,10 +90,41 @@ def test_preview_can_change_wording_quest_and_edit_text(style):
     button(g, "Another wording")
     assert w.preview.GetText(w.preview) != first
     w.preview.SetText(w.preview, "Fellow wanderers, will you join my quest?")
-    w.channel.SetText(w.channel, "guild")
+    button(g, "Guild")
     button(g, "Prepare chat")
     assert g.opened()[-1] == "/g Fellow wanderers, will you join my quest?"
     assert not w.frame.shown and not g.sent()
+
+
+def test_the_chat_is_picked_from_buttons_not_typed(style):
+    g = game(style)
+    g.slash("adventure 100")
+    w = g.eval("NS.adventure._window()")
+    assert w.frame.title.text == "Quest invitation", "one name for the feature"
+    labels = [b.text for b in w.channels.values()]
+    assert labels == ["Current chat", "Say", "Party", "Raid", "Guild", "Channel 1", "Whisper target"], labels
+    assert w.route == "current" and w.channels[1].edge.shown, "the current chat is picked at first"
+    for label, prefix in (("Say", "/s "), ("Party", "/p "), ("Raid", "/raid "), ("Channel 1", "/1 ")):
+        g.run("CLOSE_CHAT()")
+        g.slash("adventure 100")
+        button(g, label)
+        picked = [b.text for b in w.channels.values() if b.edge.shown]
+        assert picked == [label], picked
+        button(g, "Prepare chat")
+        assert g.opened()[-1].startswith(prefix), (label, g.opened()[-1])
+    assert not g.sent()
+
+
+def test_whisper_target_whispers_the_player_you_target(style):
+    g = game(style)
+    g.slash("adventure 100")
+    w = g.eval("NS.adventure._window()")
+    button(g, "Whisper target")
+    button(g, "Prepare chat")
+    assert "Target a player" in w.status.text and not g.opened()
+    g.run('TARGET = { name = "Anna", player = true }')
+    button(g, "Prepare chat")
+    assert g.opened()[-1].startswith("/w Anna ") and not g.sent()
 
 
 def test_standard_whisper_and_numbered_chat_routes(style):

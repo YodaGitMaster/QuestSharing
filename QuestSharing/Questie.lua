@@ -21,11 +21,15 @@ local function call(f, ...)
     if ok then return v end
 end
 
+-- Speed: every field Questie 12 has no value for falls through to here, thousands of times per scan. A module once found
+-- is kept for as long as the same loader is installed (a failed or not-yet-started lookup is not kept, so it retries).
+local foundLoader, foundModule
 local function questieModule()
     if not (QuestieLoader and QuestieLoader.ImportModule) then return nil end
     if Questie and Questie.started == false then return nil end             -- still starting (or failed to start)
+    if foundModule and foundLoader == QuestieLoader then return foundModule end
     local ok, mod = pcall(QuestieLoader.ImportModule, QuestieLoader, "QuestieDB")
-    if ok and type(mod) == "table" then return mod end
+    if ok and type(mod) == "table" then foundLoader, foundModule = QuestieLoader, mod; return mod end
 end
 
 local function legacy()

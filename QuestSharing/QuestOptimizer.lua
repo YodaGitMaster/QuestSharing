@@ -355,6 +355,21 @@ local function eligible(m, s, d)
     return true
 end
 
+-- Level forecast only (quest gates); s.xp stays quest XP for the "xp" goal. Several level-ups in a row use the
+-- planner's XP table; without one the next level stays unknown.
+local function gainLevelXP(m, s, gain)
+    if not (s.level and s.levelXP and s.nextLevelXP and s.nextLevelXP > 0 and gain and gain > 0) then return end
+    s.levelXP = s.levelXP + gain
+    local xpTable = m.options.levelXPTable
+    while s.nextLevelXP and s.levelXP >= s.nextLevelXP do
+        s.level, s.levelXP = s.level + 1, s.levelXP - s.nextLevelXP
+        s.nextLevelXP = xpTable and xpTable[s.level] or nil
+    end
+end
+-- Classic XP for killing a creature of your own level: 5 x level + 45. Kills count toward the level forecast,
+-- so a quest a few levels up joins the route where a player really reaches it, not only after enough hand-ins.
+local function killXP(level) return 5 * level + 45 end
+
 local function advance(m, s, d, travelTime, approx, detail, site)
     site = site or d.sites[1]
     local effort, kills, run, unknown, saved, uncertaintyReason, bounds = service(m, d, s, site)
@@ -363,6 +378,7 @@ local function advance(m, s, d, travelTime, approx, detail, site)
     s.time = s.time + travelTime + effort + waitTime
     s.travel, s.kills, s.wait, s.work = s.travel + travelTime, s.kills + kills, s.wait + waitTime, s.work + effort
     s.uncertain = s.uncertain or approx or unknown or false
+    if kills and kills > 0 and s.level then gainLevelXP(m, s, kills * killXP(s.level)) end
     if run and run.key then s.campWork[run.key] = run end
     if d.farm and (d.farm.items or 0) > 0 then
         local itemID = d.s.objectives and d.s.objectives[1].target.itemID
@@ -392,12 +408,7 @@ local function advance(m, s, d, travelTime, approx, detail, site)
         for id, gain in pairs(m.qs[d.qid].reputationReward or {}) do
             if s.reputation[id] then s.reputation[id] = s.reputation[id] + gain end
         end
-        if s.level and s.levelXP and s.nextLevelXP and s.nextLevelXP > 0 then
-            s.levelXP = s.levelXP + m.xp[d.qid]
-            if s.levelXP >= s.nextLevelXP then
-                s.level, s.levelXP, s.nextLevelXP = s.level + 1, s.levelXP - s.nextLevelXP, nil
-            end
-        end
+        gainLevelXP(m, s, m.xp[d.qid])
         if m.selected[d.qid] then s.targetCount = s.targetCount + 1 end
     end
     for _, child in ipairs(d.children) do
@@ -408,10 +419,13 @@ local function advance(m, s, d, travelTime, approx, detail, site)
     end
     if detail then
         if bounds ~= nil and run and run.key then detail.lootBounds[run.key] = bounds or nil end
+        -- reasons go to the report; stepNotes are the few the player can act on, shown on the guide step itself.
         if saved and saved > 0.0001 then
             detail.reasons[d.id] = string.format("At this camp, shared kill credit avoids about %.1f extra kills.", saved)
+            detail.stepNotes[d.id] = detail.reasons[d.id]
         elseif waitTime > 0 then
             detail.reasons[d.id] = string.format("Estimated wait here: %.0f seconds.", waitTime)
+            detail.stepNotes[d.id] = detail.reasons[d.id]
         elseif unknown then
             detail.reasons[d.id] = bounds and string.format(
                 "These two drops may overlap: about %.1f–%.1f expected kills at this camp; joint rate unknown.",
@@ -808,7 +822,7 @@ function O.optimize(quests, stops, options)
         keptPrevious = keptPrevious,
         coverage = best.count, baselineCoverage = comparable.count,
         baselineComparable = matched, nearestCoverage = baseline.count, nearestSeconds = baseline.time,
-        plannedIDs = {}, completedIDs = {}, missingIDs = {}, reasons = {}, lootBounds = {}, baselineRoute = {} }
+        plannedIDs = {}, completedIDs = {}, missingIDs = {}, reasons = {}, stepNotes = {}, lootBounds = {}, baselineRoute = {} }
     local ordered, replay = {}, newState(m)
     for i, d in ipairs(best.path) do
         local site, t, approx = place(m, replay, d)
@@ -830,4 +844,18 @@ function O.optimize(quests, stops, options)
         if not report.completedIDs[id] then report.missingIDs[id] = true end
     end
     return ordered, report
+end
+
+-- Test hook: the simulated time of one exact action order (stop ids), or nil when that order is not possible.
+-- Lets a test check a route against an independent search with the same cost model.
+function O._evaluate(quests, stops, options, ids)
+    local m = compile(quests, stops, options or {})
+    if not m then return nil end
+    local path = {}
+    for i, id in ipairs(ids) do
+        path[i] = m.byID[id]
+        if not path[i] then return nil end
+    end
+    local result = evaluate(m, path)
+    return result and result.time or nil
 end

@@ -1,5 +1,19 @@
 # Insights
 
+## 2026-11-19 — UX review run r-20261119-095449-ea8e (cross-cutting patterns, `context/ux-review-2026-11-19.md`)
+- **Settings links rot when tabs are reorganised.** Hard-coded old tab ids/names: 'optional' in `QuestPlanner.lua:1129` (UX-09), 'party' for the finder (UX-05, now fixed), "Optional" tab in `Fishing.lua:222` (UX-07), "Send the message at once" in `Diagnostics.lua:432`, "General > Copy logs" in README. Build every pointer from `ns.settingPath` / tab constants, and add a harness test per "open settings" control that asserts the landing heading.
+- **Silent state changes are the most common defect.** Auto messages dropped in Draft mode (UX-01), finish announce gated on a hidden switch (UX-06), toggles answer with an unrelated status dump (UX-08), silent clamping (UX-14, UX-50), silent goal/camp changes (UX-13, UX-21). Rule: every state change prints one line with the Settings label and the effective value.
+- **Destructive or overriding actions lack confirmation or protection.** One-click reset incl. custom quick chat (UX-04), Clear records (UX-11), key binding over movement (UX-03), teammate overwriting my waypoint (UX-10). The key setters also unbind the old key before the protected-key check (found by the verifier). Use a second click / StaticPopup and protect what the player set.
+- **One feature, many names; one colour, many meanings.** Quest guide has six names (UX-27), goal names differ (UX-28), journal, Party quests window, zone levels, fishing, invitation; gold = selected + to-take + heading, yellow "!" = in-log, grey = source + done, blue chat prefix. A player-facing glossary and a colour/icon legend in `Style.lua` would cover most style findings.
+- **Empty or unavailable states look like "no results" and leak developer terms** (UX-16, 19, 20, 26, 31, 40, 43, 51; "bounded search", "enumerable catalogue", "preQuestSingle", "ilvl", "bag 0"). Each empty state should say why in plain words and give one next step.
+- Process note: the verifier refuted UX-05 because a parallel session had already applied reviewer #2's party-finder findings to the working tree. Check `git diff` before fixing any review finding.
+
+## 2026-11-19 — In-game rules confirmed by the v0.4.26 report
+- `Frame:SetPropagateKeyboardInput()` is protected under combat lockdown (ADDON_ACTION_BLOCKED on every key). Any keyboard frame must skip it in combat and reset it on `PLAYER_REGEN_DISABLED`.
+- Unit API values (UnitName, UnitIsPlayer, UnitIsFriend) can be secret in combat on interface 16001: `..` works, but `==`/`~=`/boolean tests raise "attempt to compare ... secret string value". Check `issecretvalue` (guarded) before comparing.
+- Classic item data: Trade Goods are 7/0 for leather, hides, cloth, ore, stone and meat (only herbs are 7/9), elementals 5/0 Reagent. Never gate on modern subclasses 5-10; build test mocks from the real QuestieDB values.
+- The "addon last ran a timer set at X" line in blocked-action reports names the previous addon activity, not the cause.
+
 ## 2026-11-17 — Decouple run r-20261117-234605-6ba9 (streams D1–D3)
 - **One decision, one cost source.** Feeding an optional, asynchronous provider (SPF walk costs) into a choice that also has a fallback cost (straight line) makes the result depend on whether the provider is installed and when it answers. That needed a lock and a second solve, and still risked flips. Use the optional provider only for its own visible feature (the Follow arrow) and plan with a single source.
 - **Measure when two requirements look compatible.** The builder measured the actual cost gap (camp B only about 10 s cheaper at POS 0.56) and showed that "stickiness without SPF" and "keep the 0.56 switch" cannot both hold. Flag a conflict like this with numbers instead of quietly satisfying one side.
@@ -524,3 +538,41 @@
 - Blizzard's own browse list invites solo results with `InviteToGroup(leaderName)`; solo = `numMembers == 1`; no auto refresh in its code.
 - Armory cannot be reached from an addon (no network); only inspect (~28 yd) or addon-to-addon messages give other players' gear.
 - Test harness: `tests/test_look.py rows()` used to read only 18 rows; tabs with more rows need the all-rows version.
+
+## 2026-11-19 — Lua: ipairs over a list of maybe-nil values
+- `ipairs({ A.f1, A.f2 })` stops at the first nil, so a fallback after a missing function is never reached. Iterate names (`for _, k in ipairs({"f1","f2"}) do local f = A[k]`) instead. Same for `{ info.activityID }` (fine only because it is the sole element).
+
+## 2026-11-19 — Party finder listing gate
+- Blizzard's browse list does not trust the server's activity filter: `matchesFilters` re-checks each result's `activityIDs` (non-matching rows drawn greyed). Any addon matching on activity must intersect client-side too.
+- `LFGBrowseMixin:SearchActiveEntry` = category of the first non-zero listed activity + only activities of that category; reusing that rule keeps addon searches identical to the game's "search my listing".
+
+- 2026-11-19: Tank aggro: addons cannot select a target in combat (TargetUnit protected; secure button attributes locked in combat), so "auto-select lowest aggro" can only be a visual mark. Nameplates are the only way to list nearby enemies; threat comes from UnitDetailedThreatSituation("player", unit). The test harness frame mock has no SetTextColor: colour text with |cff..|r codes.
+
+## 2026-11-19 — Speed pass 1 measurements (lupa Lua 5.1, /tmp/qsbench/bench.py)
+- matchesWords over 25k item names: 25.0 -> 12.9 ms per scan pass (-48 %).
+- Questie field miss (QuestDB.Get nil, fallback to QuestieLoader): 60k misses 85.7 -> 61.6 ms (-28 %). Misses are common: most quests have no breadcrumbs/availableUntil etc.
+- Dungeon scan prerequisite loop, 10k quests: 5.1 -> 1.6 ms per pass (-69 %), and ~20k fewer short-lived tables per scan.
+- Suite after the pass: 54 test files, 2,199 checks + test_aggro (no summary line, all ok), all green.
+- test_aggro.py prints no "N/N passed" line; a loop that greps for it must not treat a missing line as a pass.
+
+- 2026-11-19: Full-suite runs can fail on files another session is editing at that moment (test_bagtools, test_lfg_invite). Before blaming your change, rerun the file and run it with your module removed from `harness.FILES`.
+
+- 2026-11-19: QuestieDB catalogue scans that stop on hide must keep a resume closure (or a paused DataWork job); bumping `generation` or resetting `loading` in OnHide silently turns every reopen into a full re-read. Grep OnHide/suspend handlers for `generation = generation + 1` when "it reloads every time" is reported.
+- 2026-11-19: SetRaidTarget is #protected (warcraft.wiki.gg API_SetRaidTarget: "can only be called from secure code"; changed to Protected in patch 12.0.0, 2026-01-20; page lists the forever build). Addon code (timers, events, even an insecure click handler) cannot place raid marks. Only a secure path works: a macro the player triggers, e.g. /tm [@mouseover] 8 on a key binding; it can only mark target/mouseover, never a unit the addon picks in combat (secure attributes are locked in combat). Matches the 0.3.3 refusal and the NEVER list in tests/test_box.py. The automatic X/skull in Aggro.lua (A.marks) must be removed or replaced.
+
+## 2026-11-19 — Dungeon route
+- Questie spawn points carry `map` only through `Q.uiMapOf(area)` (ZoneDB areaIdToUiMapId); test data must use AREA ids (Elwynn 12) and a mocked ZoneDB, or `point.map` is nil and nothing routes.
+- Real-data scan (Forever, 5,851 quests): 9 one-way `nextQuestInChain` lead-ins into dungeon quests, 0 breadcrumb fields, 6 lead-ins with no link at all (Seeking Caitlin, Dragonmaw Rumors, 4 Alterac Valley). Script `/tmp/leadscan/scan.py` (not in repo).
+- Grouping same-NPC pickups and dropping <5 s walk hops cut a sample route from 24 to 11 steps; the readability win is larger than any order tweak.
+
+
+- 2026-11-19: To persist a QuestieDB catalogue cheaply, save the IDs a full scan KEPT, not the records: the next session reruns the same code over only those IDs (identical results, fresh localized names). The kept set must include everything the output reads, not just the result rows (DungeonQuests: quests linked to/from a record, or chain names vanish). Validate with a two-session test: serialize QuestSharingCache from game 1 into game 2's pre-script (tests/test_saved_lists.py `saved_file`).
+
+## 2026-11-19 — Coldridge Valley reference case
+- Real QuestieDB data found model gaps that synthetic tests never showed: units (map fractions vs yards), level forecast (quest XP only, one level), category filing (class quests). Synthetic fixtures test the code; a real zone tests the model.
+- The optimizer itself was already near-optimal (0.8 % from annealing); the large wins (1,541 -> 1,211 s, 10 -> 14 quests) came from what it is told (which quests, which XP, which distances), not from more search.
+- More search budget changed nothing (local optimum at ~37.5k moves for 250k-5M budgets). Spend effort on the cost model, not on the search.
+- When mocking Questie, emulate `IsDoableVerbose` + `DoableStates`; with only `IsDoable` every chain follow-up looks "unknown".
+- 2026-11-19 network view (`tools/coldridge-network.html`): all 10 Coldridge camps (>= 5 spawns, 100 yd) serve 2+ quests. Burly Rockjaw Trogg spawns in 8 of 10 camps (A New Threat fills itself). Whelps + Grik'nir share camp A4, but The Stolen Journal unlocks only after The Troll Cave hand-in, so the chain forces a second trip there. Felix's 3 objects sit in whelp camps (A2, A5, A8) but the quest needs level 3, so it cannot ride along with the whelp kills at level 1-2.
+- 2026-11-19 shared camps view: in the harness a hidden parent does not make child textures report hidden (`IsShown` is the own flag), so map-layer tests must check the overlay frame's `shown`, not each circle.
+- 2026-11-19 preview of real WoW windows: the harness keeps only the last SetPoint and drops colours; `tools/preview_camp_window.py` patches CreateFrame to record all anchors, colours, alpha, fonts and justify, then resolves layout itself. Reuse it for any new window to see layout bugs (overlapping headers, hidden labels) before an in-game check.

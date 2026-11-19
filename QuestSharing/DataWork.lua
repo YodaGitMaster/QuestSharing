@@ -35,6 +35,8 @@ function W.resume(owner)
 end
 
 function W.busy(owner) return jobs[owner] ~= nil end
+-- true while combat holds every job back (a window can say "waits until the fight ends" instead of a frozen count)
+function W.fighting() return fighting() and true or false end
 function W.yield() coroutine.yield() end
 function W.checkpoint()
     if running and coroutine.running() == running then coroutine.yield() end
@@ -129,5 +131,67 @@ function W.releaseLater(owner, seconds, fn)
 end
 
 function W.releasePending(owner) return releases[owner] ~= nil end
+
+-- Catalogues read from QuestieDB are kept for the session; one Purge (Settings, /qs memory purge) frees them all.
+-- Each module registers a free function; W.purge() runs every one and returns how many ran.
+local purgers = {}
+function W.onPurge(name, fn) purgers[#purgers + 1] = { name = name, fn = fn } end
+-- Saved ID lists (SavedVariables QuestSharingCache): a catalogue saves only which IDs its full QuestieDB scan kept, so
+-- the next session reads just those records. Every list is dropped when the game build or the Quest Sharing, Questie
+-- or QuestieDB version changes (W.stamp), and by Purge. A list is any table of plain values (IDs, numbers, strings).
+local DB_ADDONS = { ADDON, "Questie", "QuestieDB", "Questie-DB", "!Questie" }
+local function version(name)
+    local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+    if type(get) ~= "function" then return "" end
+    local ok, v = pcall(get, name, "Version")
+    return ok and type(v) == "string" and v or ""
+end
+function W.stamp()
+    local parts = { type(GetBuildInfo) == "function" and tostring((select(2, GetBuildInfo()))) or "" }
+    for _, name in ipairs(DB_ADDONS) do parts[#parts + 1] = version(name) end
+    return table.concat(parts, "|")
+end
+local checked = false
+local function lists()
+    if type(QuestSharingCache) ~= "table" then QuestSharingCache = {} end
+    if not checked then
+        checked = true
+        local stamp = W.stamp()
+        if QuestSharingCache.stamp ~= stamp or type(QuestSharingCache.lists) ~= "table" then
+            QuestSharingCache = { stamp = stamp, lists = {} }
+        end
+    end
+    return QuestSharingCache.lists
+end
+-- The saved list for (name, scope), or nil when there is none for this build and these versions.
+function W.saved(name, scope)
+    local entry = lists()[name]
+    local value = type(entry) == "table" and type(entry.scopes) == "table" and entry.scopes[scope or ""]
+    return type(value) == "table" and value or nil
+end
+-- keep (optional, default 4): how many scopes of this name are kept; the oldest saved goes first.
+function W.save(name, scope, value, keep)
+    scope = scope or ""
+    local all = lists()
+    local entry = type(all[name]) == "table" and all[name] or { scopes = {}, order = {} }
+    all[name] = entry
+    for i = #entry.order, 1, -1 do if entry.order[i] == scope then table.remove(entry.order, i) end end
+    entry.order[#entry.order + 1], entry.scopes[scope] = scope, value
+    while #entry.order > (keep or 4) do entry.scopes[table.remove(entry.order, 1)] = nil end
+end
+function W.forget(name) if type(QuestSharingCache) == "table" and type(QuestSharingCache.lists) == "table" then QuestSharingCache.lists[name] = nil end end
+-- Sorted array of the keys of a set (a saved ID list).
+function W.sortedKeys(set) local out = {}; for id in pairs(set) do out[#out + 1] = id end; table.sort(out); return out end
+
+function W.purge()
+    QuestSharingCache, checked = nil, false
+    local n = 0
+    for _, p in ipairs(purgers) do
+        local ok, err = pcall(p.fn)
+        if ok then n = n + 1 else ns.print("could not free " .. p.name .. ": " .. tostring(err)) end
+    end
+    return n
+end
+function W.purgeNames() local out = {}; for _, p in ipairs(purgers) do out[#out + 1] = p.name end; return out end
 
 ns.on("PLAYER_REGEN_ENABLED", wake)

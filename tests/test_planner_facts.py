@@ -159,10 +159,10 @@ def test_external_repeatable_and_level_report(style):
 UnitLevel=function()return 10 end
 QUESTIE_QUESTS[9010]={name="Repeat",questLevel=8,startedBy={{600}},specialFlags=3}
 QUESTIE_QUESTS[9011]={name="Out of zone",questLevel=8,startedBy={{600}},finishedBy={{700}}}
-QUESTIE_QUESTS[9012]={name="Level gated",questLevel=15,requiredLevel=12,startedBy={{600}},finishedBy={{600}}}
+QUESTIE_QUESTS[9012]={name="Level gated",questLevel=15,requiredLevel=14,startedBy={{600}},finishedBy={{600}}}
 ''')
     c=g.eval("NS.questPlanner.coverage")()
-    # 9012 needs level 12 at level 10: one cheap read rules it out, so it is counted, not listed as blocked
+    # 9012 needs level 14 at level 10 (more than 3 levels ahead): one cheap read rules it out, so it is counted, not listed as blocked
     assert c.repeatable[9010] and c.external[9011] and c.blocked[9012] is None and c.skipped.level==1
     g.run('MAP_ID=100');g.fire('ZONE_CHANGED_NEW_AREA');g.advance(2)
     assert g.eval("NS.questPlanner.coverage")().external[9011] is None
@@ -197,7 +197,9 @@ QuestieLoader.ImportModule=function(self,name)if name=="DropDB" then return {Get
 else return import(self,name) end end''')
     c=g.eval("NS.questPlanner.coverage")()
     assert c.blocked[9010] and c.unknown[9011]
-    assert "Turn in Dry farm" not in text(g) and "Turn in Hidden event" not in text(g)
+    shown = text(g)
+    assert "Hand in to Sentinel Hill Giver:" in shown, "a reachable quest still gets its hand-in step"
+    assert "Dry farm" not in shown and "Hidden event" not in shown
     assert c.external[9002] is None
 
 
@@ -260,9 +262,9 @@ QuestDB.Get=function(id,key) if key=="startedBy" then BIG_READS[id]=true end;ret
 def test_level_up_rescans_what_the_old_level_skipped(style):
     g=game(style, '''
 LEVEL=10;UnitLevel=function()return LEVEL end
-QUESTIE_QUESTS[9010]={name="Needs twelve",questLevel=12,requiredLevel=12,startedBy={{600}},finishedBy={{600}}}''')
+QUESTIE_QUESTS[9010]={name="Needs twelve",questLevel=14,requiredLevel=14,startedBy={{600}},finishedBy={{600}}}''')
     assert g.eval("NS.questPlanner.coverage")().skipped.level==1
-    g.run("LEVEL=12");g.fire("PLAYER_LEVEL_UP");g.advance(5)
+    g.run("LEVEL=14");g.fire("PLAYER_LEVEL_UP");g.advance(5)
     c=g.eval("NS.questPlanner.coverage")()
     assert c.skipped.level is None and "Needs twelve" in text(g)
 

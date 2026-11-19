@@ -513,7 +513,7 @@ def test_every_helper_shows_in_the_open_settings_window_and_switches_there(style
     shown = {"general": ["Block the chat box during combat"],
              "bags": ["Order items by", "Bags to arrange", "Where items gather", "Leave bookmarked items where they are",
                       "Bookmark bag items with the Space bar", "Sell gray items when I open a vendor",
-                       "Arrange my bags by topic automatically", "Arrange my bags now", "Remove all my bookmarks"]}
+                       "Arrange my bags automatically", "Arrange my bags now", "Remove all my bookmarks"]}
     for tab, labels in shown.items():
         g.eval("NS.settingsTab")(tab)
         all_rows = g.eval("NS.settingRows")
@@ -561,7 +561,42 @@ def test_the_bookmark_commands(style):
     assert any("bookmarked:" in p and "Gray Fang" in p for p in g.printed()), g.printed()
     g.slash("bookmarks clear")
     assert g.eval("NS.bagTools.isBookmarked(1)") is False
-    assert any("1 bookmark(s) removed" in p for p in g.printed())
+    assert any("1 bookmark removed" in p for p in g.printed())
+
+
+def test_the_key_frame_never_touches_keyboard_propagation_in_a_fight(style):
+    """SetPropagateKeyboardInput is protected in combat: the game blocked it on every key (v0.4.26 report)"""
+    g = game(style)
+    g.run("""KEYFRAME = nil
+        for _, f in ipairs(FRAMES) do if f.scripts.OnKeyDown then KEYFRAME = f end end
+        PROP = {}
+        function KEYFRAME:SetPropagateKeyboardInput(v) PROP[#PROP + 1] = v end""")
+    point_at(g, 1)
+    g.eval("function() KEYFRAME.scripts.OnKeyDown(KEYFRAME, 'SPACE') end")()       # bookmarked: Space swallowed
+    assert list(g.eval("PROP").values()) == [False]
+    g.fire("PLAYER_REGEN_DISABLED")                                                  # still allowed: passes keys on again
+    assert list(g.eval("PROP").values()) == [False, True]
+    g.run("IN_COMBAT = true")
+    for k in ("W", "SPACE", "1", "W"):
+        g.eval(f"function() KEYFRAME.scripts.OnKeyDown(KEYFRAME, '{k}') end")()
+    assert list(g.eval("PROP").values()) == [False, True], "no protected call in a fight"
+    assert g.eval("NS.bagTools.isBookmarked(1)") is True, "Space in a fight did not toggle the bookmark"
+    g.run("IN_COMBAT = false")
+    g.eval("function() KEYFRAME.scripts.OnKeyDown(KEYFRAME, 'W') end")()
+    assert list(g.eval("PROP").values()) == [False, True], "unchanged value: no call"
+
+
+def test_space_over_the_bags_in_a_fight_says_once_why_nothing_happened(style):
+    g = game(style)
+    g.run("""KEYFRAME = nil
+        for _, f in ipairs(FRAMES) do if f.scripts.OnKeyDown then KEYFRAME = f end end""")
+    point_at(g, 1)
+    g.run("IN_COMBAT = true")
+    for _ in range(3):
+        g.eval("function() KEYFRAME.scripts.OnKeyDown(KEYFRAME, 'SPACE') end")()
+    said = [p for p in g.printed() if "during a fight" in p]
+    assert len(said) == 1, said
+    assert g.eval("NS.bagTools.isBookmarked(1)") is False
 
 
 if __name__ == "__main__":

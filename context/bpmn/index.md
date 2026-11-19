@@ -6,6 +6,9 @@ Graphs: `<process-id>/diagram.mmd` (Mermaid) and `<process-id>/process.bpmn` (op
 <!-- bpmn:index -->
 | Run | Process | Outcome | Duration | Agents | Rounds | Context | Graph |
 |---|---|---|---|---|---|---|---|
+| r-20261119-113937-c955 | ux-low | Low findings integrated | 23m 35s | 13 | 2 | done | [diagram](ux-low/diagram.mmd) · [bpmn](ux-low/process.bpmn) |
+| r-20261119-104206-0145 | ux-fix | UX fixes integrated | 41m 10s | 18 | 2 | done | [diagram](ux-fix/diagram.mmd) · [bpmn](ux-fix/process.bpmn) |
+| r-20261119-095449-ea8e | ux-review | Review ready | 47m 05s | 7 | 1 | done | [diagram](ux-review/diagram.mmd) · [bpmn](ux-review/process.bpmn) |
 | r-20261118-001852-fd7d | algo-tune | failed: "Fix stability, add horizon" failed: time limit (35 min, ef… | 1h 48m | 3 | 1 | skipped | [diagram](algo-tune/diagram.mmd) · [bpmn](algo-tune/process.bpmn) |
 | r-20261117-234605-6ba9 | decouple | Planner decoupled | 30m 55s | 7 | 1 | done | [diagram](decouple/diagram.mmd) · [bpmn](decouple/process.bpmn) |
 | r-20261117-215940-e171 | fix-all | Fixes integrated | 1h 46m | 12 | 2 | done | [diagram](fix-all/diagram.mmd) · [bpmn](fix-all/process.bpmn) |

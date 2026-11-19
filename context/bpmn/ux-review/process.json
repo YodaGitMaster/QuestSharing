@@ -1,0 +1,304 @@
+{
+  "id": "ux-review",
+  "name": "Usability, user-story and style review of the whole addon, ranked and independently verified",
+  "runTimeout": 100,
+  "context": {
+    "prompt": "Write the review as context/ux-review-2026-11-19.md for a developer with zero context: a short method line, then the verified findings table from the synthesis (id, area, lens, severity, title, where, evidence, suggestion, effort), marking each verifier verdict (confirmed / refuted / partly), then the user-story table per area (story, status works|friction|broken, evidence), then the proposed fix batches. Add one dated line to state.md (review done, no code changed, awaiting user choice of fixes) and a dated insights.md entry with the 3-5 most important cross-cutting patterns. Do not edit any code or test file."
+  },
+  "lanes": [
+    {
+      "id": "reviewer",
+      "name": "Area reviewer",
+      "agent": "bpmn:reviewer",
+      "timeout": 30
+    },
+    {
+      "id": "synth",
+      "name": "Synthesizer",
+      "agent": "bpmn:planner",
+      "timeout": 15
+    },
+    {
+      "id": "verifier",
+      "name": "Verifier",
+      "agent": "bpmn:reviewer",
+      "timeout": 25
+    }
+  ],
+  "data": {
+    "areas": {
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "area",
+            "stories",
+            "findings"
+          ],
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "stories": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "story",
+                  "status",
+                  "evidence"
+                ],
+                "properties": {
+                  "story": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "works",
+                      "friction",
+                      "broken"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "findings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "lens",
+                  "severity",
+                  "title",
+                  "where",
+                  "evidence",
+                  "suggestion",
+                  "effort"
+                ],
+                "properties": {
+                  "lens": {
+                    "enum": [
+                      "usability",
+                      "story",
+                      "style"
+                    ]
+                  },
+                  "severity": {
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low"
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "where": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "type": "string"
+                  },
+                  "suggestion": {
+                    "type": "string"
+                  },
+                  "effort": {
+                    "enum": [
+                      "S",
+                      "M",
+                      "L"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "synthesis": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "findings",
+          "stories",
+          "batches",
+          "patterns"
+        ],
+        "properties": {
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "area",
+                "lens",
+                "severity",
+                "title",
+                "where",
+                "evidence",
+                "suggestion",
+                "effort"
+              ]
+            }
+          },
+          "stories": {
+            "type": "array"
+          },
+          "batches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "ids",
+                "why"
+              ]
+            }
+          },
+          "patterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "verdicts": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "checked",
+          "summary"
+        ],
+        "properties": {
+          "checked": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "verdict",
+                "evidence"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "enum": [
+                    "confirmed",
+                    "refuted",
+                    "partly"
+                  ]
+                },
+                "evidence": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "name": "Review requested"
+    },
+    {
+      "id": "review",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review one area",
+      "out": "areas",
+      "multi": {
+        "as": "item",
+        "items": [
+          {
+            "area": "Quest guide",
+            "files": "QuestPlanner.lua, QuestOptimizer.lua, QuestCalibration.lua, QuestGuidance.lua, QuestPlannerPath.lua, Settings.lua (tab 'guide')",
+            "tests": "test_quest_planner_*.py, test_quest_optimizer.py, test_quest_guidance.py, test_planner_calibration.py"
+          },
+          {
+            "area": "Party, sharing and party finder",
+            "files": "Panel.lua, Share.lua, Sync.lua, Team.lua, Progress.lua, Friends.lua, Track.lua, Highlight.lua, Ping.lua, Quick.lua, Adventure.lua, Menu.lua, LFGInvite.lua, LFGFinderUI.lua, ItemLevel.lua, Aggro.lua, Settings.lua (tabs party, finder, sharing, actions, quick)",
+            "tests": "test_questsharing.py, test_together.py, test_team.py, test_friends.py, test_ping.py, test_quick.py, test_adventure.py, test_menu.py, test_lfg_*.py, test_item_level*.py, test_aggro*.py"
+          },
+          {
+            "area": "Map and world",
+            "files": "VendorMap.lua, TravelMap.lua, TravelData.lua, TrainerIndex.lua, ZoneLevels.lua, Marker.lua, Fishing.lua, ItemSources.lua, GatherSources.lua, SkinningData.lua, Settings.lua (tab maps)",
+            "tests": "test_vendor_map.py, test_travel*.py, test_zone_levels.py, test_where.py, test_gather_sources.py, test_items.py"
+          },
+          {
+            "area": "Adventurer's Journal and professions",
+            "files": "DungeonQuests.lua, Loot.lua, Rewards.lua, EquipmentUI.lua, OptionalUI.lua, Professions.lua, ProfessionUI.lua, CookingReference.lua, ProfessionReference.lua, Settings.lua (tabs browser, optional)",
+            "tests": "test_dungeon_quests.py, test_loot.py, test_equipment*.py, test_optional.py, test_professions.py, test_instance_focus.py"
+          },
+          {
+            "area": "Settings, minimap, bags, quest helpers and diagnostics",
+            "files": "Settings.lua (all tabs, layout, sidebar), MinimapButton.lua, Core.lua (slash commands, defaults), Status.lua, Diagnostics.lua, Bags.lua, BagTools.lua, QuestItems.lua, QuestCleanup.lua, QuestAutomation.lua, SpellRanks.lua, ChatLock.lua, Style.lua",
+            "tests": "test_settings.py, test_look.py, test_classic_style.py, test_bag*.py, test_quest_cleanup.py, test_spell_ranks.py, test_log.py, test_usability.py, test_extras.py"
+          }
+        ]
+      },
+      "prompt": "READ-ONLY UX REVIEW of one area of the World of Warcraft addon Quest Sharing. Repo /Users/cozzolif/Desktop/cutpdf (Lua 5.1 in QuestSharing/, Python+lupa harness in tests/). Your area: {{item.area}}. Main files: {{item.files}}. Related tests: {{item.tests}}. Read README.md (the user-facing description of your area), context/architecture.md and the code. The player base: classic-era WoW players who quest, often in a party; many are not technical.\nThree lenses, all required:\n(1) USER STORIES: write 4-8 concrete stories for your area ('As a <player>, I want <goal> so that <reason>'), then walk each one end to end in the harness (drive it like the existing tests do: Game(style, ...), g.start(), g.slash(...), g.fire(...), click frames, read the visible text) and mark it works / friction / broken with evidence (the exact text the player sees, number of steps or clicks, dead ends, missing feedback).\n(2) USABILITY: discoverability (how does a player find it: slash command, settings tab, minimap, menu?), feedback after an action, error/empty states and their wording, consistency of names for the same thing across settings, tooltips, chat output and README, number of clicks, defaults, keyboard/Esc behaviour, combat restrictions explained.\n(3) STYLE: does every window/row follow the classic WoW look in Style.lua (S.window/S.frame/S.panel/S.inset/S.button/S.checkBox, opaque stone, gold border, GameFont* templates) and tests/test_classic_style.py; readable sizes; colour meaning consistent (gold = selected/heading, grey = disabled); plain wording without jargon or developer terms (no 'provider', 'DB', 'job', 'slice'); chat message prefix and tone consistent.\nRules: do NOT modify any repository file (no edits, no git stash/checkout); scratch files only under /tmp/ux-review-<short area>/; do NOT run the whole test suite (other reviewers run in parallel) — only targeted probes and at most the related test files listed. Report only real findings with evidence (path:line and/or the exact visible text); no generic advice. Severity: high = a player cannot finish a story or is misled; medium = clear friction or inconsistency; low = polish. Effort S/M/L. Return one object: {area, stories:[...], findings:[...]}."
+    },
+    {
+      "id": "synthesize",
+      "type": "agent",
+      "lane": "synth",
+      "name": "Rank and batch findings",
+      "in": [
+        "areas"
+      ],
+      "out": "synthesis",
+      "prompt": "You receive five area reviews of the WoW addon Quest Sharing (repo /Users/cozzolif/Desktop/cutpdf): {{areas}}\nProduce ONE ranked synthesis: (1) merge duplicates across areas (same root cause = one finding, list every 'where'); give each kept finding an id like UX-01, ordered high -> low severity, then by player impact; keep evidence and suggestion concrete; drop anything without evidence. (2) Keep the user-story tables (area, story, status, evidence). (3) Group the findings into 3-5 fix batches a builder could take one at a time (by file ownership so batches do not edit the same files), each with ids and a one-line why. (4) List 3-5 cross-cutting patterns (e.g. inconsistent naming, missing empty states). Read code only to confirm a merge; do not invent findings."
+    },
+    {
+      "id": "verify",
+      "type": "agent",
+      "lane": "verifier",
+      "name": "Verify top findings",
+      "in": [
+        "synthesis"
+      ],
+      "out": "verdicts",
+      "prompt": "Independent check of a UX review of the WoW addon Quest Sharing (repo /Users/cozzolif/Desktop/cutpdf, Lua 5.1 in QuestSharing/, Python+lupa harness in tests/ run with /tmp/qs-test-env/bin/python from tests/). Ranked findings: {{synthesis.findings}}\nFor EVERY high-severity finding and at least the first 8 medium ones: try to REFUTE it. Re-read the cited code yourself and reproduce the visible behaviour in the harness (scratch scripts only under /tmp/ux-review-verify/). Verdict confirmed (reproduced as described), partly (real but smaller/different than claimed — say how) or refuted (not reproducible or already handled — show where). Do not modify repository files. Return {checked:[{id, verdict, evidence}], summary}."
+    },
+    {
+      "id": "done",
+      "type": "end",
+      "name": "Review ready"
+    }
+  ],
+  "flows": [
+    {
+      "from": "start",
+      "to": "review"
+    },
+    {
+      "from": "review",
+      "to": "synthesize"
+    },
+    {
+      "from": "synthesize",
+      "to": "verify"
+    },
+    {
+      "from": "verify",
+      "to": "done"
+    }
+  ]
+}

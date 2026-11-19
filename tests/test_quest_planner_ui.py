@@ -122,13 +122,14 @@ def test_right_click_marks_the_quest_giver_on_the_game_map():
     assert abs(waypoint["y"] - 0.41) < 0.001
 
 
-def test_right_click_waits_for_combat_before_setting_waypoint():
+def test_step_click_sets_the_waypoint_in_combat_too():
+    # UX-47: one click action and one combat rule; a map waypoint is not a protected action.
     g = planner_game()
     _, _, _, rows = planner_rows(g)
     g.run("IN_COMBAT = true")
     rows[0].scripts["OnClick"](rows[0], "RightButton")
     assert g.eval("OPENED_MAP") is None
-    assert g.eval("WAYPOINT") is None
+    assert g.eval("WAYPOINT") is not None
 
 
 def test_all_trivial_local_quests_explain_zone_is_too_low_level():

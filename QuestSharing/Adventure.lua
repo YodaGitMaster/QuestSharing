@@ -61,6 +61,12 @@ function A.route(input)
     local text = trim(input)
     text = string.gsub(text, "^/", "")
     if text == "" or string.lower(text) == "current" then return "", true end
+    if string.lower(text) == "target" then                      -- "Whisper target": the player you have targeted
+        local name, realm
+        if UnitIsPlayer and UnitIsPlayer("target") and UnitName then name, realm = UnitName("target") end
+        if not name or name == "" then return nil, "Target a player first to whisper them." end
+        return "/w " .. name .. ((realm and realm ~= "") and ("-" .. realm) or "") .. " ", false
+    end
     local route = ROUTES[string.lower(text)]
     if route then return route, false end
     local cmd, who = string.match(text, "^(%S+)%s+(.+)$")
@@ -84,7 +90,7 @@ function A.prepare(e, text, route)
     e = live(e)
     if not e then return false, "Choose an unfinished quest from your quest log." end
     text = trim(text)
-    if text == "" or #text > 255 then return false, "Your invitation must be 1–255 bytes; shorten it before preparing chat." end
+    if text == "" or #text > 255 then return false, "Your invitation must be 1–255 letters; shorten it before preparing chat." end
     if string.find(text, "[%c]") then return false, "Use a single line for the invitation." end
     local prefix, current = A.route(route)
     if not prefix then return false, current end
@@ -94,7 +100,7 @@ function A.prepare(e, text, route)
     if old ~= "" then
         if not current then return false, "Your chat already contains a draft; send or clear it before changing channels." end
         if string.find(old, C.link(e), 1, true) or string.find(old, text, 1, true) then return false, "That quest is already in the chat box." end
-        if #old + 1 + #text > 255 then return false, "Your current draft plus the invitation exceeds 255 bytes; send or clear the draft first." end
+        if #old + 1 + #text > 255 then return false, "Your current draft plus the invitation exceeds 255 letters; send or clear the draft first." end
         if not box.SetText then return false, "This client cannot edit the active chat box." end
         box:SetText(old .. " " .. text)
         usedBox = box
@@ -128,9 +134,23 @@ local function refresh()
     W.preview:SetText(e and A.message(e, wording) or "")
 end
 
+-- the chat buttons of the window: label, route (as A.route reads it), width
+local CHANNELS = { { "Current chat", "current", 100 }, { "Say", "say", 56 }, { "Party", "party", 60 }, { "Raid", "raid", 56 },
+                   { "Guild", "guild", 60 }, { "Channel 1", "1", 80 }, { "Whisper target", "target", 110 } }
+
+-- the picked chat is lit with a gold rule; the others are dimmed
+local function showChannel()
+    for _, b in ipairs(W.channels) do
+        local on = b.route == W.route
+        local lit = on and 1 or 0.55
+        b.bg:SetVertexColor(lit, lit, lit)
+        if on then b.edge:Show() else b.edge:Hide() end
+    end
+end
+
 local function build()
     if W then return true end
-    local f = U.window("QuestSharingAdventure", 670, 340, "Seek fellow adventurers")
+    local f = U.window("QuestSharingAdventure", 670, 340, "Quest invitation")
     if not f then return false end
     W = { frame = f }
     U.text(f, "Choose your quest and chat, then edit the invitation if you wish.", 24, 34, 620)
@@ -144,11 +164,22 @@ local function build()
     nextQuest:SetPoint("TOPLEFT", f, "TOPLEFT", 24, -88)
     local another = S.button(f, "Another wording", 150, function() wording = wording % #TEMPLATES + 1; refresh() end)
     another:SetPoint("LEFT", nextQuest, "RIGHT", 10, 0)
-    W.channel = U.box(f, "Chat channel", 24, 122, 610, "current", 100)
-    U.text(f, "current, say, yell, party, raid, guild, officer, instance, whisper Name, or a joined channel number/name", 24, 165, 610)
+    -- the chat: picked from buttons, nothing to type (A.route still takes any channel for prepare)
+    U.text(f, "Chat", 24, 122, 610)
+    W.route, W.channels = "current", {}
+    local x = 0
+    for i, c in ipairs(CHANNELS) do
+        local b = S.button(f, c[1], c[3], function() W.route = c[2]; showChannel() end)
+        b:SetPoint("TOPLEFT", f, "TOPLEFT", 24 + x, -139)
+        b.route = c[2]
+        W.channels[i] = b
+        x = x + c[3] + 6
+    end
+    showChannel()
+    U.text(f, "Current chat uses whatever your chat box is set to (a whisper, World...). Channel 1 is usually General. Whisper target whispers the player you target.", 24, 165, 610)
     W.preview = U.box(f, "Your invitation (editable)", 24, 193, 610, "", 255)
     local prepare = S.button(f, "Prepare chat", 150, function()
-        local ok, why = A.prepare({ questID = selected }, W.preview:GetText(), W.channel:GetText())
+        local ok, why = A.prepare({ questID = selected }, W.preview:GetText(), W.route)
         if ok then W.frame:Hide() else W.status:SetText(S.RED .. why .. "|r") end
     end)
     prepare:SetPoint("TOPLEFT", f, "TOPLEFT", 24, -250)

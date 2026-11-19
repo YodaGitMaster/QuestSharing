@@ -130,11 +130,9 @@ def test_remote_results_require_explicit_elsewhere_action(style):
     assert "Closest" not in " ".join(labels(g))
     button = next(f for f in g.eval("FRAMES").values() if f.text == "Elsewhere" and f.shown)
     assert button.label.text == "Elsewhere"
-    button.scripts.OnClick(button)
-    assert "Closest" in " ".join(labels(g))
+    button.scripts.OnClick(button)                       # one click finds the closest one and sets the waypoint
+    assert "Closest" in " ".join(labels(g)) and "Westfall" in " ".join(labels(g))
     assert button.label.text == "Waypoint"
-    assert g.eval("WAYPOINT") is None
-    button.scripts.OnClick(button)
     assert g.eval("WAYPOINT.map") == 1436
 
 
@@ -225,7 +223,7 @@ def test_cancelled_loading_cannot_reset_a_replacement_scan(style):
     g.run("NS.db.vendorSearch=false; NS.vendorMap.refresh(); NS.db.vendorSearch=true; NS.vendorMap.refresh()")
     g.eval("NS.vendorMap.search")("General Goods", True, "vendor")
     g.advance(20)
-    assert g.eval("NPC_ENUMERATIONS") == 2
+    assert g.eval("NPC_ENUMERATIONS") == 1, "the replacement scan reads the NPC list saved by the first one"
     assert len(pins(g)) == 600
     assert not suggestions(g)
 
@@ -307,7 +305,7 @@ def test_seller_suggestion_keeps_non_sellers_out_of_general_results(style):
     g = game(style, SELLERS + '''
 QUESTIE_NPCS[6].subName="General Commander"
 ''')
-    type_query(g, "general vendor")
+    type_query(g, "gener vendor")                         # word completions only while the word is unfinished
     row = next(r for r in suggestions(g) if r.suggestion.value == "General")
     row.scripts.OnClick(row)
     g.advance(3)
@@ -557,7 +555,7 @@ def test_classic_size_suggestions_arrive_quickly_while_typing(style):
     cold = wait_for(g, lambda: "General Goods" in shown(), each=lambda _: status.append(" ".join(labels(g))))
     assert cold is not None, "no suggestion for cold 'gene'"
     assert cold <= 1.5, f"cold 'gene' first suggestion after {cold}s (target <= 1.5 s)"
-    assert any("Indexing" in s and "/ 10,122 NPCs" in s for s in status), status
+    assert any("Reading the NPC list" in s and "/ 10,122" in s for s in status), status
 
     # Refining the text keeps the last suggestions visible until the new ones replace them.
     type_keys(g, edit, "gener", start=5)
@@ -783,18 +781,16 @@ QUESTIE_NPCS[4].friendlyToFaction = "A"
     assert sorted(p.result.vendor.id for p in pins(g)) == [2, 4, 5]
 
 
-def test_map_search_index_is_dropped_after_two_idle_minutes_and_rebuilt_by_the_next_search(style):
+def test_map_search_index_is_kept_for_the_session_until_purged_and_rebuilt_by_the_next_search(style):
     g = game(style)
-    g.fire("PLAYER_LOGIN")  # the harness does not send it; it starts the map's own timer, which does the releasing
+    g.fire("PLAYER_LOGIN")  # the harness does not send it; it starts the map's own timer
     type_query(g, "General Goods")
     assert g.eval("NS.vendorMap._state()")[2], "the typed search built the index"
-    g.advance(60)
-    assert g.eval("NS.vendorMap._state()")[2], "kept while the query is still typed on an open map"
     g.run("WorldMapFrame:Hide()")
-    g.advance(60)
-    assert g.eval("NS.vendorMap._state()")[2], "kept inside the grace period"
-    g.advance(130)
-    assert not any(g.eval("NS.vendorMap._state()")), "dropped once the map has been closed for two minutes"
+    g.advance(3600)
+    assert g.eval("NS.vendorMap._state()")[2], "kept long after the map closed"
+    g.eval("NS.vendorMap.purge")()
+    assert not any(g.eval("NS.vendorMap._state()")), "purge drops it"
     g.run("WorldMapFrame:Show()")
     g.advance(2)
     type_query(g, "General Goods")

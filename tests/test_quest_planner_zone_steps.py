@@ -1,5 +1,6 @@
 """Westfall-only quest plans and readable grouped travel/work instructions."""
 import pathlib
+import re
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -80,9 +81,9 @@ def test_named_travel_pickup_work_and_turnin_steps_follow_dependencies(style):
     visible = rows(g)
     assert len(visible) == 3
     assert "Step 1" in visible[0].title.text and "Go to Sentinel Hill" in visible[0].title.text
-    assert "Take these quests" in visible[0].detail.text
+    assert "Pick up from Sentinel Hill Giver:" in visible[0].detail.text
     assert "Complete these quests here" in visible[1].detail.text
-    assert "Hand in these quests" in visible[2].detail.text
+    assert "Hand in to Sentinel Hill Giver:" in visible[2].detail.text
     assert all("[1]" in row.detail.text for row in visible)
     assert "TRIP" not in text(g)
 
@@ -123,7 +124,7 @@ end
 ''')
     output = text(g)
     assert "Harvest Watcher" in output
-    assert "Turn in Local Harvest" not in output
+    assert "Hand in to" not in output
     assert "Premature Followup" not in output
 
 
@@ -154,8 +155,8 @@ QuestieLoader.ImportModule=function(_,name)
 end
 ''')
     output = [row.detail.text for row in rows(g)]
-    pickup = next(i for i,t in enumerate(output) if "Pick up Followup Harvest" in t)
-    handin = next(i for i,t in enumerate(output) if "Turn in Local Harvest" in t)
+    pickup = next(i for i,t in enumerate(output) if "Pick up from" in t and "Followup Harvest" in t)
+    handin = next(i for i,t in enumerate(output) if "Hand in to" in t and "Local Harvest" in t)
     assert pickup > handin
 
 
@@ -175,7 +176,7 @@ def test_completed_active_quest_can_have_a_local_turnin_even_if_started_elsewher
 QUESTIE_QUESTS[9002].finishedBy={{600}}
 QUESTS[1].complete=true
 ''')
-    assert "Turn in Foreign Active Quest" in text(g)
+    assert re.search(r"Hand in to Sentinel Hill Giver:(\n\[\d\] [^\n]*)*\n\[\d\] Foreign Active Quest", text(g)), text(g)
     assert "Faraway Creature" not in text(g)
 
 
@@ -187,7 +188,7 @@ QUESTIE_QUESTS[9002].finishedBy={{600}}
     g.run("QUESTS[1].complete=true")
     g.fire("QUEST_LOG_UPDATE")
     g.advance(3)
-    assert "Turn in Foreign Active Quest" in text(g)
+    assert re.search(r"Hand in to Sentinel Hill Giver:(\n\[\d\] [^\n]*)*\n\[\d\] Foreign Active Quest", text(g)), text(g)
 
 
 def test_invalid_local_spawn_coordinates_do_not_become_zero_point_steps(style):
@@ -204,18 +205,18 @@ def test_degenerate_child_rectangle_is_rejected_even_with_correct_ancestry(style
 
 def test_accepting_and_completing_quest_advances_from_pickup_to_work_to_handin(style):
     g = game(style)
-    assert "Take these quests" in text(g)
+    assert "Pick up from Sentinel Hill Giver:" in text(g)
     g.run('''QUESTS={{id=9000,title="Local Harvest",level=8,
  objectives={{text="Harvest Watcher slain: 0/8",type="monster",have=0,need=8}}}}''')
     g.fire("QUEST_ACCEPTED", 1, 9000)
     g.advance(3)
-    assert "Pick up Local Harvest" not in text(g)
+    assert "Pick up from" not in text(g)
     assert "Complete these quests here" in text(g)
     g.run("QUESTS[1].complete=true; QUESTS[1].objectives[1].finished=true")
     g.fire("QUEST_LOG_UPDATE")
     g.advance(3)
     assert len(rows(g)) == 1
-    assert "Turn in Local Harvest" in text(g)
+    assert "Hand in to Sentinel Hill Giver:\n[1] Local Harvest" in text(g)
     assert "Kill Harvest Watcher" not in text(g)
 
 
@@ -343,14 +344,14 @@ QUESTIE_QUESTS[9002].finishedBy={{600}}
 '''
     assert "Foreign Active Quest" not in text(game(style, base))
     g = game(style, base + "QUESTS[1].complete=true")
-    assert "Turn in Foreign Active Quest" in text(g)
+    assert re.search(r"Hand in to Sentinel Hill Giver:(\n\[\d\] [^\n]*)*\n\[\d\] Foreign Active Quest", text(g)), text(g)
     assert "Faraway Creature" not in text(g)
     # A breadcrumb has nothing to do but hand in, so it is ready as soon as it is in the log.
     g = game(style, '''
 QUESTIE_QUESTS[9014]={name="Report to Sentinel Hill",questLevel=8,zoneOrSort=12,startedBy={{700}},finishedBy={{600}}}
 QUESTS={{id=9014,title="Report to Sentinel Hill",level=8,objectives={}}}
 ''')
-    assert "Turn in Report to Sentinel Hill" in text(g)
+    assert re.search(r"Hand in to Sentinel Hill Giver:\n\[\d\] Report to Sentinel Hill", text(g)), text(g)
 
 
 TWO_CAMPS = CAMP + '''
