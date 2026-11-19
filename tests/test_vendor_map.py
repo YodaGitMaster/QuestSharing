@@ -797,6 +797,18 @@ def test_map_search_index_is_kept_for_the_session_until_purged_and_rebuilt_by_th
     assert g.eval("NS.vendorMap._state()")[2] and pins(g), "the next search rebuilds it"
 
 
+def test_saved_npc_list_is_kept_per_faction(style):
+    # The saved list is account-wide; a Horde alt's list must not hide Alliance sellers (Hillsbrad report).
+    g = game(style, 'FACTION="Horde"; UnitFactionGroup=function() return FACTION end; '
+                    'QUESTIE_NPCS[1].friendlyToFaction="A"; QUESTIE_NPCS[2].friendlyToFaction="H"')
+    type_query(g, "General Goods")
+    assert len(pins(g)) == 1, "Horde sees only its own General Goods seller"
+    type_query(g, "")
+    g.run('FACTION="Alliance"; NS.vendorMap._release()')
+    type_query(g, "General Goods")
+    assert len(pins(g)) == 2, "Alliance character got the Horde-filtered saved list"
+
+
 if __name__ == "__main__":
     failed = total = 0
     for name, test in sorted(list(globals().items())):

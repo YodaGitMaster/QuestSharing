@@ -8,6 +8,9 @@
 ## 2026-11-18 — Party finder auto-invite
 - One search per click/key (C_LFGList.Search HasRestrictions in classic_era source), no timer scan; invite solo players (numMembers==1) by lfgRoles via C.invite; healers on by default, own-window watching (lfgWatch) off by default so browsing never invites by surprise. Rows live in the Party window tab (no 16th tab fits). Gear number not built: no ilvl in LFG data; only addon-message (Quest Sharing users) or inspect (nearby) possible, waiting on user.
 
+## 2026-11-19 — Supercharge limited to free spots (supersedes "more invites than spots")
+- The game counts open invites as party spots (ERR_GROUP_FULL "Your party is full." for extra invites), so supercharge now means "ignore the per-role need" but never more invites than members + open invites + players being asked leave free. PENDING 75 s (margin over the game's ~60 s invite).
+
 ## 2026-11-19 — Role need vs supercharge
 - Normal mode now respects a dungeon party shape (1/1/3) so a healer-only search invites one healer; user asked for an opt-in "supercharge" that invites all matches because one may not answer. Supercharge capped at 10 per click (chat + invite throttles) and does not count open invites as taken spots; no auto-kick of extra accepters (rude, and protected/uncertain) - the tooltip warns instead.
 
@@ -23,6 +26,14 @@
 - GearScore/TacoTip model (inspect nearby + cache + share between users of the addon) chosen; armory query rejected: addons have no network, SavedVariables only sync on /reload/logout, so an external Battle.net API script cannot answer in time (and Forever coverage unknown).
 - Ask-first waits only when a minimum item level is set (no delay for "any"). Unknown default = invite (never silently lose a healer); user can pick skip.
 - Separate prefix QSILVL (works outside a party, independent of the `sync` switch); answering is behind `ilvlShare` (default on).
+
+## 2026-11-19 — Quest guide: replan only on quest events, never on walking or noise (user)
+- User: the guide "closes itself and re-calcs"; wants it to stay on and recalc only when a quest is done.
+- Chosen (user picked "No re-sort on walking"): removed the P.open OnUpdate (3 s, >=0.025 moved or speed change -> rebuildProgress). Supersedes the "re-plans from where you stand" behaviour behind the 2026-11-17 camp decisions; camp hysteresis (quarter cost + 20 s) still applies at each replan.
+- BAG_UPDATE_DELAYED/SPELLS_CHANGED/SKILL_LINES_CHANGED no longer force a scan; UPDATE_FACTION forces only when `repGates()` (met/unmet of planned quests' requiredMin/MaxRep) changes (test_visible_reputation_change_replans_selected_quest).
+- Same-zone scan keeps `route`/`selected` on screen until buildRoute replaces them; Guidance.clear only on a zone change.
+- Off the zone map with a plan (`currentZone` nil): `keepOutside` keeps plan, message "(paused: reason)"; only a different outdoor zone replans. selectStop/pin/follow no longer clearPlan off-zone.
+- OnHide tears down only when `panelDismissed` (close button, /qs plan hide, setting off); game-hidden UI keeps the session, OnShow resumes the job.
 
 ## 2026-11-19 — Save QuestieDB ID lists to disk (QuestSharingCache) so a new session skips the full scans
 - User approved after the options table: persist only the IDs each full scan kept, not the records (tens of KB, not MB; records stay fresh and localized).
@@ -750,3 +761,7 @@ Not done (needs data): mob level per objective for kill XP (assumes your own lev
 - Only the small labels take the mouse; circles never block map clicks. Hidden in combat. Table: <= 14 rows, <= 8 columns (rest fold into "Other", no spawn dropped).
 - Unverified: the circle texture's look in the real client.
 - 2026-11-19 (user: "this is what i wanna see but in wow style inside"): the camps table became the full Shared camps window mirroring tools/coldridge-network.html (buttons, network, map, matrix). Network curves = 8 straight CreateLine pieces per link; map background = the zone's own map art (dimmed), plain inset when the client gives no art; givers within 14 px share one label; "Mountaineer" title dropped from short names.
+
+## 2026-11-19 — Dungeon areas are data-driven
+- `ns.loot.dungeonOf(area)` -> canonical dungeon area: base table (23 + Forever 16544/16919/17191) + Forever `subAreas` -> parent + QuestieDB `ZoneDB.private.dungeons` keys and alternative ids (via `Q.dungeonList()`), minus `notDungeon` (raids, battlegrounds, Deeprun Tram, Darkmoon). Wowhead's Forever zone lists are JS-only (WebFetch empty, curl 403); The Hall of Thanes and Ruins of Lordaeron have Wowhead 'Dungeon Strategy Guide' pages; Dalaran / Manor Mistmantle unconfirmed online but are QuestieDB instance areas (harmless: a dungeon shows only when it has quests).
+

@@ -155,7 +155,7 @@ def test_ux08_every_simple_switch_command_names_a_real_setting(style):
     g = fresh(style)
     for cmd in ("minimap", "auto", "new", "chat", "click", "link", "solo", "pickup", "coords", "shareclick", "debug",
                 "bagmarks", "hidetracker", "sellgray", "chatlock", "aggro", "mappins", "waypoint", "sound", "ping",
-                "pingobjects", "items", "itembutton", "sync", "announce", "markers", "panel", "friends", "near"):
+                "pingobjects", "items", "sync", "announce", "markers", "panel", "friends", "near"):
         g.run("PRINTED = {}")
         g.slash(cmd + " off")
         text = printed(g)
@@ -240,7 +240,7 @@ def test_ux25_help_lists_guide_subcommands_and_missing_commands(style):
     g.slash("help")
     text = printed(g)
     for part in ("/qs plan all|xp", "budget", "selected", "busy", "range|unrestricted", "why", "options", "follow", "hide",
-                 "/qs lfg", "/qs ilvl", "/qs sound on|off", "/qs itembutton on|off", "/qs solo on|off",
+                 "/qs lfg", "/qs ilvl", "/qs sound on|off", "/qs solo on|off",
                  "/qs pingobjects on|off", "/qs map", "/qs status", "/qs help"):
         assert part in text, part
     assert "planner" not in text.lower()

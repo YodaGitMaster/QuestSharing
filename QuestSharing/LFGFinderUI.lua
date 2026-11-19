@@ -120,7 +120,7 @@ local function build()
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:SetText("Supercharge", 1, 0.82, 0)
             GameTooltip:AddLine("Off: per role only what is still open (1 healer, 1 tank, 3 damage), highest level first.", 1, 1, 1, true)
-            GameTooltip:AddLine("On: invites every match at once (up to 10 per Find). The first to accept gets the spot; extra players who accept may need to be removed.", 1, 1, 1, true)
+            GameTooltip:AddLine("On: fills every free spot at once with players who fit (the game counts open invites as spots). The first to accept gets the spot; extra players who accept may need to be removed.", 1, 1, 1, true)
             GameTooltip:Show()
         end) end
     end)

@@ -257,10 +257,10 @@ for _, p in ipairs({{80,80},{81,79},{79,81}}) do table.insert(QUESTIE_NPCS[610].
 ''')
     assert near(objective_waypoint(g), 0.30, 0.30)
     g.run("POS.x, POS.y = 0.52, 0.52")
-    g.advance(8)
+    g.fire("QUEST_ACCEPTED"); g.advance(8)
     assert near(objective_waypoint(g), 0.30, 0.30)
     g.run("POS.x, POS.y = 0.75, 0.75")
-    g.advance(8)
+    g.fire("QUEST_ACCEPTED"); g.advance(8)
     assert near(objective_waypoint(g), 0.80, 0.80)
 
 
@@ -449,6 +449,7 @@ def camp_timeline(style, extra, positions=CAMP_WALK):
     plans = [plan()]
     for x in positions:
         g.run(f"POS.x, POS.y = {x}, {x}")
+        g.fire("QUEST_ACCEPTED")   # walking alone no longer re-plans (2026-11-19); a quest event does
         spf_tick(g, 4)
         plans.append(plan())
     return plans, g
@@ -518,6 +519,12 @@ POS={x=0.40,y=0.40}
 '''
 
 
+def replan_here(g):
+    """Walking no longer re-plans (2026-11-19); a quest event does, from where the player stands."""
+    g.fire("QUEST_ACCEPTED")
+    spf_tick(g, 4)
+
+
 def mark_objective_camp_busy(g):
     objective_waypoint(g)  # selects the objective step
     g.eval("NS.questPlanner.markCampBusy")()
@@ -579,12 +586,12 @@ def test_clear_camp_wait_chooses_the_camp_afresh_from_where_you_stand(style):
     for spf in ("",) + SPF_BUILDS:
         g = spf_game(style, TWO_CAMPS + spf)
         g.run("POS.x, POS.y = 0.65, 0.65")
-        spf_tick(g, 4)
+        replan_here(g)
         assert near(objective_waypoint(g), 0.80, 0.80), (spf, objective_waypoint(g))
         mark_objective_camp_busy(g)
         assert near(objective_waypoint(g), 0.30, 0.30), (spf, objective_waypoint(g))
         g.run("POS.x, POS.y = 0.53, 0.53")
-        spf_tick(g, 4)
+        replan_here(g)
         assert near(objective_waypoint(g), 0.30, 0.30), (spf, objective_waypoint(g))
         # Clearing forgets the remembered camps as well: from 0.53 the west camp is nearer, so the guide does not
         # send you back to the east camp it held before the busy mark.
@@ -600,10 +607,10 @@ def test_camp_chosen_before_a_busy_mark_returns_when_the_wait_ends(style):
         mark_objective_camp_busy(g)
         assert near(objective_waypoint(g), 0.80, 0.80), (spf, objective_waypoint(g))
         # The camp the busy mark forced is not remembered as the guide's choice: once the five minutes are over,
-        # the next re-plan (a small step) returns to the west camp instead of holding on to the east one.
+        # the next re-plan returns to the west camp instead of holding on to the east one.
         g.advance(301)
         g.run("POS.x, POS.y = 0.52, 0.52")
-        spf_tick(g, 4)
+        replan_here(g)
         assert "plan origin: map 1436 (0.5200, 0.5200)" in g.eval("NS.questPlanner.debugText")()
         assert near(objective_waypoint(g), 0.30, 0.30), (spf, objective_waypoint(g))
         assert g.eval("SPF_ESTIMATES or 0") == 0, spf

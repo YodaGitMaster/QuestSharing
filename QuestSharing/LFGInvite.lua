@@ -15,13 +15,15 @@ local L = {}
 ns.lfgInvite = L
 
 local RECENT = 300          -- seconds a player we invited is skipped (no repeat invites while they decide)
-local PENDING = 60          -- seconds an invite still counts as a taken spot
+local PENDING = 75          -- seconds an invite still counts as a taken spot (the game keeps it open about 60 s;
+                            -- a margin is safer: freeing the spot too early gives "Your party is full.")
 local MAX_PARTY = 5
 local DUNGEONS = 2          -- the game's "Dungeons" category, used when the Blizzard window has no choice
 local ASK_WAIT = 2          -- seconds we wait for a Quest Sharing user to tell us their item level
 
 local NEED = { healer = 1, tank = 1, damage = 3 }      -- a dungeon party: what each role needs at most
-local SUPER_MAX = 10        -- supercharge: invites per click at most (chat and invite throttles)
+local SUPER_MAX = 10        -- supercharge: invites per click at most (chat and invite throttles); the free spots
+                            -- still limit it, because the game counts open invites as party spots
 local SEARCH_TIMEOUT = 6    -- seconds after which a search the game never answered no longer blocks the next one
 
 local invited = {}          -- name -> GetTime() of our invite (not invited again for RECENT seconds)
@@ -65,10 +67,9 @@ function L.freeSpots()
     if C.inGroup() and not C.isLeader() then return 0, "only the party leader can invite" end
     local taken = C.inGroup() and C.groupSize() or 1
     local now = GetTime()
-    if not ns.db.lfgSupercharge then             -- supercharge sends more invites than spots on purpose
-        for _, at in pairs(pending) do if now - at < PENDING then taken = taken + 1 end end
-        for _ in pairs(deciding) do taken = taken + 1 end
-    end
+    -- open invites hold a spot for the game too (more invites than spots = "Your party is full."), in every mode
+    for _, at in pairs(pending) do if now - at < PENDING then taken = taken + 1 end end
+    for _ in pairs(deciding) do taken = taken + 1 end
     if taken >= MAX_PARTY then return 0, "the party is full" end
     return MAX_PARTY - taken
 end
@@ -171,7 +172,7 @@ function L.matches()
     local get = A.GetFilteredSearchResults or A.GetSearchResults
     if not get then return {} end
     local _, results = get()
-    local wanted, now, out = L.wanted(), GetTime(), {}
+    local wanted, now, out, seen = L.wanted(), GetTime(), {}, {}
     local me = UnitName and UnitName("player")
     local lo, hi = tonumber(ns.db.lfgMinLevel) or 1, tonumber(ns.db.lfgMaxLevel) or 1000
     local function recent(t, name) return t[name] and now - t[name] < (tonumber(ns.db.lfgReinvite) or RECENT / 60) * 60 end
@@ -186,7 +187,8 @@ function L.matches()
             local can = roles and rolesFor(roles, wanted, class) or {}
             local level = tonumber(p.level)
             local inRange = not level or (level >= lo and level <= hi)
-            if #can > 0 and name and name ~= me and inRange and not recent(invited, name) and not recent(skipped, name) and not deciding[name] then
+            if #can > 0 and name and name ~= me and inRange and not seen[name] and not recent(invited, name) and not recent(skipped, name) and not deciding[name] then
+                seen[name] = true                                      -- listed twice (relisted): one invite
                 local known = ns.itemLevel and ns.itemLevel.known(name)
                 out[#out + 1] = { id = id, name = name, roles = can, role = can[1], level = level, class = p.className,
                                   classFile = class, spec = p.specName, activity = act, ilvl = known }
@@ -307,7 +309,8 @@ end
 function L.roleOpen(role, membersOnly) return math.max(0, (NEED[role] or 0) - L.roleTaken(role, membersOnly)) end
 
 -- normal: per role only what is still open (healer 1, tank 1, damage 3), within the free spots.
--- supercharge: every match at once (at most SUPER_MAX), the first to accept gets the spot.
+-- supercharge: every match at once, ignoring how many of a role are wanted, but never more than the free spots
+-- (open invites included) and SUPER_MAX: the first to accept gets the spot.
 function L.inviteMatches()
     if not L.wantedText() then return 0 end
     if not L.listing() then note("party finder: " .. NOT_LISTED); return 0 end
@@ -319,7 +322,7 @@ function L.inviteMatches()
     local super = ns.db.lfgSupercharge
     local n = 0
     for _, m in ipairs(L.matches()) do
-        if n >= (super and SUPER_MAX or spots) then break end
+        if n >= math.min(spots, SUPER_MAX) then break end
         -- the first of their roles still open; supercharge only skips roles the party members already fill
         local pick
         for _, r in ipairs(m.roles) do
@@ -419,8 +422,14 @@ local REFUSED = {
     { _G.ERR_ALREADY_IN_GROUP_S or "%s is already in a group.", "is already in a group" },
     { _G.ERR_BAD_PLAYER_NAME_S or "Cannot find player '%s'.", "could not be found" },
 }
+local FULL = _G.ERR_GROUP_FULL or "Your party is full."
 ns.on("CHAT_MSG_SYSTEM", function(_, msg)
     if type(msg) ~= "string" or next(pending) == nil then return end
+    if msg == FULL then
+        -- should not happen any more (open invites count as spots); if the game still says it, say why in plain words
+        ns.log("lfg", "game: party full with open invites")
+        return note("party finder: the game says the party is full - open invites count as spots, wait for answers")
+    end
     for _, r in ipairs(REFUSED) do
         local p = pattern(r[1])
         local who = p and string.match(msg, p)

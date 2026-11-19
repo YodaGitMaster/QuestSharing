@@ -245,32 +245,17 @@ function ns.nearestQuestItem()
     return best
 end
 
+-- The key clicks this button. It always stays hidden: there is no on-screen item button (removed 2026-11-19).
 local function buildKeyButton()
     if keyBtn or inCombat() then return keyBtn end
     keyBtn = newButton(KEY_BUTTON, 36)
     if not keyBtn then return nil end
-    keyBtn:SetMovable(true)
-    keyBtn:RegisterForDrag("LeftButton")
-    keyBtn:SetScript("OnDragStart", function(self) if IsShiftKeyDown and IsShiftKeyDown() and not inCombat() then self:StartMoving() end end)
-    keyBtn:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local point, _, _, x, y = self:GetPoint()
-        ns.db.itemButtonPos = { point, x, y }
-    end)
-    local pos = ns.db.itemButtonPos
     keyBtn:ClearAllPoints()
-    if pos then keyBtn:SetPoint(pos[1], UIParent, pos[1], pos[2], pos[3]) else keyBtn:SetPoint("CENTER", UIParent, "CENTER", 0, -180) end
+    keyBtn:SetPoint("CENTER", UIParent, "CENTER", 0, -180)
+    keyBtn:Hide()
     return keyBtn
 end
 ns.questItemButton = function() return keyBtn end
-function ns.resetItemButtonPosition(quiet)
-    ns.db.itemButtonPos = nil
-    if keyBtn and not inCombat() then
-        keyBtn:ClearAllPoints()
-        keyBtn:SetPoint("CENTER", UIParent, "CENTER", 0, -180)
-    end
-    if not quiet then ns.print("the quest item button is back below the middle of the screen") end
-end
 
 function ns.refreshItemKey()
     if inCombat() or ns.isBlocked("items") then return end
@@ -281,7 +266,7 @@ function ns.refreshItemKey()
     if near then
         if b.itemID ~= near.id then setItem(b, near.id) else paint(b) end
         b.questID = near.questID
-        if ns.db.itemButton then b:Show() else b:Hide() end
+        b:Hide()
     else
         if b.itemID then setItem(b, nil) end
         b:Hide()

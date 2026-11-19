@@ -152,14 +152,16 @@ end
 -- Keep only role/name/link metadata; a query reads locations for its matching NPCs later.
 -- Saved list (ns.dataWork.saved) "mapSearchNPCs": the NPC IDs that got a role row; later sessions read only those.
 -- Items are not saved: their scan reads one name per item and a vendor list only for names with the typed words.
-local savedNPCs
+local savedNPCs, savedScope
 local function indexRoles()
     if ready then return end
     if not npcIDs then
-        savedNPCs = Work.saved("mapSearchNPCs")
+        playerFaction = Q.me().faction
+        -- The cache is account-wide and the list skips the other faction's NPCs, so each faction keeps its own.
+        savedScope = playerFaction or "any"
+        savedNPCs = Work.saved("mapSearchNPCs", savedScope)
         npcIDs = savedNPCs or (Q and Q.ids and Q.ids("npc")) or {}
         mask = vendorMask()
-        playerFaction = Q.me().faction
     end
     while npcIDs[npcCursor] do
         metadata(npcIDs[npcCursor])
@@ -167,7 +169,7 @@ local function indexRoles()
         if npcCursor % 500 == 1 then progress() end
         Work.yield()
     end
-    if not savedNPCs then Work.save("mapSearchNPCs", "", Work.sortedKeys(vendors)) end
+    if not savedNPCs then Work.save("mapSearchNPCs", savedScope, Work.sortedKeys(vendors)) end
     ready, npcIDs, savedNPCs = true, nil, nil
 end
 

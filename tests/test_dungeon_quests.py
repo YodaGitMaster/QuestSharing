@@ -937,6 +937,56 @@ def test_a_short_name_inside_a_longer_one_is_not_coloured_twice(style):
     assert "|cff006666Kobold Miner|r" in t and t.count("|c")==t.count("|r"), t
 
 
+FOREVER=r'''
+local names2={[1337]="Uldaman",[16732]="Excavation Site: Wetlands",[16919]="The Hall of Thanes",[16611]="Ruins of Lordaeron"}
+local area=C_Map.GetAreaInfo
+C_Map.GetAreaInfo=function(id) return names2[id] or area(id) end
+QUESTIE_NPCS[920]={name="Thicket stalker",spawns={[16878]={{40,40}}}}   -- Excavation Site sub-area
+QUESTIE_NPCS[921]={name="Lordaeron ghoul",spawns={[16617]={{50,50}}}}   -- Ruins of Lordaeron: Market Street
+QUESTIE_QUESTS[30]={name="Uldaman under its quest id",questLevel=40,zoneOrSort=1517,startedBy={{197}}}
+QUESTIE_QUESTS[31]={name="Stalker hunt",questLevel=31,startedBy={{197}},objectives={{{920}}}}
+QUESTIE_QUESTS[32]={name="Thanes errand",questLevel=40,zoneOrSort=16919,startedBy={{197}}}
+QUESTIE_QUESTS[33]={name="Ghoul cleanup",questLevel=40,startedBy={{197}},objectives={{{921}}}}
+local get=LibQuestieDB.Support.Get
+LibQuestieDB.Support.Get=function(name)
+ if name=="ZoneDB" then
+  local z=get(name) or {private={}}
+  z.private.dungeons="return {[1337]={'Uldaman',{1517},3,{{3,44.6,12.1}}},[2717]={'Molten Core',nil,51,{{51,34.9,83.9}}},[16732]={'Excavation Site: Wetlands',nil,11,{{11,47.79,56.16}}}}"
+  return z
+ end
+ return get(name)
+end
+'''
+
+
+def test_forever_dungeons_sub_areas_and_alternative_quest_ids_are_dungeons(style):
+    g=game(style,FOREVER)
+    rows={r.id:r for r in g.eval("NS.dungeonQuests._results()").values()}
+    assert rows[30].dungeons[1337], "Uldaman's quests use area 1517 in Questie: it is Uldaman"
+    assert rows[31].dungeons[16732], "an NPC in Stalkers' Thicket (16878) makes it an Excavation Site quest"
+    assert rows[32].dungeons[16919], "The Hall of Thanes is a dungeon"
+    assert rows[33].dungeons[16611], "Market Street (16617) belongs to Ruins of Lordaeron"
+    assert 11 not in rows, "a Molten Core (raid) quest is still not a dungeon quest"
+    loot=g.eval("NS.loot")
+    assert loot.dungeonOf(1517)==1337 and loot.dungeonOf(16880)==16732 and loot.dungeonOf(2717) is None
+    assert not g.eval("NS.db.errors")
+
+
+def test_wowhead_dungeon_quest_lists_add_new_forever_dungeons_without_questie_locations(style):
+    # Questie has no location for these (outdoor giver, no zone): Wowhead's per-dungeon lists still place them.
+    g=game(style,r'''
+    QUESTIE_QUESTS[95788]={name="Drowned City errand",questLevel=36,startedBy={{197}}}
+    QUESTIE_QUESTS[96246]={name="Blackmaw errand",questLevel=56,startedBy={{197}}}
+    QUESTIE_QUESTS[96403]={name="Thanes errand",questLevel=14,startedBy={{197}}}
+    ''')
+    rows={r.id:r for r in g.eval("NS.dungeonQuests._results()").values()}
+    assert rows[95788].dungeons[16550] and rows[96246].dungeons[16554] and rows[96403].dungeons[16919]
+    assert "The Drowned City" in rows[95788].dungeonText and "Blackmaw Hold" in rows[96246].dungeonText
+    loot=g.eval("NS.loot")
+    assert loot.dungeonOf(16985)==16667 and loot.dungeonOf(17780)==16842
+    assert not g.eval("NS.db.errors")
+
+
 if __name__=="__main__":
     failed=total=0
     for name,fn in sorted(list(globals().items())):

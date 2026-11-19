@@ -145,6 +145,61 @@ QuestDB.Get = function(id, key) local q=QUESTIE_QUESTS[id]; return q and q[key] 
     assert any(content.children[i].isFontString and "This zone is too low level for you." in content.children[i].text
                for i in range(1, len(content.children) + 1))
 
+# ---- The guide stays on: no blank list, no replan from noise, kept inside mines (2026-11-19) ----------------------
+COUNT_SCANS = """PLAN_SCANS=0;local start=NS.dataWork.start
+NS.dataWork.start=function(owner,...) if owner=='quest-plan' then PLAN_SCANS=PLAN_SCANS+1 end return start(owner,...) end"""
+MINE = "\nlocal info=C_Map.GetMapInfo;C_Map.GetMapInfo=function(m) if m==9001 then return {name='Fargodeep Mine',mapType=5,parentMapID=1429} end return info(m) end\n"
+
+
+def visible_rows(g):
+    return sum(1 for r in planner_rows(g)[3] if r.shown)
+
+
+def test_loot_reputation_skills_and_spells_do_not_replan_the_guide():
+    g = planner_game(); g.run(COUNT_SCANS)
+    for event in ("BAG_UPDATE_DELAYED", "UPDATE_FACTION", "SKILL_LINES_CHANGED", "SPELLS_CHANGED"):
+        g.fire(event); g.advance(0.651)
+        assert visible_rows(g) == 2, event + ": the steps stay on screen"
+        g.advance(3)
+    assert g.eval("PLAN_SCANS") == 0, "no replan without a quest log change"
+
+
+def test_a_finished_quest_replans_without_blanking_the_list():
+    g = planner_game(); g.run(COUNT_SCANS)
+    g.run("QUESTS[#QUESTS+1]={id=8101,title='Green Quest',level=10,objectives={}}")
+    g.fire("QUEST_ACCEPTED"); g.advance(0.651)
+    assert visible_rows(g) == 2, "the old steps stay while the new route is built"
+    g.advance(5)
+    assert g.eval("PLAN_SCANS") == 1 and visible_rows(g) >= 1
+
+
+def test_walking_does_not_replan_the_route():
+    g = planner_game(); g.run(COUNT_SCANS)
+    for _ in range(5):
+        g.run("POS={x=POS.x+0.03,y=POS.y}"); g.advance(3.1)
+    assert g.eval("PLAN_SCANS") == 0 and visible_rows(g) == 2
+
+
+def test_a_mine_inside_the_zone_keeps_the_plan_and_coming_out_does_not_rebuild_it():
+    g = planner_game(DATA + MINE); g.run(COUNT_SCANS)
+    g.run("MAP_ID=9001"); g.fire("ZONE_CHANGED"); g.advance(2)
+    assert visible_rows(g) == 2, "the plan stays inside the mine"
+    panel = g.eval("QuestSharingPlannerPanel")
+    texts = [panel.children[i].text for i in range(1, len(panel.children) + 1) if getattr(panel.children[i], "text", None)]
+    g.run("MAP_ID=1429"); g.fire("ZONE_CHANGED"); g.advance(2)
+    assert visible_rows(g) == 2 and g.eval("PLAN_SCANS") == 0, "back outside: same plan, no rebuild"
+
+
+def test_the_game_hiding_the_interface_does_not_end_the_guide():
+    g = planner_game()
+    g.run("QuestSharingPlannerPanel:Hide(); QuestSharingPlannerPanel:Show()")   # Alt+Z or a cinematic
+    assert g.eval("NS.questPlanner.active()"), "still running"
+    g.run("QUESTS[#QUESTS+1]={id=8101,title='Green Quest',level=10,objectives={}}")
+    g.fire("QUEST_ACCEPTED"); g.advance(5)
+    assert visible_rows(g) >= 1
+    g.eval("NS.questPlanner.command")("hide")
+    assert not g.eval("NS.questPlanner.active()"), "the close command still ends it"
+
 
 if __name__ == "__main__":
     tests = [value for name, value in globals().items() if name.startswith("test_")]

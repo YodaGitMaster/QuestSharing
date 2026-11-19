@@ -204,6 +204,16 @@ def test_settings_row_in_the_quest_guide_tab_opens_the_table(style):
     assert g.eval("NS.campMap._table()").shown
 
 
+
+def test_the_quest_guide_panel_has_a_camps_button_that_opens_the_window(style):
+    g = game(style, on=False)
+    panel = g.eval("QuestSharingPlannerPanel")
+    button = next(c for c in panel.children.values() if getattr(c, "text", None) == "Camps")
+    assert button.shown and button.bg.shown, "a word button with the classic art"
+    button.scripts.OnClick(button, "LeftButton")
+    w = g.eval("NS.campMap._table()")
+    assert w.shown and w.net.shown, "opens the Shared camps window with the network"
+
 if __name__ == "__main__":
     import inspect
     failed = total = 0

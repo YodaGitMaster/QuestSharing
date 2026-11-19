@@ -36,7 +36,7 @@ local function yardScale(map)
 end
 local catalog, route, selected, frameMap, playerPoint, plannedMap, loading, generation = {}, {}, 1, nil, nil, nil, false, 0
 local selectionLocked = false
-local panel, message, planScroll, planRows, planContent, emptyText, followButton
+local panel, message, planScroll, planRows, planContent, emptyText, followButton, campsButton
 local previousButton, nextButton, stepCounter, modeButton, lockButton, waypointButton, guidePosition, busyButton
 local guideExpanded, guideLocked = true, false
 local sessionActive, zoneQuestIDs, zoneOrder = false, {}, {}
@@ -414,19 +414,30 @@ local function newCandidate(id, starter, log, data, membership, zoneReason)
     return data
 end
 
+-- In a mine, cave, town or dungeon of the planned zone the plan stays on screen; it carries on back outside.
+local plannedZoneName, pausedOutside
+local function keepOutside(reason)
+    pausedOutside = true
+    if message then message:SetText((plannedZoneName or "Quest guide") .. " (paused: " .. tostring(reason or "not outdoors") .. ")") end
+end
+
 local function scan(rediscover)
-    Guidance.clear()
+    local zone, locationError, zoneMap = currentZone()
+    if not zone and plannedMap and #route > 0 then keepOutside(locationError); return end
+    -- A replan of the same zone keeps showing the current steps until the new route is ready (no blank list).
+    local sameZone = zone and plannedMap == zoneMap and #route > 0
+    if not sameZone then Guidance.clear() end
     if P.cancelEstimate then P.cancelEstimate() end
     coverage = emptyCoverage()
     generation = generation + 1
     Work.cancel("quest-plan")
     local thisGeneration = generation
     local q = questie()
-    local zone, locationError, zoneMap = currentZone()
     if not zone then
         clearPlan(locationError)
         return
     end
+    pausedOutside, plannedZoneName = false, zone
     local log = ns.compat.entryMap()
     lastLogMembers, lastLogStructure, lastLogProgress = questLogState(log)
     if plannedMap ~= zoneMap then selectionLocked = false end
@@ -449,10 +460,13 @@ local function scan(rediscover)
     local discoveredIDs, sourceCache, zoneCache = {}, {}, {}
     local levelStats = { localCount = 0, below = 0, above = 0, eligible = 0, unknown = 0 }
     lastLevelStats = levelStats
-    loading, catalog, route, selected, plannedMap = true, {}, {}, 1, zoneMap
+    loading, catalog, plannedMap = true, {}, zoneMap
     if message then message:SetText(zone) end
-    if emptyText then emptyText:SetText("Checking quest locations…") end
-    if planContent then planScroll:SetVerticalScroll(0); showPlanRows() end
+    if not sameZone then
+        route, selected = {}, 1
+        if emptyText then emptyText:SetText("Checking quest locations…") end
+        if planContent then planScroll:SetVerticalScroll(0); showPlanRows() end
+    end
 
     Work.start("quest-plan", function()
         local ids
@@ -561,6 +575,7 @@ local function scan(rediscover)
             end
         end
         loading = false
+        if P.repGates then P.lastRepGates = P.repGates() end
         render(zone)
     end, function()
         return thisGeneration == generation and loading and ns.db.enabled and ns.db.questPlanner
@@ -1331,8 +1346,10 @@ local function ensurePanel()
     previousButton = smallButton("<", 20, 8, 34, function() P.navigate(-1) end, "Previous step")
     stepCounter = U.text(panel, "0/0", 32, 38, 40)
     nextButton = smallButton(">", 20, 74, 34, function() P.navigate(1) end, "Next step")
-    message = U.text(panel, "", 100, 38, PLAN_WIDTH - 138)
+    message = U.text(panel, "", 100, 38, PLAN_WIDTH - 194)
     message:SetWordWrap(false)
+    campsButton = smallButton("Camps", 52, PLAN_WIDTH - 88, 34, function() if ns.campMap then ns.campMap.openTable() end end,
+        "Shared camps: which mobs of your route share a camp (network, map and matrix). Also /qs plan camps table.", true)
     modeButton = smallButton("-", 22, PLAN_WIDTH - 32, 34, function(self)
         guideExpanded = not guideExpanded
         self:SetLabel(guideExpanded and "-" or "+")
@@ -1373,7 +1390,10 @@ local function ensurePanel()
     guidePosition:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 8, 4)
     guidePosition:SetHeight(3); guidePosition:SetWidth(1)
     S.closeButton(panel, function() panelDismissed = true; panel:Hide() end, -2, -2)
+    panel:SetScript("OnShow", function() if sessionActive then Work.resume("quest-plan") end end)
     panel:SetScript("OnHide", function()
+        -- The game hid the whole interface (Alt+Z, a cinematic): keep the session; the plan job waits until it shows.
+        if not panelDismissed then return end
         Guidance.clear()
         panelDismissed = true
         sessionActive = false
@@ -1606,9 +1626,9 @@ end
 
 selectStop = function(index)
     if loading or #route == 0 then return false end
-    local zone, reason, map = currentZone()
-    if not zone then clearPlan(reason); return false end
-    if map ~= plannedMap then scan(); return false end
+    local zone, _, map = currentZone()
+    if not zone then zone = plannedZoneName
+    elseif map ~= plannedMap then scan(); return false end
     selected = math.max(1, math.min(#route, index))
     selectionLocked = true
     render(zone)
@@ -1627,9 +1647,8 @@ end
 function P.pin()
     if loading then return ns.print("the Quest guide is updating") end
     if not plannedMap and #route == 0 then return ns.print("the Quest guide has no route yet; use /qs plan") end
-    local zone, reason, map = currentZone()
-    if not zone then clearPlan(reason); return end
-    if plannedMap and map ~= plannedMap then scan(); return ns.print("you changed zones; the Quest guide is planning the new zone") end
+    local zone, _, map = currentZone()
+    if zone and plannedMap and map ~= plannedMap then scan(); return ns.print("you changed zones; the Quest guide is planning the new zone") end
     local stop = route[selected]
     if not stop or not stop.point then return ns.print("this stop has no map location") end
     local p = stop.point
@@ -1642,9 +1661,8 @@ function P.follow()
     if loading then return ns.print("the Quest guide is updating") end
     local stop = route[selected]
     if not stop or not stop.point then return ns.print("this stop has no map location") end
-    local zone, reason, map = currentZone()
-    if not zone then clearPlan(reason); return end
-    if plannedMap and map ~= plannedMap then
+    local zone, _, map = currentZone()
+    if zone and plannedMap and map ~= plannedMap then
         scan()
         return ns.print("you changed zones; the Quest guide is planning the new zone")
     end
@@ -1672,21 +1690,8 @@ function P.open()
     if not ensurePanel() then return ns.print("this client cannot open the Quest guide") end
     dockPanel()
     panel:Show()
-    local elapsed = 0
-    panel:SetScript("OnUpdate", function(_, dt)
-        elapsed = elapsed + dt
-        if elapsed < 3 then return end
-        elapsed = 0
-        if loading or not sessionActive or U.call(InCombatLockdown) then return end
-        local map, x, y = ns.compat.playerPos()
-        if map and finite(x) and finite(y) and lastOrigin and map == lastOrigin.map then
-            local point = {map=map,x=x,y=y}
-            if distance(lastOrigin, point) >= 0.025 or math.abs(runSpeed() - (plannedSpeed or 7)) > 0.5 then
-                playerPoint = point
-                rebuildProgress(ns.compat.entryMap())
-            end
-        end
-    end)
+    -- No replan while walking: the route changes when a quest is accepted, progressed, done or abandoned, on a
+    -- level-up or a new zone, and on Refresh (user, 2026-11-19: steps must not move or vanish by themselves).
     scan()
 end
 
@@ -1747,7 +1752,7 @@ scheduleRefresh = function(force, zoneEntry)
         or panelDismissed or not (panel and panel:IsShown()) then return end
     if zoneEntry and plannedMap then
         local zone, reason, map = currentZone()
-        if map ~= plannedMap then
+        if zone and map ~= plannedMap then
             generation = generation + 1
             clearPlan(zone and ("Building a new plan for " .. zone .. "…") or reason)
         end
@@ -1772,6 +1777,8 @@ scheduleRefresh = function(force, zoneEntry)
             if enteredZone or mustRefresh then scan() end
             return
         end
+        if not zone then return end
+        if pausedOutside and map == plannedMap then pausedOutside = false; if message then message:SetText(zone) end end
         local log = ns.compat.entryMap()
         local members, structure, progress = questLogState(log)
         if mustRefresh or map ~= plannedMap or members ~= lastLogMembers or structure ~= lastLogStructure
@@ -1792,10 +1799,39 @@ ns.on("QUEST_REMOVED", function() scheduleRefresh(true, false) end)
 ns.on("QUEST_TURNED_IN", function() scheduleRefresh(true, false) end)
 ns.on("PLAYER_LEVEL_UP", function() scheduleRefresh(true, false) end)
 ns.on("QUEST_LOG_UPDATE", function() scheduleRefresh(false, false) end)
-ns.on("BAG_UPDATE_DELAYED", function() scheduleRefresh(true, false) end)
-ns.on("SPELLS_CHANGED", function() scheduleRefresh(true, false) end)
-ns.on("UPDATE_FACTION", function() scheduleRefresh(true, false) end)
-ns.on("SKILL_LINES_CHANGED", function() scheduleRefresh(true, false) end)
+-- Which reputation requirements of the planned quests are met ("" when none has one). A rep gain replans only when it
+-- crosses one of them, so a kill that gives reputation does not rebuild the guide.
+local function repGates()
+    local gates, factions = {}, {}
+    for id, quest in pairs(catalog) do
+        for _, key in ipairs({ "requiredMinRep", "requiredMaxRep" }) do
+            local pair = quest[key]
+            if type(pair) == "table" and pair[1] then gates[#gates + 1] = { id, key, pair[1], tonumber(pair[2]) or 0 }; factions[pair[1]] = true end
+        end
+    end
+    if #gates == 0 then return "" end
+    local values, parts = ns.compat.plannerReputation(factions) or {}, {}
+    for _, g in ipairs(gates) do
+        local v = tonumber(values[g[3]])
+        local met = v == nil and "?" or (((g[2] == "requiredMinRep") == (v >= g[4])) and "1" or "0")
+        parts[#parts + 1] = g[1] .. g[2] .. "=" .. met
+    end
+    table.sort(parts)
+    return table.concat(parts, ",")
+end
+P.repGates = repGates
+
+-- Loot, reputation, skill-ups and spells fire all the time; they replan only when the quest log changed with them
+-- (reputation also when it crosses a planned quest's requirement).
+ns.on("BAG_UPDATE_DELAYED", function() scheduleRefresh(false, false) end)
+ns.on("SPELLS_CHANGED", function() scheduleRefresh(false, false) end)
+ns.on("UPDATE_FACTION", function()
+    local now = repGates()
+    local crossed = P.lastRepGates ~= nil and now ~= P.lastRepGates
+    P.lastRepGates = now
+    scheduleRefresh(crossed, false)
+end)
+ns.on("SKILL_LINES_CHANGED", function() scheduleRefresh(false, false) end)
 ns.on("QUEST_WATCH_UPDATE", function() scheduleRefresh(false, false) end)
 ns.on("UNIT_QUEST_LOG_CHANGED", function() scheduleRefresh(false, false) end)
 

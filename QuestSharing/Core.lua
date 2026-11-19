@@ -73,7 +73,6 @@ ns.defaults = {
     pingGap = 10,       -- anti-spam: outside combat a new ping only after this many seconds (or once the last one died)
     pingObjects = true, -- with no quest creature in sight, ping the quest object you face ("look here")
     questItems = true,  -- icons next to the quests in the tracker for usable quest items in your bags, and the item key
-    itemButton = true,  -- a small movable button with the item of your nearest quest
     sound = true,       -- a soft sound for good news (someone accepted a quest I shared, a party member finished a shared quest)
     panelCombat = true, -- hide the Party quests window during combat
     panelSolo = true,   -- show the Party quests window when you are not in a party too (your quests of the zone)
@@ -308,6 +307,7 @@ ns.on("ADDON_LOADED", function(_, name)
         if QuestSharingDB[k] == nil then QuestSharingDB[k] = v end
     end
     QuestSharingDB.dbVersion = ns.defaults.dbVersion
+    QuestSharingDB.itemButton, QuestSharingDB.itemButtonPos = nil, nil     -- the on-screen item button was removed
     ns.db = QuestSharingDB
     if ns.refreshSettings then ns.refreshSettings() end
 end)
@@ -457,7 +457,7 @@ function ns.setSetting(key, value)
         if (key == "panel" or key == "panelCombat" or key == "panelSolo") and ns.syncPanelVisibility then ns.syncPanelVisibility() end
         if key == "panelScale" and ns.applyPanelScale then ns.applyPanelScale() end
         if key == "mapPins" and ns.refreshMapPins then ns.refreshMapPins() end
-        if (key == "questItems" or key == "itemButton") and ns.applyQuestItems then ns.applyQuestItems() end
+        if key == "questItems" and ns.applyQuestItems then ns.applyQuestItems() end
         if key == "minimap" and ns.syncMinimapButton then ns.syncMinimapButton() end
         if string.sub(key, 1, 3) == "lfg" and ns.lfgFinder then ns.lfgFinder.refresh() end
         if key == "markMobs" and ns.refreshMarkers then ns.refreshMarkers() end
@@ -543,8 +543,7 @@ local help = {
     "/qs memory purge     free every catalogue read from QuestieDB (each reads again when next used)",
     "/qs pingkey <KEY>    the key that pings the nearest quest creature (Attack) or quest object (look here); none removes it",
     "/qs itemkey <KEY>    the key that uses the item of your nearest quest (a torch, a flare...); none removes it",
-    "/qs items on|off     item icons next to the quests in the tracker, and the quest item button",
-    "/qs itembutton on|off the separate movable button with the item of your nearest quest",
+    "/qs items on|off     item icons next to the quests in the tracker, and the quest item key",
     "/qs cleanup         review leftover quest items in your bags and delete confirmed stacks",
     "/qs gather [item]    why an item does or does not show where to gather it (default: the last item you hovered)",
     "/qs questie          does Quest Sharing read Questie's quest database? (with a real lookup from your quest log)",
@@ -568,7 +567,7 @@ local help = {
     "/qs probe            show what this game client supports (send this to the author if something fails)",
 }
 
-local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", shareclick = "shareByClick", debug = "debug", bagmarks = "bagMarks", hidetracker = "hideTracker", sellgray = "autoSellGray", chatlock = "chatLock", aggro = "aggroPlates", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems", itembutton = "itemButton",
+local BOOLS = { minimap = "minimap", auto = "auto", new = "shareNew", chat = "chat", click = "click", link = "link", solo = "panelSolo", pickup = "pickup", coords = "coords", shareclick = "shareByClick", debug = "debug", bagmarks = "bagMarks", hidetracker = "hideTracker", sellgray = "autoSellGray", chatlock = "chatLock", aggro = "aggroPlates", mappins = "mapPins", waypoint = "teamWaypoint", sound = "sound", ping = "ping", pingobjects = "pingObjects", items = "questItems",
                 sync = "sync", announce = "announce", markers = "markers", panel = "panel" }
 
 -- /qs map: the world map switches, wherever they are in the settings

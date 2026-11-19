@@ -198,8 +198,50 @@ end
 local dungeonIDs = { [389]=true,[43]=true,[36]=true,[33]=true,[48]=true,[34]=true,[90]=true,[47]=true,
     [189]=true,[129]=true,[70]=true,[209]=true,[349]=true,[109]=true,[230]=true,[229]=true,[429]=true,[289]=true,[329]=true,[3065]=true,[2999]=true,[2998]=true,[2959]=true,[3002]=true }
 local dungeonAreas = { [2437]=true,[718]=true,[1581]=true,[209]=true,[719]=true,[717]=true,[721]=true,[491]=true,
-    [796]=true,[722]=true,[1337]=true,[1176]=true,[2100]=true,[1477]=true,[1584]=true,[1583]=true,[2557]=true,[2057]=true,[2017]=true,[16611]=true,[16732]=true,[16560]=true,[3002]=true }
-function L.isDungeonArea(area) return dungeonAreas[tonumber(area)] == true end
+    [796]=true,[722]=true,[1337]=true,[1176]=true,[2100]=true,[1477]=true,[1584]=true,[1583]=true,[2557]=true,[2057]=true,[2017]=true,
+    [16611]=true,[16732]=true,[3002]=true,
+    -- Forever instance areas (QuestieDB AreaTable 1.60.1): City of Dalaran, The Hall of Thanes, Manor Mistmantle
+    [16544]=true,[16919]=true,[17191]=true,
+    -- the other new Forever dungeons (Wowhead "Dungeons Overview for Forever"): The Drowned City, Krol'dok Stronghold,
+    -- Alcaz Prison, Blackmaw Hold, The Shaper's Terrace
+    [16550]=true,[16842]=true,[16620]=true,[16554]=true,[16667]=true }
+-- Forever sub-areas of an instance (NPCs spawn there) -> the instance itself.
+local subAreas = { [16558]=16544,[16559]=16544,[16560]=16544,[16562]=16544,
+    [16612]=16611,[16614]=16611,[16615]=16611,[16617]=16611,
+    [16877]=16732,[16878]=16732,[16879]=16732,[16880]=16732,
+    [17803]=1584,[17804]=1583,
+    [16985]=16667,[17780]=16842 } -- QuestieDB's ids for The Shaper's Terrace and Krol'dok Stronghold
+-- Raids, battlegrounds and other non-dungeon instances in QuestieDB's list: never "dungeon quests".
+local notDungeon = { [1977]=true,[2159]=true,[2257]=true,[2597]=true,[2677]=true,[2717]=true,[2917]=true,[2918]=true,[3277]=true,
+    [3358]=true,[3428]=true,[3429]=true,[3456]=true,[3457]=true,[3606]=true,[5861]=true,[16394]=true,[16603]=true,[16653]=true }
+local alias
+-- The dungeon an area belongs to (its canonical area id), or nil. QuestieDB's instance list adds every 5-player
+-- instance and its alternative ids (Uldaman's quests use 1517, Gnomeregan's 133, Dire Maul's wings 10022-10027).
+function L.dungeonOf(area)
+    area = tonumber(area)
+    if not area then return nil end
+    if dungeonAreas[area] then return area end
+    if subAreas[area] then return subAreas[area] end
+    if not alias then
+        local list = ns.questie and ns.questie.dungeonList and ns.questie.dungeonList()
+        if type(list) == "table" then
+            alias = {}
+            for key, entry in pairs(list) do
+                key = tonumber(key)
+                if key and not notDungeon[key] and type(entry) == "table" then
+                    local canonical = subAreas[key] or key
+                    alias[key] = alias[key] or canonical
+                    for _, alt in ipairs(type(entry[2]) == "table" and entry[2] or {}) do
+                        alt = tonumber(alt)
+                        if alt and not notDungeon[alt] and not dungeonAreas[alt] then alias[alt] = alias[alt] or canonical end
+                    end
+                end
+            end
+        end
+    end
+    return alias and alias[area] or nil
+end
+function L.isDungeonArea(area) return L.dungeonOf(area) ~= nil end
 local function standardDungeon(content, module, owner)
     if content.IsRaid or (tonumber(content.MaxPlayers) or 0) > 10 then return false end
     local types = U.call(module.GetContentTypes, module)

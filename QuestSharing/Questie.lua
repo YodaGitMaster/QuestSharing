@@ -806,6 +806,17 @@ local function decodeTable(s)
     local ok, v = pcall(chunk)
     return (ok and type(v) == "table") and v or nil
 end
+-- QuestieDB's instance list: { [area] = { name, alternativeAreaIds, parentZone, { {parentZone, x, y}, ... } } } or nil.
+-- Read once it is available (QuestieDB may load after us); nil until then.
+local dungeonList
+function Q.dungeonList()
+    if dungeonList then return dungeonList end
+    local lib = type(LibQuestieDB) == "table" and LibQuestieDB.Support
+    local ok, zone = pcall(function() return lib and lib.Get and lib.Get("ZoneDB") end)
+    local priv = ok and type(zone) == "table" and zone.private
+    dungeonList = type(priv) == "table" and decodeTable(priv.dungeons) or nil
+    return dungeonList
+end
 -- the game's map for one of QuestieDB's zones (QuestieDB ships the table, with its overrides), or nil
 function Q.uiMapOf(areaId)
     if areaToMap == nil then

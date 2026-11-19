@@ -576,3 +576,12 @@
 - 2026-11-19 network view (`tools/coldridge-network.html`): all 10 Coldridge camps (>= 5 spawns, 100 yd) serve 2+ quests. Burly Rockjaw Trogg spawns in 8 of 10 camps (A New Threat fills itself). Whelps + Grik'nir share camp A4, but The Stolen Journal unlocks only after The Troll Cave hand-in, so the chain forces a second trip there. Felix's 3 objects sit in whelp camps (A2, A5, A8) but the quest needs level 3, so it cannot ride along with the whelp kills at level 1-2.
 - 2026-11-19 shared camps view: in the harness a hidden parent does not make child textures report hidden (`IsShown` is the own flag), so map-layer tests must check the overlay frame's `shown`, not each circle.
 - 2026-11-19 preview of real WoW windows: the harness keeps only the last SetPoint and drops colours; `tools/preview_camp_window.py` patches CreateFrame to record all anchors, colours, alpha, fonts and justify, then resolves layout itself. Reuse it for any new window to see layout bugs (overlapping headers, hidden labels) before an in-game check.
+
+## 2026-11-19 — Forever dungeons
+- Wowhead Forever list pages are JS-only (curl 403 / WebFetch empty), but `https://www.wowhead.com/forever/search/suggestions-template?q=NAME` returns JSON (zone ids, guide ids), and guide pages (`/forever/guide=ID`) carry the markup in `printHtml("...")` with `[quest=ID]` and `[zone=ID]` tags.
+- 9 new Forever dungeons (guide 34783): Hall of Thanes 16919 (13-18), Ruins of Lordaeron 16611 (15-20), Excavation Site 16732 (24-29), City of Dalaran 16544 (28-33), Drowned City 16550 (35-40), Krol'dok Stronghold 16842 (40-45), Alcaz Prison 16620 (48-53), Blackmaw Hold 16554 (55-60), Shaper's Terrace 16667 (58-60). QuestieDB files quests for only Shaper's Terrace (as 16985) among the last five.
+
+
+- 2026-11-19: "The guide closes and re-calcs by itself" = noisy events (BAG_UPDATE_DELAYED, UPDATE_FACTION, SKILL_LINES_CHANGED, SPELLS_CHANGED) passed force=true to scheduleRefresh, and scan() emptied `route` before rebuilding; plus sub-maps (mines are mapType 5) made currentZone nil -> clearPlan. Measure with a counter on ns.dataWork.start("quest-plan") and visible rows right after the 0.65 s debounce (advance 0.651) before the job pump runs.
+
+- 2026-11-19: Saved ID lists in account-wide `QuestSharingCache` must include every filter applied before saving in their scope key (faction, class). `mapSearchNPCs` lacked faction -> other-faction alts saw no own-faction sellers. Harness has no `UnitFactionGroup`; set it in tests or faction filters are silently off.

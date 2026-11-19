@@ -531,28 +531,28 @@ end
 def test_local_search_runs_again_only_when_the_plan_inputs_change(style):
     g=Game(style,WESTFALL,fresh=True);g.run(COUNT_REFINES);g.start();g.slash("plan");g.advance(8)
     assert g.eval("REFINES")==1
-    # Small moves re-plan from the new position (starting from the refined order) without a new local search.
-    for x in (0.53,0.5,0.53):
+    # Walking does not re-plan at all (2026-11-19): the route stays as it is until a quest event or a new goal.
+    import re
+    def plan_origin(): return re.search(r"plan origin: [^;]*",g.eval("NS.questPlanner.debugText")()).group(0)
+    origin=plan_origin()
+    for x in (0.53,0.5,0.53,0.6):
         g.run(f"POS.x, POS.y = {x}, {x}");g.advance(4)
-        assert "plan origin: map 1436 (%.4f, %.4f)"%(x,x) in g.eval("NS.questPlanner.debugText")()
     assert g.eval("REFINES")==1
+    assert plan_origin()==origin
     assert not g.eval('NS.dataWork.busy("quest-improve")')
-    # Real movement, or another goal, refines again.
-    g.run("POS.x, POS.y = 0.6, 0.6");g.advance(4)
-    assert g.eval("REFINES")==2
+    # Another goal refines again.
     g.slash("plan xp");g.advance(5)
-    assert g.eval("REFINES")==3
+    assert g.eval("REFINES")==2
 
 def test_local_search_gate_holds_with_any_spf_build(style):
     from test_quest_planner_zone_steps import SPF_BUILDS, spf_tick
     # SPF is never asked for walking estimates, so every build plans and refines exactly as without SPF:
-    # one local search, and small moves re-plan without a new one.
+    # one local search, and walking starts no new one.
     for spf in SPF_BUILDS:
         g=Game(style,WESTFALL+spf,fresh=True);g.run(COUNT_REFINES);g.start();g.slash("plan");spf_tick(g,8)
         assert g.eval("REFINES")==1,(spf,g.eval("REFINES"))
         for x in (0.53,0.5,0.53,0.5):
             g.run(f"POS.x, POS.y = {x}, {x}");spf_tick(g,4)
-            assert "plan origin: map 1436 (%.4f, %.4f)"%(x,x) in g.eval("NS.questPlanner.debugText")()
         assert g.eval("REFINES")==1,(spf,g.eval("REFINES"))
         assert g.eval("SPF_ESTIMATES")==0,spf
         assert not g.eval('NS.dataWork.busy("quest-improve")')

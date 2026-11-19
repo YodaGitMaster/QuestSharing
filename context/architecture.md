@@ -31,7 +31,7 @@ cutpdf/
 │   ├── ux-review-verdicts-2026-11-19.json            # Verifier verdicts per UX id (confirmed/partly/refuted + fix notes) used by the ux-fix builders
 │   └── walkable-routing-research.md                  # Terrain-routing feasibility, provider sources and proposed integration (not implemented)
 ├── questidea.txt                                     # User-provided predictive quest optimizer design requirements
-├── QuestSharing/                                     # WoW addon runtime (52 files, collapsed; LFGInvite.lua = party finder (needs own listing) search + auto-invite by activity/role/class/level/item level, highest level first, LFGFinderUI.lua = spyglass picker window, ItemLevel.lua = inspect + remembered/shared item levels, BagTools.lua = bag bookmarks / sell grays / arrange by topic, ChatLock.lua = no chat box in combat, Aggro.lua = tank aggro % over enemy nameplates + lowest-aggro near enemy marked) (60 files, collapsed; CampMap.lua = Quest guide shared camps on the world map + camps table; DungeonRoute.lua = 'get them all' route: walk/flight/boat/hearth graph, Dijkstra legs, precedence-aware stop order) (59 files, collapsed)
+├── QuestSharing/                                     # WoW addon runtime (52 files, collapsed; LFGInvite.lua = party finder (needs own listing) search + auto-invite by activity/role/class/level/item level, highest level first, LFGFinderUI.lua = spyglass picker window, ItemLevel.lua = inspect + remembered/shared item levels, BagTools.lua = bag bookmarks / sell grays / arrange by topic, ChatLock.lua = no chat box in combat, Aggro.lua = tank aggro % over enemy nameplates + lowest-aggro near enemy marked) (61 files, collapsed; CampMap.lua = Quest guide shared camps on the world map + camps table; DungeonQuestData.lua = Wowhead per-dungeon quest lists (quest -> dungeon area) + names of the 9 new Forever dungeons; DungeonRoute.lua = 'get them all' route: walk/flight/boat/hearth graph, Dijkstra legs, precedence-aware stop order) (59 files, collapsed)
 ├── README.md                                         # User documentation
 ├── tests/                                            # Python tests and Lua API harness (collapsed; test_aggro.py = tank aggro marks, test_lfg_invite.py = party finder, test_item_level.py = item levels, test_coldridge_valley.py = optimizer reference case on real QuestieDB rows; test_camp_map.py = shared camps map + table; data/coldridge_valley.lua = its generated fixture) (63 files + data/, collapsed)
 └── tools/                                            # Local UI emulation utilities, never shipped in the addon
@@ -782,6 +782,25 @@ sequenceDiagram
     Planner->>Guide: clear on scan, close, zone invalidation or disable
     Guide->>HUD: Hide and remove OnUpdate
     Guide->>Overlay: Hide and drop route/hover references
+```
+
+### Quest guide: what replans it (2026-11-19, QuestPlanner.lua scheduleRefresh)
+```mermaid
+sequenceDiagram
+    participant Game
+    participant P as QuestPlanner.lua
+    participant Panel as QuestSharingPlannerPanel
+    Game->>P: QUEST_ACCEPTED / REMOVED / TURNED_IN / PLAYER_LEVEL_UP (forced)
+    P->>P: scan() same zone: old steps stay on screen until buildRoute replaces route
+    Game->>P: QUEST_LOG_UPDATE / BAG_UPDATE_DELAYED / SPELLS / SKILL_LINES (not forced)
+    P->>P: replan only if questLogState changed (members/structure) or rebuildProgress on objective progress
+    Game->>P: UPDATE_FACTION
+    P->>P: forced only if repGates() (rep requirement met/unmet of planned quests) changed
+    Game->>P: ZONE_CHANGED* into mine/cave/town/dungeon (currentZone nil)
+    P->>Panel: keepOutside: plan kept, "(paused: ...)"; back on plannedMap: same plan, no rebuild
+    Game->>Panel: UIParent hidden (Alt+Z, cinematic) -> OnHide
+    Panel->>P: session kept unless panelDismissed (close button, /qs plan hide)
+    Note over P: no OnUpdate walking replan any more
 ```
 
 ```mermaid

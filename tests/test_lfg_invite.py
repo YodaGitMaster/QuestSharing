@@ -292,7 +292,7 @@ def test_supercharge_invites_every_matching_healer_at_once(style):
     g.eval("NS.lfgInvite.scan")()
     assert g.invited() == ["Lia", "Hec", "Heb", "Hea"], "all four, highest level first"
     assert all(m.endswith("First to accept gets the spot.") for m, _ in whispers(g))
-    assert g.eval("(NS.lfgInvite.freeSpots())") == 4, "open invites do not block more searches in supercharge"
+    assert g.eval("(NS.lfgInvite.freeSpots())") == 0, "4 open invites fill the 4 spots (the game counts them too)"
 
 
 def test_a_joined_healer_fills_the_healer_role(style):
@@ -388,6 +388,52 @@ def test_settings_links_open_the_party_finder_page(style):
     g.eval("NS.lfgFinder.toggle")(True)
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(g.eval("NS.lfgFinder._window()").more)
     assert g.eval("NS._settingsWindow()").tab == "finder", "the picker's Settings button"
+
+
+def test_supercharge_never_sends_more_invites_than_free_spots(style):
+    g = game(style)
+    g.run(HEALERS + "; NS.setSetting('lfgSupercharge', true)")
+    g.join_party(["A", "B"])                                     # 3 in the party: 2 spots
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == ["Lia", "Hec"], "only 2 invites: a 3rd would get 'Your party is full.'"
+    g.reply("Lia declines your group invitation.")
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == ["Lia", "Hec", "Heb"], "a decline frees one spot for one more"
+
+
+def test_supercharge_counts_players_still_being_asked_for_their_item_level(style):
+    g = game(style)
+    g.run(HEALERS + "; NS.setSetting('lfgSupercharge', true); NS.setSetting('lfgMinIlvl', 30)")
+    g.join_party(["A", "B", "C"])                                # 1 spot
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == [] and g.eval("(NS.lfgInvite.freeSpots())") == 0, "one player asked: the spot is held"
+    g.advance(3)
+    assert g.invited() == ["Lia"], "after the wait, one invite only"
+
+
+def test_a_player_listed_twice_gets_one_invite(style):
+    g = game(style)
+    g.run("LISTED[50] = { numMembers = 1, leaderName = 'Lia', activityIDs = { 101 }, player = LISTED[11].player }")
+    g.run("NS.setSetting('lfgSupercharge', true)")
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited().count("Lia") == 1
+
+
+def test_an_open_invite_holds_its_spot_past_one_minute(style):
+    g = game(style)
+    g.join_party(["A", "B", "C"])                                # 1 spot
+    g.eval("NS.lfgInvite.scan")()
+    g.advance(65)                                                # the game may still show her the invite
+    assert g.eval("(NS.lfgInvite.freeSpots())") == 0
+    g.advance(15)
+    assert g.eval("(NS.lfgInvite.freeSpots())") == 1
+
+
+def test_the_games_party_full_error_gets_a_plain_explanation(style):
+    g = game(style)
+    g.eval("NS.lfgInvite.scan")()
+    g.reply("Your party is full.")
+    assert any("open invites count as spots" in p for p in g.printed())
 
 
 if __name__ == "__main__":

@@ -164,7 +164,11 @@ QUESTIE_QUESTS[9012]={name="Level gated",questLevel=15,requiredLevel=14,startedB
     c=g.eval("NS.questPlanner.coverage")()
     # 9012 needs level 14 at level 10 (more than 3 levels ahead): one cheap read rules it out, so it is counted, not listed as blocked
     assert c.repeatable[9010] and c.external[9011] and c.blocked[9012] is None and c.skipped.level==1
+    # Off the zone map (a mine, town, dungeon or here the continent map) the plan is kept, paused
     g.run('MAP_ID=100');g.fire('ZONE_CHANGED_NEW_AREA');g.advance(2)
+    assert g.eval("NS.questPlanner.coverage")().external[9011]
+    # Another outdoor zone gets its own plan
+    g.run('MAP_ID=1429');g.fire('ZONE_CHANGED_NEW_AREA');g.advance(4)
     assert g.eval("NS.questPlanner.coverage")().external[9011] is None
 
 

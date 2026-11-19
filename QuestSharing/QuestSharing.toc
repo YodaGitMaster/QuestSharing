@@ -50,6 +50,7 @@ Professions.lua
 ProfessionUI.lua
 Rewards.lua
 Loot.lua
+DungeonQuestData.lua
 DungeonRoute.lua
 DungeonQuests.lua
 SpellRanks.lua

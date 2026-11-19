@@ -229,6 +229,8 @@ def render(g, win):
     out.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="8" fill="none" stroke="#5a4510" stroke-width="2"/>' % (wx + 8, wy + 8, ww - 16, wh - 16))
     # inset rims around the two panels
     for p in (win.net, win.map):
+        if p is None:
+            continue
         x, y, w, h = L.rect(p)
         out.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="none" stroke="#8c6d2c" stroke-width="1.5"/>' % (x, y, w, h))
     return wx, wy, ww, wh, "\n".join(out)

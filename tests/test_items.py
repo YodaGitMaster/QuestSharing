@@ -116,7 +116,7 @@ def test_the_button_holds_the_item_of_the_nearest_quest(style):
         g.run("NS.refreshQuestItems()")
         g.advance(1)
     b = g.eval("NS.questItemButton()")
-    assert b.shown is True and b.attrs.type == "item"
+    assert b.shown is False and b.attrs.type == "item", "no button on screen; the key clicks it"
     assert b.attrs.item == ("item:6000" if style == "modern" else b.attrs.item), "the torch: its quest is nearer"
     assert b.icon.texture is not None
 
@@ -132,13 +132,13 @@ def test_the_item_key(style):
     assert g.eval("NS.itemKeyName()") is None
 
 
-def test_count_and_range_show_on_the_button(style):
+def test_the_key_button_holds_the_count_and_stays_hidden(style):
     g = game(style, "BAGS[0] = { { id = 6001, questID = 100 } }")
     b = g.eval("NS.questItemButton()")
     assert b.count.text == "3"
     g.run('TARGET = { name = "Kobold", player = false }; ITEM_IN_RANGE = false')
     g.advance(1.5)
-    assert tuple(round(v, 1) for v in list(b.icon.vertex.values())[:3]) == (1, 0.3, 0.3), "red: out of range"
+    assert b.shown is False, "no icon in the middle of the screen"
 
 
 def test_no_range_check_in_a_fight(style):
@@ -157,16 +157,16 @@ def test_no_range_check_in_a_fight(style):
     g.advance(30)
     assert g.eval("RANGE_IN_COMBAT") == 0, "not once during the fight"
     assert g.eval("NS.db.errors == nil or #NS.db.errors == 0") is True
-    assert g.eval("NS.questItemButton()").shown is True, "the button stays"
+    assert g.eval("NS.questItemButton()").attrs.item == "item:6001", "the key keeps its item through the fight"
 
 
 def test_no_item_no_button_and_the_switches(style):
     g = game(style)
     assert g.eval("NS.questItemButton()").shown is False
     g2 = game(style, "BAGS[0] = { { id = 6000 } }")
-    g2.slash("itembutton off")
-    assert g2.eval("NS.questItemButton()").shown is False
-    assert g2.eval("NS.questItemButton()").attrs.item == "item:6000", "the key still works without the button"
+    assert g2.eval("NS.questItemButton()").shown is False, "never shown on screen"
+    assert g2.eval("NS.questItemButton()").attrs.item == "item:6000", "the key still works without a visible button"
+    assert g2.eval("NS.db.itemButton") is None and g2.eval("NS.db.itemButtonPos") is None
     g2.slash("items off")
     track(g2, 700)
     assert shown_icons(g2) == []
@@ -183,7 +183,7 @@ def test_the_settings_tab(style):
     g.eval("NS.settingsTab")("items")
     labels = [re.sub(r"\|c[0-9a-fA-F]{8}|\|r", "", W.rows[n].text.text) for n in range(1, 19) if W.rows[n].frame.shown]
     for want in ("Find and use quest items", "Show usable item buttons beside tracked quests",
-                 "Key to use my nearest quest's item", "Show a separate button for my nearest quest's item"):
+                 "Key to use my nearest quest's item"):
         assert want in labels, (want, labels)
     row = next(W.rows[n] for n in range(1, 19) if W.rows[n].frame.shown and re.sub(r"\|c[0-9a-fA-F]{8}|\|r", "", W.rows[n].text.text) == "Key to use my nearest quest's item")
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(row.button)

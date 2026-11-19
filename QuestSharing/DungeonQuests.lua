@@ -39,7 +39,8 @@ end
 local function number(v) return tonumber(v) or 0 end
 local function enums() return type(LibQuestieDB)=="table" and LibQuestieDB.Enum or {} end
 local function areaName(area)
-    return U.call(C_Map and C_Map.GetAreaInfo,area) or U.call(GetAreaInfo,area) or ("Dungeon area "..area)
+    return U.call(C_Map and C_Map.GetAreaInfo,area) or U.call(GetAreaInfo,area)
+        or (ns.dungeonQuestData and ns.dungeonQuestData.names[area]) or ("Dungeon area "..area)
 end
 local function defaults(mine)
     local _,class=U.call(UnitClass,"player")
@@ -241,7 +242,7 @@ end
 -- Cache only repeated source associations (bounded to 256); no item catalogue enumeration or native item reads.
 local function memberships(id,read,sourceCache)
     local found={}
-    local function add(area) if ns.loot.isDungeonArea(area) then found[tonumber(area)]=true end end
+    local function add(area) local dungeon=ns.loot.dungeonOf(area);if dungeon then found[dungeon]=true end end
     add(read("quest",id,"zoneOrSort"))
     local function source(kind,sourceID,collect)
         local key=kind..":"..tostring(sourceID)
@@ -252,7 +253,8 @@ local function memberships(id,read,sourceCache)
             for area,points in pairs(type(spawns)=="table" and spawns or {}) do
                 if type(points)=="table" and next(points) then
                     areas.known=true
-                    if ns.loot.isDungeonArea(area) then areas[#areas+1]=tonumber(area) else areas.outside=true end
+                    local dungeon=ns.loot.dungeonOf(area)
+                    if dungeon then areas[#areas+1]=dungeon else areas.outside=true end
                 end
             end
             sourceCache.slot=(sourceCache.slot or 0)%256+1
@@ -302,6 +304,9 @@ local function memberships(id,read,sourceCache)
     end
     local trigger=read("quest",id,"triggerEnd")
     for area in pairs(type(trigger)=="table" and type(trigger[2])=="table" and trigger[2] or {}) do add(area) end
+    -- Wowhead's per-dungeon quest lists (DungeonQuestData.lua): new Forever dungeons and quests Questie files outdoors
+    local known=ns.dungeonQuestData and ns.dungeonQuestData.areasOf(id)
+    for _,area in ipairs(known or {}) do found[area]=true end
     return found
 end
 
@@ -1272,9 +1277,7 @@ end
 -- The dungeon's entrance: QuestieDB's own list first (it knows Forever dungeons such as the Excavation Site),
 -- then the static TravelData pins.
 local function entranceOf(area)
-    local lib=type(LibQuestieDB)=="table" and LibQuestieDB.Support
-    local zone=lib and U.call(lib.Get,"ZoneDB")
-    local list=type(zone)=="table" and type(zone.private)=="table" and zone.private.dungeons
+    local list=Q.dungeonList()
     if type(list)=="table" then
         local entry=list[area]
         if not entry then

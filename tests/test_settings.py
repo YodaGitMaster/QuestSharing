@@ -748,13 +748,6 @@ def test_every_saved_option_has_a_row_in_the_window(style):
     assert not keys - rows, "options without a Settings row: %s" % sorted(keys - rows)
 
 
-def test_the_item_button_move_back_row_clears_its_saved_position(style):
-    g = fresh(style)
-    g.eval("(function() NS.db.itemButtonPos = { 'TOPLEFT', 10, -10 } end)()")
-    g.eval("NS.settingRows[%d].action" % idx(g, label="Move the item button back"))()
-    assert g.eval("NS.db.itemButtonPos") is None
-
-
 def test_tunable_waits_are_settings_rows_and_change_behaviour(style):
     g = fresh(style)
     for key, default in (("sortDelay", 3), ("chatLockNotice", 20), ("friendsReserve", 5), ("lfgReinvite", 5), ("ilvlKeepDays", 14)):
