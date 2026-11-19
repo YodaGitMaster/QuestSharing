@@ -765,3 +765,7 @@ Not done (needs data): mob level per objective for kill XP (assumes your own lev
 ## 2026-11-19 — Dungeon areas are data-driven
 - `ns.loot.dungeonOf(area)` -> canonical dungeon area: base table (23 + Forever 16544/16919/17191) + Forever `subAreas` -> parent + QuestieDB `ZoneDB.private.dungeons` keys and alternative ids (via `Q.dungeonList()`), minus `notDungeon` (raids, battlegrounds, Deeprun Tram, Darkmoon). Wowhead's Forever zone lists are JS-only (WebFetch empty, curl 403); The Hall of Thanes and Ruins of Lordaeron have Wowhead 'Dungeon Strategy Guide' pages; Dalaran / Manor Mistmantle unconfirmed online but are QuestieDB instance areas (harmless: a dungeon shows only when it has quests).
 
+
+## 2026-11-19 — Script-driven v0.4.28
+- User authorized pull and release again. Source cutpdf/main `4e5a186`; destination YodaGitMaster/QuestSharing, README-only main plus source release tag. No cutpdf refs change.
+- Preserve published changelog, include only new/changed notes, align to 0.4.27 and run unchanged build_release.py --bump/--check/build. Validate full test scripts (exit code, FAIL lines, completed coverage) and Lua 5.1 syntax.

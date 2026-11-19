@@ -8,7 +8,7 @@ Last updated: 2026-11-19
 <!-- /bpmn:state -->
 
 ## Goal
-- Fix the regressions found in the 2026-11-17 audit (planner A1–A5, map-search typing B1–B4, dungeon menu C1), decouple the planner from SPF and keep map step numbers readable, then release v0.4.22 once the user approves.
+- Pull latest source and release 0.4.28 through QuestSharing; candidate verified, publication next.
 
 ## Status (2026-11-17/18)
 - 2026-11-19: Added the full user-provided v0.4.26 Stormwind City report to `bugs.txt` (30 recorded errors / 1,634 occurrences), verified byte-for-byte against the attachment. User clarified delivery belongs in `YodaGitMaster/cutpdf`, after the initial push to `YodaGitMaster/QuestSharing`. Report storage only; no addon fixes or runtime changes. Existing `bug.txt` is preserved. Commit/push to `origin/main` authorized; Git records delivery status.
@@ -19,6 +19,8 @@ Last updated: 2026-11-19
 - The tree also holds the uncommitted classic Style.lua restyle from another session (see the Active task entry below). VendorMap.lua mixes both changes: `ensureUI` uses `S.panel`/`S.inset`.
 
 ## Active tasks & blockers
+- 2026-11-19: 0.4.28 candidate verified: 63 suites / 2,636 checks, 59 Lua 5.1 compilations, zero failures. ZIP: 61 files / 397,511 bytes / SHA256 `fb1773c805558704e947f95479dc80d1ca77ec30b85c16f387cc153a33415ef3`; CRC/source identity verified. No runtime edits beyond version. Next: publish tag and ZIP, update README-only main, then download-verify. Native WoW validation unavailable.
+- 2026-11-19: User requested another pull and release. Pulled cutpdf/main `4e5a1869a5e8aa78d145e7ab6f59e00bd47225d9`; preparing 0.4.28 in isolated release worktree with unchanged build_release.py. No runtime edits. Full checks passed; publication verification pending; distribution main stays README-only.
 - 2026-11-19: map search per-faction saved list fix (uncommitted). `VendorMap.lua` indexRoles saves/reads `mapSearchNPCs` under scope A/H/any; test `test_saved_npc_list_is_kept_per_faction`; vendor suite 112/112. Live cause unconfirmed: asked user if they have an other-faction alt and the status text under the search box. See context/BUGS/2026-11-19-map-search-faction-saved-list.md.
 - 2026-11-19: ALL 9 FOREVER DUNGEONS (uncommitted, mock only): new `QuestSharing/DungeonQuestData.lua` generated from Wowhead guide 34916 (+ Blackmaw guide 35373), memberships add `areasOf(id)`; Loot base set + 16550/16842/16620/16554/16667, sub 16985->16667, 17780->16842. Real-data scan: 22 -> 28 dungeons with quests. No entrances yet for the 5 newest (route ends at last quest). Regenerate script: inline in session (parse `[quest=ID]` per `[h2/h3]` heading of guide body).
 - 2026-11-19: MISSING DUNGEONS FIXED (uncommitted, mock only): `Loot.lua` `L.dungeonOf` (QuestieDB instance list + alt ids + Forever sub-areas, raids/BGs excluded), `Questie.lua` `Q.dungeonList()`, DungeonQuests memberships store the canonical id; entrance lookup uses `Q.dungeonList()`. Test `test_forever_dungeons_sub_areas_and_alternative_quest_ids_are_dungeons`. Needs in-game check of the dropdown on Forever.
