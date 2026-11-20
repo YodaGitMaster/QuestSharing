@@ -400,15 +400,10 @@ the game's tracker still tells the party you are done, because that is your own 
       settings): turns on enemy nameplates (the icons need them) and the game's icons over objects you can
       interact with. Switching it off puts your own values back.
     - `/qs highlight mobs|pin|cvars [on|off]`; the same switches are in `/qs settings`.
-17. **Aggro for tanks** (off by default: Settings > General > During a fight, or `/qs aggro on|off`). Every
-    enemy always shows how much of its aggro you hold, right above its nameplate, and the colour follows the
-    fight: white = nobody is fighting it yet (you walk into the room); red with a small flame = it is on you,
-    100 %; green = below 50 %, someone's spell pulled it away; orange = 50-99 %, you hit it and it is coming
-    back. In a fight, when 2 or more enemies are next to you (about 10 yards) and one of them is not on you, the
-    lowest one (below 50 %) and every one within 10 points of it get the alarm: the enemy's portrait in a
-    pulsing red ring, with "Losing aggro 20%" in grey under it: Tab to it or click it and taunt. The game does not let addons pick your target in a fight, so the addon marks it and you select it.
-    Switching it on also turns on enemy nameplates (an addon only sees the enemies that have one); switching it off
-    puts your own setting back. During a fight that change waits until the fight is over.
+17. **Aggro for tanks** (off by default: Settings > General > During a fight, or `/qs aggro on|off`). While you
+    fight, every enemy shows your share of its aggro as a number right above its nameplate: `73%`
+    (100% = it is attacking you). Nothing else, no colours or marks. Needs enemy nameplates (press V).
+    Switching it on prints what the addon can see (threat data, nameplates on/off), to check a client quickly.
 
 ## Settings window
 Open `/qs settings`, left-click the minimap button, click **Settings** in the Party quests window, or use
@@ -757,6 +752,16 @@ common materials also dropped outdoors do not associate unrelated quests with a 
 data, and filters do not check every reputation, profession, event or acceptance condition. Scans run only on explicit
 open/refresh (reward links on first hover), share the small data-work budget, pause in combat and cancel when the tab closes;
 no login scan or new saved setting.
+
+**Dungeon journal look.** Dungeon quests opens on a home page of dungeon cards (art, level range, open/total
+quests, faction crests, and a tick when all are done). The search box above the cards finds a dungeon by its name or by one of
+its quest titles; the Alliance and Horde crests show one faction (click again for all). Click a card for the dungeon page:
+**Quests**, **Bosses** (encounter order, portraits, levels and drops: full with AtlasLoot, partial from QuestieDB),
+**Map** (the client's dungeon map with floors, mouse-wheel zoom and drag; without map art, a button pins the entrance)
+and **Route** (the pickup route inside the page). **< Dungeons** goes back. All textures come from the game client.
+Boss descriptions and abilities come from the Encounter Journal text shipped with the addon (classic dungeons only): the
+Bosses page shows a facts line, the description, up to four abilities with their spell icons (hover: the full text) and
+**Needed for**, the quests of the dungeon that ask you to kill that boss (click one to open it on the Quests tab).
 
 **Instance drops and who drops them.** Opening the **Instance drops** tab inside a recognized dungeon selects that dungeon
 and brings its navigation row into view. This also works after the catalogue finishes loading. Old item/dungeon

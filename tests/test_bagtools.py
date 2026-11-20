@@ -21,11 +21,13 @@ ITEMS[7] = { name = "Recipe: Soup", quality = 1, sell = 30, class = 9, sub = 3 }
 ITEMS[8] = { name = "Linen Vest", quality = 1, sell = 15, class = 4, sub = 1 }
 ITEMS[9] = { name = "Broken Tooth", quality = 0, sell = 0, class = 15, sub = 0 }      -- no sell price
 ITEMS[10] = { name = "Wolf Pelt", quality = 1, sell = 2, class = 12, sub = 0 }
+ITEMS[11] = { name = "Copper Ore", quality = 1, sell = 5, class = 7, sub = 7 }
+ITEMS[12] = { name = "Light Leather", quality = 1, sell = 6, class = 7, sub = 6, stack = 20 }
 CURSOR_ITEM, SOLD = nil, {}
 function GetItemInfo(id)
     local it = ITEMS[id]
     if not it then return nil end
-    return it.name, "|Hitem:" .. id .. "|h[" .. it.name .. "]|h", it.quality, 1, 1, "", "", 1, "", "icon", it.sell, it.class, it.sub
+    return it.name, "|Hitem:" .. id .. "|h[" .. it.name .. "]|h", it.quality, 1, 1, "", "", it.stack or 1, "", "icon", it.sell, it.class, it.sub
 end
 C_Container.GetContainerItemInfo = function(bag, slot)
     local it = BAGS[bag] and BAGS[bag][slot]
@@ -35,7 +37,13 @@ C_Container.GetContainerItemInfo = function(bag, slot)
 end
 C_Container.PickupContainerItem = function(bag, slot)
     local here = BAGS[bag][slot] or nil
-    if CURSOR_ITEM then
+    local max = CURSOR_ITEM and ITEMS[CURSOR_ITEM.id].stack or 1
+    if CURSOR_ITEM and here and here.id == CURSOR_ITEM.id and max > 1 and (here.count or 1) < max then
+        local n = math.min(max - (here.count or 1), CURSOR_ITEM.count or 1)      -- the game joins the stacks
+        here.count = (here.count or 1) + n
+        CURSOR_ITEM.count = (CURSOR_ITEM.count or 1) - n
+        if CURSOR_ITEM.count <= 0 then CURSOR_ITEM = nil end
+    elseif CURSOR_ITEM then
         BAGS[bag][slot] = CURSOR_ITEM
         CURSOR_ITEM = here
     elseif here then
@@ -494,6 +502,99 @@ def test_a_wrong_sort_option_says_how_to_use_it(style):
     assert any("usage: /qs sort by" in p for p in g.printed()), g.printed()
 
 
+# ---- rows, crafting kinds and stacks ----------------------------------------------------------------------------------
+
+FEW = """BAGS[0] = { { id = 1 }, { id = 2, count = 5 }, false, { id = 4 }, false, { id = 3 } }
+BAGS[1] = { false, false, false, false, false, false }"""
+
+
+def arrange(g, *opts):
+    for o in opts:
+        g.slash("sort " + o)
+    g.slash("sort")
+    g.advance(10)
+    return flat(g)
+
+
+def test_the_new_options_default_to_packed_game_bags_split_crafts_and_merged_stacks(style):
+    g = game(style)
+    assert g.eval("NS.db.sortLayout") == "packed" and g.eval("NS.db.sortView") == "bags"
+    assert g.eval("NS.db.sortColumns") == 8
+    assert g.eval("NS.db.sortCraftRows") is True and g.eval("NS.db.sortMergeStacks") is True
+
+
+def test_rows_in_game_bags_start_each_topic_on_a_new_row_of_four(style):
+    g = game(style, FEW)
+    # backpack 6 = a row of 4 + a short row of 2; bag 1 the same
+    assert arrange(g, "layout rows") == [3, 0, 0, 0, 4, 0,  2, 0, 0, 0, 1, 0], flat(g)
+    assert any("a new row for each group" in p for p in g.printed()), g.printed()
+    assert g.eval("#NS.bagTools.plan()") == 0, "arranging again makes no moves"
+
+
+def test_rows_in_one_big_bag_follow_the_column_count(style):
+    three = FEW.replace("{ id = 1 }", "false")                # no gray item: three groups
+    g = game(style, three)
+    assert arrange(g, "layout rows", "view onebag", "columns 4") == [3, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0], flat(g)
+    g = game(style, three)
+    assert arrange(g, "layout rows", "view onebag", "columns 5") == [3, 0, 0, 0, 0, 4, 0, 0, 0, 0, 2, 0], \
+        "rows of 5 run across the border between the backpack and bag 1"
+    g = game(style, FEW)
+    assert arrange(g, "layout rows", "view onebag", "columns 5") == [3, 4, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0], \
+        "with the gray item there is no row left for it, so everything is packed"
+
+
+def test_rows_that_do_not_fit_fall_back_to_packed_and_say_so(style):
+    g = game(style)                                          # 10 items in 12 slots, 6 topics
+    assert arrange(g, "layout rows") == EXPECTED, flat(g)
+    assert any("packed instead" in p for p in g.printed()), g.printed()
+
+
+def test_rows_by_quality_and_name_order_is_always_packed(style):
+    g = game(style, FEW)
+    assert arrange(g, "layout rows", "by quality", "view onebag", "columns 4") == [4, 0, 0, 0, 3, 2, 0, 0, 1, 0, 0, 0], flat(g)
+    g = game(style, FEW)
+    names = [g.eval(f"ITEMS[{i}].name") for i in arrange(g, "layout rows", "by name") if i]
+    assert flat(g)[4:] == [0] * 8 and names == sorted(names, key=str.lower)
+
+
+def test_crafting_kinds_each_get_a_row_unless_switched_off(style):
+    pre = """BAGS[0] = { { id = 11 }, { id = 2 }, { id = 3 }, false, false, false }
+BAGS[1] = { false, false, false, false, false, false }"""
+    g = game(style, pre)
+    assert arrange(g, "layout rows", "view onebag", "columns 4") == [3, 0, 0, 0, 2, 0, 0, 0, 11, 0, 0, 0], flat(g)
+    g = game(style, pre)
+    assert arrange(g, "layout rows", "view onebag", "columns 4", "crafts off") == [3, 0, 0, 0, 2, 11, 0, 0, 0, 0, 0, 0], flat(g)
+
+
+def test_partial_stacks_are_joined_before_arranging(style):
+    pre = """BAGS[0] = { { id = 12, count = 5 }, { id = 3 }, { id = 12, count = 18 }, false, false, false }
+BAGS[1] = { { id = 12, count = 4 }, false, false, false, false, false }"""
+    g = game(style, pre)
+    arrange(g)
+    stacks = sorted(int(x["count"]) for b in (0, 1) for x in g.eval(f"BAGS[{b}]").values() if x and int(x["id"]) == 12)
+    assert stacks == [7, 20], stacks
+    assert g.eval("#NS.bagTools.plan()") == 0
+    g = game(style, pre)
+    g.slash("sort merge off")
+    moves = g.eval("NS.bagTools.plan()")[0]
+    assert not any(m.merge for m in moves.values()), "off: no joining step of its own"
+    arrange(g)
+    total = sum(int(x["count"]) for b in (0, 1) for x in g.eval(f"BAGS[{b}]").values() if x and int(x["id"]) == 12)
+    assert total == 27, "nothing is lost (the game may still join two stacks a move drops on each other)"
+
+
+def test_the_new_sort_commands_and_their_usage(style):
+    g = game(style)
+    for cmd, key, val in (("layout rows", "sortLayout", "rows"), ("view onebag", "sortView", "onebag"),
+                          ("columns 12", "sortColumns", 12), ("crafts off", "sortCraftRows", False), ("merge off", "sortMergeStacks", False)):
+        g.slash("sort " + cmd)
+        assert g.eval(f"NS.db.{key}") == val, cmd
+    for bad in ("columns 3", "columns 17", "columns x", "layout grid", "merge maybe"):
+        g.slash("sort " + bad)
+        assert any("columns 4-16" in p for p in g.printed()), bad
+    assert g.eval("NS.db.sortColumns") == 12
+
+
 # ---- the settings window ------------------------------------------------------------------------------------------
 
 def test_every_helper_has_a_row_in_the_settings(style):
@@ -502,8 +603,10 @@ def test_every_helper_has_a_row_in_the_settings(style):
     for key, tab in (("bagBookmarks", "bags"), ("autoSellGray", "bags"), ("autoSortBags", "bags"), ("sortKeepBookmarked", "bags"), ("chatLock", "general")):
         assert key in rows and rows[key].kind == "bool" and rows[key].tab == tab, key
     assert any(r.kind == "action" and r.label == "Arrange my bags now" for r in g.eval("NS.settingRows").values())
-    for key in ("sortBy", "sortBags", "sortFrom"):
+    for key in ("sortBy", "sortBags", "sortFrom", "sortLayout", "sortView"):
         assert rows[key].kind == "choice" and rows[key].tab == "bags", key
+    for key, kind in (("sortColumns", "number"), ("sortCraftRows", "bool"), ("sortMergeStacks", "bool")):
+        assert rows[key].kind == kind and rows[key].tab == "bags", key
 
 
 def test_every_helper_shows_in_the_open_settings_window_and_switches_there(style):

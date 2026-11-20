@@ -60,9 +60,14 @@ ns.defaults = {
     sortFrom = "start", -- where the items gather: "start" (empty slots at the end) or "end" (empty slots at the start)
     sortDelay = 3,      -- seconds the bags must stay quiet before the automatic arrangement starts (1-30)
     sortKeepBookmarked = false, -- (off) bookmarked items stay in their slot while the bags are arranged
+    sortLayout = "packed", -- "packed" (items one after another) or "rows" (each group starts on a new row)
+    sortView = "bags",  -- how the bags are shown, for the rows: "bags" (the game's bag windows, 4 a row) or "onebag"
+    sortColumns = 8,    -- slots a row in a one-bag view (a bag addon or combined bags), 4-16
+    sortCraftRows = true, -- crafting materials split into one group per kind (cloth, herbs, metal...)
+    sortMergeStacks = true, -- partial stacks of the same item are joined before the bags are arranged
     chatLockNotice = 20, -- seconds between two "the chat box is locked" notes while you fight (5-120)
     chatLock = false,   -- (off) no chat typing box while you are in a fight
-    aggroPlates = false, -- (off) tanks: my aggro % on enemy nameplates in combat, lowest one next to me marked
+    aggroPlates = false, -- (off) tanks: my aggro % as a number on enemy nameplates while I fight
     debug = true,       -- diagnostic actions and outcomes, saved on /reload or logout
     shareByClick = false, -- share only on my clicks (set by itself when the game refuses an automatic share)
     pickup = false,     -- (off) say in party chat when I pick up a quest someone in the party has ("let's do it together?")
@@ -463,7 +468,6 @@ function ns.setSetting(key, value)
         if key == "markMobs" and ns.refreshMarkers then ns.refreshMarkers() end
         if key == "nearPin" and not value and ns.releasePin then ns.releasePin() end
         if key == "highlightCVars" and ns.setHighlightCVars then ns.setHighlightCVars(value) end
-        if key == "highlightCVars" and not value and ns.aggro then ns.aggro.applyNameplates() end -- aggro still needs nameplates
         if (key == "nearMode" or key == "nearCount") and d.near and ns.nearEvaluate then ns.nearEvaluate(true) end
     end
     if ns.refreshSettings then ns.refreshSettings() end
@@ -536,7 +540,7 @@ local help = {
     "/qs sort by topic|quality|name, bags all|bags|backpack, from start|end, keep on|off   how and what to arrange",
     "/qs chatlock on|off  no chat typing box while you are in a fight",
     "/qs sound on|off     a soft sound when someone accepts your quest or a teammate finishes a shared quest",
-    "/qs aggro on|off     tanks: my aggro % on enemies in combat, lowest one next to me marked",
+    "/qs aggro on|off     tanks: my aggro % as a number on enemy nameplates while I fight",
     "/qs debug on|off     the debug log: every action and its outcome, saved to the addon's file on /reload or logout",
     "/qs log [clear]      all diagnostics in one copyable window (clear empties the debug log)",
     "/qs memory           how much memory Quest Sharing and QuestieDB use, and which catalogues are loaded",
@@ -575,6 +579,8 @@ local MAP_SWITCHES = { "zoneLevels", "travelMap", "travelFaction", "myTrainers",
                        "itemSources", "fishingMap" }
 -- after a command changed a setting: one line naming it as the Settings window does
 local function said(key) ns.print(ns.settingLine(key)) end
+local SORT_USAGE = "usage: /qs sort by topic|quality|name, bags all|bags|backpack, from start|end, layout packed|rows, " ..
+    "view bags|onebag, columns 4-16, crafts on|off, merge on|off, keep on|off"
 
 SLASH_QUESTSHARING1, SLASH_QUESTSHARING2 = "/qs", "/questsharing"
 SlashCmdList["QUESTSHARING"] = function(msg)
@@ -590,14 +596,20 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     elseif cmd == "sort" then
         local what, val = string.match(string.lower(arg or ""), "^(%S+)%s*(%S*)$")
         local SORT_OPTS = { by = { "sortBy", topic = 1, quality = 1, name = 1 }, bags = { "sortBags", all = 1, bags = 1, backpack = 1 },
-                            from = { "sortFrom", start = 1, ["end"] = 1 } }
+                            from = { "sortFrom", start = 1, ["end"] = 1 }, layout = { "sortLayout", packed = 1, rows = 1 },
+                            view = { "sortView", bags = 1, onebag = 1 } }
+        local SORT_SWITCHES = { keep = "sortKeepBookmarked", crafts = "sortCraftRows", merge = "sortMergeStacks" }
+        local cols = what == "columns" and tonumber(val)
         if arg == "on" or arg == "off" then ns.setSetting("autoSortBags", arg == "on"); said("autoSortBags")
-        elseif what == "keep" and (val == "on" or val == "off") then
-            ns.setSetting("sortKeepBookmarked", val == "on"); said("sortKeepBookmarked")
+        elseif what and SORT_SWITCHES[what] and (val == "on" or val == "off") then
+            ns.setSetting(SORT_SWITCHES[what], val == "on"); said(SORT_SWITCHES[what])
+        elseif cols and cols >= 4 and cols <= 16 and cols == math.floor(cols) then
+            ns.setSetting("sortColumns", cols); said("sortColumns")
         elseif what and SORT_OPTS[what] then
             local o = SORT_OPTS[what]
             if o[val] then ns.setSetting(o[1], val); said(o[1])
-            else ns.print("usage: /qs sort by topic|quality|name, bags all|bags|backpack, from start|end, keep on|off") end
+            else ns.print(SORT_USAGE) end
+        elseif what == "columns" or (what and SORT_SWITCHES[what]) then ns.print(SORT_USAGE)
         else ns.bagTools.sort(true) end
     elseif cmd == "lfg" or cmd == "finder" then ns.lfgInvite.command(arg)
     elseif cmd == "ilvl" then ns.itemLevel.command(arg)

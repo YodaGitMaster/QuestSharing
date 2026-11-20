@@ -6,6 +6,10 @@ Graphs: `<process-id>/diagram.mmd` (Mermaid) and `<process-id>/process.bpmn` (op
 <!-- bpmn:index -->
 | Run | Process | Outcome | Duration | Agents | Rounds | Context | Graph |
 |---|---|---|---|---|---|---|---|
+| r-20261120-114959-1c34 | dungeon-journal-r3 | Round 3 done | 1h 05m | 12 | 3 | done | [diagram](dungeon-journal-r3/diagram.mmd) · [bpmn](dungeon-journal-r3/process.bpmn) |
+| r-20261120-111056-9c21 | dungeon-journal-r2 | Round 2 done | 38m 49s | 6 | 1 | done | [diagram](dungeon-journal-r2/diagram.mmd) · [bpmn](dungeon-journal-r2/process.bpmn) |
+| r-20261120-102551-f86e | dungeon-journal-finish | Look rebuilt | 22m 23s | 2 | 1 | done | [diagram](dungeon-journal-finish/diagram.mmd) · [bpmn](dungeon-journal-finish/process.bpmn) |
+| r-20261120-095917-cec1 | dungeon-journal | failed: deadlock: tokens wait at join join for branches that can no… | 25m 32s | 10 | 2 | skipped | [diagram](dungeon-journal/diagram.mmd) · [bpmn](dungeon-journal/process.bpmn) |
 | r-20261119-113937-c955 | ux-low | Low findings integrated | 23m 35s | 13 | 2 | done | [diagram](ux-low/diagram.mmd) · [bpmn](ux-low/process.bpmn) |
 | r-20261119-104206-0145 | ux-fix | UX fixes integrated | 41m 10s | 18 | 2 | done | [diagram](ux-fix/diagram.mmd) · [bpmn](ux-fix/process.bpmn) |
 | r-20261119-095449-ea8e | ux-review | Review ready | 47m 05s | 7 | 1 | done | [diagram](ux-review/diagram.mmd) · [bpmn](ux-review/process.bpmn) |

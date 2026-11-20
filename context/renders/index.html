@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dungeon quests: previews (round 3)</title>
+<style>
+  body { background: #14110d; color: #e8dcc0; font: 14px/1.45 Georgia, serif; margin: 24px; }
+  h1 { color: #ffd100; font-weight: normal; margin: 0 0 4px; }
+  h2 { color: #ffd100; font-weight: normal; border-bottom: 1px solid #5a4422; padding-bottom: 4px; margin-top: 36px; }
+  p.lead { color: #b8a888; margin: 0 0 18px; max-width: 1100px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+  figure { margin: 0; background: #0b0906; border: 1px solid #5a4422; padding: 8px; }
+  figure img { width: 100%; height: auto; display: block; }
+  figcaption { color: #b8a888; font-size: 12px; margin-top: 6px; }
+  figure.ref figcaption { color: #d88a6a; }
+  .none { display: flex; align-items: center; justify-content: center; min-height: 160px; color: #8a7a5a; border: 1px dashed #5a4422; }
+  code { color: #f0e0b0; }
+</style>
+</head>
+<body>
+<h1>Dungeon quests: previews, round 3</h1>
+<p class="lead">
+  Left: our pages, rendered by <code>tools/render_journal.py</code> from the real addon code (test harness, classic style),
+  painted with the client's own textures and fonts (Friz Quadrata, Morpheus) looked up in the client listfile.
+  Quest and boss data are render fixtures (Deadmines names, AtlasLoot-shaped boss tables); the dungeon and boss
+  descriptions and abilities are the shipped Encounter Journal text (<code>QuestSharing/DungeonLore.lua</code>).
+  Scroll frames clip their children, fixed-width text wraps or ends in "..." as in the client. Rendered 2026-11-20.
+  Right: the matching screen of the Dungeon Journal addon, kept here as a look reference only.
+  The reference files live in <code>context/renders/reference/</code> and are not part of the addon.
+</p>
+
+<h2>Home</h2>
+<div class="pair">
+  <figure><img src="home.png" alt="our home page"><figcaption>ours: home grid (2 columns, full width), search with clear button, crest filters; a done dungeon shows the tick with the star glow</figcaption></figure>
+  <figure class="ref"><img src="reference/dj1.png" alt="reference home"><figcaption>reference: Dungeon Journal by Exehn, not part of the addon</figcaption></figure>
+</div>
+
+<h2>Home: searching</h2>
+<div class="pair">
+  <figure><img src="home_search.png" alt="our home page with a search"><figcaption>ours: "dead" typed in the search, the clear cross shows and only The Deadmines is left</figcaption></figure>
+  <figure class="ref"><img src="reference/dj1.png" alt="reference home"><figcaption>reference: Dungeon Journal by Exehn, not part of the addon</figcaption></figure>
+</div>
+
+<h2>Quests: a normal quest</h2>
+<div class="pair">
+  <figure><img src="quests.png" alt="our quest page"><figcaption>ours: one-row filter bar (Level, Class and Faction behind Filters), the journal line under the dungeon name, quest list with chain and dungeon icons, quest page with Share (grey: not in your log), rewards, XP and reputation chips, quest chain</figcaption></figure>
+  <figure class="ref"><img src="reference/dj2.png" alt="reference quests"><figcaption>reference: Dungeon Journal by Exehn, not part of the addon</figcaption></figure>
+</div>
+
+<h2>Quests: a class-only quest</h2>
+<div class="pair">
+  <figure><img src="quests_class.png" alt="our class quest"><figcaption>ours: "DRUID / WARRIOR ONLY" in the class colours with the class icons, class icons on the row</figcaption></figure>
+  <figure class="ref"><img src="reference/dj2.png" alt="reference quests"><figcaption>reference: Dungeon Journal by Exehn, not part of the addon</figcaption></figure>
+</div>
+
+<h2>Quests: a done chain quest</h2>
+<div class="pair">
+  <figure><img src="quests_chain.png" alt="our done chain quest"><figcaption>ours: the first step of a chain, done (green strip in the badge tint, tick on the row), "Next:" in the chain section</figcaption></figure>
+  <figure class="ref"><img src="reference/dj2.png" alt="reference quests"><figcaption>reference: Dungeon Journal by Exehn, not part of the addon</figcaption></figure>
+</div>
+
+<h2>Bosses</h2>
+<div class="pair">
+  <figure><img src="bosses.png" alt="our bosses page"><figcaption>ours: bosses in encounter order with their Encounter Journal portraits and levels; Edwin VanCleef selected (as a click on an item he drops does): facts line, journal description, his drops, and beside them Abilities (spell icons, short text) and Needed for (the quest that asks you to kill him)</figcaption></figure>
+  <figure class="ref"><img src="reference/dj3.png" alt="reference bosses"><figcaption>reference: Dungeon Journal by Exehn, not part of the addon</figcaption></figure>
+</div>
+
+<h2>Map</h2>
+<div class="pair">
+  <figure><img src="map.png" alt="our map page"><figcaption>ours: the game's Deadmines map tiles, floor buttons, zoom box</figcaption></figure>
+  <figure class="ref"><img src="reference/dj4.png" alt="reference map"><figcaption>reference: Dungeon Journal by Exehn, not part of the addon</figcaption></figure>
+</div>
+
+<h2>Route</h2>
+<div class="pair">
+  <figure><img src="route.png" alt="our route page"><figcaption>ours: the route to pick up the quests, in the page (steps from a render fixture of the planner); step 1 marked as next, dark ink on the parchment</figcaption></figure>
+  <div class="none">no matching Dungeon Journal screen</div>
+</div>
+
+<h2>Other reference screens</h2>
+<div class="pair">
+  <figure class="ref"><img src="reference/dj5.png" alt="reference RPG mode"><figcaption>reference: Dungeon Journal by Exehn, not part of the addon (RPG mode home)</figcaption></figure>
+  <figure class="ref"><img src="reference/dj6.png" alt="reference icon" style="max-width:256px"><figcaption>reference: Dungeon Journal by Exehn, not part of the addon (its icon)</figcaption></figure>
+</div>
+</body>
+</html>

@@ -71,7 +71,8 @@ def test_dungeon_rows_mark_to_take_with_exclamation_and_in_log_with_question_mar
     assert "ActiveQuestIcon" in rows[2].icon.texture, rows[2].icon.texture
     assert "AvailableQuestIcon" in rows[3].icon.texture, rows[3].icon.texture
     assert not any(border_on(r) for r in rows.values()), "no gold 'to take' border: gold means selected"
-    status = g.eval("NS.dungeonQuests._window().status.text")
+    status = g.eval("NS.dungeonQuests._window().legend.text")  # the legend moved from the status line to the list foot
+    assert g.eval("NS.dungeonQuests._window().legend").shown is not False
     assert "gold border" not in status and "!: to pick up" in status and "?: in your log" in status, status
 
 

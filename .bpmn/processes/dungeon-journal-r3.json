@@ -1,0 +1,76 @@
+{
+  "id": "dungeon-journal-r3",
+  "name": "Dungeon Journal round 3: lore, user-story polish, previews",
+  "runTimeout": 190,
+  "context": { "prompt": "Record round 3 of the Dungeon Journal look: Blizzard Encounter Journal lore (tools/build_dungeon_lore.py -> DungeonLore.lua, source wago.tools retail DB2 because Forever has no journal tables), the bosses page description/abilities/needed-for/facts, home card tooltip, the user-story polish list, and the refreshed previews. Note what is unverified in game." },
+  "lanes": [
+    { "id": "builder", "name": "Builder", "agent": "bpmn:worker", "timeout": 40 },
+    { "id": "reviewer", "name": "Reviewer", "agent": "bpmn:reviewer", "timeout": 12 }
+  ],
+  "data": {
+    "wL": { "schema": { "type": "object", "required": ["files", "summary", "tests"] } },
+    "wU": { "schema": { "type": "object", "required": ["files", "summary", "tests"] } },
+    "vL": { "schema": { "type": "object", "required": ["status", "issues"], "properties": { "status": { "enum": ["approved", "changes"] } } } },
+    "vU": { "schema": { "type": "object", "required": ["status", "issues"], "properties": { "status": { "enum": ["approved", "changes"] } } } },
+    "fL": { "schema": { "type": "object", "required": ["files", "summary"] } },
+    "fU": { "schema": { "type": "object", "required": ["files", "summary"] } },
+    "prev": { "schema": { "type": "object", "required": ["files", "summary", "tests"] } },
+    "vF": { "schema": { "type": "object", "required": ["status", "issues"], "properties": { "status": { "enum": ["approved", "changes"] } } } },
+    "fF": { "schema": { "type": "object", "required": ["files", "summary"] } }
+  },
+  "nodes": [
+    { "id": "start", "type": "start", "name": "Round 3 started" },
+    { "id": "split", "type": "and", "join": "join" },
+
+    { "id": "build_l", "type": "agent", "lane": "builder", "name": "Build boss and dungeon lore", "out": "wL",
+      "prompt": "Round 3, stream L. Read context/dungeon-journal-contract.md (hard rules + 'Round 3', stream L) and look at context/renders/bosses.png and home.png and the reference /tmp/dj_images/dj3.png. You own ONLY tools/build_dungeon_lore.py, QuestSharing/DungeonLore.lua, QuestSharing/DungeonBossesUI.lua, QuestSharing/DungeonHomeUI.lua and tests/test_dungeon_lore.py, tests/test_dungeon_journal_bosses.py, tests/test_dungeon_journal_home.py. Implement everything in stream L: the generator (cached CSVs in /tmp/ejdata; fetch with curl when missing), the generated DungeonLore.lua with the stub API kept, the bosses page description / abilities / needed-for (nil-guarded ns.dungeonQuests.questsForNpc) / facts with no empty headings, and the home card hover tooltip. Report the coverage (how many of our dungeons and bosses got text). Tests for each item; run your test files plus tests/test_dungeon_quests.py. Report {files, summary, tests, notes}." },
+    { "id": "review_l", "type": "agent", "lane": "reviewer", "name": "Review lore", "in": ["wL", "fL?"], "out": "vL",
+      "prompt": "Review round 3 stream L ({{wL.summary}}) against context/dungeon-journal-contract.md 'Round 3' stream L: generator reproducible and offline-safe, DungeonLore.lua small and correct (spot-check 5 bosses against /tmp/ejdata/JournalEncounter.csv, classic versions preferred over reworked ones), text cleaned ($-tokens, colour codes), UI shows no empty headings, needed-for nil-guarded, only client textures, nothing copied from /tmp/dj_addon, no edits outside owned files, tests green (run them). Report {status, issues}." },
+    { "id": "ok_l", "type": "xor", "name": "L approved?" },
+    { "id": "fix_l", "type": "agent", "lane": "builder", "name": "Fix lore", "in": ["vL"], "out": "fL",
+      "prompt": "Fix these review issues in round 3 stream L (own only the stream L files): {{vL.issues}}. Report {files, summary}." },
+    { "id": "merge_l", "type": "xor", "name": "L settled" },
+
+    { "id": "build_u", "type": "agent", "lane": "builder", "name": "Polish the user stories", "out": "wU",
+      "prompt": "Round 3, stream U. Read context/dungeon-journal-contract.md (hard rules + 'Round 3', stream U) and look at every context/renders/*.png and context/renders/index.html. You own ONLY QuestSharing/DungeonQuests.lua, QuestSharing/JournalItems.lua, QuestSharing/JournalTheme.lua, QuestSharing/DungeonMapUI.lua, QuestSharing/DungeonRouteUI.lua and tests/test_dungeon_journal_quests.py, tests/test_dungeon_quests.py, tests/test_dungeon_route.py, tests/test_dungeon_journal_map.py. Walk the six user stories in the contract, fix what gets in the way (small, focused changes), and do the 7 known items, including D.questsForNpc and the header lore line (nil-guarded ns.dungeonLore.dungeon). Never weaken behaviour assertions. Run your test files plus tests/test_ux_b5.py and tests/test_classic_style.py. Report {files, summary (list each user-story fix and why), tests, notes}." },
+    { "id": "review_u", "type": "agent", "lane": "reviewer", "name": "Review user-story polish", "in": ["wU", "fU?"], "out": "vU",
+      "prompt": "Review round 3 stream U ({{wU.summary}}) against context/dungeon-journal-contract.md 'Round 3' stream U: walk the six user stories yourself (code + previews) and check each claimed fix really helps; the 7 known items done; D.questsForNpc correct; filters still all reachable; behaviour assertions not weakened (read test diffs); only client textures; nothing copied from /tmp/dj_addon; no edits outside owned files; tests green (run them). Report {status, issues}." },
+    { "id": "ok_u", "type": "xor", "name": "U approved?" },
+    { "id": "fix_u", "type": "agent", "lane": "builder", "name": "Fix user-story polish", "in": ["vU"], "out": "fU",
+      "prompt": "Fix these review issues in round 3 stream U (own only the stream U files): {{vU.issues}}. Report {files, summary}." },
+    { "id": "merge_u", "type": "xor", "name": "U settled" },
+
+    { "id": "join", "type": "and" },
+    { "id": "previews", "type": "agent", "lane": "builder", "name": "Integrate and render previews", "in": ["wL", "wU"], "out": "prev", "timeout": 30,
+      "prompt": "Round 3, stream P (after L and U). Read context/dungeon-journal-contract.md 'Round 3'. (1) Fix seams between L ({{wL.summary}}) and U ({{wU.summary}}) (questsForNpc used by the bosses page, header lore line) with small diffs. (2) Full suite green (loop over tests/test_*.py with /tmp/qs-test-env/bin/python), all QuestSharing/*.lua compile under Lua 5.1 (lupa.lua51). (3) tools/render_journal.py (you own it and context/renders/*): clip scroll children, render home with search text so the clear button shows, render the bosses page with a real description, abilities and needed-for, re-render all scenes, update context/renders/index.html. Add one CHANGELOG Unreleased line for round 3 and a README sentence about boss descriptions. Report {files, summary, tests, notes}." },
+    { "id": "final_review", "type": "agent", "lane": "reviewer", "name": "Review round 3 result", "in": ["prev", "fF?"], "out": "vF",
+      "prompt": "Final review of round 3 ({{prev.summary}}): look at context/renders/*.png and index.html next to the references; walk the six user stories in context/dungeon-journal-contract.md 'Round 3' on the previews; check the lore text is clean and correct for the Deadmines bosses; full suite green (run it); no copied code/media from /tmp/dj_addon in QuestSharing/; client textures only. Report {status, issues}." },
+    { "id": "ok_final", "type": "xor", "name": "Final approved?" },
+    { "id": "fix_final", "type": "agent", "lane": "builder", "name": "Fix round 3 issues", "in": ["vF"], "out": "fF", "timeout": 25,
+      "prompt": "Fix these final review issues of round 3 (keep the full suite green, re-render the previews if the look changed): {{vF.issues}}. Report {files, summary}." },
+    { "id": "done", "type": "end", "name": "Round 3 done" },
+    { "id": "open_issues", "type": "end", "name": "Done with open issues" }
+  ],
+  "flows": [
+    { "from": "start", "to": "split" },
+    { "from": "split", "to": "build_l" }, { "from": "split", "to": "build_u" },
+    { "from": "build_l", "to": "review_l" }, { "from": "review_l", "to": "ok_l" },
+    { "from": "ok_l", "to": "merge_l", "name": "approved", "when": { "path": "vL.status", "eq": "approved" } },
+    { "from": "ok_l", "to": "merge_l", "name": "3rd round", "when": { "path": "$loop.ok_l", "gte": 3 } },
+    { "from": "ok_l", "to": "fix_l", "name": "changes", "default": true },
+    { "from": "fix_l", "to": "review_l" },
+    { "from": "merge_l", "to": "join" },
+    { "from": "build_u", "to": "review_u" }, { "from": "review_u", "to": "ok_u" },
+    { "from": "ok_u", "to": "merge_u", "name": "approved", "when": { "path": "vU.status", "eq": "approved" } },
+    { "from": "ok_u", "to": "merge_u", "name": "3rd round", "when": { "path": "$loop.ok_u", "gte": 3 } },
+    { "from": "ok_u", "to": "fix_u", "name": "changes", "default": true },
+    { "from": "fix_u", "to": "review_u" },
+    { "from": "merge_u", "to": "join" },
+    { "from": "join", "to": "previews" },
+    { "from": "previews", "to": "final_review" }, { "from": "final_review", "to": "ok_final" },
+    { "from": "ok_final", "to": "done", "name": "approved", "when": { "path": "vF.status", "eq": "approved" } },
+    { "from": "ok_final", "to": "open_issues", "name": "3rd round", "when": { "path": "$loop.ok_final", "gte": 3 } },
+    { "from": "ok_final", "to": "fix_final", "name": "changes", "default": true },
+    { "from": "fix_final", "to": "final_review" }
+  ]
+}

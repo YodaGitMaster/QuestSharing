@@ -5,6 +5,10 @@
 --   * Arrange (autoSortBags, /qs sort): the chosen bags (sortBags) are treated as ONE long bag and ordered by
 --     sortBy: topic (quest items, consumables, equipment, materials, recipes, other, gray items last), quality or name.
 --     sortFrom "end" gathers the items at the end of the bags; sortKeepBookmarked leaves bookmarked items in their slot.
+--     sortLayout "rows" starts every group (topic, or quality) on a new row of the bag view (sortView "bags": rows of 4
+--     inside each game bag; "onebag": rows of sortColumns across all bags joined, as bag addons show them).
+--     sortCraftRows splits crafting materials into one group per kind (cloth, herbs, metal...); sortMergeStacks first
+--     joins partial stacks of the same item.
 -- Only the game's own bags are handled (bag replacement addons use their own buttons).
 local ADDON, ns = ...
 
@@ -65,8 +69,8 @@ local function facts(id)
     m = {}
     local f = (C_Item and C_Item.GetItemInfo) or GetItemInfo
     if f then
-        local ok, name, _, quality, _, _, _, _, _, _, _, sell, class, sub = pcall(f, id)
-        if ok then m.name, m.quality, m.sell, m.class, m.sub = name, quality, sell, class, sub end
+        local ok, name, _, quality, _, _, _, _, stack, _, _, sell, class, sub = pcall(f, id)
+        if ok then m.name, m.quality, m.stack, m.sell, m.class, m.sub = name, quality, tonumber(stack), sell, class, sub end
     end
     if m.class == nil then
         local inst = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
@@ -382,9 +386,74 @@ local function sortedBags()
     return list
 end
 
--- The moves that would put every item in its place: { { from = {bag, slot}, to = {bag, slot} }, ... } and the items in
--- their target order. The chosen bags are one list of slots: backpack first, then bag 1, 2, 3, 4 (reversed when
--- the items gather at the end). A bookmarked item kept in place takes its slot out of the list.
+-- Rows: which row of the bag view a slot is in. "bags": the game's own bag windows, 4 slots a row counted from slot 1
+-- of each bag (a bag of 14 has one short row). "onebag": all bags joined, as bag addons and combined bags show them,
+-- sortColumns slots a row.
+local function rowKeys()
+    local key = {}
+    if ns.db.sortView == "onebag" then
+        local cols = math.max(1, math.floor(tonumber(ns.db.sortColumns) or 8))
+        local i = 0
+        for bag = 0, lastBag() do
+            for slot = 1, numSlots(bag) do key[bag .. ":" .. slot] = math.floor(i / cols); i = i + 1 end
+        end
+    else
+        for bag = 0, lastBag() do
+            for slot = 1, numSlots(bag) do key[bag .. ":" .. slot] = bag * 1000 + math.floor((slot - 1) / 4) end
+        end
+    end
+    return key
+end
+
+-- the group an item belongs to when every group starts a new row (nil: no rows for this order)
+local function groupOf(it)
+    local by = ns.db.sortBy
+    if by == "quality" then return "q" .. it.quality end
+    if by == "name" then return nil end
+    if it.topic == 4 and ns.db.sortCraftRows ~= false then return "t4:" .. it.class .. ":" .. it.sub end
+    return "t" .. it.topic
+end
+
+-- Target slot positions for the ordered items: one after another, or with each group starting on a new row.
+-- Falls back to one after another when the rows need more slots than the bags have (second value true).
+local function targets(order, slots)
+    local packed = {}
+    for i = 1, #order do packed[i] = i end
+    if ns.db.sortLayout ~= "rows" or #order == 0 or groupOf(order[1]) == nil then return packed, false end
+    local key, out, pos, lastGroup, lastRow = rowKeys(), {}, 0, nil, nil
+    for i, it in ipairs(order) do
+        pos = pos + 1
+        local g = groupOf(it)
+        if lastGroup ~= nil and g ~= lastGroup then
+            while slots[pos] and key[slots[pos].bag .. ":" .. slots[pos].slot] == lastRow do pos = pos + 1 end
+        end
+        if not slots[pos] then return packed, true end
+        out[i], lastGroup, lastRow = pos, g, key[slots[pos].bag .. ":" .. slots[pos].slot]
+    end
+    return out, false
+end
+
+-- Two partial stacks of the same item: the later one is dropped on the earlier one (the game joins them; what does
+-- not fit stays on the cursor and goes back). nil when every item has at most one partial stack.
+local function mergeMove(raw)
+    local partial = {}
+    for _, r in ipairs(raw) do
+        local info = r.info
+        if info and not info.locked then
+            local max = facts(info.id).stack or 1
+            if max > 1 and info.count < max then
+                local first = partial[info.id]
+                if first then return { from = { bag = r.bag, slot = r.slot }, to = first, merge = true } end
+                partial[info.id] = { bag = r.bag, slot = r.slot }
+            end
+        end
+    end
+end
+
+-- The moves that would put every item in its place: { { from = {bag, slot}, to = {bag, slot} }, ... }, the items in
+-- their target order, and true when rows did not fit and the items were packed instead. The chosen bags are one list
+-- of slots: backpack first, then bag 1, 2, 3, 4 (reversed when the items gather at the end). A bookmarked item kept
+-- in place takes its slot out of the list. With sortMergeStacks the first move joins two partial stacks, if any.
 function T.plan(keepFacts)
     if not keepFacts then factMemo = {} end
     local keepMarked = ns.db.sortKeepBookmarked
@@ -399,6 +468,10 @@ function T.plan(keepFacts)
             end
         end
     end
+    if ns.db.sortMergeStacks ~= false then
+        local m = mergeMove(raw)
+        if m then return { m }, {}, false end
+    end
     if ns.db.sortFrom == "end" then
         for i = 1, math.floor(#raw / 2) do raw[i], raw[#raw + 1 - i] = raw[#raw + 1 - i], raw[i] end
     end
@@ -410,22 +483,24 @@ function T.plan(keepFacts)
     local order = {}
     for i, it in ipairs(items) do order[i] = it end
     table.sort(order, ORDERS[ns.db.sortBy] or byTopic)
+    local target, fellBack = targets(order, slots)
     local cur, where, moves = {}, {}, {}
     for _, it in ipairs(items) do cur[it.pos], where[it] = it, it.pos end
     for i, it in ipairs(order) do
-        local j = where[it]
-        if j ~= i then
-            local other = cur[i]
-            moves[#moves + 1] = { from = slots[j], to = slots[i] }
-            cur[i], cur[j] = it, other
-            where[it] = i
+        local p, j = target[i], where[it]
+        if j ~= p then
+            local other = cur[p]
+            moves[#moves + 1] = { from = slots[j], to = slots[p] }
+            cur[p], cur[j] = it, other
+            where[it] = p
             if other then where[other] = j end
         end
     end
-    return moves, order
+    return moves, order, fellBack
 end
 
 local sorting, autoTimer = nil, nil
+local rowsHinted = false                           -- the "rows did not fit" note of the automatic arranging, once a session
 
 local function busyReason()
     if inFight() then return "you are in a fight" end
@@ -443,7 +518,13 @@ local function finishSort(job, why)
     sorting = nil
     if job.manual or why ~= "done" then
         ns.print(why == "done" and (job.moves == 0 and "your bags are already in order"
-            or string.format("bags arranged %s (%d moves)", ORDER_WORDS[ns.db.sortBy] or ORDER_WORDS.topic, job.moves)) or ("bag arrangement stopped: " .. why))
+            or string.format("bags arranged %s%s (%d moves)", ORDER_WORDS[ns.db.sortBy] or ORDER_WORDS.topic,
+                (ns.db.sortLayout == "rows" and not job.fellBack) and ", a new row for each group" or "", job.moves))
+            or ("bag arrangement stopped: " .. why))
+    end
+    if why == "done" and job.fellBack and (job.manual or not rowsHinted) then
+        rowsHinted = true
+        ns.print("not enough free slots to start each group on a new row - the items were packed instead")
     end
     ns.log("sort", why .. ", " .. job.moves .. " moves")
 end
@@ -460,8 +541,9 @@ local function sortStep(job)
         job.timer = ns.after(STEP, function() sortStep(job) end)
         return
     end
-    local moves = T.plan(true)                               -- look again every time: new loot or your own moves never matter
+    local moves, _, fellBack = T.plan(true)                  -- look again every time: new loot or your own moves never matter
     local m = moves[1]
+    if not m then job.fellBack = fellBack end
     if not m then return finishSort(job, "done") end
     local a, b = slotInfo(m.from.bag, m.from.slot), slotInfo(m.to.bag, m.to.slot)
     if (a and a.locked) or (b and b.locked) then            -- the game has not finished the last move yet

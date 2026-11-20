@@ -1,0 +1,416 @@
+{
+  "id": "dungeon-journal-r2",
+  "name": "Dungeon Journal look round 2 and previews",
+  "runTimeout": 150,
+  "context": {
+    "prompt": "Record round 2 of the Dungeon Journal look (home clean-up, wider grid, class/dungeon/chain icons, star glow, EJ name variants, class-only label, Share button, item -> boss jump, Plan route -> Route tab) and the preview gallery context/renders/index.html. Note what is still unverified in game."
+  },
+  "lanes": [
+    {
+      "id": "builder",
+      "name": "Builder",
+      "agent": "bpmn:worker",
+      "timeout": 35
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "agent": "bpmn:reviewer",
+      "timeout": 12
+    }
+  ],
+  "data": {
+    "wT": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "wQ": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "vT": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "vQ": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "fT": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    },
+    "fQ": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    },
+    "prev": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "vF": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "fF": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "name": "Round 2 approved"
+    },
+    {
+      "id": "split",
+      "type": "and",
+      "join": "join"
+    },
+    {
+      "id": "build_t",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Build theme home bosses",
+      "out": "wT",
+      "prompt": "Round 2, stream T. Read context/dungeon-journal-contract.md (hard rules + section 'Round 2', stream T) and look at the previews context/renders/home.png and bosses.png and the reference /tmp/dj_images/dj1.png, dj3.png. You own ONLY QuestSharing/JournalTheme.lua, QuestSharing/DungeonHomeUI.lua, QuestSharing/DungeonBossesUI.lua, tests/test_dungeon_journal_home.py, tests/test_dungeon_journal_bosses.py. Implement everything listed for stream T (full-width 2-column grid, clear button on the home search, T.glow / T.classIcon / T.dungeonIcon / T.chainIcon with exact names, glow on done cards, EJ portrait name variants, and B.select(bossName) on the bosses page so another page can open a boss). Verify any new client texture path against /tmp/listfile/lf.csv. Tests for each item. Run /tmp/qs-test-env/bin/python on your two test files plus tests/test_dungeon_quests.py and tests/test_classic_style.py. Report {files, summary, tests, notes}."
+    },
+    {
+      "id": "review_t",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review theme home bosses",
+      "in": [
+        "wT",
+        "fT?"
+      ],
+      "out": "vT",
+      "prompt": "Review round 2 stream T ({{wT.summary}}) against context/dungeon-journal-contract.md 'Round 2' stream T: every item done, helper names exact, only client textures (paths verified in /tmp/listfile/lf.csv), nothing copied from /tmp/dj_addon, no edits outside the owned files (git diff --stat), tests green (run them). Report {status: approved|changes, issues: [...]}."
+    },
+    {
+      "id": "ok_t",
+      "type": "xor",
+      "name": "T approved?"
+    },
+    {
+      "id": "fix_t",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix theme home bosses",
+      "in": [
+        "vT"
+      ],
+      "out": "fT",
+      "prompt": "Fix these review issues in round 2 stream T (own only JournalTheme.lua, DungeonHomeUI.lua, DungeonBossesUI.lua and their two test files): {{vT.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "merge_t",
+      "type": "xor",
+      "name": "T settled"
+    },
+    {
+      "id": "build_q",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Build shell quests items",
+      "out": "wQ",
+      "prompt": "Round 2, stream Q. Read context/dungeon-journal-contract.md (hard rules + section 'Round 2', stream Q) and look at the previews context/renders/home.png and quests.png and the reference /tmp/dj_images/dj1.png, dj2.png. You own ONLY QuestSharing/DungeonQuests.lua, QuestSharing/JournalItems.lua, tests/test_dungeon_journal_quests.py, tests/test_dungeon_quests.py, tests/test_dungeon_route.py. Implement everything listed for stream Q (home view without the quest filter bar and status line, summaries respecting the hide boxes and crest filter, class/dungeon/chain icons on rows via T.classIcon/T.dungeonIcon/T.chainIcon with nil guards, class-only label, Share button wired to the existing share action, strip colour fix, item click -> Bosses tab with that boss (ns.dungeonBossesUI.select if present) and a 'Drops from <boss>' tooltip line, Plan route -> Route tab). Never weaken behaviour assertions. Run your test files plus tests/test_ux_b5.py and tests/test_classic_style.py. Report {files, summary, tests, notes}."
+    },
+    {
+      "id": "review_q",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review shell quests items",
+      "in": [
+        "wQ",
+        "fQ?"
+      ],
+      "out": "vQ",
+      "prompt": "Review round 2 stream Q ({{wQ.summary}}) against context/dungeon-journal-contract.md 'Round 2' stream Q: every item done, home shows no quest filter bar/status, Share wired to the real share action, item -> boss jump works, nil guards for stream T helpers, behaviour assertions not weakened (read test diffs), only client textures, nothing copied from /tmp/dj_addon, no edits outside owned files, tests green (run them). Report {status, issues}."
+    },
+    {
+      "id": "ok_q",
+      "type": "xor",
+      "name": "Q approved?"
+    },
+    {
+      "id": "fix_q",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix shell quests items",
+      "in": [
+        "vQ"
+      ],
+      "out": "fQ",
+      "prompt": "Fix these review issues in round 2 stream Q (own only DungeonQuests.lua, JournalItems.lua and the three test files): {{vQ.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "merge_q",
+      "type": "xor",
+      "name": "Q settled"
+    },
+    {
+      "id": "join",
+      "type": "and"
+    },
+    {
+      "id": "previews",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Integrate and render previews",
+      "in": [
+        "wT",
+        "wQ"
+      ],
+      "out": "prev",
+      "timeout": 30,
+      "prompt": "Round 2, stream P (after T and Q). Read context/dungeon-journal-contract.md 'Round 2'. (1) Fix seams between T ({{wT.summary}}) and Q ({{wQ.summary}}) if any (helpers wired, B.select used), in any of their files, no redesign. (2) Run the full suite (loop over tests/test_*.py with /tmp/qs-test-env/bin/python) and make it green; all QuestSharing/*.lua compile. (3) Extend tools/render_journal.py (you own it and context/renders/*): scenes home, quests (normal quest, a class-only quest, a done chain quest), bosses (with an EJ portrait), map, route; render with real client textures/fonts as it already does (/tmp/qs-test-env/bin/python tools/render_journal.py then python3 tools/render_journal.py paint). (4) Write context/renders/index.html: a gallery with each of our renders next to the matching Dungeon Journal reference screenshot copied from /tmp/dj_images into context/renders/reference/ (label: 'reference: Dungeon Journal by Exehn, not part of the addon'). Add a CHANGELOG Unreleased line for round 2. Report {files, summary, tests, notes}."
+    },
+    {
+      "id": "final_review",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review round 2 result",
+      "in": [
+        "prev",
+        "fF?"
+      ],
+      "out": "vF",
+      "prompt": "Final review of round 2 ({{prev.summary}}). Look at context/renders/*.png and context/renders/index.html next to the references; check every 'Round 2' item of context/dungeon-journal-contract.md is visible or tested; full suite green (run it); no copied code/media from /tmp/dj_addon in QuestSharing/ (reference screenshots only under context/renders/reference/, never in QuestSharing/); client textures only. Report {status, issues}."
+    },
+    {
+      "id": "ok_final",
+      "type": "xor",
+      "name": "Final approved?"
+    },
+    {
+      "id": "fix_final",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix round 2 issues",
+      "in": [
+        "vF"
+      ],
+      "out": "fF",
+      "timeout": 25,
+      "prompt": "Fix these final review issues of round 2 (keep the full suite green, re-render the previews if the look changed): {{vF.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "done",
+      "type": "end",
+      "name": "Round 2 done"
+    },
+    {
+      "id": "open_issues",
+      "type": "end",
+      "name": "Done with open issues"
+    }
+  ],
+  "flows": [
+    {
+      "from": "start",
+      "to": "split"
+    },
+    {
+      "from": "split",
+      "to": "build_t"
+    },
+    {
+      "from": "split",
+      "to": "build_q"
+    },
+    {
+      "from": "build_t",
+      "to": "review_t"
+    },
+    {
+      "from": "review_t",
+      "to": "ok_t"
+    },
+    {
+      "from": "ok_t",
+      "to": "merge_t",
+      "name": "approved",
+      "when": {
+        "path": "vT.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_t",
+      "to": "merge_t",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_t",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_t",
+      "to": "fix_t",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_t",
+      "to": "review_t"
+    },
+    {
+      "from": "merge_t",
+      "to": "join"
+    },
+    {
+      "from": "build_q",
+      "to": "review_q"
+    },
+    {
+      "from": "review_q",
+      "to": "ok_q"
+    },
+    {
+      "from": "ok_q",
+      "to": "merge_q",
+      "name": "approved",
+      "when": {
+        "path": "vQ.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_q",
+      "to": "merge_q",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_q",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_q",
+      "to": "fix_q",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_q",
+      "to": "review_q"
+    },
+    {
+      "from": "merge_q",
+      "to": "join"
+    },
+    {
+      "from": "join",
+      "to": "previews"
+    },
+    {
+      "from": "previews",
+      "to": "final_review"
+    },
+    {
+      "from": "final_review",
+      "to": "ok_final"
+    },
+    {
+      "from": "ok_final",
+      "to": "done",
+      "name": "approved",
+      "when": {
+        "path": "vF.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_final",
+      "to": "open_issues",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_final",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_final",
+      "to": "fix_final",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_final",
+      "to": "final_review"
+    }
+  ]
+}

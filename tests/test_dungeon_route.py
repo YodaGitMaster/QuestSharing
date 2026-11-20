@@ -157,6 +157,10 @@ def test_button_needs_a_dungeon_and_opens_a_read_only_route_with_click_to_pin_st
     filters(g, dungeon=1581)
     assert not w.route.disabled
     click(w.route); g.advance(30)
+    # the Quests page button opens the Route tab of the same dungeon; the old window stays as D.planRoute()
+    assert w.tabs.route.selected and not w.questsPage.shown and g.eval("NS.dungeonQuests.current")() == 1581
+    assert g.eval("NS.dungeonQuests._routeWindow()") is None, "no separate window from the button"
+    g.eval("NS.dungeonQuests.planRoute")(); g.advance(30)
     f = g.eval("NS.dungeonQuests._routeWindow()")
     assert f.shown and "The Deadmines" in plain(f.summary.text) and "about" in plain(f.summary.text)
     rows = [b for b in f.rows.values() if b.shown]
@@ -194,7 +198,7 @@ def test_quests_needing_kill_or_collect_first_are_listed_as_do_first(style):
 
 def route_window(g, area):
     filters(g, dungeon=area)
-    click(g.eval("NS.dungeonQuests._window()").route); g.advance(30)
+    g.eval("NS.dungeonQuests.planRoute")(); g.advance(30)  # the old route window (the button opens the Route tab)
     return g.eval("NS.dungeonQuests._routeWindow()")
 
 

@@ -42,6 +42,8 @@ GatherSources.lua
 Menu.lua
 ZoneLevels.lua
 EquipmentUI.lua
+JournalTheme.lua
+JournalItems.lua
 Adventure.lua
 Fishing.lua
 CookingReference.lua
@@ -51,8 +53,13 @@ ProfessionUI.lua
 Rewards.lua
 Loot.lua
 DungeonQuestData.lua
+DungeonLore.lua
 DungeonRoute.lua
 DungeonQuests.lua
+DungeonHomeUI.lua
+DungeonBossesUI.lua
+DungeonMapUI.lua
+DungeonRouteUI.lua
 SpellRanks.lua
 Track.lua
 Highlight.lua

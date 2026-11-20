@@ -1,0 +1,61 @@
+flowchart LR
+  %% Dungeon Journal round 3: lore, user-story polish, previews · 6 agents: 3 × bpmn:worker, 3 × bpmn:reviewer · up to 18 with loop rounds
+  subgraph n_lane_builder["🤖 Builder · bpmn:worker · ⏱ 40 min"]
+    n_start(("Round 3 started"))
+    n_split{"+"}
+    n_build_l["⚙ Build boss and dungeon lore"]
+    n_fix_l["⚙ Fix lore"]
+    n_build_u["⚙ Polish the user stories"]
+    n_fix_u["⚙ Fix user-story polish"]
+    n_previews["⚙ Integrate and render previews · ⏱ 30 min"]
+    n_fix_final["⚙ Fix round 3 issues · ⏱ 25 min"]
+    n_review_l__merge{"✕"}
+    n_review_u__merge{"✕"}
+    n_final_review__merge{"✕"}
+  end
+  subgraph n_lane_reviewer["🤖 Reviewer · bpmn:reviewer · ⏱ 12 min"]
+    n_review_l["⚙ Review lore"]
+    n_ok_l{"L approved?"}
+    n_merge_l{"L settled"}
+    n_review_u["⚙ Review user-story polish"]
+    n_ok_u{"U approved?"}
+    n_merge_u{"U settled"}
+    n_join{"+"}
+    n_final_review["⚙ Review round 3 result"]
+    n_ok_final{"Final approved?"}
+    n_done((("Round 3 done")))
+    n_open_issues((("Done with open issues")))
+  end
+  n_start --> n_split
+  n_split --> n_build_l
+  n_split --> n_build_u
+  n_build_l --> n_review_l__merge
+  n_review_l --> n_ok_l
+  n_ok_l -- "approved" --> n_merge_l
+  n_ok_l -- "3rd round" --> n_merge_l
+  n_ok_l -- "changes" --> n_fix_l
+  n_fix_l --> n_review_l__merge
+  n_merge_l --> n_join
+  n_build_u --> n_review_u__merge
+  n_review_u --> n_ok_u
+  n_ok_u -- "approved" --> n_merge_u
+  n_ok_u -- "3rd round" --> n_merge_u
+  n_ok_u -- "changes" --> n_fix_u
+  n_fix_u --> n_review_u__merge
+  n_merge_u --> n_join
+  n_join --> n_previews
+  n_previews --> n_final_review__merge
+  n_final_review --> n_ok_final
+  n_ok_final -- "approved" --> n_done
+  n_ok_final -- "3rd round" --> n_open_issues
+  n_ok_final -- "changes" --> n_fix_final
+  n_fix_final --> n_final_review__merge
+  n_review_l__merge --> n_review_l
+  n_review_u__merge --> n_review_u
+  n_final_review__merge --> n_final_review
+  classDef done fill:#e6f4ea,stroke:#1e8e3e,color:#0d3b1e
+  classDef running fill:#e8f0fe,stroke:#1a73e8,color:#0b2a5b
+  classDef ready fill:#fef7e0,stroke:#b06000,color:#4a3600
+  classDef failed fill:#fce8e6,stroke:#c5221f,color:#5f0d06
+  classDef cancelled fill:#f1f3f4,stroke:#80868b,color:#3c4043
+  class n_start,n_split,n_build_l,n_review_l,n_ok_l,n_fix_l,n_merge_l,n_build_u,n_review_u,n_ok_u,n_merge_u,n_join,n_previews,n_final_review,n_ok_final,n_fix_final,n_done,n_review_l__merge,n_review_u__merge,n_final_review__merge done

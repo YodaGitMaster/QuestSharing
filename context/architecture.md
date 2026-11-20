@@ -1,5 +1,5 @@
 # Architecture
-Last updated: 2026-11-19
+Last updated: 2026-11-20
 
 ## File tree
 <!-- bpmn:file-tree -->
@@ -12,10 +12,11 @@ cutpdf/
 ├── context/                                          # Session continuity and live architecture
 │   ├── algo-plan-2026-11-17.md                       # Planner algorithm tuning plan (streams E-opt/E-plan: stability, horizon, calibration, yards) with outcome
 │   ├── architecture.md                               # Live source map and runtime diagrams
-│   ├── bpmn/                                         # BPMN plugin run index + last run per process (process.json/.bpmn, diagram.mmd) (22 files, collapsed)
-│   ├── BUGS/                                         # Verified bug methodology and regressions (45 files, collapsed)
+│   ├── bpmn/                                         # BPMN plugin run index + last run per process (process.json/.bpmn, diagram.mmd) (34 files, collapsed)
+│   ├── BUGS/                                         # Verified bug methodology and regressions (49 files, collapsed)
 │   ├── decisions.md                                  # Choices and rationale
-│   ├── diagrams/                                     # Dated Mermaid snapshots captured during BPMN runs (flowcharts, sequence diagrams) (155 files, collapsed)
+│   ├── diagrams/                                     # Dated Mermaid snapshots captured during BPMN runs (flowcharts, sequence diagrams) (185 files, collapsed)
+│   ├── dungeon-journal-contract.md                   # Dungeon Journal look stream contract (2026-11-20): file owners, ns.journalTheme/journalItems/page-module APIs, integration follow-ups, in-game checklist
 │   ├── fix-plan-2026-11-17.md                        # Audit fix plan (streams A/B/C) with per-bug results of the fix-all run
 │   ├── insights.md                                   # Timestamped findings
 │   ├── predictive-quest-optimizer.md                 # Implemented algorithm, executed simulation and evidence limits
@@ -23,6 +24,8 @@ cutpdf/
 │   ├── quest-narration-research.md                   # Separate local voice-acting addon proposals and verified source limits
 │   ├── quest-optimization-research.md                # Prior art and proposed quest graph/route optimizer design
 │   ├── quest-planner-routing-and-validation-plan.md  # SPF integration behavior, automated coverage and pending in-game checks
+│   ├── renders/                                      # Dungeon Journal PNG previews from tools/render_journal.py (home, home_search, quests, quests_class, quests_chain, bosses, map, route) + reference/ shots
+│   │   └── index.html                                # Gallery: each render next to the Dungeon Journal reference shot
 │   ├── schema.md                                     # Data structures and formats
 │   ├── shortest-path-source-study.md                 # External router implementation trace; no runtime dependency
 │   ├── state.md                                      # Current task and handoff
@@ -31,23 +34,25 @@ cutpdf/
 │   ├── ux-review-verdicts-2026-11-19.json            # Verifier verdicts per UX id (confirmed/partly/refuted + fix notes) used by the ux-fix builders
 │   └── walkable-routing-research.md                  # Terrain-routing feasibility, provider sources and proposed integration (not implemented)
 ├── questidea.txt                                     # User-provided predictive quest optimizer design requirements
-├── QuestSharing/                                     # WoW addon runtime (52 files, collapsed; LFGInvite.lua = party finder (needs own listing) search + auto-invite by activity/role/class/level/item level, highest level first, LFGFinderUI.lua = spyglass picker window, ItemLevel.lua = inspect + remembered/shared item levels, BagTools.lua = bag bookmarks / sell grays / arrange by topic, ChatLock.lua = no chat box in combat, Aggro.lua = tank aggro % over enemy nameplates + lowest-aggro near enemy marked) (61 files, collapsed; CampMap.lua = Quest guide shared camps on the world map + camps table; DungeonQuestData.lua = Wowhead per-dungeon quest lists (quest -> dungeon area) + names of the 9 new Forever dungeons; DungeonRoute.lua = 'get them all' route: walk/flight/boat/hearth graph, Dijkstra legs, precedence-aware stop order) (59 files, collapsed)
+├── QuestSharing/                                     # WoW addon runtime (52 files, collapsed; LFGInvite.lua = party finder (needs own listing) search + auto-invite by activity/role/class/level/item level, highest level first, LFGFinderUI.lua = spyglass picker window, ItemLevel.lua = inspect + remembered/shared item levels, BagTools.lua = bag bookmarks / sell grays / arrange (packed or a row per group, game-bag or one-bag rows, stack merge), ChatLock.lua = no chat box in combat, Aggro.lua = tank aggro % as a plain number over enemy nameplates in a fight) (61 files, collapsed; CampMap.lua = Quest guide shared camps on the world map + camps table; DungeonQuestData.lua = Wowhead per-dungeon quest lists (quest -> dungeon area) + names of the 9 new Forever dungeons; DungeonRoute.lua = 'get them all' route: walk/flight/boat/hearth graph, Dijkstra legs, precedence-aware stop order) (68 files, collapsed)
 ├── README.md                                         # User documentation
-├── tests/                                            # Python tests and Lua API harness (collapsed; test_aggro.py = tank aggro marks, test_lfg_invite.py = party finder, test_item_level.py = item levels, test_coldridge_valley.py = optimizer reference case on real QuestieDB rows; test_camp_map.py = shared camps map + table; data/coldridge_valley.lua = its generated fixture) (63 files + data/, collapsed)
+├── tests/                                            # Python tests and Lua API harness (collapsed; test_aggro.py = tank aggro marks, test_lfg_invite.py = party finder, test_item_level.py = item levels, test_coldridge_valley.py = optimizer reference case on real QuestieDB rows; test_camp_map.py = shared camps map + table; data/coldridge_valley.lua = its generated fixture) (63 files + data/, collapsed) (70 files, collapsed)
 └── tools/                                            # Local UI emulation utilities, never shipped in the addon
-    ├── build_cooking_reference.py                    # Rebuild pinned factual Cooking subset with upstream MIT attribution
-    ├── coldridge-network.html                        # Static view: Coldridge Valley quests -> mobs/objects -> 100-yd camps (network, map, intersection matrix), data baked in from tests/data/coldridge_valley.lua
-    ├── preview_camp_window.py                        # Render the real Shared camps window (harness frames, recorded anchors/colours) to an SVG/HTML preview
     ├── build_coldridge_fixture.py                    # Regenerate tests/data/coldridge_valley.lua (14 gnome-mage quests + NPCs/objects/items/XP) from a local Classic QuestieDB checkout
+    ├── build_cooking_reference.py                    # Rebuild pinned factual Cooking subset with upstream MIT attribution
+    ├── build_dungeon_lore.py                         # TODO: purpose
     ├── build_skinning_data.py                        # Regenerate QuestSharing/SkinningData.lua (creature -> skinning item + chance) from a CMaNGOS classic-db SQL dump
+    ├── coldridge-network.html                        # Static view: Coldridge Valley quests -> mobs/objects -> 100-yd camps (network, map, intersection matrix), data baked in from tests/data/coldridge_valley.lua
     ├── lua-optimization-prompt.md                    # Lua 5.1 speed optimization prompt that applies proven (>= 20 %, benchmarked) fixes
     ├── lua-performance-review-prompt.md              # Reusable Lua 5.1 speed review prompt (hot paths, dictionaries, fewer loops, no per-loop allocs)
     ├── lua-syntax-review-prompt.md                   # Reusable Lua 5.1 syntax/bug review prompt (parse, 5.2+ leaks, globals, nil traps)
+    ├── preview_camp_window.py                        # Render the real Shared camps window (harness frames, recorded anchors/colours) to an SVG/HTML preview
     ├── preview_professions.py                        # Export actual profession model into an illustrative native-window layout preview
     ├── preview_quest_planner.py                      # Run actual Lua planner and embed its rows in the Westfall emulation
     ├── preview_search_journal.py                     # Export real Lua search rows/details to a local journal layout emulation
     ├── profession-preview.html                       # Embedded recipe-list/source visual template with sample learned states
     ├── quest-guide-preview.html                      # Interactive compact-guide fragment template with navigation, mini mode and lock
+    ├── render_journal.py                             # Dev-only preview: dump the real Dungeon quests frame tree (lupa harness) and paint it with PIL + client art/fonts -> context/renders/*.png (gallery index.html)
     └── search-journal-preview.html                   # Interactive three-tab journal layout emulation; native textures approximated
 ```
 <!-- /bpmn:file-tree -->
@@ -77,10 +82,10 @@ flowchart TD
     Diagnostics --> Report[QuestSharingReport: issue overview, full details, Copy all, Refresh and Clear records]
     Core --> Share[Share.lua: quest offers; ns.shareBusy true while a round offers quests]
     Share -->|ns.shareBusy: Share button reads Stop -> ns.stopShare| PanelWin[Panel.lua: Party quests window; close x -> ns.closePanel sets db.panel=false]
-    Core --> BagTools[BagTools.lua: Space bookmarks, sell grays at vendor, arrange all bags by topic]
+    Core --> BagTools[BagTools.lua: Space bookmarks, sell grays at vendor, arrange bags: packed or rows per group, merge stacks]
     Bags[Bags.lua: ns.bagEachSlot, bagItemFor] --> BagTools
     Core --> ChatLock[ChatLock.lua: closes the chat box in combat]
-    Core --> Aggro[Aggro.lua: aggroPlates, threat % labels over nameplates, lowest near enemy marked; no auto-target, TargetUnit protected]
+    Core --> Aggro[Aggro.lua: aggroPlates, plain threat % number over each enemy nameplate in a fight; A.status() diagnosis]
     Aggro -->|ns.getCVar/ns.setCVar, ns.markerFor| Highlight[Highlight.lua]
     Core --> DataWork[DataWork.lua: shared optional database work budget + onPurge/purge registry + saved ID lists in QuestSharingCache (W.saved/W.save); W.fighting for combat status]
     Core --> Sync[Sync.lua: party addon messages]
@@ -107,6 +112,7 @@ flowchart TD
     Planner --> Style[Style.lua: opaque compact guide, current/upcoming rows, navigation and mini mode]
     Planner --> Preview[tools/preview_quest_planner.py: real Lua rows to browser emulation]
     Preview --> PreviewTemplate[tools/quest-guide-preview.html: interactive reference-led guide]
+    DungeonQuests --> JournalRender[tools/render_journal.py: dev-only PNG preview of the Dungeon Journal pages from the real Lua frame tree; client art via wago.tools by FileDataID, cached in /tmp; output context/renders/*.png]
     Planner -->|Follow button only| Path[QuestPlannerPath.lua: optional SPF Follow bridge]
     Path --> SPF[Optional ShortestPathForever.API: Navigate only, never used for planning]
     Path -. unsupported or missing .-> Planner
@@ -210,6 +216,35 @@ flowchart TD
     ReportClear[Diagnostics.lua report: Clear records] -->|same second-click rule| ReportClear
     Toggle[Core.lua ns.setSetting / slash on-off] --> Line[ns.settingLine: label + state + ns.settingPath]
     Toggle -->|chat/announce/pickup on while mode ~= send| SendNote[one warning line; rows greyed via inactiveNote]
+```
+
+Dungeon Journal look (2026-11-20, runs r-20261120-102551-f86e + round 2 r-20261120-111056-9c21 + round 3 r-20261120-114959-1c34): the Dungeon quests page is a shell with a home view and a dungeon view. Inspired by the Dungeon Journal addon, but no code or media from it. Only client textures are used.
+```mermaid
+flowchart TD
+    DQ[DungeonQuests.lua: shell, D.summaries / D.openDungeon / D.home / D.openBoss / D.openQuest / D.questsForNpc, applyView; window.filterBar one row + window.filterPanel popover, hidden on home] --> Home[DungeonHomeUI.lua: H.build/H.refresh, only home search + clear button, crest filters, 2-col grid H.cardWidth ~488px, card hover tooltip with lore]
+    DQ --> Header[dungeon view: < Dungeons, LFG icon, name, LV, entrance pin, muted lore line, T.tab Map/Bosses/Quests/Route]
+    LoreGen[tools/build_dungeon_lore.py: wago.tools retail DB2 CSVs, cached /tmp/ejdata, + D.names] -->|generates offline| Lore[DungeonLore.lua: ns.dungeonLore L.dungeons by area, L.bosses by L.norm name; L.dungeon / L.boss]
+    Home --> Lore
+    Header --> Lore
+    Bosses --> Lore
+    Bosses -->|B.neededFor: D.questsForNpc npcID, view.area; click -> D.openQuest| DQ
+    Header --> Content[window.content 1000x560 at TOPLEFT 16,-140; modulePage builds each page lazily, safely via xpcall]
+    Content --> QuestsPage[questsPage: DungeonQuests list + renderPanel, items 3 columns, More details fit rule]
+    Content --> Bosses[DungeonBossesUI.lua: boss rows + loot rows; right panel description, Abilities, Needed for, facts]
+    Content --> MapPage[DungeonMapUI.lua: floors, tiles, zoom, entrance pin]
+    Content --> RoutePage[DungeonRouteUI.lua: route steps via D.routePlan / D.routeStepText / D.minutes / D.pinPlace]
+    Home --> Theme[JournalTheme.lua: T.C palette, panel/parchment/button/tab/pill/crest/badge/tick/round, T.cardArt, T.lfgIcon, T.glow/classIcon/dungeonIcon/chainIcon, T.hasFile]
+    Header --> Theme
+    Bosses --> Theme
+    QuestsPage --> Theme
+    QuestsPage --> Items[JournalItems.lua: I.button / I.attach item tooltips, compare, chat link, dress-up, Drops from boss line]
+    Bosses --> Items
+    Items -->|click item a boss here drops: setOpener| DQ
+    QuestsPage -->|Plan route| RoutePage
+    QuestsPage -->|Share button: shareLine, repaint on GROUP_ROSTER_UPDATE / QUEST_LOG_UPDATE| Game[WoW quest share]
+    Bosses -->|L.bossesOf name, done, area| Loot[Loot.lua: AtlasLoot encounter tables, else QuestieDB scan in background + bossWaiters]
+    MapPage --> CMap[C_Map map group + art layers, else WorldMap folder tiles; local CLASSIC table of 19 dungeons]
+    RoutePage --> Route[DungeonRoute.lua]
 ```
 
 Shared classic menu look (2026-11-17): every window and panel draws through `Style.lua`.
@@ -346,6 +381,34 @@ sequenceDiagram
     Note over D,Menu: D.refresh() without argument (filters, search, buttons), D.go, f.suspend, D.scan still close the menu. Other windows' menus untouched
     Note over Work: Combat and close/Esc/tab switch pause the scan (reopen resumes); master disable and Refresh data cancel it
 ```
+### Dungeon Journal: home -> dungeon page -> tabs (2026-11-20)
+```mermaid
+sequenceDiagram
+    participant User
+    participant D as DungeonQuests.lua shell
+    participant H as DungeonHomeUI.lua
+    participant P as Page module (Bosses / Map / Route)
+    participant L as Loot.lua
+    User->>D: Open Dungeon quests (filters.dungeon = 0)
+    D->>H: first time: H.build(homeView, 1000, 636, onOpen, {completed, inLog, search})
+    D->>H: H.refresh(D.summaries()) on every list render (so also when the scan finishes); hide boxes anchored to H._frame().bar
+    User->>H: Click a card
+    H->>D: onOpen(area) -> D.openDungeon(area, "quests")
+    D->>D: applyView: header (name, LV from summaryOf, T.lfgIcon), tabs SetSelected, questsPage shown
+    User->>D: Click tab Map / Bosses / Route
+    D->>P: modulePage(key): build(page, 1000, 560) once, then show(area, name); old tab hide()
+    P->>L: Bosses only: L.bossesOf(name, done, area)
+    L-->>P: list now (AtlasLoot) or done(list, source, reason) after the background scan
+    User->>D: Click a reward/drop item (JournalItems opener)
+    D->>D: D.dropSource(id) -> boss of this dungeon? else pendingOpen while boss list LOADING (cleared on quest/tab change, item leave)
+    D->>P: D.openBoss(boss): openDungeon(area,"bosses") then B.select(boss) (view.want kept only while loading)
+    User->>P: Bosses: click a "Needed for" quest
+    P->>D: D.openQuest(id): in list? else All quests (filters reset, keep dungeon); still loading -> wantQuest, opens after the scan
+    D->>D: openDungeon(area,"quests"), select the quest on its page
+    User->>D: Plan route (Quests page) -> D.openDungeon(area,"route")
+    User->>D: < Dungeons -> D.home(): hide module, levelError cleared, home view again
+```
+
 ```mermaid
 sequenceDiagram
     participant User

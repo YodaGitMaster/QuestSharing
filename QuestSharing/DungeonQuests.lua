@@ -19,11 +19,16 @@ local redraw=false -- a filter changed: the details are drawn again even if the 
 -- so a filter that widens past this needs a new scan (D.refresh), and one that narrows does not.
 local scope
 local menuEntry, menuQuest -- what D.menu last opened, to tell our right-click menu from other windows' menus
-local PAGE, OWNER, REWARDS_OWNER = 5, "dungeonQuests", "dungeonQuestRewards"
+local PAGE, OWNER, REWARDS_OWNER = 8, "dungeonQuests", "dungeonQuestRewards" -- 8 rows of 48 px on the quests page
 local FOREGROUND_MS = 8 -- the player is waiting on this visible list; it reads ~18 fields per quest
 local rewardIndex, rewardsReady, rewardsLoading = {}, false, false
 local hovered, showHover
 local paint
+local entranceOf -- defined with the route below; the dungeon header pins it
+local bossLists = {} -- area -> {byItem={[itemID]=boss name}} from ns.loot.bossesOf, or LOADING; read on item hover / click
+local LOADING = {}
+local pendingOpen -- {area, id}: an item clicked while its dungeon's boss list was loading; dropped on quest / tab change or leaving the item
+local wantQuest -- a quest D.openQuest asked for while its filter reset rescans; opened when the scan ends
 -- Memory: the catalogue is read once and kept for the session; only Settings "Purge" (D.purge) or switching the addon
 -- off (D.close) frees it. A paused scan still holds its tables, so the jobs go too.
 local function release()
@@ -33,6 +38,7 @@ local function release()
     records,results,places={}, {}, {}
     chainPrev,chainNext,depthOf,chainLead={}, {}, {}, {}
     rewardIndex,rewardsReady,rewardsLoading={},false,false
+    bossLists={}
     ready,loading,progress,total,selected,hovered,scope=false,false,0,0,nil,nil,nil
     if window then for _,row in ipairs(window.rows or {}) do row.result=nil end end
 end
@@ -137,14 +143,6 @@ local function classChoices()
     end
     return list
 end
-local function dungeonChoices()
-    local list,sorted={{value=0,label="All dungeons"}},{}
-    for _,place in pairs(places) do sorted[#sorted+1]=place end
-    table.sort(sorted,function(a,b) if a.name~=b.name then return a.name<b.name end;return a.area<b.area end)
-    for _,place in ipairs(sorted) do list[#list+1]={value=place.area,label=place.name.." ("..place.count..")"} end
-    return list
-end
-
 local function currentDungeon()
     local name,kind
     if type(GetInstanceInfo)=="function" then
@@ -487,6 +485,7 @@ function D.scan(full)
         if filters.dungeon~=0 and not places[filters.dungeon] then filters.dungeon=0 end
         focusCurrentDungeon()
         D.updateControls();D.refresh()
+        if wantQuest then local id=wantQuest;wantQuest=nil;D.openQuest(id,true) end
     end,shown,function(ok,err)
         if token~=generation then return end
         if not ok then loading=false;message="Could not read dungeon quests: "..tostring(err);paint() end
@@ -522,10 +521,6 @@ local function pickupText(p)
     local source=p.source
     return (source.startsFrom and ("Item "..(source.startsFrom.name or source.startsFrom.id).." from ") or "")
         ..(source.name or "Unknown giver")..(p.point and (" — "..Q.where(p.point)) or " — location unknown")
-end
-local function locationSummary(list)
-    if #list==0 then return "Unknown location" end
-    return pickupText(list[1])..(#list>1 and (" +"..(#list-1).." more") or "")
 end
 
 local function chainLabel(r)
@@ -585,7 +580,6 @@ end
 local GREEN,DIM="|cff0d6e0d","|cff6b4a26"
 local NAME,PICK,TURN,REWARD="|cff7a0c0c","|cff0a2a8a","|cff5a1a7a","|cff6b4a00" -- panel: quest name crimson, pickup deep blue, turn-in purple
 local GREYED="|cff7d7d7d"
-local ROW_PICK,ROW_TURN,ROW_TASK="|cff9fe6ff","|cffe6b3ff","|cffe0e0e0" -- the same roles, bright for the dark list
 local function baseXP(id)
     local support=type(LibQuestieDB)=="table" and LibQuestieDB.Support
     local xp=support and U.call(support.Get,"QuestXP")
@@ -720,7 +714,6 @@ end
 -- the small print. Plain words, big type for the key facts, small type for everything else.
 local INK={0.18,0.105,0.045}
 local SOFT={0.38,0.27,0.13}
-local QUALITY_INK={[0]="|cff5a5a5a",[1]="|cff2a1a08",[2]="|cff0a6a0a",[3]="|cff0a3f9a",[4]="|cff6a1a9a",[5]="|cff9a4a00"}
 local BADGES={ -- text colour on parchment, strip tint, icon
     todo={"|cff6a4600",{0.90,0.66,0.12,0.40},"Interface\\GossipFrame\\AvailableQuestIcon"},
     taken={"|cff6a4600",{0.98,0.86,0.25,0.40},"Interface\\GossipFrame\\ActiveQuestIcon"},
@@ -772,7 +765,12 @@ local function doText(r)
         text=table.concat(parts," ")
     end
     local task,talk=taskLabel(r)
-    if type(text)=="string" and text~="" then return text,talk and "Talk only" or task end
+    -- under the quest's own words the task kind is only shown when it adds something: "Talk only" is a guess from a
+    -- quest with no objectives in the data (it reads wrong under "Bring 10 ..."), and the generic kinds repeat the text
+    if type(text)=="string" and text~="" then
+        if talk or task=="Complete quest objectives" or string.find(task,"^Task unknown") then return text,nil end
+        return text,task
+    end
     local who=talk and string.match(task,"speak to (.+)$")
     if who then return "Talk to "..who,nil end
     if string.find(task,"^Task unknown") then return "Not clear from the quest data: open the quest log or Questie for steps.",nil end
@@ -814,11 +812,11 @@ local function hoverable(b)
     b:RegisterForClicks("LeftButtonUp")
 end
 local function placeButton(parent,width)
-    local b=CreateFrame("Button",nil,parent);b:SetWidth(width);b:SetHeight(40)
+    local b=CreateFrame("Button",nil,parent);b:SetWidth(width);b:SetHeight(38)
     hoverable(b)
-    b.icon=b:CreateTexture(nil,"ARTWORK");b.icon:SetWidth(22);b.icon:SetHeight(22);b.icon:SetPoint("TOPLEFT",b,"TOPLEFT",2,-4)
-    b.title=fs(b,14,INK,width-34);b.title:SetPoint("TOPLEFT",b,"TOPLEFT",30,-3);b.title:SetWordWrap(false);bold(b.title,INK)
-    b.sub=fs(b,11,SOFT,width-34);b.sub:SetPoint("TOPLEFT",b,"TOPLEFT",30,-22);b.sub:SetWordWrap(false)
+    b.icon=b:CreateTexture(nil,"ARTWORK");b.icon:SetWidth(20);b.icon:SetHeight(20);b.icon:SetPoint("TOPLEFT",b,"TOPLEFT",2,-3)
+    b.title=fs(b,13,INK,width-34);b.title:SetPoint("TOPLEFT",b,"TOPLEFT",28,-2);b.title:SetWordWrap(false);bold(b.title,INK)
+    b.sub=fs(b,11,SOFT,width-34);b.sub:SetPoint("TOPLEFT",b,"TOPLEFT",28,-20);b.sub:SetWordWrap(false)
     b:SetScript("OnEnter",function(self)
         self.hl:Show()
         U.tip(self,self.title:GetText() or "",{pinnable(self.place and self.place.point) and "Click: put a pin on your world map (open it with M)."
@@ -827,90 +825,195 @@ local function placeButton(parent,width)
     b:SetScript("OnClick",function(self) if self.place then pinPlace(self.place) end end)
     return b
 end
-local function itemButton(parent,width)
-    local b=CreateFrame("Button",nil,parent);b:SetWidth(width);b:SetHeight(36)
-    hoverable(b)
-    b.icon=b:CreateTexture(nil,"ARTWORK");b.icon:SetWidth(30);b.icon:SetHeight(30);b.icon:SetPoint("TOPLEFT",b,"TOPLEFT",2,-3)
-    b.name=fs(b,12,INK,width-40);b.name:SetPoint("TOPLEFT",b,"TOPLEFT",37,-3)
-    b:SetScript("OnEnter",function(self)
-        self.hl:Show()
-        if not self.itemID then return end
-        if GameTooltip and GameTooltip.SetHyperlink then
-            pcall(function()
-                GameTooltip:SetOwner(self,"ANCHOR_RIGHT");GameTooltip:SetHyperlink("item:"..self.itemID);GameTooltip:Show()
-                if GameTooltip_ShowCompareItem then GameTooltip_ShowCompareItem(GameTooltip) end
-            end)
-        else U.tip(self,(itemInfo(self.itemID)),{"Shift-click: link it in chat."}) end
-    end)
-    b:SetScript("OnClick",function(self)
-        local _,link=itemInfo(self.itemID)
-        if link and HandleModifiedItemClick then pcall(HandleModifiedItemClick,link) end
-    end)
-    return b
+local MAX_ITEMS,MAX_REPS,MIN_MORE=6,3,40
+local MORPHEUS="Fonts\\MORPHEUS.TTF"
+local HEAD={0.42,0.24,0.04}
+local function grouped(n) -- 2300 -> "2,300"
+    local s=tostring(n)
+    local out
+    repeat s,out=string.gsub(s,"^(-?%d+)(%d%d%d)","%1,%2") until out==0
+    return s
 end
-local MAX_ITEMS=6
-local function buildPanel(frame)
-    local P={frame=frame,width=330,texts={}}
-    P.title=fs(frame,15,{1,0.82,0},326);P.title:SetPoint("TOPLEFT",frame,"TOPLEFT",14,-10);P.title:SetWordWrap(false);bold(P.title,{1,0.82,0})
-    P.strip=S.fill(frame,"ARTWORK",1,1,1,1);P.strip:SetHeight(28)
-    P.badgeIcon=frame:CreateTexture(nil,"OVERLAY");P.badgeIcon:SetWidth(20);P.badgeIcon:SetHeight(20)
-    P.badge=fs(frame,15,INK,290);P.badge:SetWordWrap(false);bold(P.badge,INK)
-    P.meta=fs(frame,12,SOFT,330)
-    P.heads={}
-    for _,key in ipairs({"do","where","rewards","chain","more"}) do
-        P.heads[key]=fs(frame,11,{0.48,0.30,0.05});bold(P.heads[key],{0.48,0.30,0.05})
-        P.heads[key]:SetText(({["do"]="WHAT TO DO",where="WHERE (click for a map pin)",rewards="REWARDS (hover an item for stats)",chain="QUEST CHAIN",more="MORE DETAILS"})[key])
+local function moneyText(copper)
+    local g,s,c=math.floor(copper/10000),math.floor(copper/100)%100,copper%100
+    local parts={}
+    if g>0 then parts[#parts+1]=g.."g" end
+    if s>0 then parts[#parts+1]=s.."s" end
+    if c>0 or #parts==0 then parts[#parts+1]=c.."c" end
+    return table.concat(parts," ")
+end
+local function setPill(p,text) p.value=text;p:SetText(text) end
+-- The class tokens a class-only quest is for ({} = every class), in the filter's class order.
+local function classTokens(r)
+    local out={}
+    if r.classes==0 then return out end
+    for _,choice in ipairs(classChoices()) do
+        local mask=enums().classKeys and enums().classKeys[choice.value]
+        if mask and ns.rewards.overlaps(r.classes,mask) then out[#out+1]={token=choice.value,label=choice.label} end
     end
-    P.doText=fs(frame,14,INK,330)
-    P.doKind=fs(frame,11,SOFT,330)
-    P.pickup=placeButton(frame,330);P.pickup.icon:SetTexture("Interface\\GossipFrame\\AvailableQuestIcon")
-    P.turnIn=placeButton(frame,330);P.turnIn.icon:SetTexture("Interface\\GossipFrame\\ActiveQuestIcon")
-    P.xp=fs(frame,15,INK,330);bold(P.xp,INK)
-    P.rep=fs(frame,12,INK,330)
-    P.itemNote=fs(frame,12,SOFT,330)
-    P.itemMore=fs(frame,11,SOFT,330)
+    return out
+end
+local function classColor(token)
+    local c=(CUSTOM_CLASS_COLORS or RAID_CLASS_COLORS or {})[token]
+    if type(c)~="table" or not c.r then return "|cff6b4a26" end
+    return string.format("|cff%02x%02x%02x",math.floor(c.r*255+0.5),math.floor(c.g*255+0.5),math.floor(c.b*255+0.5))
+end
+-- The quest menu's own "Offer it to the party" line: its action and why it is off (nil = you can share it now).
+local SHARE_LINE="Offer it to the party"
+local function shareLine(r)
+    local ok,items=pcall(ns.questMenuItems,entry(r))
+    if ok and type(items)=="table" then
+        for _,it in ipairs(items) do if it.text==SHARE_LINE then return it,it.why end end
+    end
+    return nil,"sharing is not available on this client"
+end
+local SHARE_ON,SHARE_OFF={.10,.34,.10,.95},{.17,.16,.15,.92}
+local function paintShare(b,r)
+    local line,why=shareLine(r)
+    b.line,b.why=line,why
+    b.shareable=line~=nil and why==nil
+    local T=ns.journalTheme
+    if b.bg and T.color then T.color(b.bg,b.shareable and SHARE_ON or SHARE_OFF) end
+    if b.label and b.label.SetTextColor then
+        if b.shareable then b.label:SetTextColor(.55,1,.55) else b.label:SetTextColor(.62,.62,.62) end
+    end
+end
+-- The quest page on parchment: Morpheus title, status strip, Objective / Starts at / Turn in, the reward items in three
+-- columns, XP / money / reputation pills, the chain neighbours and the small print.
+local function buildPanel(frame,width)
+    local T,IT=ns.journalTheme,ns.journalItems
+    local inner=width-28
+    local P={frame=frame,width=width,inner=inner,texts={}}
+    P.title=fs(frame,20,{0.36,0.20,0.04},inner-200);P.title:SetWordWrap(false)
+    if P.title.SetFont then P.title:SetFont(MORPHEUS,20,"") end
+    P.actions=T.button(frame,"Actions",90,function() if P.quest then D.menu(P.quest.id) end end,
+        "Quest actions: where to pick it up, mark the giver, share, how to do it")
+    P.actions:SetPoint("TOPRIGHT",frame,"TOPRIGHT",-14,-12)
+    -- Share: green when the quest is in your log and the game lets you share it, grey with the reason otherwise
+    P.share=T.button(frame,"Share",80,function(self)
+        if self.shareable and self.line and self.line.run then self.line.run()
+        else ns.print("cannot share this quest: "..tostring(self.why or "not available")) end
+    end)
+    P.share:SetPoint("TOPRIGHT",frame,"TOPRIGHT",-110,-12)
+    P.share:SetScript("OnEnter",function(self)
+        U.tip(self,"Share",{self.shareable and "Click: offer this quest to your party." or ("Can't share: "..tostring(self.why or "not available"))})
+    end)
+    P.share:SetScript("OnLeave",U.hideTip)
+    -- "WARRIOR / PALADIN ONLY" in the class colours, with the class icons (icons once JournalTheme has T.classIcon)
+    P.classOnly=fs(frame,12,SOFT,inner-60);P.classOnly:SetWordWrap(false);bold(P.classOnly,{0,0,0})
+    P.classIcons={}
+    P.avail=fs(frame,12,SOFT,190);P.avail:SetWordWrap(false)
+    P.crestA=T.crest(frame,"Alliance",20);P.crestH=T.crest(frame,"Horde",20)
+    P.rule=S.fill(frame,"ARTWORK",0.48,0.35,0.16,0.55);P.rule:SetHeight(1)
+    P.strip=S.fill(frame,"ARTWORK",1,1,1,1);P.strip:SetHeight(26)
+    P.badgeIcon=frame:CreateTexture(nil,"OVERLAY");P.badgeIcon:SetWidth(20);P.badgeIcon:SetHeight(20)
+    P.badge=fs(frame,14,INK,inner-40);P.badge:SetWordWrap(false);bold(P.badge,INK)
+    P.meta=fs(frame,12,SOFT,inner)
+    P.heads={}
+    for _,key in ipairs({"do","start","turn","rewards","also","chain","more"}) do
+        P.heads[key]=fs(frame,key=="rewards" and 15 or 13,HEAD);bold(P.heads[key],HEAD)
+        P.heads[key]:SetText(({["do"]="Objective",start="Starts at",turn="Turn in",rewards="Rewards",
+            also="You will also receive:",chain="Quest chain",more="More details"})[key])
+    end
+    if P.heads.rewards.SetFont then P.heads.rewards:SetFont(MORPHEUS,15,"") end
+    P.doText=fs(frame,13,INK,inner)
+    P.doKind=fs(frame,11,SOFT,inner)
+    P.pickup=placeButton(frame,inner);P.pickup.icon:SetTexture("Interface\\GossipFrame\\AvailableQuestIcon")
+    P.turnIn=placeButton(frame,inner);P.turnIn.icon:SetTexture("Interface\\GossipFrame\\ActiveQuestIcon")
+    P.itemNote=fs(frame,12,SOFT,inner)
+    P.itemMore=fs(frame,11,SOFT,inner)
+    P.itemWidth=math.floor((inner-16)/3)
     P.items={}
-    for i=1,MAX_ITEMS do P.items[i]=itemButton(frame,163) end
-    P.chain=fs(frame,12,INK,330)
+    for i=1,MAX_ITEMS do P.items[i]=IT.button(frame,P.itemWidth,46) end
+    P.xpPill=T.pill(frame,"xp","");P.moneyPill=T.pill(frame,"money","")
+    P.repPills={}
+    for i=1,MAX_REPS do P.repPills[i]=T.pill(frame,"rep","") end
+    P.xpNote=fs(frame,11,SOFT,inner)
+    P.chain=fs(frame,12,INK,inner)
     return P
 end
--- Lay the panel out top to bottom for quest r (or hide it and show a message when r is nil).
+-- Lay the page out top to bottom for quest r (or show only a message when r is nil).
 local function renderPanel(P,r,message,setMore,moreScroll)
     local f=P.frame
-    local all={P.title,P.strip,P.badgeIcon,P.badge,P.meta,P.doText,P.doKind,P.pickup,P.turnIn,P.xp,P.rep,P.itemNote,P.itemMore,P.chain}
+    local all={P.title,P.actions,P.share,P.classOnly,P.avail,P.crestA,P.crestH,P.rule,P.strip,P.badgeIcon,P.badge,P.meta,P.doText,P.doKind,
+        P.pickup,P.turnIn,P.itemNote,P.itemMore,P.xpPill,P.moneyPill,P.xpNote,P.chain}
     for _,h in pairs(P.heads) do all[#all+1]=h end
     for _,b in ipairs(P.items) do all[#all+1]=b end
+    for _,b in ipairs(P.repPills) do all[#all+1]=b end
+    for _,t in pairs(P.classIcons) do all[#all+1]=t end
     for _,w in ipairs(all) do w:Hide() end
-    local y=44
+    P.quest=r
+    local y=12
     local function at(w,x,dy) w:ClearAllPoints();w:SetPoint("TOPLEFT",f,"TOPLEFT",x or 14,-y);w:Show();y=y+(dy or 0) end
-    local function head(key) y=y+6;at(P.heads[key],14,16) end
+    local function head(key,label) if label then P.heads[key]:SetText(label) end;y=y+6;at(P.heads[key],14,18) end
     local function text(t,value,size,gap) t:SetText(value);at(t,14,0);y=y+textHeight(t,size)+(gap or 2) end
     if not r then
-        P.title:SetText("Quest details");P.title:Show()
-        moreScroll:ClearAllPoints();moreScroll:SetPoint("TOPLEFT",f,"TOPLEFT",16,-y);moreScroll:SetHeight(f:GetHeight()-y-14)
+        P.title:SetText("Quest details");at(P.title,14,32)
+        moreScroll:ClearAllPoints();moreScroll:SetPoint("TOPLEFT",f,"TOPLEFT",16,-y);moreScroll:SetHeight(f:GetHeight()-y-14);moreScroll:Show()
         setMore(message or "");return
     end
-    P.title:SetText(r.name);P.title:Show()
+    P.title:SetText(r.name);at(P.title,14,28);P.actions:Show()
+    paintShare(P.share,r);P.share:Show()
+    -- "Available from level N" and the crests of the factions that can take it
+    P.avail:SetText("Available from level "..kw("num",math.max(1,r.required))..(r.max>0 and (" to "..kw("num",r.max)) or ""))
+    at(P.avail,14,0)
+    local x=14+(P.avail.GetStringWidth and math.min(190,P.avail:GetStringWidth() or 150) or 150)+8
+    local masks=enums().factionRaceMasks or {}
+    for _,pair in ipairs({{P.crestA,"Alliance"},{P.crestH,"Horde"}}) do
+        local mask=masks[pair[2]]
+        if r.races==0 or not mask or ns.rewards.overlaps(r.races,mask) then
+            pair[1]:ClearAllPoints();pair[1]:SetPoint("TOPLEFT",f,"TOPLEFT",x,-y+3);pair[1]:Show();x=x+22
+        end
+    end
+    y=y+22
+    -- class-only quests: the classes in their colours, each with its icon
+    local tokens=classTokens(r)
+    if #tokens>0 then
+        local T=ns.journalTheme
+        x=14
+        local names={}
+        for i,c in ipairs(tokens) do
+            names[#names+1]=classColor(c.token)..string.upper(c.label).."|r"
+            if i<=4 and T.classIcon then
+                local icon=P.classIcons[c.token]
+                if not icon then
+                    local ok,t=pcall(T.classIcon,f,16,c.token)
+                    icon=ok and t or nil;P.classIcons[c.token]=icon
+                end
+                if icon then icon:ClearAllPoints();icon:SetPoint("TOPLEFT",f,"TOPLEFT",x,-y);icon:Show();x=x+18 end
+            end
+        end
+        P.classOnly:SetText(table.concat(names," / ").." ONLY")
+        P.classOnly:ClearAllPoints();P.classOnly:SetPoint("TOPLEFT",f,"TOPLEFT",x+(x>14 and 2 or 0),-y-2);P.classOnly:Show()
+        y=y+20
+    end
+    P.rule:ClearAllPoints();P.rule:SetPoint("TOPLEFT",f,"TOPLEFT",14,-y);P.rule:SetPoint("TOPRIGHT",f,"TOPRIGHT",-14,-y);P.rule:Show()
+    y=y+6
     local state,label=badgeOf(r)
     local b=BADGES[state]
-    P.strip:SetVertexColor(b[2][1],b[2][2],b[2][3],b[2][4])
-    P.strip:ClearAllPoints();P.strip:SetPoint("TOPLEFT",f,"TOPLEFT",8,-y+2);P.strip:SetPoint("TOPRIGHT",f,"TOPRIGHT",-8,-y+2);P.strip:Show()
-    local x=16
-    if b[3] then P.badgeIcon:SetTexture(b[3]);P.badgeIcon:ClearAllPoints();P.badgeIcon:SetPoint("TOPLEFT",f,"TOPLEFT",x,-y-2);P.badgeIcon:Show();x=x+24 end
-    P.badge:SetText(b[1]..label.."|r");P.badge:ClearAllPoints();P.badge:SetPoint("TOPLEFT",f,"TOPLEFT",x,-y-5);P.badge:Show()
-    y=y+32
+    -- the strip is the badge tint itself: colour x vertex = tint (a white colour texture with only a vertex tint draws
+    -- white where the client or a renderer ignores the vertex colour)
+    P.strip:SetVertexColor(1,1,1,1)
+    if ns.journalTheme.color then ns.journalTheme.color(P.strip,b[2])
+    elseif P.strip.SetColorTexture then P.strip:SetColorTexture(b[2][1],b[2][2],b[2][3],b[2][4]) end
+    P.strip.tint=b[2]
+    P.strip:ClearAllPoints();P.strip:SetPoint("TOPLEFT",f,"TOPLEFT",8,-y);P.strip:SetPoint("TOPRIGHT",f,"TOPRIGHT",-8,-y);P.strip:Show()
+    x=16
+    if b[3] then P.badgeIcon:SetTexture(b[3]);P.badgeIcon:ClearAllPoints();P.badgeIcon:SetPoint("TOPLEFT",f,"TOPLEFT",x,-y-3);P.badgeIcon:Show();x=x+24 end
+    P.badge:SetText(b[1]..label.."|r");P.badge:ClearAllPoints();P.badge:SetPoint("TOPLEFT",f,"TOPLEFT",x,-y-6);P.badge:Show()
+    y=y+30
     local req=r.required>1 and (" · needs "..kw("num",r.required.."+")) or ""
     text(P.meta,kw("dungeon",r.dungeonText).." · level "..kw("num",r.level)..req.." · "..roleWord(r),12,2)
     -- what to do
     head("do")
     local what,kind=doText(r)
-    text(P.doText,highlight(what,objectiveNames(r)),14,0)
+    text(P.doText,highlight(what,objectiveNames(r)),13,0)
     if kind then text(P.doKind,kind,11,0) end
-    -- where (pick up / hand in), each a click-to-pin button
-    head("where")
+    -- starts at / turn in, each a click-to-pin button
     local list=locations(r)
-    for _,pair in ipairs({{P.pickup,list.pickups,"Pick up from "},{P.turnIn,list.turnIns,"Hand in to "}}) do
-        local button,places,verb=pair[1],pair[2],pair[3]
+    for _,pair in ipairs({{"start",P.pickup,list.pickups,"Pick up from "},{"turn",P.turnIn,list.turnIns,"Hand in to "}}) do
+        local key,button,places,verb=pair[1],pair[2],pair[3],pair[4]
+        head(key)
         local place=places[1]
         button.place=place
         if place then
@@ -923,31 +1026,49 @@ local function renderPanel(P,r,message,setMore,moreScroll)
             button.title:SetText(verb.."unknown")
             button.sub:SetText(verb=="Pick up from " and (Q.whereText(r.id) or "not in quest data") or "not in quest data")
         end
-        at(button,10,42)
+        at(button,10,38)
     end
-    -- rewards
-    head("rewards")
-    local xp=baseXP(r.id)
-    local mine=xp and xpAtMyLevel(xp,r.level)
-    text(P.xp,xp and (kw("num",mine or xp).." XP"..(mine and ("  |cff7a6a5a(base "..xp..", less at your level)|r") or "")) or "XP unknown",15,2)
-    local reps=reputationLines(r)
-    if #reps>0 then text(P.rep,table.concat(reps,"\n"),12,2) end
+    -- reward items: three columns of item buttons (hover: full tooltip, Shift: compare)
+    local ids=rewardsReady and rewardIndex and rewardIndex[r.id] or {}
+    head("rewards",#ids>1 and "Choose one reward" or #ids==1 and "Reward" or "Rewards")
     if not rewardsReady then text(P.itemNote,"Items: loading…",12,2)
     elseif not rewardIndex then text(P.itemNote,"Items: not in the installed quest data",12,2)
-    elseif not rewardIndex[r.id] or #rewardIndex[r.id]==0 then text(P.itemNote,"No item rewards",12,2)
+    elseif #ids==0 then text(P.itemNote,"No item rewards",12,2)
     else
-        local ids=rewardIndex[r.id]
-        if #ids>1 then text(P.itemNote,"Items (you may pick one):",12,0) end
-        for i=1,math.min(#ids,MAX_ITEMS) do
+        local count=math.min(#ids,MAX_ITEMS)
+        for i=1,count do
             local button=P.items[i]
-            local name,_,quality,icon=itemInfo(ids[i])
-            button.itemID=ids[i];button.icon:SetTexture(icon)
-            button.name:SetText((QUALITY_INK[quality] or QUALITY_INK[1])..name.."|r")
-            button:ClearAllPoints();button:SetPoint("TOPLEFT",f,"TOPLEFT",i%2==1 and 10 or 177,-y);button:Show()
-            if i%2==0 or i==math.min(#ids,MAX_ITEMS) then y=y+38 end
+            button:SetItem(ids[i])
+            local col=(i-1)%3
+            button:ClearAllPoints();button:SetPoint("TOPLEFT",f,"TOPLEFT",14+col*(P.itemWidth+8),-y);button:Show()
+            if col==2 or i==count then y=y+50 end
         end
         if #ids>MAX_ITEMS then text(P.itemMore,"+"..(#ids-MAX_ITEMS).." more items (see details)",11,2) end
     end
+    -- XP, money and reputation pills
+    head("also",#ids>0 and "You will also receive:" or "You will receive:")
+    local px=14
+    local function pill(p,value)
+        setPill(p,value)
+        if px>14 and px+p:GetWidth()>P.width-14 then px=14;y=y+32 end
+        p:ClearAllPoints();p:SetPoint("TOPLEFT",f,"TOPLEFT",px,-y);p:Show();px=px+p:GetWidth()+8
+    end
+    local xp=baseXP(r.id)
+    local mine=xp and xpAtMyLevel(xp,r.level)
+    pill(P.xpPill,xp and (grouped(mine or xp).." XP") or "XP unknown")
+    local money=tonumber((Q.get("quest",r.id,"rewardMoney")))
+    if money and money>0 then pill(P.moneyPill,moneyText(money)) end
+    local rep=Q.get("quest",r.id,"reputationReward")
+    local reps=0
+    for _,pair in ipairs(type(rep)=="table" and rep or {}) do
+        if reps<MAX_REPS and type(pair)=="table" and tonumber(pair[1]) and tonumber(pair[2]) then
+            reps=reps+1
+            local name=U.call(GetFactionInfoByID,pair[1]) or ("Faction "..pair[1])
+            pill(P.repPills[reps],(pair[2]>=0 and "+" or "")..pair[2].." "..name)
+        end
+    end
+    y=y+32
+    if mine then text(P.xpNote,"base "..xp.." XP, less at your level",11,2) end
     -- chain: plain before/next lines with their state
     local lines={}
     for _,field in ipairs({"chainBefore","chainAfter"}) do
@@ -961,11 +1082,21 @@ local function renderPanel(P,r,message,setMore,moreScroll)
             lines[#lines+1]=(field=="chainBefore" and "Before: " or "Next: ")..kw("quest",name)..state
         end
     end
-    if #lines>0 then head("chain");text(P.chain,table.concat(lines,"\n"),12,2) end
+    -- The page must stay inside its parchment: when the chain would leave the More details box too small it moves
+    -- into that box; when even that leaves no room, More details is left out (Actions still has the details).
+    local bottom=f:GetHeight()-12
+    local more=D.detail(r)
+    if #lines>0 then
+        local chainText=table.concat(lines,"\n")
+        P.chain:SetText(chainText)
+        if y+24+textHeight(P.chain,12)+2+24+MIN_MORE<=bottom then head("chain");text(P.chain,chainText,12,2)
+        else more="Quest chain\n"..chainText.."\n\n"..more end
+    end
+    if y+24+MIN_MORE>bottom then moreScroll:Hide();setMore("");return end
     head("more")
     moreScroll:ClearAllPoints();moreScroll:SetPoint("TOPLEFT",f,"TOPLEFT",16,-y)
-    moreScroll:SetHeight(math.max(60,f:GetHeight()-y-12))
-    setMore(D.detail(r))
+    moreScroll:SetHeight(bottom-y);moreScroll:Show()
+    setMore(more)
 end
 
 function D.showPickup(id)
@@ -1046,6 +1177,343 @@ function D.refresh(keepMenu)
     end
     paint()
 end
+-- ===== Page shell: a home (dungeon cards) and a dungeon page (header, tabs Map / Bosses / Quests / Route) =====
+local TABS={{key="map",label="Map",icon="Interface\\Icons\\Ability_Spy"},
+    {key="bosses",label="Bosses",icon="Interface\\TargetingFrame\\UI-RaidTargetingIcon_8"},
+    {key="quests",label="Quests",icon="Interface\\GossipFrame\\AvailableQuestIcon"},
+    {key="route",label="Route",icon="Interface\\Icons\\Ability_Mount_Gryphon_01"}}
+local MODULES={map="dungeonMapUI",bosses="dungeonBossesUI",route="dungeonRouteUI"} -- the other pages, built lazily
+local CONTENT_W,CONTENT_H=1000,560
+local ROW_W,ROW_H,ROW_GAP,INDENT=296,48,6,14
+local HIDE_X={548,748} -- the two hide check boxes in the dungeon page's filter row (between All quests and Refresh data)
+local function report(err) local h=geterrorhandler and geterrorhandler();if h then h(err) end;return err end
+local function safely(fn,...) -- another stream's page must not break the shell
+    if type(fn)~="function" then return end
+    local args={...}
+    local n=select("#",...)
+    xpcall(function() fn(unpack(args,1,n)) end,report)
+end
+-- What a dungeon card needs: its quests, how many are left to take, done, and which factions can take them.
+-- The counts follow Hide completed / Hide quests in my log and the home's own crest filter; a dungeon left with no
+-- quest is not listed. The crests (alliance / horde) say who can take its quests at all.
+-- homeFaction(): the faction of the home's crest buttons (H._frame().faction), or nil for both. Never the quest page's
+-- faction filter: that one is hidden on the home, so counting by it would change the cards with no visible reason.
+local function homeFaction()
+    local H=ns.dungeonHomeUI
+    local ok,home=pcall(function() return H and H._frame and H._frame() end)
+    local f=ok and type(home)=="table" and home.faction
+    if f=="Alliance" or f=="Horde" then return f end -- the hidden faction filter of the quest page is not used here
+end
+function D.summaries()
+    if not ready then return {} end
+    local by={}
+    local masks=enums().factionRaceMasks or {}
+    local function forFaction(r,faction) local m=masks[faction];return r.races==0 or not m or ns.rewards.overlaps(r.races,m) end
+    local faction=homeFaction()
+    local hideDone,hideLog=filters and filters.hideCompleted,filters and filters.hideLog
+    for id,r in pairs(records) do
+        local done=finished(id)
+        local taken=inLog(id)
+        local open=not done and not taken and canTake(r)
+        local counted=not (hideDone and done) and not (hideLog and taken) and (not faction or forFaction(r,faction))
+        for area,role in pairs(r.dungeons) do
+            local s=by[area]
+            if not s then
+                s={area=area,name=places[area] and places[area].name or areaName(area),total=0,open=0,done=0,alliance=false,horde=false,quests={}}
+                by[area]=s
+            end
+            if forFaction(r,"Alliance") then s.alliance=true end
+            if forFaction(r,"Horde") then s.horde=true end
+            if counted then
+                s.total=s.total+1
+                if r.name then s.quests[#s.quests+1]=r.name end -- the home search also matches quest titles
+                if done then s.done=s.done+1 elseif open then s.open=s.open+1 end
+            end
+            if r.level>0 then
+                -- the dungeon's own quests give its level range; outdoor preparation only when it has none
+                local k=role==true and "direct" or "any"
+                s[k.."Min"]=math.min(s[k.."Min"] or r.level,r.level);s[k.."Max"]=math.max(s[k.."Max"] or r.level,r.level)
+            end
+        end
+    end
+    local list={}
+    for _,s in pairs(by) do
+        s.minLevel,s.maxLevel=s.directMin or s.anyMin,s.directMax or s.anyMax
+        s.directMin,s.directMax,s.anyMin,s.anyMax=nil,nil,nil,nil
+        if s.total>0 then list[#list+1]=s end
+    end
+    table.sort(list,function(a,b)
+        if (a.minLevel or 0)~=(b.minLevel or 0) then return (a.minLevel or 0)<(b.minLevel or 0) end
+        if a.name~=b.name then return a.name<b.name end
+        return a.area<b.area
+    end)
+    return list
+end
+-- The quests of a dungeon (default: the open one) that ask you to kill this NPC: kill objectives and kill-credit
+-- objectives. For the Bosses page's "Needed for" list. Each row: {id, name, level, state, label} (state / label as the
+-- quest page's status strip: todo, taken, done, skip, blocked), sorted by level then name.
+function D.questsForNpc(npcID,area)
+    npcID=tonumber(npcID);area=tonumber(area) or (filters and filters.dungeon) or 0
+    if not ready or not npcID or area==0 then return {} end
+    local function kills(id)
+        local objectives=Q.get("quest",id,"objectives")
+        if type(objectives)~="table" then return false end
+        for _,row in ipairs(type(objectives[1])=="table" and objectives[1] or {}) do
+            if (type(row)=="table" and row[1] or row)==npcID then return true end
+        end
+        for _,row in ipairs(type(objectives[5])=="table" and objectives[5] or {}) do
+            if type(row)=="table" then
+                if row[2]==npcID then return true end
+                for _,id2 in ipairs(type(row[1])=="table" and row[1] or {}) do if id2==npcID then return true end end
+            end
+        end
+        return false
+    end
+    local out={}
+    for id,r in pairs(records) do
+        if r.dungeons[area]~=nil and kills(id) then
+            local state,label=badgeOf(r)
+            out[#out+1]={id=id,name=r.name,level=r.level,state=state,label=label}
+        end
+    end
+    table.sort(out,function(a,b)
+        if a.level~=b.level then return a.level<b.level end
+        if a.name~=b.name then return tostring(a.name)<tostring(b.name) end
+        return a.id<b.id
+    end)
+    return out
+end
+-- One dungeon's LV range, read straight from its records (same rule as D.summaries, without building every card).
+local function summaryOf(area)
+    if not ready then return end
+    local direct,any={},{}
+    for _,r in pairs(records) do
+        local role=r.dungeons[area]
+        if role~=nil and r.level>0 then
+            local k=role==true and direct or any
+            k.min=math.min(k.min or r.level,r.level);k.max=math.max(k.max or r.level,r.level)
+        end
+    end
+    local s={area=area,minLevel=direct.min or any.min,maxLevel=direct.max or any.max}
+    return s
+end
+local function hideModule(key)
+    local p=key and MODULES[key] and window.pages[key]
+    if not p then return end
+    p:Hide();local m=ns[MODULES[key]];if m then safely(m.hide) end
+end
+local function modulePage(key)
+    if window.pages[key] then return window.pages[key] end
+    local p=CreateFrame("Frame",nil,window.content)
+    p:SetPoint("TOPLEFT",window.content,"TOPLEFT",0,0);p:SetWidth(CONTENT_W);p:SetHeight(CONTENT_H);p:Hide()
+    window.pages[key]=p
+    local m=ns[MODULES[key]]
+    if m then safely(m.build,p,CONTENT_W,CONTENT_H) end
+    return p
+end
+local function refreshHome()
+    local H=ns.dungeonHomeUI
+    if not H then return end
+    if not window.homeBuilt then
+        window.homeBuilt=true
+        -- the shell's own filters stay theirs; the home may place the two hide check boxes and use the search box
+        safely(H.build,window.homeView,CONTENT_W,636,function(area) D.openDungeon(area) end,
+            {completed=window.completed,inLog=window.inLog,search=window.search})
+        -- the home's crest filter changes the counts: recount after its own click
+        local home=H._frame and select(2,pcall(H._frame))
+        for _,key in ipairs({"alliance","horde"}) do
+            local b=type(home)=="table" and home[key]
+            if type(b)=="table" and b.HookScript then
+                b:HookScript("OnClick",function() if window and (filters.dungeon or 0)==0 then safely(H.refresh,D.summaries()) end end)
+            end
+        end
+    end
+    safely(H.refresh,D.summaries())
+end
+-- The two hide check boxes: on the home they sit on the right of the home's top bar, on a dungeon page in the filter bar.
+local function placeHideBoxes(onHome)
+    local H=ns.dungeonHomeUI
+    local home=onHome and H and H._frame and H._frame()
+    local bar=home and home.bar
+    local f=window.frame
+    window.completed:ClearAllPoints();window.inLog:ClearAllPoints()
+    if bar then
+        window.inLog:SetPoint("RIGHT",bar,"RIGHT",0,0)
+        window.completed:SetPoint("RIGHT",window.inLog,"LEFT",-10,0)
+    else
+        window.completed:SetPoint("TOPLEFT",f,"TOPLEFT",HIDE_X[1],-17)
+        window.inLog:SetPoint("TOPLEFT",f,"TOPLEFT",HIDE_X[2],-17)
+    end
+end
+-- The Filters popover and its click catcher (a click anywhere else on the page closes it, so does Escape).
+local function showFilters(on)
+    if not (window and window.filterPanel) then return end
+    for _,frame in ipairs({window.filterPanel,window.filterCatcher}) do
+        if on then frame:Show() else frame:Hide() end
+    end
+    -- Escape is read only out of combat: there the key-propagation call is allowed, so no key is ever swallowed.
+    -- Propagation is put back to "on" before the keyboard is taken and again on hide (Escape turned it off).
+    local more=window.filterPanel
+    local combat=InCombatLockdown and InCombatLockdown()
+    if not combat and more.SetPropagateKeyboardInput then pcall(more.SetPropagateKeyboardInput,more,true) end
+    if more.EnableKeyboard then more:EnableKeyboard(on and not combat or false) end
+end
+-- The dungeon's Encounter Journal description (ns.dungeonLore, may be missing or a stub), or nil.
+local function loreOf(area,name)
+    local L=ns.dungeonLore
+    if not (L and type(L.dungeon)=="function") then return nil end
+    local ok,entry=pcall(L.dungeon,area,name)
+    local text=ok and type(entry)=="table" and entry.description
+    if type(text)~="string" then return nil end
+    text=string.gsub(string.gsub(text,"%s+"," "),"^ ","")
+    return text~="" and text or nil
+end
+-- Shows the home or the dungeon page for filters.dungeon (0 = home) and the chosen tab.
+local function applyView()
+    if not window or not filters then return end
+    local area=filters.dungeon or 0
+    -- the home has its own search and crests: the quest-only filters and the count line belong to the dungeon page
+    -- (the status line stays on the home only to say why there are no cards: loading, no QuestieDB, a filter error)
+    if area==0 then window.filterBar:Hide() else window.filterBar:Show() end
+    -- The status line only speaks when something needs saying (loading, an error, nothing found); the page range lives
+    -- in the list heading, as in a journal, so the dungeon page has no legend line.
+    if window.levelError or filterError or loading or not ready or (area~=0 and #results==0) then window.status:Show() else window.status:Hide() end
+    if area==0 then
+        window.dungeonView:Hide();window.homeView:Show();window.title:SetText("All dungeons")
+        hideModule(window.shownTab);window.shownTab,window.shownArea=nil,nil
+        pendingOpen,wantQuest=nil,nil;showFilters(false)
+        refreshHome();placeHideBoxes(true)
+        return
+    end
+    placeHideBoxes(false)
+    window.homeView:Hide();window.dungeonView:Show()
+    local name=places[area] and places[area].name or areaName(area)
+    local s=summaryOf(area)
+    window.title:SetText(name)
+    window.levels:SetText(s and s.minLevel and ("LV "..s.minLevel..(s.maxLevel and s.maxLevel~=s.minLevel and ("-"..s.maxLevel) or "")) or "")
+    window.icon:SetTexture(ns.journalTheme.lfgIcon(area) or "Interface\\Icons\\INV_Misc_Map_01")
+    window.loreText=loreOf(area,name);window.lore:SetText(window.loreText or "")
+    for _,t in ipairs(TABS) do window.tabs[t.key]:SetSelected(t.key==window.tab) end
+    if window.tab=="quests" then window.questsPage:Show() else window.questsPage:Hide() end
+    if window.shownTab~=window.tab or window.shownArea~=area then
+        pendingOpen,wantQuest=nil,nil;showFilters(false)
+        if window.shownTab~=window.tab then hideModule(window.shownTab) end
+        local m=MODULES[window.tab] and ns[MODULES[window.tab]]
+        if m then modulePage(window.tab):Show();safely(m.show,area,name) end
+        window.shownTab,window.shownArea=window.tab,area
+    end
+end
+function D.openDungeon(area,tab)
+    area=tonumber(area) or 0
+    if not window then D.open();if not window then return false end end
+    if area==0 then return D.home() end
+    window.tab=(tab=="map" or tab=="bosses" or tab=="route") and tab or "quests"
+    focusTarget=nil
+    if filters.dungeon~=area then
+        filters.dungeon,page=area,1;D.updateControls();D.refresh()
+    end
+    applyView()
+    return true
+end
+function D.home()
+    if not window then D.open();if not window then return false end end
+    window.tab="quests";focusTarget=nil;window.levelError=nil
+    if filters.dungeon~=0 then filters.dungeon,page=0,1;D.updateControls();D.refresh() end
+    applyView()
+    return true
+end
+function D.current() return filters and filters.dungeon or 0 end
+-- "All quests": every quest of the open dungeon (filters back to their defaults, search cleared).
+local function showAllQuests()
+    local dungeon=filters.dungeon;filters=defaults();filters.dungeon=dungeon
+    window.level:SetText(tostring(filters.level));window.level.cancel();window.search:SetText("");window.search.cancel()
+    window.levelError=nil;page=1;D.updateControls();D.refresh()
+end
+-- Opens the Quests tab of the open dungeon on that quest (e.g. from the Bosses page's "Needed for" list). A quest
+-- hidden by a filter is reached through All quests (filters reset). False when it is still not in the list (another
+-- dungeon) or when the reset started a rescan (then it opens once the list is read).
+function D.openQuest(id,noReset)
+    id=tonumber(id)
+    local area=filters and filters.dungeon or 0
+    if not window or area==0 or not id then return false end
+    local function find() for i,r in ipairs(results) do if r.id==id then return i end end end
+    local at=find()
+    if not at and not noReset and records[id] and records[id].dungeons[area]~=nil then
+        showAllQuests();at=find()
+        if not at and loading then wantQuest=id;return false end
+    end
+    if not at then return false end
+    wantQuest=nil
+    for p=#pageStarts,1,-1 do if pageStarts[p]<=at then page=p;break end end
+    selected=id;redraw=true
+    D.openDungeon(area,"quests");paint()
+    return true
+end
+-- Which boss of the open dungeon drops an item (ns.loot.bossesOf, asked only when you hover or click an item).
+-- update() runs once a list that was still loading arrives.
+local function dropsIndex(area,update)
+    local got=bossLists[area]
+    if got==LOADING then return nil end
+    if got then return got end
+    local L=ns.loot
+    if not (L and L.bossesOf) or area==0 then return nil end
+    local name=places[area] and places[area].name or areaName(area)
+    local sync=true
+    local function store(list)
+        if type(list)~="table" or #list==0 then
+            if bossLists[area]==LOADING then bossLists[area]=nil end -- no answer: ask again next time
+            return
+        end
+        local by={}
+        for _,boss in ipairs(list) do
+            for _,item in ipairs(type(boss)=="table" and type(boss.items)=="table" and boss.items or {}) do
+                local id=tonumber(type(item)=="table" and (item.itemID or item.id or item[1]) or item)
+                if id and boss.name and not by[id] then by[id]=boss.name end
+            end
+        end
+        local first=bossLists[area]~=nil and bossLists[area]~=LOADING
+        bossLists[area]={byItem=by}
+        if not sync and not first then
+            if update then pcall(update) end
+            local p=pendingOpen
+            if p and p.area==area then pendingOpen=nil;if by[p.id] then D.openBoss(by[p.id]) end end
+        end
+    end
+    bossLists[area]=LOADING
+    local ok,list=pcall(L.bossesOf,name,function(l) store(l) end,area)
+    sync=false
+    if not ok then bossLists[area]=nil;report(list);return nil end
+    if type(list)=="table" then store(list) end
+    got=bossLists[area]
+    return got~=LOADING and got or nil
+end
+function D.dropSource(id,update)
+    local area=filters and filters.dungeon or 0
+    local index=area~=0 and dropsIndex(area,update)
+    return index and index.byItem[tonumber(id)] or nil
+end
+-- Opens the Bosses tab of the current dungeon with that boss chosen (when the Bosses page can select one).
+function D.openBoss(boss)
+    local area=filters and filters.dungeon or 0
+    if area==0 or not window then return false end
+    D.openDungeon(area,"bosses")
+    local B=ns.dungeonBossesUI
+    if B and B.select then safely(B.select,boss) end
+    return true
+end
+if ns.journalItems and ns.journalItems.setSource then
+    ns.journalItems.setSource(function(id,_,update) return D.dropSource(id,update) end)
+    ns.journalItems.setOpener(function(id,_,boss)
+        if not shown() then return false end
+        boss=boss or D.dropSource(id)
+        if boss then pendingOpen=nil;return D.openBoss(boss) end
+        local area=filters and filters.dungeon or 0
+        if bossLists[area]==LOADING then pendingOpen={area=area,id=tonumber(id)} end
+        return false
+    end)
+    if ns.journalItems.setLeave then ns.journalItems.setLeave(function() pendingOpen=nil end) end
+end
+
 function D.updateControls()
     if not window then return end
     for _,control in ipairs(window.controls) do control.refresh() end
@@ -1056,6 +1524,24 @@ function D.updateControls()
     end
     window.levelMode:SetLabel("Quest levels: "..(filters.allLevels and "all" or ("for level "..filters.level)))
 end
+local function selectRow(rows,chosen)
+    for _,r in ipairs(rows) do
+        r.selected=r==chosen
+        if r.selected then r.selectedArt:Show();r.edge:Show() else r.selectedArt:Hide();r.edge:Hide() end
+    end
+end
+local function focusRows(rows,wanted)
+    local chosen,first
+    for _,row in ipairs(rows) do
+        if row.result and row.frame:IsShown() then
+            first=first or row
+            if row.result.id==wanted then chosen=row end
+        end
+    end
+    chosen=chosen or first
+    if chosen then chosen.choose(true) else selectRow(rows,nil) end
+    return chosen
+end
 paint=function()
     if not window then return end
     hovered=nil;U.hideTip()
@@ -1064,47 +1550,62 @@ paint=function()
     local last=math.min(#results,(pageStarts[page+1] or #results+1)-1)
     window.status:SetText(window.levelError or filterError or (loading and ("Reading dungeon quests: "..progress.."/"..total.." (pauses in combat)"))
         or (not ready and message) or (#results==0 and "No matching quests; broaden your filters or refresh Questie data.")
-        or first.."–"..last.." of "..#results.." quests • !: to pick up • ?: in your log • green tick: done / not needed • right-click: actions")
+        or first.."–"..last.." of "..#results.." quests")
+    window.listTitle:SetText("Quests  |  "..(#pageStarts>1 and (first.."–"..last.." of "..#results) or #results))
     E.pageButtons(window.prev,window.next,#pageStarts,page,1)
+    local masks=enums().factionRaceMasks or {}
     for i,row in ipairs(window.rows) do
         local r=first+i-1<=last and results[first+i-1] or nil;row.result=r
         if r then
             local done,implied=finished(r.id)
             local taken=not done and inLog(r.id)
-            local depth=math.min(depthOf[r.id] or 0,4);local indent=depth*22
-            row.frame:ClearAllPoints();row.frame:SetPoint("TOPLEFT",window.list,"TOPLEFT",indent,-(i-1)*106)
-            row.frame:SetWidth(650-indent)
-            for _,fs in ipairs({row.item,row.from}) do fs:SetWidth(650-indent-60) end
-            for _,fs in ipairs({row.task,row.pickup,row.turnIn}) do fs:SetWidth(590-indent) end
-            local req=r.required>1 and (" · req "..r.required.."+") or ""
-            local subtitle=chainLabel(r).." · "..r.dungeonText..(completed(r.id) and " · Completed" or implied and " · Not needed (next step done or taken)"
-                or taken and " · In your quest log" or "")
-            E.paintRow(row,nil,r.name.." · level "..r.level..req,subtitle)
-            if done then row.from:SetText(GREYED..subtitle.."|r") end -- grey means done; open quests keep the tan line
-            -- a quest you cannot take yet (level too low, other faction) is not "still to take": no "!", red requirement
+            local depth=math.min(depthOf[r.id] or 0,4);local indent=depth*INDENT
+            local width=ROW_W-indent
+            row.frame:ClearAllPoints();row.frame:SetPoint("TOPLEFT",window.list,"TOPLEFT",indent,-(i-1)*(ROW_H+ROW_GAP))
+            row.frame:SetWidth(width);row.item:SetWidth(width-(taken and 112 or 84));row.from:SetWidth(width-84)
+            -- a quest you cannot take yet (level too low, other faction) is not "still to take": no "!", red level
             local able=canTake(r)
-            if not able and r.required>(playerLevel() or 0) then req=" · |cffff6060req "..r.required.."+|r" end
-            row.item:SetText((depth>0 and (S.GREY.."» |r") or "")..(done and (GREYED..r.name.."|r") or (S.GOLD..r.name.."|r"))
-                ..S.GREY.." · level |r"..(done and GREYED or KW_ROW.num)..r.level.."|r"..S.GREY..req.."|r"
-                ..(baseXP(r.id) and ((done and GREYED or "|cffb8a0ff").." · "..(xpAtMyLevel(baseXP(r.id),r.level) or baseXP(r.id)).." XP|r") or ""))
-            local task,talk=taskLabel(r)
-            local list=locations(r)
+            local need=math.max(1,r.required)
+            row.item:SetText((depth>0 and (S.GREY.."» |r") or "")..(done and GREYED or S.GOLD)..r.name.."|r")
             if done then
-                row.task:SetText(GREYED.."Task: "..task.."|r")
-                row.pickup:SetText(GREYED.."Pickup: "..locationSummary(list.pickups).."|r")
-                row.turnIn:SetText(GREYED.."Turn-in: "..locationSummary(list.turnIns).."|r")
+                row.from:SetText(GREYED..(completed(r.id) and "Completed" or implied and "Not needed (next step done or taken)" or "Done").."|r")
             else
-                -- labels keep their role colour; the NPC (white) and the place (light orange) stand out inside the line
-                local names={}
-                for _,group in ipairs({list.pickups,list.turnIns}) do for _,pl in ipairs(group) do names[#names+1]={pl.source.name,"npc"} end end
-                row.task:SetText((talk and "|cff80e0ff" or ROW_TASK).."Task:|r "..highlight(task,names,KW_ROW))
-                for _,pair in ipairs({{row.pickup,list.pickups,ROW_PICK,"Pickup:"},{row.turnIn,list.turnIns,ROW_TURN,"Turn-in:"}}) do
-                    local places=pair[2]
-                    local who,where=placeText(places[1],KW_ROW)
-                    pair[1]:SetText(pair[3]..pair[4].."|r "..(places[1] and (who.." "..S.GREY.."—|r "..where) or "Unknown location")
-                        ..(#places>1 and (S.GREY.." +"..(#places-1).." more|r") or ""))
-                end
+                local xp=baseXP(r.id)
+                local level=(not able and r.required>(playerLevel() or 0)) and ("|cffff6060Needs level "..need.."|r")
+                    or ("|cffccb88fAvailable from level |r"..KW_ROW.num..need.."|r")
+                row.from:SetText(level..(xp and (" |cffb8a0ff· "..(xpAtMyLevel(xp,r.level) or xp).." XP|r") or ""))
             end
+            if taken then row.have:Show() else row.have:Hide() end
+            -- the factions that can take it, as crests on the right
+            local x=-6
+            for _,pair in ipairs({{row.crestH,"Horde"},{row.crestA,"Alliance"}}) do
+                local mask=masks[pair[2]]
+                if r.races==0 or not mask or ns.rewards.overlaps(r.races,mask) then
+                    pair[1]:ClearAllPoints();pair[1]:SetPoint("BOTTOMRIGHT",row.frame,"BOTTOMRIGHT",x,6);pair[1]:Show();x=x-20
+                else pair[1]:Hide() end
+            end
+            -- class icons, the dungeon icon (picked up inside the dungeon) and the chain icon, further left
+            local function place(w) w:ClearAllPoints();w:SetPoint("BOTTOMRIGHT",row.frame,"BOTTOMRIGHT",x,7);w:Show();x=x-18 end
+            for _,icon in pairs(row.classIcons) do if icon then icon:Hide() end end
+            local T=ns.journalTheme
+            for i,c in ipairs(classTokens(r)) do
+                if i>2 or not T.classIcon then break end
+                local icon=row.classIcons[c.token]
+                if icon==nil then
+                    local ok,t=pcall(T.classIcon,row.frame,16,c.token)
+                    icon=ok and t or false;row.classIcons[c.token]=icon
+                end
+                if icon then place(icon) end
+            end
+            if row.dungeonIcon then
+                local inside=false
+                for _,pk in ipairs(locations(r).pickups) do if pk.point and pk.point.dungeon then inside=true end end
+                if inside then place(row.dungeonIcon) else row.dungeonIcon:Hide() end
+            end
+            if row.chain then
+                if r.chainBefore or r.chainAfter then place(row.chain) else row.chain:Hide() end
+            end
+            row.from:SetWidth(math.min(width-84,width-36+x))
             -- done (or made pointless by a later done step): green tick and grey text, so you do not travel for it
             -- the game's own NPC marks: a yellow "?" when it is in your quest log, a yellow "!" when you can still pick it
             -- up (gold stays the selection colour); a quest you cannot take yet keeps the plain note icon
@@ -1113,42 +1614,136 @@ paint=function()
             row.icon:SetTexture(done and "Interface\\RaidFrame\\ReadyCheck-Ready" or taken and "Interface\\GossipFrame\\ActiveQuestIcon"
                 or toTake and "Interface\\GossipFrame\\AvailableQuestIcon" or "Interface\\Icons\\INV_Misc_Note_01")
             row.icon:SetTexCoord(flat and 0 or 0.06,flat and 1 or 0.94,flat and 0 or 0.06,flat and 1 or 0.94)
-            row.rarity:Hide();row.frame:Show()
+            row.frame:Show()
         else row.frame:Hide() end
     end
-    local focused=E.focusRows(window.rows,selected,function(r) return r.id end)
+    local focused=focusRows(window.rows,selected)
     redraw=false
     if not focused then
-        selected=nil;window.setDetails(loading and "Loading quests…" or "Select a dungeon and quest to see pickups, objectives and prerequisites.")
+        selected=nil;window.setDetails(loading and "Loading quests…" or "Choose a quest on the left to see its objective, giver and rewards.")
     end
+    applyView()
+end
+-- A quest row of the left list: 296 x 48, the NPC mark, the name, "Available from level N", crests, "YOU HAVE IT".
+local function questRow(parent,i)
+    local T=ns.journalTheme
+    local row={frame=CreateFrame("Button",nil,parent)}
+    local b=row.frame
+    b:SetWidth(ROW_W);b:SetHeight(ROW_H);b:SetPoint("TOPLEFT",parent,"TOPLEFT",0,-(i-1)*(ROW_H+ROW_GAP))
+    T.panel(b,"row",10)
+    local c=T.C.rowSelected
+    row.selectedArt=S.fill(b,"BORDER",c[1],c[2],c[3],c[4] or 1);row.selectedArt:SetAllPoints(b);row.selectedArt:Hide()
+    row.edge=S.fill(b,"OVERLAY",0.95,0.7,0.2,0.95);row.edge:SetWidth(3);row.edge:SetHeight(ROW_H)
+    row.edge:SetPoint("TOPLEFT",b,"TOPLEFT",0,0);row.edge:Hide()
+    row.icon=b:CreateTexture(nil,"ARTWORK");row.icon:SetWidth(22);row.icon:SetHeight(22);row.icon:SetPoint("LEFT",b,"LEFT",8,0)
+    row.item=b:CreateFontString(nil,"OVERLAY","GameFontNormal");E.font(row.item,13,1,0.82,0)
+    row.item:SetPoint("TOPLEFT",b,"TOPLEFT",36,-7);row.item:SetJustifyH("LEFT");row.item:SetWordWrap(false)
+    row.from=b:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");E.font(row.from,11,0.93,0.84,0.66)
+    row.from:SetPoint("TOPLEFT",b,"TOPLEFT",36,-27);row.from:SetJustifyH("LEFT");row.from:SetWordWrap(false)
+    row.have=b:CreateFontString(nil,"OVERLAY","GameFontNormalSmall");E.font(row.have,9,1,0.82,0)
+    row.have:SetPoint("TOPRIGHT",b,"TOPRIGHT",-6,-6);row.have:SetText("YOU HAVE IT");row.have:Hide()
+    row.crestA=T.crest(b,"Alliance",18);row.crestH=T.crest(b,"Horde",18)
+    -- left of the crests: class icons (class-only quest), a dungeon icon (picked up inside), a chain icon (hover: the
+    -- chain). Each only once JournalTheme has the helper.
+    row.classIcons={}
+    if T.dungeonIcon then local ok,t=pcall(T.dungeonIcon,b,16);row.dungeonIcon=ok and t or nil;if row.dungeonIcon then row.dungeonIcon:Hide() end end
+    if T.chainIcon then
+        local c=CreateFrame("Button",nil,b);c:SetWidth(16);c:SetHeight(16);c:Hide()
+        local ok,t=pcall(T.chainIcon,c,16)
+        if ok and t then
+            if t.SetPoint then t:ClearAllPoints();t:SetPoint("CENTER",c,"CENTER",0,0) end
+            c.icon=t;row.chain=c
+            c:SetScript("OnEnter",function(self)
+                if row.result then U.tip(self,"Quest chain",chainLines(row.result)) end
+            end)
+            c:SetScript("OnLeave",U.hideTip)
+            c:SetScript("OnClick",function() row.choose() end)
+        end
+    end
+    b:RegisterForClicks("LeftButtonUp","RightButtonUp")
+    return row
 end
 local function build()
     if window then return true end
     local f=E.page(OWNER)
     if not f then return false end
-    window={frame=f,rows={},controls={}}
+    local T=ns.journalTheme
+    window={frame=f,rows={},controls={},pages={},tabs={},tab="quests"}
+    -- Filter bar (dungeon page), one row: search, Filters (opens Level / Quest levels / Class / Faction), the two
+    -- presets, the two hide boxes and Refresh data; the status line under it. The quest-only filters live on their own
+    -- frame (labels included), hidden on the home.
+    local bar=CreateFrame("Frame",nil,f);bar:SetAllPoints(f);window.filterBar=bar
+    local more=CreateFrame("Frame",nil,bar);window.filterPanel=more
+    more:SetPoint("TOPLEFT",f,"TOPLEFT",240,-44);more:SetWidth(530);more:SetHeight(58);more:Hide()
+    if more.SetFrameLevel and f.GetFrameLevel then more:SetFrameLevel((f:GetFrameLevel() or 0)+30) end
+    T.panel(more,"header")
+    if more.EnableMouse then more:EnableMouse(true) end -- clicks on the panel do not fall through to the header
     local function choice(label,x,width,choices,key)
-        local b=E.dropdown(f,label,x,8,width,choices,function() return filters[key] end,function(value)
-            if key=="dungeon" then focusTarget=nil end
+        local b=E.dropdown(more,label,x,25,width,choices,function() return filters[key] end,function(value)
             filters[key]=value;page=1;D.updateControls();D.refresh()
         end)
         window.controls[#window.controls+1]=b;return b
     end
-    window.dungeon=choice("Dungeon",0,300,dungeonChoices,"dungeon")
-    window.faction=choice("Faction",310,165,{"All factions","Alliance","Horde"},"faction")
-    window.class=choice("Class",485,165,classChoices,"class")
-    window.level=E.box(f,"Character level",0,43,100,filters.level,4)
+    window.search,window.clearSearch=E.searchBox(bar,"Search dungeon, quest or ID",0,0,230,OWNER,function(text) filters.text=text;page=1;D.refresh() end)
+    window.level=E.box(more,"Level",10,8,56,filters.level,4)
     E.liveBox(window.level,OWNER,function(text)
         local n=tonumber(text)
         if n and n>=1 and n<=1000 and n%1==0 then
             filters.level=n;filters.allLevels=false;window.levelError=nil;page=1;D.updateControls();D.refresh()
-        else window.levelError="Character level must be a whole number from 1 to 1000.";paint() end
+        else window.levelError="Character level must be a whole number from 1 to 1000 (Filters).";paint() end
     end)
     window.level:SetScript("OnEscapePressed",function(self)
         self:SetText(tostring(filters.level));self.cancel();window.levelError=nil;self:ClearFocus();D.refresh()
     end)
-    window.levelMode=E.button(f,"Quest levels: all",180,function() filters.allLevels=not filters.allLevels;page=1;D.updateControls();D.refresh() end)
-    window.levelMode:SetPoint("TOPLEFT",f,"TOPLEFT",110,-60)
+    window.levelMode=E.button(more,"Quest levels: all",140,function() filters.allLevels=not filters.allLevels;page=1;D.updateControls();D.refresh() end)
+    window.levelMode:SetPoint("TOPLEFT",more,"TOPLEFT",76,-25)
+    window.class=choice("Class",226,150,classChoices,"class")
+    window.faction=choice("Faction",386,134,{"All factions","Alliance","Horde"},"faction")
+    -- the Filters button says how many of its filters narrow the list, so a hidden filter is never a surprise
+    -- a click outside the popover (tabs, header, list) closes it; the catcher sits just under the popover
+    local catcher=CreateFrame("Button",nil,bar);window.filterCatcher=catcher
+    catcher:SetAllPoints(f);catcher:Hide()
+    if catcher.SetFrameLevel and f.GetFrameLevel then catcher:SetFrameLevel((f:GetFrameLevel() or 0)+29) end
+    if catcher.RegisterForClicks then catcher:RegisterForClicks("AnyUp") end
+    catcher:SetScript("OnClick",function() showFilters(false) end)
+    -- Escape closes the popover; every other key goes on to the game (no key is swallowed)
+    more:SetScript("OnKeyDown",function(self,key)
+        local escape=key=="ESCAPE"
+        if self.SetPropagateKeyboardInput then pcall(self.SetPropagateKeyboardInput,self,not escape) end
+        if escape then showFilters(false) end
+    end)
+    -- combat starts: let go of the keyboard (propagation cannot be changed in combat, so no key may be held)
+    if more.RegisterEvent then
+        more:RegisterEvent("PLAYER_REGEN_DISABLED")
+        more:SetScript("OnEvent",function(self)
+            if self.SetPropagateKeyboardInput then pcall(self.SetPropagateKeyboardInput,self,true) end
+            if self.EnableKeyboard then self:EnableKeyboard(false) end
+        end)
+    end
+    window.filtersButton=E.button(bar,"Filters",100,function()
+        if more:IsShown() then showFilters(false) else E.dismissMenu();showFilters(true) end
+    end)
+    window.filtersButton:SetPoint("TOPLEFT",f,"TOPLEFT",240,-17)
+    window.filtersButton:SetScript("OnEnter",function(self)
+        U.tip(self,"Filters",{"Level, Quest levels, Class and Faction.","Click: show or hide them."})
+    end)
+    window.filtersButton:SetScript("OnLeave",U.hideTip)
+    window.filtersButton.refresh=function()
+        local on=(filters.allLevels and 0 or 1)+(filters.class~="All classes" and 1 or 0)+(filters.faction~="All factions" and 1 or 0)
+        window.filtersButton.active=on
+        window.filtersButton:SetLabel(on>0 and ("Filters ("..on..")") or "Filters")
+    end
+    window.controls[#window.controls+1]=window.filtersButton
+    window.mine=E.button(bar,"My character",100,function()
+        local dungeon=filters.dungeon;filters=defaults(true);filters.dungeon=dungeon
+        window.level:SetText(tostring(filters.level));window.level.cancel();window.search:SetText("");window.search.cancel()
+        window.levelError=nil;page=1;D.updateControls();D.refresh()
+    end,"Only the quests your character can take: your level, class and faction")
+    window.mine:SetPoint("TOPLEFT",f,"TOPLEFT",348,-17)
+    window.reset=E.button(bar,"All quests",80,showAllQuests,"Every quest of this dungeon: all levels, classes and factions")
+    window.reset:SetPoint("TOPLEFT",f,"TOPLEFT",456,-17)
+    window.reload=E.button(f,"Refresh data",86,function() D.scan(true) end,"Read the whole quest catalogue again")
+    window.reload:SetPoint("TOPLEFT",f,"TOPLEFT",946,-17)
     local function checkbox(label,x,y,width,key)
         local b=CreateFrame("Button",nil,f)
         b:SetPoint("TOPLEFT",f,"TOPLEFT",x,-y);b:SetWidth(width);b:SetHeight(24)
@@ -1160,59 +1755,127 @@ local function build()
         window.controls[#window.controls+1]=b
         return b
     end
-    window.completed=checkbox("Hide completed quests",300,60,185,"hideCompleted")
-    window.inLog=checkbox("Hide quests in my log",310,108,160,"hideLog")
-    window.mine=E.button(f,"My character",160,function()
-        local dungeon=filters.dungeon;filters=defaults(true);filters.dungeon=dungeon
-        window.level:SetText(tostring(filters.level));window.level.cancel();window.search:SetText("");window.search.cancel()
-        window.levelError=nil;page=1;D.updateControls();D.refresh()
+    window.status=E.text(f,"",0,50,610)
+    window.completed=checkbox("Hide completed quests",HIDE_X[1],17,190,"hideCompleted")
+    window.inLog=checkbox("Hide quests in my log",HIDE_X[2],17,180,"hideLog")
+    -- Home: the dungeon cards (DungeonHomeUI.lua)
+    window.homeView=CreateFrame("Frame",nil,f);window.homeView:SetPoint("TOPLEFT",f,"TOPLEFT",16,-72)
+    window.homeView:SetWidth(CONTENT_W);window.homeView:SetHeight(636)
+    -- Dungeon page: back button, header (round icon, name, LV, entrance pin), tabs and the 1000 x 560 content area
+    local d=CreateFrame("Frame",nil,f);d:SetPoint("TOPLEFT",f,"TOPLEFT",0,-70);d:SetWidth(1032);d:SetHeight(645);d:Hide()
+    window.dungeonView=d
+    window.back=T.button(d,"< Dungeons",110,function() D.home() end,"Back to all dungeons")
+    window.back:SetPoint("TOPLEFT",f,"TOPLEFT",16,-84)
+    window.icon=d:CreateTexture(nil,"ARTWORK");window.icon:SetWidth(44);window.icon:SetHeight(44)
+    window.icon:SetPoint("TOPLEFT",f,"TOPLEFT",138,-76);T.round(window.icon,d,44)
+    window.title=d:CreateFontString(nil,"OVERLAY","GameFontNormalHuge");E.font(window.title,22,1,0.82,0)
+    window.title:SetPoint("TOPLEFT",f,"TOPLEFT",192,-78);window.title:SetWidth(320);window.title:SetJustifyH("LEFT")
+    if window.title.SetWordWrap then window.title:SetWordWrap(false) end
+    window.dungeon=window.title -- the chosen dungeon's name ("All dungeons" on the home)
+    window.levels=d:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");E.font(window.levels,11,0.82,0.74,0.60)
+    window.levels:SetPoint("TOPLEFT",f,"TOPLEFT",193,-106);window.levels:SetJustifyH("LEFT")
+    -- one muted line of the Encounter Journal description (DungeonLore.lua) under the name; hover the header for all of it
+    window.lore=d:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");E.font(window.lore,11,0.70,0.63,0.50)
+    window.lore:SetPoint("TOPLEFT",f,"TOPLEFT",193,-121);window.lore:SetWidth(320);window.lore:SetJustifyH("LEFT")
+    if window.lore.SetWordWrap then window.lore:SetWordWrap(false) end
+    window.loreHover=CreateFrame("Frame",nil,d);window.loreHover:SetPoint("TOPLEFT",f,"TOPLEFT",138,-76)
+    window.loreHover:SetWidth(376);window.loreHover:SetHeight(60)
+    if window.loreHover.EnableMouse then window.loreHover:EnableMouse(true) end
+    window.loreHover:SetScript("OnEnter",function(self)
+        if window.loreText then U.tip(self,window.title:GetText() or "",{window.loreText}) end
     end)
-    window.mine:SetPoint("TOPLEFT",f,"TOPLEFT",490,-60)
-    window.search,window.clearSearch=E.searchBox(f,"Search dungeon, quest or ID",0,90,300,OWNER,function(text) filters.text=text;page=1;D.refresh() end)
-    window.reset=E.button(f,"All quests",170,function()
-        local dungeon=filters.dungeon;filters=defaults();filters.dungeon=dungeon
-        window.level:SetText(tostring(filters.level));window.level.cancel();window.search:SetText("");window.search.cancel()
-        window.levelError=nil;page=1;D.updateControls();D.refresh()
+    window.loreHover:SetScript("OnLeave",U.hideTip)
+    window.pin=CreateFrame("Button",nil,d);window.pin:SetWidth(30);window.pin:SetHeight(30)
+    window.pin:SetPoint("TOPLEFT",f,"TOPLEFT",520,-84)
+    window.pin.icon=window.pin:CreateTexture(nil,"ARTWORK");window.pin.icon:SetWidth(30);window.pin.icon:SetHeight(30)
+    window.pin.icon:SetPoint("CENTER",window.pin,"CENTER",0,0);window.pin.icon:SetTexture("Interface\\Icons\\INV_Misc_Map02")
+    T.round(window.pin.icon,window.pin,30)
+    window.pin:RegisterForClicks("LeftButtonUp")
+    window.pin:SetScript("OnEnter",function(self)
+        local e=entranceOf(filters.dungeon)
+        U.tip(self,e and e.label or "Dungeon entrance",{e and "Click: put a pin on your world map (open it with M)." or "The entrance is not in the installed data."})
     end)
-    window.reset:SetPoint("TOPLEFT",f,"TOPLEFT",480,-108)
-    window.status=E.text(f,"",0,143,650)
-    window.list=CreateFrame("Frame",nil,f);window.list:SetPoint("TOPLEFT",f,"TOPLEFT",0,-170);window.list:SetWidth(650);window.list:SetHeight(530)
+    window.pin:SetScript("OnLeave",U.hideTip)
+    window.pin:SetScript("OnClick",function()
+        local e=entranceOf(filters.dungeon)
+        if e then pinPlace({source={name=e.label},point=e.point}) else ns.print("the entrance of this dungeon is not in the installed data.") end
+    end)
+    for i,t in ipairs(TABS) do
+        local key=t.key
+        local b=T.tab(d,t.label,t.icon,110,function() D.openDungeon(filters.dungeon,key) end)
+        b:SetPoint("TOPLEFT",f,"TOPLEFT",1016-(#TABS-i+1)*116+6,-84)
+        window.tabs[key]=b
+    end
+    window.content=CreateFrame("Frame",nil,d);window.content:SetPoint("TOPLEFT",f,"TOPLEFT",16,-140)
+    window.content:SetWidth(CONTENT_W);window.content:SetHeight(CONTENT_H)
+    -- Quests page: the list on the left, the quest page on parchment on the right
+    local q=CreateFrame("Frame",nil,window.content);q:SetPoint("TOPLEFT",window.content,"TOPLEFT",0,0)
+    q:SetWidth(CONTENT_W);q:SetHeight(CONTENT_H);window.questsPage=q
+    local left=CreateFrame("Frame",nil,q);left:SetPoint("TOPLEFT",q,"TOPLEFT",0,0);left:SetWidth(330);left:SetHeight(CONTENT_H)
+    T.panel(left,"left");window.left=left
+    window.listTitle=left:CreateFontString(nil,"OVERLAY","GameFontNormalLarge");E.font(window.listTitle,15,1,0.82,0)
+    window.listTitle:SetPoint("TOPLEFT",left,"TOPLEFT",16,-16);window.listTitle:SetJustifyH("LEFT")
+    for _,fac in ipairs({"Alliance","Horde"}) do
+        local b=CreateFrame("Button",nil,left);b:SetWidth(32);b:SetHeight(32)
+        b:SetPoint("TOPRIGHT",left,"TOPRIGHT",fac=="Alliance" and -50 or -12,-8)
+        b.crest=T.crest(b,fac,28);b.crest:SetPoint("CENTER",b,"CENTER",0,0)
+        b:RegisterForClicks("LeftButtonUp")
+        b:SetScript("OnClick",function()
+            filters.faction=filters.faction==fac and "All factions" or fac;page=1;D.updateControls();D.refresh()
+        end)
+        b:SetScript("OnEnter",function(self)
+            U.tip(self,fac.." quests",{filters.faction==fac and "Click: show the quests of both factions." or ("Click: only quests "..fac.." can take.")})
+        end)
+        b:SetScript("OnLeave",U.hideTip)
+        b.refresh=function() b:SetAlpha((filters.faction=="All factions" or filters.faction==fac) and 1 or 0.35) end
+        window["crest"..fac]=b;window.controls[#window.controls+1]=b
+    end
+    window.list=CreateFrame("Frame",nil,left);window.list:SetPoint("TOPLEFT",left,"TOPLEFT",17,-48)
+    window.list:SetWidth(ROW_W);window.list:SetHeight(PAGE*(ROW_H+ROW_GAP))
     E.wheel(window.list,D.go)
-    window.detailFrame,window.detailsText,window.setMore,window.moreScroll=E.details(f,674,358,"",690)
-    window.detailFrame:SetHeight(690)
-    window.detailFrame.journalSurface.grain:Hide() -- plain parchment yellow, no picture behind the text
-    if window.detailsText.SetFont then E.font(window.detailsText,11,0.30,0.21,0.10) end
-    window.panel=buildPanel(window.detailFrame)
-    window.pickup=window.panel.pickup -- click: map pin at the pickup
-    window.showQuest=function(r) renderPanel(window.panel,r,nil,window.setMore,window.moreScroll) end
-    window.setDetails=function(message) renderPanel(window.panel,nil,message,window.setMore,window.moreScroll) end
     for i=1,PAGE do
-        local row=E.row(window.list,0,(i-1)*106,650,i);window.rows[i]=row
-        row.frame:SetHeight(102);row.edge:SetHeight(102)
-        row.task=E.text(row.frame,"",52,44,590);row.task:SetWordWrap(false)
-        row.pickup=E.text(row.frame,"",52,62,590);row.pickup:SetWordWrap(false)
-        row.turnIn=E.text(row.frame,"",52,80,590);row.turnIn:SetWordWrap(false)
+        local row=questRow(window.list,i);window.rows[i]=row
         row.choose=function(auto)
             local r=row.result;if not r then return end
             if auto~=true then E.dismissMenu();ns.closeQuestMenu() end
-            E.select(window.rows,row)
+            selectRow(window.rows,row)
+            if selected~=r.id then pendingOpen=nil end
             if selected~=r.id or auto~=true or redraw then selected=r.id;window.showQuest(r) end
             -- item rewards need one pass over the item catalogue: only when the player asks (click), never on open
             if auto~=true then scanRewards() end
         end
-        row.frame:RegisterForClicks("LeftButtonUp","RightButtonUp")
         row.frame:SetScript("OnClick",function(_,button) row.choose();if button=="RightButton" and row.result then D.menu(row.result.id) end end)
         row.frame:SetScript("OnEnter",function()
             if row.result then hovered=row;showHover(row);scanRewards() end
         end)
         row.frame:SetScript("OnLeave",function() if hovered==row then hovered=nil end;U.hideTip() end);E.wheel(row.frame,D.go)
     end
-    window.prev=E.button(f,"Previous",100,function() D.go(-1) end);window.prev:SetPoint("TOPLEFT",f,"TOPLEFT",0,-705)
-    window.next=E.button(f,"Next",100,function() D.go(1) end);window.next:SetPoint("TOPLEFT",f,"TOPLEFT",110,-705)
-    window.reload=E.button(f,"Refresh data",120,function() D.scan(true) end);window.reload:SetPoint("TOPLEFT",f,"TOPLEFT",530,-705) -- Refresh reads the whole catalogue again
-    window.route=E.button(f,"Plan route to get them all",240,function() D.planRoute() end,
-        "The shortest way to pick up every quest of this dungeon you can take now, with flights, boats and your hearthstone.")
-    window.route:SetPoint("TOPLEFT",f,"TOPLEFT",230,-705)
+    -- What the row marks mean, small and muted at the foot of the list (it used to sit in the status line on top).
+    window.legend=left:CreateFontString(nil,"OVERLAY","GameFontHighlightSmall");E.font(window.legend,10,0.72,0.66,0.55)
+    window.legend:SetPoint("BOTTOMLEFT",left,"BOTTOMLEFT",16,46);window.legend:SetWidth(300);window.legend:SetHeight(26);window.legend:SetJustifyH("LEFT")
+    window.legend:SetText("!: to pick up  •  ?: in your log\ngreen tick: done / not needed  •  right-click: actions")
+    window.prev=E.button(left,"Previous",76,function() D.go(-1) end);window.prev:SetPoint("BOTTOMLEFT",left,"BOTTOMLEFT",16,14)
+    window.next=E.button(left,"Next",60,function() D.go(1) end);window.next:SetPoint("BOTTOMLEFT",left,"BOTTOMLEFT",98,14)
+    window.route=E.button(left,"Plan route",140,function()
+        if ns.dungeonRouteUI then D.openDungeon(filters.dungeon,"route") else D.planRoute() end
+    end,"The shortest way to pick up every quest of this dungeon you can take now, with flights, boats and your hearthstone (opens the Route tab).")
+    window.route:SetPoint("BOTTOMRIGHT",left,"BOTTOMRIGHT",-16,14)
+    local detail=CreateFrame("Frame",nil,q);detail:SetPoint("TOPLEFT",q,"TOPLEFT",342,0)
+    detail:SetWidth(CONTENT_W-342);detail:SetHeight(CONTENT_H)
+    T.parchment(detail);detail.parchment=true
+    window.detailFrame=detail
+    local text,write,scroll=U.scrollText(detail,16,48,CONTENT_W-342-32,CONTENT_H-110)
+    E.font(text,11,0.30,0.21,0.10)
+    if text.SetShadowColor then text:SetShadowColor(0,0,0,0) end
+    window.detailsText,window.moreScroll=text,scroll
+    window.setMore=function(value)
+        -- quest links use yellow in dark tooltips; use dark ink on this parchment instead
+        write((string.gsub(string.gsub(value,"|cffffff00","|cff4b2a11"),"|cffffd100","|cff4b2a11")))
+    end
+    window.panel=buildPanel(detail,CONTENT_W-342)
+    window.pickup=window.panel.pickup -- click: map pin at the pickup
+    window.showQuest=function(r) renderPanel(window.panel,r,nil,window.setMore,window.moreScroll) end
+    window.setDetails=function(message) renderPanel(window.panel,nil,message,window.setMore,window.moreScroll) end
     E.navigation(window.search,window.rows,D.go)
     -- Hiding (close, Esc, other tab) pauses both scans so reopening continues them; the read data is kept.
     f.suspend=function()
@@ -1276,7 +1939,7 @@ function D.routeTargets(area)
 end
 -- The dungeon's entrance: QuestieDB's own list first (it knows Forever dungeons such as the Excavation Site),
 -- then the static TravelData pins.
-local function entranceOf(area)
+function entranceOf(area)
     local list=Q.dungeonList()
     if type(list)=="table" then
         local entry=list[area]
@@ -1409,26 +2072,40 @@ local function showRoute(f,result,area,doFirst,later)
     f.content:SetHeight(math.max(400,#result.steps*27))
     if #result.steps>ROUTE_ROWS then f.notes:SetText(f.notes:GetText().."\nShowing the first "..ROUTE_ROWS.." steps.") end
 end
+-- Plans the route for a dungeon as the route window does; callback(result, doFirst, later[, err]) runs when it is done.
+-- Used by the old window (D.planRoute) and the Route tab (DungeonRouteUI.lua).
+function D.routePlan(area,assumeAll,callback,valid)
+    area=tonumber(area) or (filters and filters.dungeon) or 0
+    if not ready or area==0 then return false end
+    local targets,doFirst,later=D.routeTargets(area)
+    local map,x,y=C.playerPos()
+    local options={start=map and {map=map,x=x*100,y=y*100} or nil,assumeAllFlights=assumeAll and true or false,finish=entranceOf(area),
+        checkpoint=ns.dataWork.checkpoint}
+    ROUTE_RIDE=(tonumber(U.call(UnitLevel,"player")) or 0)>=40
+    ns.dataWork.start(ROUTE_OWNER,function()
+        local result=ns.dungeonRoute.plan(targets,options)
+        D._lastRoute=result
+        if callback then callback(result,doFirst,later) end
+    end,valid or function() return shown() or (routeWindow~=nil and routeWindow:IsShown()) end,function(ok,err)
+        if not ok and callback then callback(nil,doFirst,later,tostring(err)) end
+    end,FOREGROUND_MS)
+    return true
+end
 function D.planRoute()
     local area=filters and filters.dungeon or 0
     if not ready or area==0 then ns.print("choose a dungeon first, then plan the route.");return false end
     local f=buildRoute()
     if not f then return false end
     f:Show();showRoute(f,nil,area)
-    local targets,doFirst,later=D.routeTargets(area)
-    local map,x,y=C.playerPos()
-    local options={start=map and {map=map,x=x*100,y=y*100} or nil,assumeAllFlights=ns.db.routeAllFlights and true or false,finish=entranceOf(area),
-        checkpoint=ns.dataWork.checkpoint}
-    ROUTE_RIDE=(tonumber(U.call(UnitLevel,"player")) or 0)>=40
-    ns.dataWork.start(ROUTE_OWNER,function()
-        local result=ns.dungeonRoute.plan(targets,options)
-        if f:IsShown() then showRoute(f,result,area,doFirst,later) end
-        D._lastRoute=result
-    end,function() return f:IsShown() end,function(ok,err)
-        if not ok then f.summary:SetText("Could not plan the route: "..tostring(err)) end
-    end,FOREGROUND_MS)
-    return true
+    return D.routePlan(area,ns.db.routeAllFlights,function(result,doFirst,later,err)
+        if err then f.summary:SetText("Could not plan the route: "..err)
+        elseif f:IsShown() then showRoute(f,result,area,doFirst,later) end
+    end,function() return f:IsShown() end)
 end
+D.entranceOf=function(area) return entranceOf(tonumber(area) or 0) end
+D.routeStepText=function(step) return stepText(step) end
+D.minutes=minutes
+D.pinPlace=pinPlace
 function D._routeWindow() return routeWindow end
 local function stop()
     generation=generation+1;ns.dataWork.cancel(OWNER)
@@ -1463,17 +2140,30 @@ function D._panelText()
     if not P then return "" end
     local out={}
     local function add(t) if t and t:IsShown() and t:GetText() then out[#out+1]=t:GetText() end end
-    add(P.title);add(P.badge);add(P.meta);add(P.heads["do"]);add(P.doText);add(P.doKind);add(P.heads.where)
-    for _,b in ipairs({P.pickup,P.turnIn}) do if b:IsShown() then add(b.title);add(b.sub) end end
-    add(P.heads.rewards);add(P.xp);add(P.rep);add(P.itemNote)
+    add(P.title);add(P.avail);add(P.classOnly);add(P.badge);add(P.meta);add(P.heads["do"]);add(P.doText);add(P.doKind)
+    for _,pair in ipairs({{"start",P.pickup},{"turn",P.turnIn}}) do
+        add(P.heads[pair[1]])
+        if pair[2]:IsShown() then add(pair[2].title);add(pair[2].sub) end
+    end
+    add(P.heads.rewards);add(P.itemNote)
     for _,b in ipairs(P.items) do if b:IsShown() then add(b.name) end end
-    add(P.itemMore)
-    add(P.heads.chain);add(P.chain);add(P.heads.more)
+    add(P.itemMore);add(P.heads.also)
+    for _,p in ipairs({P.xpPill,P.moneyPill,unpack(P.repPills)}) do if p:IsShown() and p.value then out[#out+1]=p.value end end
+    add(P.xpNote);add(P.heads.chain);add(P.chain);add(P.heads.more)
     out[#out+1]=window.detailsText.text or ""
     return table.concat(out,"\n")
 end
 function D._state() return ready,loading,progress end
 function D._release() release() end -- tests: free memory only (as a new session would), the saved list stays
+-- the Share button follows the party and the quest log while a quest page is open
+local function repaintShare()
+    local P=window and window.panel
+    if not (P and P.share and P.quest and shown() and window.tab=="quests") then return end
+    if P.share.IsShown and not P.share:IsShown() then return end
+    pcall(paintShare,P.share,P.quest)
+end
+ns.on("GROUP_ROSTER_UPDATE",repaintShare)
+ns.on("QUEST_LOG_UPDATE",repaintShare)
 ns.on("QUEST_LOG_UPDATE",function()
     if not shown() or not ready or refreshPending then return end
     refreshPending=true

@@ -1,0 +1,660 @@
+{
+  "id": "dungeon-journal",
+  "name": "Dungeon quests tab in the Dungeon Journal look",
+  "runTimeout": 210,
+  "context": {
+    "prompt": "Record the Dungeon Journal look rebuild: new files (JournalTheme, JournalItems, DungeonHomeUI, DungeonBossesUI, DungeonMapUI, DungeonRouteUI), the page shell, the client art table (loading screens, LFG icons, EJ portraits), the inspiration-only rule (no Dungeon Journal code or media), what is unverified in game. Update architecture.md file tree/flowchart/sequence for the new home -> dungeon page -> tabs flow."
+  },
+  "lanes": [
+    {
+      "id": "builder",
+      "name": "Builder",
+      "agent": "bpmn:worker",
+      "timeout": 40
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "agent": "bpmn:reviewer",
+      "timeout": 12
+    }
+  ],
+  "data": {
+    "wA": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "wB": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "wD": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "wM": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "vA": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "vB": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "vD": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "vM": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "fA": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    },
+    "fB": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    },
+    "fD": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    },
+    "fM": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    },
+    "integ": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "vF": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "fF": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "name": "Plan approved"
+    },
+    {
+      "id": "split",
+      "type": "and",
+      "join": "join"
+    },
+    {
+      "id": "build_a",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Build theme and home",
+      "out": "wA",
+      "prompt": "Stream A of the Dungeon Journal look. Read context/dungeon-journal-contract.md (hard rules, your files, the API) and the plan /Users/cozzolif/.claude/plans/melodic-orbiting-kahn.md (sections Approach 1-2, Art and icons). Look at /tmp/dj_images/dj1.png. You own ONLY QuestSharing/JournalTheme.lua and QuestSharing/DungeonHomeUI.lua (replace the stubs, keep the API) and tests/test_dungeon_journal_home.py. Build: (1) JournalTheme: the palette, T.panel (WHITE8X8 fill + UI-Tooltip-Border edge + faint QuestBG), T.parchment, T.button (dark, gold label, UI-QuestTitleHighlight hover), T.tab (UIPanelButtonTemplate when available else S.button, with an icon and :SetSelected), T.pill (xp purple / money / rep green), T.crest (UI-PVP-Alliance/Horde cropped), T.badge (TempPortraitAlphaMask disc + MiniMap-TrackingBorder ring + number), T.tick, T.round, T.cardArt(area) with the full 28-dungeon loading-screen table from the plan (classic by path, Forever by FileDataID; crop {.02,.98,.24,.82}; nil when unknown), T.lfgIcon(area) (Interface\\LFGFrame\\LFGIcon-<Dungeon> for the classic dungeons and RuinsOfLordaeron). (2) DungeonHomeUI: H.build(parent,w,h,onOpen) with a 2-column scroll grid of 352x126 cards (12 px gap, 138 px rows, mouse wheel): art (or tinted UI-Background-Rock fallback), dark 42 px title band, title in gold with shadow, 'LV x-y', 'open/total quests' with crest(s), a tick when open==0 and total>0, gold border on hover, click -> onOpen(area). A search box (filters by dungeon name) and Alliance/Horde crest filter buttons at the top. H.refresh(summaries) repaints from D.summaries() rows. Mock tests: cards built from a fake summaries list, art path or fallback chosen, LV/count/tick text, hover border, click calls onOpen, search and crest filters. Report {files, summary, tests, notes}."
+    },
+    {
+      "id": "review_a",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review theme and home",
+      "in": [
+        "wA",
+        "fA?"
+      ],
+      "prompt": "Review stream A (JournalTheme.lua, DungeonHomeUI.lua, tests/test_dungeon_journal_home.py) against context/dungeon-journal-contract.md and the plan /Users/cozzolif/.claude/plans/melodic-orbiting-kahn.md. Check: API signatures exactly as the contract; only client textures (no Interface\\AddOns\\ForeverDungeonJournal, no new image files); nothing copied from /tmp/dj_addon (grep for distinctive identifiers like FDJ, ForeverDJ); the 28-row art table matches the plan; tests run green with /tmp/qs-test-env/bin/python tests/test_dungeon_journal_home.py; no edits outside the owned files (git diff --stat). Report {status: approved|changes, issues: [...]}.",
+      "out": "vA"
+    },
+    {
+      "id": "ok_a",
+      "type": "xor",
+      "name": "A approved?"
+    },
+    {
+      "id": "fix_a",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix theme and home",
+      "in": [
+        "vA"
+      ],
+      "out": "fA",
+      "prompt": "Fix these review issues in stream A (own only JournalTheme.lua, DungeonHomeUI.lua, tests/test_dungeon_journal_home.py; contract context/dungeon-journal-contract.md): {{vA.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "build_b",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Build quests page and shell",
+      "out": "wB",
+      "prompt": "Stream B of the Dungeon Journal look. Read context/dungeon-journal-contract.md and the plan /Users/cozzolif/.claude/plans/melodic-orbiting-kahn.md (Approach 2, Art and icons). Look at /tmp/dj_images/dj2.png. You own ONLY QuestSharing/DungeonQuests.lua and QuestSharing/JournalItems.lua and tests/test_dungeon_journal_quests.py; keep tests/test_dungeon_quests.py and tests/test_dungeon_route.py green (you may update their UI assertions, never weaken behaviour checks). Build: (1) JournalItems: I.attach (SetHyperlink item tooltip, Shift compare via GameTooltip_ShowCompareItem, shift-click link, ctrl-click DressUpItemLink) and I.button (38 px icon, quality-coloured name, subtitle). (2) In DungeonQuests.lua the page shell: a home view (calls ns.dungeonHomeUI.build/refresh with D.summaries(), passes the existing Hide completed / Hide quests in my log check boxes) and a dungeon view with header (name in large gold, LV range, T.lfgIcon round icon, entrance-pin button using D.entranceOf), '< Dungeons' back button, tabs Map / Bosses / Quests / Route (T.tab, icons per the plan), and a 1000x560 content area at TOPLEFT 16,-140; lazy-build ns.dungeonBossesUI / dungeonMapUI / dungeonRouteUI pages there. Replace the dungeon dropdown with this navigation (D.openDungeon(area, tab), D.home()). (3) Restyle the Quests page: left list rows 296x48 (T.panel row/rowSelected, the existing !/tick/'YOU HAVE IT'/gold border/chain indent, 'Available from level N', crests), right page on T.parchment: Morpheus title, Objective / Starts at / Turn in (click = map pin, existing pinPlace), 'Choose one reward' with 2 columns of I.button, XP / money / rep pills (T.pill). Keep keyword colours and every existing feature. (4) Export D.summaries, D.openDungeon, D.home, D.entranceOf, D.routePlan(area, assumeAll, callback), D.routeStepText, D.minutes, D.pinPlace per the contract; the old route window may stay as a fallback but the Route tab is stream M's. Report {files, summary, tests, notes}."
+    },
+    {
+      "id": "review_b",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review quests page",
+      "in": [
+        "wB",
+        "fB?"
+      ],
+      "prompt": "Review stream B (DungeonQuests.lua, JournalItems.lua, tests/test_dungeon_journal_quests.py, and any assertion changes in tests/test_dungeon_quests.py / tests/test_dungeon_route.py) against context/dungeon-journal-contract.md and the plan /Users/cozzolif/.claude/plans/melodic-orbiting-kahn.md. Check: shell + tabs + content area as specified; all exported API present; existing features kept (chain nesting, states, filters, keyword colours, click-to-pin, rewards); item hover uses SetHyperlink and Shift compare; no behaviour assertions were weakened (read the test diffs); only client textures; nothing copied from /tmp/dj_addon; tests green: /tmp/qs-test-env/bin/python tests/test_dungeon_journal_quests.py, tests/test_dungeon_quests.py, tests/test_dungeon_route.py; no edits outside owned files. Report {status, issues}.",
+      "out": "vB"
+    },
+    {
+      "id": "ok_b",
+      "type": "xor",
+      "name": "B approved?"
+    },
+    {
+      "id": "fix_b",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix quests page",
+      "in": [
+        "vB"
+      ],
+      "out": "fB",
+      "prompt": "Fix these review issues in stream B (own only DungeonQuests.lua, JournalItems.lua, tests/test_dungeon_journal_quests.py, plus assertion updates in tests/test_dungeon_quests.py and tests/test_dungeon_route.py; contract context/dungeon-journal-contract.md): {{vB.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "build_d",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Build bosses and drops",
+      "out": "wD",
+      "prompt": "Stream D of the Dungeon Journal look. Read context/dungeon-journal-contract.md and the plan /Users/cozzolif/.claude/plans/melodic-orbiting-kahn.md (Approach 3, Art and icons: boss portraits). Look at /tmp/dj_images/dj3.png. You own ONLY QuestSharing/Loot.lua (add L.bossesOf, do not change existing behaviour) and QuestSharing/DungeonBossesUI.lua and tests/test_dungeon_journal_bosses.py. Build: (1) L.bossesOf(dungeonName, done) from the encounter tables L.scan already reads (AtlasLoot first, Questie fallback): ordered bosses {name, npcID, displayID, level, items}; starts the scan when not ready and calls done(list). (2) DungeonBossesUI B.build/show/hide: left boss rows 315x55 (T.panel row/rowSelected) with a round 44 px portrait (Interface\\EncounterJournal\\UI-EJ-BOSS-<Name> when the client has it, else SetPortraitTextureFromCreatureDisplayID(displayID), else Interface\\TargetingFrame\\UI-TargetingFrame-Skull; masked round with T.round) and a T.badge level; right panel: selected boss (68 px portrait, name in large gold) and loot rows 388x52 using ns.journalItems.button (hover tooltip + Shift compare); 'Loading drops…' and 'Install AtlasLoot for full drops' states. Use ns.journalTheme helpers (stubs exist, stream A fills them). Mock tests with mocked AtlasLoot tables (see tests/test_loot.py for how they are mocked): boss order, portrait source chain, loot rows, hover calls SetHyperlink, empty/loading states. Report {files, summary, tests, notes}."
+    },
+    {
+      "id": "review_d",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review bosses and drops",
+      "in": [
+        "wD",
+        "fD?"
+      ],
+      "prompt": "Review stream D (Loot.lua L.bossesOf addition, DungeonBossesUI.lua, tests/test_dungeon_journal_bosses.py) against context/dungeon-journal-contract.md and the plan. Check: L.bossesOf contract and that existing Loot behaviour is unchanged (tests/test_loot.py and tests/test_equipment_grouping.py still green); portrait chain uses client art only; loot rows use ns.journalItems; nothing copied from /tmp/dj_addon; tests green; no edits outside owned files. Report {status, issues}.",
+      "out": "vD"
+    },
+    {
+      "id": "ok_d",
+      "type": "xor",
+      "name": "D approved?"
+    },
+    {
+      "id": "fix_d",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix bosses and drops",
+      "in": [
+        "vD"
+      ],
+      "out": "fD",
+      "prompt": "Fix these review issues in stream D (own only Loot.lua L.bossesOf, DungeonBossesUI.lua, tests/test_dungeon_journal_bosses.py; contract context/dungeon-journal-contract.md): {{vD.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "build_m",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Build map and route pages",
+      "out": "wM",
+      "prompt": "Stream M of the Dungeon Journal look. Read context/dungeon-journal-contract.md and the plan /Users/cozzolif/.claude/plans/melodic-orbiting-kahn.md (Approach 4-5). Look at /tmp/dj_images/dj4.png. You own ONLY QuestSharing/DungeonMapUI.lua, QuestSharing/DungeonRouteUI.lua and tests/test_dungeon_journal_map.py. Build: (1) DungeonMapUI M.build/show/hide: the client's dungeon map art via C_Map.GetMapArtLayers / C_Map.GetMapArtLayerTextures(uiMapID) assembled into a tile grid scaled into the page (uiMapID from the dungeon's area via ns.questie.uiMapOf or C_Map lookups), fallback the 12 tiles Interface\\WorldMap\\<Name>\\<Name><floor>_1..12 (4x3, 256 px) for the classic dungeons, floor buttons when there are several, mouse-wheel zoom 1-4x and drag pan; for dungeons without client map art a 'No map for this dungeon in the game files' message plus an entrance-pin button (D.entranceOf + D.pinPlace). (2) DungeonRouteUI R.build/show/hide: the 'get them all' route as a page (summary, notes, numbered step rows with icons and times, click = D.pinPlace, 'Assume I know all flight paths' check box, Refresh), using D.routePlan, D.routeStepText, D.minutes (stream B exports them; until then guard with nil checks). Use ns.journalTheme helpers. Mock tests: tiles assembled for a classic dungeon (mock C_Map art layer APIs), fallback tile paths, no-map message, zoom bounds, route page rows from a fake D.routePlan. Report {files, summary, tests, notes}."
+    },
+    {
+      "id": "review_m",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review map and route",
+      "in": [
+        "wM",
+        "fM?"
+      ],
+      "prompt": "Review stream M (DungeonMapUI.lua, DungeonRouteUI.lua, tests/test_dungeon_journal_map.py) against context/dungeon-journal-contract.md and the plan. Check: client map art only (no bundled maps, nothing from /tmp/dj_addon), tile assembly and fallback correct, zoom bounded, route page uses the contract API with nil guards; tests green; no edits outside owned files. Report {status, issues}.",
+      "out": "vM"
+    },
+    {
+      "id": "ok_m",
+      "type": "xor",
+      "name": "M approved?"
+    },
+    {
+      "id": "fix_m",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix map and route",
+      "in": [
+        "vM"
+      ],
+      "out": "fM",
+      "prompt": "Fix these review issues in stream M (own only DungeonMapUI.lua, DungeonRouteUI.lua, tests/test_dungeon_journal_map.py; contract context/dungeon-journal-contract.md): {{vM.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "join",
+      "type": "and"
+    },
+    {
+      "id": "integrate",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Integrate and run suite",
+      "in": [
+        "wA",
+        "wB",
+        "wD",
+        "wM"
+      ],
+      "out": "integ",
+      "timeout": 30,
+      "prompt": "Integrate the four Dungeon Journal streams (A {{wA.summary}} / B {{wB.summary}} / D {{wD.summary}} / M {{wM.summary}}; their notes list stubs relied on). Read context/dungeon-journal-contract.md. Fix only the seams between streams (wrong calls, missing exports, layout overlaps in the 1032x715 page) in any of the new files or DungeonQuests.lua; do not redesign. Run every test file with /tmp/qs-test-env/bin/python tests/<file>.py (loop over tests/test_*.py) and make the full suite green; check every QuestSharing/*.lua compiles (lupa loadstring). Add a CHANGELOG '## Unreleased' entry and a short README paragraph for the new Dungeon quests look. Report {files, summary, tests, notes}."
+    },
+    {
+      "id": "final_review",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review the whole look",
+      "in": [
+        "integ",
+        "fF?"
+      ],
+      "prompt": "Final review of the Dungeon Journal look rebuild ({{integ.summary}}). Compare the built layout (read the new files; you may render panel texts via the test helpers) with the screenshots /tmp/dj_images/dj1-4.png and the plan /Users/cozzolif/.claude/plans/melodic-orbiting-kahn.md: home cards, dungeon header + tabs, quests list + parchment page + rewards + pills, bosses + drops, map, route. Verify the hard rules: no code or media from /tmp/dj_addon (grep for FDJ, ForeverDJ, ForeverDungeonJournal, and compare a few distinctive function bodies), client textures only, no new image files; full suite green; existing features intact. Report {status, issues}.",
+      "out": "vF"
+    },
+    {
+      "id": "ok_final",
+      "type": "xor",
+      "name": "Final approved?"
+    },
+    {
+      "id": "fix_final",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix final issues",
+      "in": [
+        "vF"
+      ],
+      "out": "fF",
+      "timeout": 25,
+      "prompt": "Fix these final review issues of the Dungeon Journal look (contract context/dungeon-journal-contract.md; keep the full suite green): {{vF.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "done",
+      "type": "end",
+      "name": "Look rebuilt"
+    },
+    {
+      "id": "open_issues",
+      "type": "end",
+      "name": "Done with open issues"
+    },
+    {
+      "id": "merge_a",
+      "type": "xor",
+      "name": "A settled"
+    },
+    {
+      "id": "merge_b",
+      "type": "xor",
+      "name": "B settled"
+    },
+    {
+      "id": "merge_d",
+      "type": "xor",
+      "name": "D settled"
+    },
+    {
+      "id": "merge_m",
+      "type": "xor",
+      "name": "M settled"
+    }
+  ],
+  "flows": [
+    {
+      "from": "start",
+      "to": "split"
+    },
+    {
+      "from": "split",
+      "to": "build_a"
+    },
+    {
+      "from": "split",
+      "to": "build_b"
+    },
+    {
+      "from": "split",
+      "to": "build_d"
+    },
+    {
+      "from": "split",
+      "to": "build_m"
+    },
+    {
+      "from": "build_a",
+      "to": "review_a"
+    },
+    {
+      "from": "review_a",
+      "to": "ok_a"
+    },
+    {
+      "from": "ok_a",
+      "to": "merge_a",
+      "name": "approved",
+      "when": {
+        "path": "vA.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_a",
+      "to": "merge_a",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_a",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_a",
+      "to": "fix_a",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_a",
+      "to": "review_a"
+    },
+    {
+      "from": "build_b",
+      "to": "review_b"
+    },
+    {
+      "from": "review_b",
+      "to": "ok_b"
+    },
+    {
+      "from": "ok_b",
+      "to": "merge_b",
+      "name": "approved",
+      "when": {
+        "path": "vB.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_b",
+      "to": "merge_b",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_b",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_b",
+      "to": "fix_b",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_b",
+      "to": "review_b"
+    },
+    {
+      "from": "build_d",
+      "to": "review_d"
+    },
+    {
+      "from": "review_d",
+      "to": "ok_d"
+    },
+    {
+      "from": "ok_d",
+      "to": "merge_d",
+      "name": "approved",
+      "when": {
+        "path": "vD.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_d",
+      "to": "merge_d",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_d",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_d",
+      "to": "fix_d",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_d",
+      "to": "review_d"
+    },
+    {
+      "from": "build_m",
+      "to": "review_m"
+    },
+    {
+      "from": "review_m",
+      "to": "ok_m"
+    },
+    {
+      "from": "ok_m",
+      "to": "merge_m",
+      "name": "approved",
+      "when": {
+        "path": "vM.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_m",
+      "to": "merge_m",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_m",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_m",
+      "to": "fix_m",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_m",
+      "to": "review_m"
+    },
+    {
+      "from": "join",
+      "to": "integrate"
+    },
+    {
+      "from": "integrate",
+      "to": "final_review"
+    },
+    {
+      "from": "final_review",
+      "to": "ok_final"
+    },
+    {
+      "from": "ok_final",
+      "to": "done",
+      "name": "approved",
+      "when": {
+        "path": "vF.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_final",
+      "to": "open_issues",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_final",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_final",
+      "to": "fix_final",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_final",
+      "to": "final_review"
+    },
+    {
+      "from": "merge_a",
+      "to": "join"
+    },
+    {
+      "from": "merge_b",
+      "to": "join"
+    },
+    {
+      "from": "merge_d",
+      "to": "join"
+    },
+    {
+      "from": "merge_m",
+      "to": "join"
+    }
+  ]
+}

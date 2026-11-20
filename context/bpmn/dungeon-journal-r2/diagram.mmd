@@ -1,0 +1,61 @@
+flowchart LR
+  %% Dungeon Journal look round 2 and previews · 6 agents: 3 × bpmn:worker, 3 × bpmn:reviewer · up to 18 with loop rounds
+  subgraph n_lane_builder["🤖 Builder · bpmn:worker · ⏱ 35 min"]
+    n_start(("Round 2 approved"))
+    n_split{"+"}
+    n_build_t["⚙ Build theme home bosses"]
+    n_fix_t["⚙ Fix theme home bosses"]
+    n_build_q["⚙ Build shell quests items"]
+    n_fix_q["⚙ Fix shell quests items"]
+    n_previews["⚙ Integrate and render previews · ⏱ 30 min"]
+    n_fix_final["⚙ Fix round 2 issues · ⏱ 25 min"]
+    n_review_t__merge{"✕"}
+    n_review_q__merge{"✕"}
+    n_final_review__merge{"✕"}
+  end
+  subgraph n_lane_reviewer["🤖 Reviewer · bpmn:reviewer · ⏱ 12 min"]
+    n_review_t["⚙ Review theme home bosses"]
+    n_ok_t{"T approved?"}
+    n_merge_t{"T settled"}
+    n_review_q["⚙ Review shell quests items"]
+    n_ok_q{"Q approved?"}
+    n_merge_q{"Q settled"}
+    n_join{"+"}
+    n_final_review["⚙ Review round 2 result"]
+    n_ok_final{"Final approved?"}
+    n_done((("Round 2 done")))
+    n_open_issues((("Done with open issues")))
+  end
+  n_start --> n_split
+  n_split --> n_build_t
+  n_split --> n_build_q
+  n_build_t --> n_review_t__merge
+  n_review_t --> n_ok_t
+  n_ok_t -- "approved" --> n_merge_t
+  n_ok_t -- "3rd round" --> n_merge_t
+  n_ok_t -- "changes" --> n_fix_t
+  n_fix_t --> n_review_t__merge
+  n_merge_t --> n_join
+  n_build_q --> n_review_q__merge
+  n_review_q --> n_ok_q
+  n_ok_q -- "approved" --> n_merge_q
+  n_ok_q -- "3rd round" --> n_merge_q
+  n_ok_q -- "changes" --> n_fix_q
+  n_fix_q --> n_review_q__merge
+  n_merge_q --> n_join
+  n_join --> n_previews
+  n_previews --> n_final_review__merge
+  n_final_review --> n_ok_final
+  n_ok_final -- "approved" --> n_done
+  n_ok_final -- "3rd round" --> n_open_issues
+  n_ok_final -- "changes" --> n_fix_final
+  n_fix_final --> n_final_review__merge
+  n_review_t__merge --> n_review_t
+  n_review_q__merge --> n_review_q
+  n_final_review__merge --> n_final_review
+  classDef done fill:#e6f4ea,stroke:#1e8e3e,color:#0d3b1e
+  classDef running fill:#e8f0fe,stroke:#1a73e8,color:#0b2a5b
+  classDef ready fill:#fef7e0,stroke:#b06000,color:#4a3600
+  classDef failed fill:#fce8e6,stroke:#c5221f,color:#5f0d06
+  classDef cancelled fill:#f1f3f4,stroke:#80868b,color:#3c4043
+  class n_start,n_split,n_build_t,n_review_t,n_ok_t,n_merge_t,n_build_q,n_review_q,n_ok_q,n_merge_q,n_join,n_previews,n_final_review,n_ok_final,n_done,n_review_t__merge,n_review_q__merge,n_final_review__merge done

@@ -1,5 +1,17 @@
 # Insights
 
+## 2026-11-20 — Dungeon Journal round 3 (run r-20261120-114959-1c34)
+- WoW Forever (build 1.60.1) has no Encounter Journal DB2 tables; retail tables on wago.tools are the only source. Retail descriptions describe the current (Cataclysm-era or later) version: e.g. Shadowfang Keep's text names Lord Godfrey, who is not in the classic dungeon. Review dungeon descriptions for such mismatches before an in-game look.
+- Matching journal instances by name alone picks wrong entries (two Blackrock Depths, reworked Uldaman/UBRS). Break ties by boss overlap with a known classic boss list.
+- System python lacks SSL certs here; fetch wago.tools CSVs with curl (cache /tmp/ejdata).
+- A query helper that defaults its scope to a filter (`filters.dungeon`) silently returns nothing when that filter is 0 ("All dungeons"). Callers that know the scope must pass it.
+
+## 2026-11-20 — Dungeon Journal round 2 (run r-20261120-111056-9c21)
+- Rendering the real frame tree to PNG (`tools/render_journal.py`) caught layout bugs the text tests missed: quest filter bar + status + 2 search boxes on the home, a grid narrower than the page, white status strip (colour must be colour x vertex). Render before asking for an in-game look.
+- EJ boss art file names are not consistent: some keep spaces (`UI-EJ-BOSS-Mutanus the Devourer`), some drop them (`UI-EJ-BOSS-EdwinVanCleef`). Try every variant via `GetFileIDFromPath`; paths are case-insensitive.
+- Hidden filters must not shape a visible view: the home card counts used the dungeon page's hidden `filters.faction`, so counts shrank with no cue. Read only controls visible on the same view.
+- Async jumps (item click while the boss list loads) need a pending slot that is cleared on every navigation, or a late answer moves the user to another tab.
+
 ## 2026-11-19 — UX review run r-20261119-095449-ea8e (cross-cutting patterns, `context/ux-review-2026-11-19.md`)
 - **Settings links rot when tabs are reorganised.** Hard-coded old tab ids/names: 'optional' in `QuestPlanner.lua:1129` (UX-09), 'party' for the finder (UX-05, now fixed), "Optional" tab in `Fishing.lua:222` (UX-07), "Send the message at once" in `Diagnostics.lua:432`, "General > Copy logs" in README. Build every pointer from `ns.settingPath` / tab constants, and add a harness test per "open settings" control that asserts the landing heading.
 - **Silent state changes are the most common defect.** Auto messages dropped in Draft mode (UX-01), finish announce gated on a hidden switch (UX-06), toggles answer with an unrelated status dump (UX-08), silent clamping (UX-14, UX-50), silent goal/camp changes (UX-13, UX-21). Rule: every state change prints one line with the Settings label and the effective value.
@@ -585,3 +597,7 @@
 - 2026-11-19: "The guide closes and re-calcs by itself" = noisy events (BAG_UPDATE_DELAYED, UPDATE_FACTION, SKILL_LINES_CHANGED, SPELLS_CHANGED) passed force=true to scheduleRefresh, and scan() emptied `route` before rebuilding; plus sub-maps (mines are mapType 5) made currentZone nil -> clearPlan. Measure with a counter on ns.dataWork.start("quest-plan") and visible rows right after the 0.65 s debounce (advance 0.651) before the job pump runs.
 
 - 2026-11-19: Saved ID lists in account-wide `QuestSharingCache` must include every filter applied before saving in their scope key (faction, class). `mapSearchNPCs` lacked faction -> other-faction alts saw no own-faction sellers. Harness has no `UnitFactionGroup`; set it in tests or faction filters are silently off.
+
+- 2026-11-20: A believable offline preview of WoW frames is possible: patch the lupa mock (record every SetPoint anchor, SetAllPoints, SetScrollChild, SetColorTexture, SetAlpha), resolve absolute rects in Lua, and paint with PIL. Real Blizzard textures and the UI fonts (fonts/frizqt__.ttf 615960, fonts/morpheus.ttf 615962) download as BLP/TTF from `https://wago.tools/api/casc/<FileDataID>?download`; the FileDataID comes from the community listfile. PIL reads BLP2. macOS system python3 lacks SSL certs, so fetch through `curl`. Preview art stays in /tmp and is never shipped.
+- 2026-11-20: Blizzard EJ boss portraits are not named consistently: older files use spaces (`ui-ej-boss-mutanus the devourer`), newer ones do not (`ui-ej-boss-edwinvancleef`). Look up both spellings.
+- 2026-11-20: Turning aggro numbers on prints A.status() (threat API, enemy nameplates CVar, visible plate count). Ask the user for that line first when they say aggro shows nothing in game.

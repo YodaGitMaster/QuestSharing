@@ -1,0 +1,203 @@
+{
+  "id": "dungeon-journal-finish",
+  "name": "Integrate and review the Dungeon Journal look",
+  "runTimeout": 120,
+  "context": {
+    "prompt": "Record the Dungeon Journal look rebuild: new files (JournalTheme, JournalItems, DungeonHomeUI, DungeonBossesUI, DungeonMapUI, DungeonRouteUI), the page shell, the client art table (loading screens, LFG icons, EJ portraits), the inspiration-only rule (no Dungeon Journal code or media), what is unverified in game. Update architecture.md file tree/flowchart/sequence for the new home -> dungeon page -> tabs flow."
+  },
+  "lanes": [
+    {
+      "id": "builder",
+      "name": "Builder",
+      "agent": "bpmn:worker",
+      "timeout": 40
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "agent": "bpmn:reviewer",
+      "timeout": 12
+    }
+  ],
+  "data": {
+    "wA": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "wB": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "wD": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "wM": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "integ": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "vF": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "fF": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "name": "Streams approved"
+    },
+    {
+      "id": "integrate",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Integrate and run suite",
+      "in": [
+        "wA",
+        "wB",
+        "wD",
+        "wM"
+      ],
+      "out": "integ",
+      "timeout": 30,
+      "prompt": "Integrate the four Dungeon Journal streams (A {{wA.summary}} / B {{wB.summary}} / D {{wD.summary}} / M {{wM.summary}}; their notes list stubs relied on). Read context/dungeon-journal-contract.md, including its 'Integration follow-ups' section: fix every code item listed there (not the in-game checklist). Fix only the seams between streams (wrong calls, missing exports, layout overlaps in the 1032x715 page) in any of the new files or DungeonQuests.lua; do not redesign. Run every test file with /tmp/qs-test-env/bin/python tests/<file>.py (loop over tests/test_*.py) and make the full suite green; check every QuestSharing/*.lua compiles (lupa loadstring). Add a CHANGELOG '## Unreleased' entry and a short README paragraph for the new Dungeon quests look. Report {files, summary, tests, notes}."
+    },
+    {
+      "id": "final_review",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review the whole look",
+      "in": [
+        "integ",
+        "fF?"
+      ],
+      "prompt": "Final review of the Dungeon Journal look rebuild ({{integ.summary}}). Compare the built layout (read the new files; you may render panel texts via the test helpers) with the screenshots /tmp/dj_images/dj1-4.png and the plan /Users/cozzolif/.claude/plans/melodic-orbiting-kahn.md: home cards, dungeon header + tabs, quests list + parchment page + rewards + pills, bosses + drops, map, route. Verify the hard rules: no code or media from /tmp/dj_addon (grep for FDJ, ForeverDJ, ForeverDungeonJournal, and compare a few distinctive function bodies), client textures only, no new image files; full suite green; existing features intact. Report {status, issues}.",
+      "out": "vF"
+    },
+    {
+      "id": "ok_final",
+      "type": "xor",
+      "name": "Final approved?"
+    },
+    {
+      "id": "fix_final",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix final issues",
+      "in": [
+        "vF"
+      ],
+      "out": "fF",
+      "timeout": 25,
+      "prompt": "Fix these final review issues of the Dungeon Journal look (contract context/dungeon-journal-contract.md; keep the full suite green): {{vF.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "done",
+      "type": "end",
+      "name": "Look rebuilt"
+    },
+    {
+      "id": "open_issues",
+      "type": "end",
+      "name": "Done with open issues"
+    }
+  ],
+  "flows": [
+    {
+      "from": "start",
+      "to": "integrate"
+    },
+    {
+      "from": "integrate",
+      "to": "final_review"
+    },
+    {
+      "from": "final_review",
+      "to": "ok_final"
+    },
+    {
+      "from": "ok_final",
+      "to": "done",
+      "name": "approved",
+      "when": {
+        "path": "vF.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_final",
+      "to": "open_issues",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_final",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_final",
+      "to": "fix_final",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_final",
+      "to": "final_review"
+    }
+  ]
+}

@@ -11,6 +11,14 @@ local itemQueue, queueAt, page, instancePage = {}, 1, 1, 1
 local deferredAtlas = false
 local unresolved, selectedKey = 0, nil
 local focusTarget
+-- L.bossesOf: a scan it started keeps running while the loot window is hidden; its callers wait in bossWaiters.
+local background, bossWaiters, flushBosses = false, {}, nil
+-- a cancelled background scan (L.purge, or a new L.scan generation) answers its waiting bossesOf callers now
+local function cancelBosses(reason)
+    background = false
+    local list = bossWaiters; bossWaiters = {}
+    for _, w in ipairs(list) do pcall(w.done, {}, nil, reason) end
+end
 -- Memory: the loot catalogue is read once and kept for the session. Hiding the window pauses a half-read scan or item
 -- detail load; resumeLoot continues it on reopen. Purge (ns.dataWork.purge) frees it all.
 local resumeLoot
@@ -340,7 +348,8 @@ end
 
 -- full: read the whole item catalogue again (Refresh data); otherwise the IDs saved by the last full QuestieDB scan.
 function L.scan(full)
-    E.dismissMenu()
+    if loading then cancelBosses("The drop scan was restarted. Open the Bosses tab again.") end
+    if not background then E.dismissMenu() end -- a bossesOf background scan leaves the user's menu alone
     generation = generation + 1
     local token = generation
     index, results, instances, items, seen, itemQueue = {}, {}, {}, {}, {}, {}
@@ -371,7 +380,7 @@ function L.scan(full)
     local jobAt, rowAt, rows, mode, cache = 1, 1, nil, nil, {}
     local function step()
         if token ~= generation then return end
-        if not shown() then resumeLoot = step; return end
+        if not shown() and not background then resumeLoot = step; return end
         local budget = 100
         while budget > 0 do
             if jobs then
@@ -412,6 +421,7 @@ function L.scan(full)
         local done = jobs and not jobs[jobAt] or not jobs and not ids[jobAt]
         if done then
             loading, ready = false, true
+            if flushBosses then flushBosses() end
             if not jobs and not saved then ns.dataWork.save("dungeonLoot", "", ns.dataWork.sortedKeys(found)) end
             if chosen and not instances[chosen] then chosen, encounter = nil, nil end
             focusCurrentDungeon()
@@ -623,9 +633,147 @@ function L.open(text)
     return true
 end
 
+-- Dungeon Journal "Bosses & drops": the bosses of one dungeon in encounter order with their drop item IDs.
+-- AtlasLoot is read directly (one dungeon's tables, synchronous, encounter order kept); without it the QuestieDB
+-- scan above (L.scan) is used and finished in the background. Result: list, source, reason (see the contract).
+local function plainName(s)
+    s = string.lower(clean(s) or "")
+    s = string.gsub(s, "^the ", "")
+    return (string.gsub(s, "[^%w]", ""))
+end
+local function bossLevel(n) n = tonumber(n); return n and n > 0 and n < 999 and math.floor(n) or nil end
+local function firstNumber(v)
+    while type(v) == "table" do v = v[1] end
+    return positive(v) and v or nil
+end
+
+local function atlasBosses(dungeonName, area)
+    local a = atlas()
+    local db = type(a) == "table" and a.ItemDB
+    local storage = type(db) == "table" and db.Storage
+    if type(storage) ~= "table" or type(db.GetItemTable) ~= "function" then return nil end
+    local want = plainName(dungeonName)
+    for moduleName, module in pairs(storage) do
+        if type(moduleName) == "string" and string.find(moduleName, "DungeonsAndRaids", 1, true) and type(module) == "table" then
+            for key, content in pairs(module) do
+                if type(content) == "table" and type(content.items) == "table" and standardDungeon(content, module, a) then
+                    local name = clean(content.name) or clean(U.call(content.GetName, content, true))
+                    local map = tonumber(content.MapID or content.AreaID)
+                    if (want ~= "" and plainName(name) == want) or (area and map and (map == area or L.dungeonOf(map) == area)) then
+                        local list = {}
+                        for bossID, boss in ipairs(content.items) do
+                            if type(boss) == "table" and not boss.IgnoreAsSource and not boss.ExtraList then
+                                local who = clean(boss.name) or clean(U.call(content.GetNameForItemTable, content, bossID, true))
+                                    or (positive(boss.npcID) and clean(field("npc", boss.npcID, "name"))) or ("Encounter " .. bossID)
+                                local original = boss
+                                if type(boss.link) == "table" then
+                                    local target = storage[boss.link[1]]
+                                    target = target and target[boss.link[2]]
+                                    original = target and target.items and target.items[boss.link[3]] or nil
+                                end
+                                local diffs, ids, seenIDs = {}, {}, {}
+                                for diff in pairs(original or {}) do if type(diff) == "number" and diff > 0 then diffs[#diffs + 1] = diff end end
+                                table.sort(diffs)
+                                for _, diff in ipairs(diffs) do
+                                    local rows, format = U.call(db.GetItemTable, db, moduleName, key, bossID, diff)
+                                    if type(rows) == "table" and not (type(format) == "table" and format[1] and format[1] ~= "Item") then
+                                        for _, r in ipairs(rows) do
+                                            local id = type(r) == "table" and r[2]
+                                            if positive(id) and not seenIDs[id] then seenIDs[id] = true; ids[#ids + 1] = id end
+                                        end
+                                    end
+                                end
+                                local npcID = firstNumber(boss.npcID)
+                                if #ids > 0 or npcID then list[#list + 1] = { name = who, npcID = npcID,
+                                    displayID = firstNumber(boss.DisplayIDs) or firstNumber(boss.displayID),
+                                    level = bossLevel(boss.Level) or (npcID and bossLevel(field("npc", npcID, "maxLevel"))),
+                                    items = ids } end
+                            end
+                        end
+                        return list
+                    end
+                end
+            end
+        end
+    end
+    return false -- catalogue readable, but no table for this dungeon
+end
+
+local function questieBosses(dungeonName, area)
+    local want, byNpc, list = plainName(dungeonName), {}, {}
+    for _, r in ipairs(index) do
+        if r.kind == "npc" and (plainName(r.instanceName) == want or (area and r.instanceKey == "area:" .. tostring(area))) then
+            local boss = byNpc[r.sourceID]
+            if not boss then
+                local npcID = tonumber((string.match(tostring(r.sourceID), "^npc:(%d+)$")))
+                boss = { name = r.who, npcID = npcID, level = npcID and bossLevel(field("npc", npcID, "maxLevel")), items = {}, seen = {} }
+                byNpc[r.sourceID] = boss; list[#list + 1] = boss
+            end
+            if not boss.seen[r.itemID] then boss.seen[r.itemID] = true; boss.items[#boss.items + 1] = r.itemID end
+        end
+    end
+    -- QuestieDB has no encounter order: lowest level first, then by name.
+    table.sort(list, function(x, y)
+        if (x.level or 0) ~= (y.level or 0) then return (x.level or 0) < (y.level or 0) end
+        return x.name < y.name
+    end)
+    for _, boss in ipairs(list) do boss.seen = nil; table.sort(boss.items) end
+    return list
+end
+
+flushBosses = function()
+    background = false
+    local list = bossWaiters; bossWaiters = {}
+    for _, w in ipairs(list) do
+        local bosses = source == "QuestieDB" and questieBosses(w.name, w.area)
+            or source == "AtlasLoot" and atlasBosses(w.name, w.area) or {}
+        local ok, err = pcall(w.done, bosses, source, #bosses == 0 and "No drops known for " .. tostring(w.name) .. "." or nil)
+        if not ok and ns.logging and ns.logging() then ns.print("bosses: " .. tostring(err)) end
+    end
+end
+
+-- dungeonName: the area name; done(list, source, reason) is called exactly once (now, or after the scan);
+-- area (optional) also matches AtlasLoot's MapID. Returns list, source, reason now, or nil, nil, "loading".
+function L.bossesOf(dungeonName, done, area)
+    area = tonumber(area)
+    local function reply(list, src, reason)
+        if done then pcall(done, list, src, reason) end
+        return list, src, reason
+    end
+    if atlas() then
+        local list = atlasBosses(dungeonName, area)
+        if list == nil then loadAtlas(); list = atlasBosses(dungeonName, area) end
+        if list == false then return reply({}, "AtlasLoot", "AtlasLoot has no table for " .. tostring(dungeonName) .. ".") end
+        if list then return reply(list, "AtlasLoot", #list == 0 and "AtlasLoot lists no encounters here." or nil) end
+    end
+    if ready and source == "QuestieDB" then
+        local list = questieBosses(dungeonName, area)
+        return reply(list, source, #list == 0 and "No drops known for " .. tostring(dungeonName) .. "." or nil)
+    end
+    -- got: our own answer, when the scan finishes inside the first synchronous step()
+    local got
+    bossWaiters[#bossWaiters + 1] = { name = dungeonName, area = area, done = function(list, src, reason)
+        got = { list, src, reason }
+        if done then done(list, src, reason) end
+    end }
+    background = true
+    if loading then
+        if resumeLoot then local run = resumeLoot; resumeLoot = nil; run() end
+        if got then return got[1], got[2], got[3] end
+        return nil, nil, "loading"
+    end
+    if not L.scan() then
+        cancelBosses(note)
+        return {}, nil, note
+    end
+    if got then return got[1], got[2], got[3] end
+    return nil, nil, "loading" -- done is called by flushBosses when the scan finishes
+end
+
 function L.close() if W then E.close("dungeons") end end
 function L.purge()
     ns.dataWork.forget("dungeonLoot")
+    cancelBosses("The drop data was cleared. Open the Bosses tab again.")
     generation = generation + 1; resumeLoot = nil
     index, results, instances, items, itemQueue = {}, {}, {}, {}, {}
     queueAt, progress, skipped, unresolved, ready, loading = 1, 0, 0, 0, false, false

@@ -75,7 +75,10 @@ def edit(box,text):
 def filters(g, **values):
     w=g.eval("NS.dungeonQuests._window()")
     for key,value in values.items():
-        if key in ("dungeon","class","faction"):
+        if key=="dungeon":  # the dungeon is chosen by opening its page (0 = back to the dungeon cards)
+            if value: g.eval("NS.dungeonQuests.openDungeon")(value,"quests")
+            else: g.eval("NS.dungeonQuests.home")()
+        elif key in ("class","faction"):
             b=w[key];b.chooseValue(value)
         else:
             raise ValueError(key)
@@ -116,7 +119,7 @@ def test_all_quests_button_keeps_selected_dungeon_and_broadens_character_filters
     assert 17 not in ids(g) and 5 not in ids(g) and 7 not in ids(g)
     click(w.reset);g.advance(90)
     assert {5,7,17,18,19}<=ids(g) and 8 not in ids(g)
-    assert w.dungeon.readValue()==1581
+    assert g.eval("NS.dungeonQuests.current")()==1581
 
 
 def test_live_search_quest_id_and_dungeon_and_invalid_level(style):
@@ -348,10 +351,14 @@ def tooltip(g):
 
 
 def test_rows_show_distinct_pickup_and_turnin_locations(style):
+    # the 48 px row keeps name and level; pickup and turn-in are on the quest page (Starts at / Turn in) and the hover
     g=game(style,HOVER_DATA);row=hover(g)
-    assert "Pickup:" in row.pickup.text and "Marshal McBride" in row.pickup.text and "48.9" in row.pickup.text
-    assert "Turn-in:" in row.turnIn.text and "Kobold Miner" in row.turnIn.text and "60.0" in row.turnIn.text
-    assert row.pickup.wordWrap is False and row.turnIn.wordWrap is False
+    assert "Pick up:" in tooltip(g) and "Marshal McBride" in tooltip(g) and "Turn in:" in tooltip(g) and "Kobold Miner" in tooltip(g)
+    row.frame.scripts.OnClick(row.frame,"LeftButton")
+    p=g.eval("NS.dungeonQuests._window().panel")
+    assert "Marshal McBride" in p.pickup.title.text and "48.9" in p.pickup.sub.text
+    assert "Kobold Miner" in p.turnIn.title.text and "60.0" in p.turnIn.sub.text
+    assert p.pickup.title.wordWrap is False and p.turnIn.sub.wordWrap is False
     assert "Kobold Miner" in g.eval("NS.dungeonQuests._window().detailsText.text")
 
 
@@ -380,7 +387,7 @@ def test_missing_item_catalogue_keeps_locations_and_xp_usable(style):
     g=game(style,HOVER_DATA+'ItemDB.GetAllIds=nil')
     row=hover(g);g.advance(1)
     assert "Item rewards: unavailable" in tooltip(g) and "XP: 2000" in tooltip(g)
-    assert "Marshal McBride" in row.pickup.text and "Kobold Miner" in row.turnIn.text
+    assert "Marshal McBride" in tooltip(g) and "Kobold Miner" in tooltip(g)
     assert not g.eval("NS.db.errors")
 
 
@@ -406,10 +413,12 @@ def test_leaving_row_does_not_reopen_tooltip_after_async_rewards_or_item_event(s
 
 def test_expanded_location_rows_fit_page_and_page_navigation_still_works(style):
     g=game(style,HOVER_DATA);w=g.eval("NS.dungeonQuests._window()")
-    assert len(w.rows)==5
-    for row in w.rows.values():assert row.frame.height==102 and row.edge.height==102
+    assert len(w.rows)==8
+    for row in w.rows.values():assert row.frame.height==48 and row.edge.height==48 and row.frame.width<=296
+    assert w.list.height>=8*48
+    filters(g,dungeon=1581)
     assert g.eval("NS.dungeonQuests.go")(1)
-    assert w.rows[1].result and plain(w.rows[1].pickup.text).startswith("Pickup:")
+    assert w.rows[1].result and plain(w.rows[1]["from"].text).startswith(("Available from level","Needs level","Completed","Not needed"))
 
 
 def test_legacy_xp_module_fallback_and_multiple_locations_remain_visible(style):
@@ -422,15 +431,16 @@ def test_legacy_xp_module_fallback_and_multiple_locations_remain_visible(style):
     ''')
     row=hover(g)
     assert "XP: 1250 (base)" in tooltip(g)
-    assert "+1 more" in row.pickup.text and "+1 more" in row.turnIn.text
+    row.frame.scripts.OnClick(row.frame,"LeftButton");p=g.eval("NS.dungeonQuests._window().panel")
+    assert "+1 more" in p.pickup.sub.text and "+1 more" in p.turnIn.sub.text
     assert "Marshal McBride" in tooltip(g) and "Kobold Miner" in tooltip(g)
 
 
 def test_talk_only_and_chain_labels_are_separate_on_same_quest(style):
     g=game(style,HOVER_DATA);filters(g,dungeon=1581)
     row=hover(g,3)
-    assert "Chain quest: follow-up" in row['from'].text
-    assert "Talk only" in row.task.text and "Marshal McBride" in row.task.text
+    assert "Chain quest: follow-up" in tooltip(g)
+    assert "Task: Talk only" in tooltip(g) and "speak to Marshal McBride" in tooltip(g)
     assert "Previous chain quests:" in tooltip(g) and "A dungeon job (quest ID 2)" in tooltip(g)
     assert "Talk only" in tooltip(g)
 
@@ -438,15 +448,15 @@ def test_talk_only_and_chain_labels_are_separate_on_same_quest(style):
 def test_chain_start_is_recognised_by_incoming_prerequisite_link(style):
     g=game(style,HOVER_DATA);filters(g,dungeon=1581)
     row=hover(g,1)
-    assert "Chain quest: prerequisite" in row['from'].text
+    assert "Chain quest: prerequisite" in tooltip(g)
     assert "Next chain quests:" in tooltip(g) and "A dungeon job (quest ID 2)" in tooltip(g)
-    assert "Task unknown" in row.task.text
+    assert "Task: Task unknown" in tooltip(g)
 
 
 def test_standalone_dungeon_kill_quest_has_work_label_not_talk_only(style):
     g=game(style,HOVER_DATA);row=hover(g,4)
-    assert "Standalone quest" in row['from'].text and "Defeat enemies" in row.task.text
-    assert "Talk only" not in row.task.text
+    assert "Standalone quest" in tooltip(g) and "Task: Defeat enemies" in tooltip(g)
+    assert "Talk only" not in tooltip(g)
 
 
 def test_events_items_and_exploration_are_not_mislabelled_talk_only(style):
@@ -457,13 +467,14 @@ def test_events_items_and_exploration_are_not_mislabelled_talk_only(style):
     ''')
     for qid,label in ((22,"event / escort"),(23,"Deliver required items"),(24,"Deliver / use quest item"),(14,"Explore"),(5,"Collect items")):
         row=hover(g,qid)
-        assert label in row.task.text and "Talk only" not in row.task.text
+        task=next(l for l in tooltip(g).split("\n") if l.startswith("Task: "))
+        assert label in task and "Talk only" not in task
 
 
 def test_chain_status_visible_in_all_dungeons_and_no_linear_step_numbers_in_branches(style):
     g=game(style,HOVER_DATA+'QUESTIE_QUESTS[4].preQuestSingle={1}')
     row=hover(g,1)
-    assert "Chain quest" in row['from'].text and "step 1/" not in tooltip(g)
+    assert "Chain quest" in tooltip(g) and "step 1/" not in tooltip(g)
     assert "A dungeon job (quest ID 2)" in tooltip(g) and "Class mission (quest ID 4)" in tooltip(g)
 
 
@@ -492,10 +503,11 @@ NS.dataWork.start=function(owner,run,valid,finished,budget) STARTS[owner]=budget
 def test_journal_text_boxes_pass_font_flags_so_the_whole_window_builds(style):
     # Regression: EditBox:SetFont without flags errored in the client and left a black page with only the top dropdowns.
     g=game(style);w=g.eval("NS.dungeonQuests._window()")
-    for key in ("level","search","levelMode","mine","reset","status","detailFrame","pickup","prev","next","reload"):
+    for key in ("level","search","levelMode","mine","reset","status","detailFrame","pickup","prev","next","reload",
+                "back","title","pin","content","questsPage","homeView","dungeonView"):
         assert w[key] is not None, key
     assert w.level.font and w.level.font[3]=="" and w.search.font[3]==""
-    assert len(list(w.rows.values()))==5 and w.rows[1].frame.shown
+    assert len(list(w.rows.values()))==8 and w.rows[1].frame.shown
     host,c,p,t=g.eval("NS.equipmentUI._window()")
     assert c.min.font[3]=="" and c.stats[3].stat is not None
 
@@ -526,16 +538,16 @@ def test_names_and_locations_have_their_own_colours_in_rows_and_panel(style):
     assert "|cff8a0c0cOutdoor preparation|r" in p.chain.text and "|cff8a0c0cReturn outside|r" in p.chain.text
     assert len({"|cff006666","|cff8a4000","|cff8a1a6a","|cff8a0c0c","|cff1a2a6a"})==5
     row=next(r for r in w.rows.values() if r.result and r.result.id==2)
-    assert row.item.text.startswith("|cffffd100A dungeon job|r") and "|cffff9ad820|r" in row.item.text
-    assert row.pickup.text.startswith("|cff9fe6ffPickup:|r") and "|cffffffffMarshal McBride|r" in row.pickup.text
-    assert "|cffffc080Elwynn Forest 48.9, 41.6|r" in row.pickup.text and row.turnIn.text.startswith("|cffe6b3ffTurn-in:|r")
+    assert row.item.text.startswith("|cffffd100A dungeon job|r") and "|cffff9ad815|r" in row["from"].text  # needs level 15
+    assert "Available from level" in plain(row["from"].text)
     assert not g.eval("NS.db.errors")
 
 
-def test_detail_panel_keeps_the_yellow_but_drops_the_picture(style):
-    g=game(style)
-    surface=g.eval("NS.dungeonQuests._window().detailFrame.journalSurface")
-    assert not surface.grain.shown and surface.base.shown
+def test_detail_panel_is_a_parchment_page_next_to_the_list(style):
+    g=game(style);w=g.eval("NS.dungeonQuests._window()")
+    assert w.detailFrame.parchment and w.detailFrame.width==1000-342 and w.detailFrame.height==560
+    assert w.left.width==330 and w.content.width==1000 and w.content.height==560
+    assert w.content.point[3]=="TOPLEFT" and w.content.point[4]==16 and w.content.point[5]==-140
 
 
 def rows_by_id(g, pages=1):
@@ -550,7 +562,8 @@ def lead_rows(g):
     while go(-1): pass
     while True:
         for q,row in rows_by_id(g).items():
-            out[q]=type("Row",(),{"from_":row["from"].text,"item":row.item.text,"icon":row.icon.texture,"pickup":row.pickup.text})
+            tip="\n".join(g.eval("NS.dungeonQuests.hoverLines")(row.result).values())
+            out[q]=type("Row",(),{"from_":row["from"].text+"\n"+tip,"item":row.item.text,"icon":row.icon.texture,"row":row["from"].text})
         if not go(1): break
     while go(-1): pass
     return out
@@ -579,9 +592,9 @@ def test_done_steps_are_ticked_and_greyed_and_a_finished_later_step_ticks_the_on
     g.run("FINISHED[1]=nil;FINISHED[3]=true");g.eval("NS.dungeonQuests.refresh")();g.advance(.3)
     rows=rows_by_id(g)
     for q in (1,2,3):
-        assert ready(q) and "|cff7d7d7d" in rows[q].item.text and "|cff7d7d7d" in rows[q].pickup.text, q
+        assert ready(q) and "|cff7d7d7d" in rows[q].item.text and "|cff7d7d7d" in rows[q]["from"].text, q
     assert "Not needed" in rows[1]["from"].text
-    assert "Not needed" not in rows[3]["from"].text
+    assert "Not needed" not in rows[3]["from"].text and "Completed" in rows[3]["from"].text
     assert "Skip it: the next step is done or taken" in plain(chain_text(g,2))
     assert "Next: Return outside (done)" in plain(chain_text(g,2))
     assert not g.eval("NS.db.errors")
@@ -657,7 +670,8 @@ def test_lead_in_is_greyed_and_ticked_once_the_quest_it_leads_to_is_done(style):
 
 def test_real_prerequisite_is_not_mislabelled_as_lead_in(style):
     g=game(style,HOVER_DATA);filters(g,dungeon=1581)
-    assert "optional lead-in" not in rows_by_id(g)[1]["from"].text  # quest 2 lists quest 1 as its prerequisite
+    tip="\n".join(g.eval("NS.dungeonQuests.hoverLines")(rows_by_id(g)[1].result).values())
+    assert "optional lead-in" not in tip and "Chain quest: prerequisite" in tip  # quest 2 lists quest 1 as its prerequisite
 
 
 def border_on(row):
@@ -693,7 +707,8 @@ def test_quest_in_log_shows_question_mark_and_missing_quests_show_exclamation(st
     g.run("QUESTS[#QUESTS+1]={id=2,title='A dungeon job',level=20,objectives={}}")
     g.fire("QUEST_LOG_UPDATE");g.advance(.3)
     rows=rows_by_id(g)
-    assert "ActiveQuestIcon" in rows[2].icon.texture and "In your quest log" in rows[2]["from"].text
+    assert "ActiveQuestIcon" in rows[2].icon.texture and rows[2].have.shown and rows[2].have.text=="YOU HAVE IT"
+    assert not rows[3].have.shown
     assert not border_on(rows[2]), "already taken: no border"
     assert "AvailableQuestIcon" in rows[3].icon.texture and not border_on(rows[3]), "not taken yet: yellow '!', no gold border"
     assert "ReadyCheck-Ready" in rows[1].icon.texture and not border_on(rows[1]), "its lead-in is pointless once it is taken"
@@ -824,10 +839,10 @@ def test_round_three_labels_border_only_for_what_i_can_take_and_no_req_zero(styl
     filters(g,dungeon=1581);w=g.eval("NS.dungeonQuests._window()")
     rows=lead_rows(g)
     assert "optional lead-in" in rows[50].from_, "a lead-in is called one even when it is listed for the dungeon itself"
-    assert "req 0+" not in plain(rows[4].item) and "req 15+" in plain(rows[2].item)
+    assert "level 0" not in plain(rows[4].row) and "Available from level 15" in plain(rows[2].row)
     edit(w.search,"High quest");g.advance(.3)
     hi=rows_by_id(g)[17]
-    assert "AvailableQuestIcon" not in hi.icon.texture and "|cffff6060req 40+" in hi.item.text, "too high: red requirement, no '!'"
+    assert "AvailableQuestIcon" not in hi.icon.texture and "|cffff6060Needs level 40" in hi["from"].text, "too high: red requirement, no '!'"
     edit(w.search,"Horde mission");g.advance(.3)
     assert "AvailableQuestIcon" not in rows_by_id(g)[5].icon.texture, "other faction: no '!'"
     edit(w.search,"Class mission");g.advance(.3)
@@ -854,7 +869,7 @@ def test_a_chain_that_fits_on_one_page_is_never_split_across_pages(style):
     chain=[1,2,3]
     holder=[p for p in pages if 1 in p][0]
     assert all(q in holder for q in chain), pages
-    assert sum(len(p) for p in pages)==len(ids(g)) and all(len(p)<=5 for p in pages)
+    assert sum(len(p) for p in pages)==len(ids(g)) and all(len(p)<=8 for p in pages)
     w=g.eval("NS.dungeonQuests._window()")
     assert "of %d quests" % len(ids(g)) in plain(w.status.text)
     assert not g.eval("NS.db.errors")
@@ -872,13 +887,14 @@ def test_rewards_are_in_the_details_panel_and_xp_on_the_row(style):
     w=g.eval("NS.dungeonQuests._window()")
     edit(w.search,"A dungeon job");g.advance(.3)
     row=rows_by_id(g)[2]
-    assert "200 XP" in plain(row.item.text), "level 30 vs quest 20: 10 % of 2000 shown on the row"
+    assert "200 XP" in plain(row["from"].text), "level 30 vs quest 20: 10 % of 2000 shown on the row"
     assert g.eval("ITEM_READS")==0, "opening and auto-selecting does not read the item catalogue"
     row.frame.scripts.OnClick(row.frame,"LeftButton");g.advance(30)
     text=plain(g.eval("NS.dungeonQuests._panelText()"))
-    assert "REWARDS" in text and "200 XP  (base 2000, less at your level)" in text
-    assert "+250 reputation with Stormwind" in text
-    assert "Reward staff" in text and "you may pick one" in text, "panel refreshes when item rewards finish loading"
+    p=g.eval("NS.dungeonQuests._window().panel")
+    assert "Choose one reward" in text and p.xpPill.shown and p.xpPill.value=="200 XP" and "base 2000 XP, less at your level" in text
+    assert p.repPills[1].shown and p.repPills[1].value=="+250 Stormwind" and not p.repPills[2].shown
+    assert "Reward staff" in text and "You will also receive:" in text, "panel refreshes when item rewards finish loading"
     assert not g.eval("NS.db.errors")
 
 
@@ -891,7 +907,7 @@ def test_panel_reads_in_seconds_status_first_and_click_to_pin_places(style):
     g=game(style,HOVER_DATA+"UnitLevel=function() return 20 end QUESTIE_QUESTS[2].objectivesText={'Bring 5 Red Bandanas to Kobold Miner.'}")
     g.run('WAYPOINT=nil;UiMapPoint={CreateFromCoordinates=function(map,x,y)return {map=map,x=x,y=y} end};C_Map.SetUserWaypoint=function(p)WAYPOINT=p end')
     text=plain(chain_text(g,2));p=g.eval("NS.dungeonQuests._window().panel")
-    order=[text.index(k) for k in ("To pick up","WHAT TO DO","Bring 5 Red Bandanas","WHERE","REWARDS","QUEST CHAIN","MORE DETAILS")]
+    order=[text.index(k) for k in ("Available from level","To pick up","Objective","Bring 5 Red Bandanas","Starts at","Turn in","Rewards","You will receive:","Quest chain","More details")]
     assert order==sorted(order), "status, task, where, rewards, chain, then small print"
     p.turnIn.scripts.OnClick(p.turnIn,"LeftButton")
     pt=g.eval("WAYPOINT");assert pt and abs(pt.x-.60)<.001 and abs(pt.y-.60)<.001, "clicking the hand-in NPC pins it"
@@ -917,7 +933,8 @@ def test_item_rewards_are_buttons_with_icons_that_show_stats_on_hover(style):
     shown=[b for b in p["items"].values() if b.shown]
     assert len(shown)==2 and {b.itemID for b in shown}=={810,811}
     staff=next(b for b in shown if b.itemID==810)
-    assert "|cff0a3f9aReward staff" in staff.name.text, "rare quality, readable blue on parchment"
+    assert "|cff0070ddReward staff" in staff.name.text, "rare quality blue on the dark item box"
+    assert staff.icon.width==38 and list(staff.icon.coords.values())==[.08,.92,.08,.92]
     staff.scripts.OnEnter(staff);assert g.eval("TOOLTIP.link")=="item:810"
     assert not g.eval("NS.db.errors")
 

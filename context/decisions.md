@@ -1,5 +1,27 @@
 # Decisions
 
+## D13 2026-11-20 — Dungeon Journal look: inspiration only, client art only
+- Choice: rebuild the Dungeon quests page in the look of the Dungeon Journal addon (by Exehn). Use only sizes, palette and client texture paths. No code or media from it: it has no licence. Never use an `Interface\AddOns\ForeverDungeonJournal` path. No new image files.
+- Art comes from the client: loading screens (classic by path, checked with `GetFileIDFromPath` when the client has it; Forever by FileDataID), `LFGIcon-<Name>`, and EJ boss art with fallbacks (display ID portrait, then skull).
+- Structure: a shell in `DungeonQuests.lua` plus one file per page, so streams worked on separate files (contract `context/dungeon-journal-contract.md`). Each page is built lazily inside `xpcall`, so one broken page does not break the shell.
+- Quest page overflow: the reward items moved to 3 columns, and a fit rule was added (the builder's "option 2, compact page"). The fit rule: bottom = frame height - 12, MIN_MORE = 40. If there is no room, the chain moves into More details, or More details is hidden.
+
+## D14 2026-11-20 — Dungeon Journal round 2: one home search, home counts follow home controls only (run r-20261120-111056-9c21)
+- Home page shows only the card search (`DungeonHomeUI.lua`). The quest filters sit on `window.filterBar` (DungeonQuests.lua), hidden while `filters.dungeon == 0`. Status line on the home only for loading / not ready / filter or level error.
+- `D.summaries()` card counts follow Hide completed / Hide quests in my log and the HOME crest faction only (`homeFaction()` reads `H._frame().faction`). Rejected: falling back to `filters.faction` (set on the hidden dungeon-page filter, so counts were cut with no visible cue; review vQ). Crest flags still come from all quests. Dungeons with 0 quests left are dropped.
+- "Plan route" on the Quests page opens the Route tab (`D.openDungeon(area,"route")`); the old `QuestSharingDungeonRoute` window (`D.planRoute`) stays only as a fallback when `ns.dungeonRouteUI` is missing.
+- Item click jumps to the Bosses tab only for a boss of the current dungeon (`D.dropSource` -> `D.openBoss` -> `B.select`). If the boss list is still loading, the jump waits in `pendingOpen`, dropped on quest/tab change or item leave (no surprise jump later).
+- Every new client texture gets a fallback (`T.hasFile` / `C_Texture.GetAtlasInfo`): unverified paths must never leave an invisible but clickable button.
+
+## D15 2026-11-20 — Dungeon Journal round 3: retail Encounter Journal lore, generated file, filters behind a popover (run r-20261120-114959-1c34)
+- Lore source: wago.tools retail DB2 CSVs (JournalInstance, JournalEncounter, JournalEncounterSection), because the Forever build 1.60.1 has no journal tables. Blizzard text is shipped like Questie ships quest text. Generated offline by `tools/build_dungeon_lore.py` into `QuestSharing/DungeonLore.lua` (never edited by hand); no runtime lookup.
+- Classic over retail: two reworks are skipped (1197 Uldaman: Legacy of Tyr, 559 Warlords Upper Blackrock Spire); on a name clash the instance whose bosses overlap our classic list most wins (Blackrock Depths = 228, not 1301). Only bosses in the script's `CLASSIC_BOSSES` list are written, so Cataclysm Deadmines/Shadowfang bosses never appear. Group/renamed encounters are mapped by hand (The Lost Dwarves -> Baelog/Olaf/Eric, etc.).
+- Ability text: at most 4 top-level sections, ~140 chars, `$`-tokens and `|c` codes removed; "<verb> $s1% of" becomes "<verb> part of" (no orphan words).
+- Downloads go to `.csv.tmp` and are renamed only on success, so a cut download never replaces the cache.
+- Dungeon-page filters: one row (search, Filters, My character, All quests, two hide boxes, Refresh data); Level, Quest levels, Class, Faction in the `window.filterPanel` popover. Its button shows the active count ("Filters (2)") so a hidden filter is never silent. All quests stays on the main row (one-click "every quest of this dungeon").
+- "Needed for" passes the page's area (`D.questsForNpc(npcID, view.area)`): `filters.dungeon` can be 0. `D.openQuest` resets the filters (All quests) when the quest is hidden, so a click always lands.
+- Task kind under objectives only when it adds information: guessed "Talk only" and generic "Complete quest objectives"/"Task unknown" moved to the tooltip only.
+
 ## 2026-11-19 — Speed pass 1 (tools/lua-optimization-prompt.md)
 - Rule: apply only with a Lua 5.1 benchmark saving >= 20 %, identical behaviour, small local diff; else report only.
 - Applied: (1) `VendorMap.lua` matchesWords splits the query once per new query (one-entry cache), not once per item name. (2) `Questie.lua` questieModule keeps the found QuestieDB module while the same QuestieLoader table is installed; a failed/not-started lookup is not kept. (3) `DungeonQuests.lua` scan: prerequisite and breadcrumb loops unrolled, no `ipairs({a or {}, b or {}})` / `{number(x)}` tables per quest.
@@ -765,3 +787,10 @@ Not done (needs data): mob level per objective for kill XP (assumes your own lev
 ## 2026-11-19 — Dungeon areas are data-driven
 - `ns.loot.dungeonOf(area)` -> canonical dungeon area: base table (23 + Forever 16544/16919/17191) + Forever `subAreas` -> parent + QuestieDB `ZoneDB.private.dungeons` keys and alternative ids (via `Q.dungeonList()`), minus `notDungeon` (raids, battlegrounds, Deeprun Tram, Darkmoon). Wowhead's Forever zone lists are JS-only (WebFetch empty, curl 403); The Hall of Thanes and Ruins of Lordaeron have Wowhead 'Dungeon Strategy Guide' pages; Dalaran / Manor Mistmantle unconfirmed online but are QuestieDB instance areas (harmless: a dungeon shows only when it has quests).
 
+
+## 2026-11-20 — Bag rows follow the bag view, not the slot list
+- A "row" is a display concept: game bag windows = 4 slots a row inside each bag, counted from slot 1 (short row = highest slots); one-bag views (bag addons, combined bags) = all bags 0..lastBag joined, `sortColumns` a row. So rows need `sortView` + `sortColumns`; no auto-detect of bag addons (each addon lays out differently).
+- Rows are all-or-nothing: if the padded layout needs more slots than free, the whole plan is packed and the chat says so (manual: every time; automatic: once a session). Name order never uses rows (one row per name would waste slots).
+- `sortMergeStacks` off = no extra merge step only; the game still joins stacks when a sort move drops one stack onto the same item.
+- Not built (offered): US-2 one bag per group (breaks in one-bag views), US-4 custom group order, US-6 gear by slot/item level.
+- 2026-11-20 tank aggro reduced to a plain number on the nameplate (user). Supersedes the colours, flame, portrait/ring alarm, 'Losing aggro', near/band picks and the automatic nameplate switch. Kept: Highlight's ns.getCVar/ns.setCVar export (used once to restore the old saved nameplate value).

@@ -1,0 +1,84 @@
+flowchart LR
+  %% Dungeon quests tab in the Dungeon Journal look · 10 agents: 5 × bpmn:worker, 5 × bpmn:reviewer · up to 30 with loop rounds
+  subgraph n_lane_builder["🤖 Builder · bpmn:worker · ⏱ 40 min"]
+    n_start(("Plan approved"))
+    n_split{"+"}
+    n_build_a["⚙ Build theme and home"]
+    n_fix_a["⚙ Fix theme and home"]
+    n_build_b["⚙ Build quests page and shell"]
+    n_fix_b["⚙ Fix quests page"]
+    n_build_d["⚙ Build bosses and drops"]
+    n_fix_d["⚙ Fix bosses and drops"]
+    n_build_m["⚙ Build map and route pages"]
+    n_fix_m["⚙ Fix map and route"]
+    n_integrate["⚙ Integrate and run suite · ⏱ 30 min"]
+    n_fix_final["⚙ Fix final issues · ⏱ 25 min"]
+    n_review_a__merge{"✕"}
+    n_review_b__merge{"✕"}
+    n_review_d__merge{"✕"}
+    n_review_m__merge{"✕"}
+    n_final_review__merge{"✕"}
+  end
+  subgraph n_lane_reviewer["🤖 Reviewer · bpmn:reviewer · ⏱ 12 min"]
+    n_review_a["⚙ Review theme and home"]
+    n_ok_a{"A approved?"}
+    n_review_b["⚙ Review quests page"]
+    n_ok_b{"B approved?"}
+    n_review_d["⚙ Review bosses and drops"]
+    n_ok_d{"D approved?"}
+    n_review_m["⚙ Review map and route"]
+    n_ok_m{"M approved?"}
+    n_join{"+"}
+    n_final_review["⚙ Review the whole look"]
+    n_ok_final{"Final approved?"}
+    n_done((("Look rebuilt")))
+    n_open_issues((("Done with open issues")))
+  end
+  n_start --> n_split
+  n_split --> n_build_a
+  n_split --> n_build_b
+  n_split --> n_build_d
+  n_split --> n_build_m
+  n_build_a --> n_review_a__merge
+  n_review_a --> n_ok_a
+  n_ok_a -- "approved" --> n_join
+  n_ok_a -- "3rd round" --> n_join
+  n_ok_a -- "changes" --> n_fix_a
+  n_fix_a --> n_review_a__merge
+  n_build_b --> n_review_b__merge
+  n_review_b --> n_ok_b
+  n_ok_b -- "approved" --> n_join
+  n_ok_b -- "3rd round" --> n_join
+  n_ok_b -- "changes" --> n_fix_b
+  n_fix_b --> n_review_b__merge
+  n_build_d --> n_review_d__merge
+  n_review_d --> n_ok_d
+  n_ok_d -- "approved" --> n_join
+  n_ok_d -- "3rd round" --> n_join
+  n_ok_d -- "changes" --> n_fix_d
+  n_fix_d --> n_review_d__merge
+  n_build_m --> n_review_m__merge
+  n_review_m --> n_ok_m
+  n_ok_m -- "approved" --> n_join
+  n_ok_m -- "3rd round" --> n_join
+  n_ok_m -- "changes" --> n_fix_m
+  n_fix_m --> n_review_m__merge
+  n_join --> n_integrate
+  n_integrate --> n_final_review__merge
+  n_final_review --> n_ok_final
+  n_ok_final -- "approved" --> n_done
+  n_ok_final -- "3rd round" --> n_open_issues
+  n_ok_final -- "changes" --> n_fix_final
+  n_fix_final --> n_final_review__merge
+  n_review_a__merge --> n_review_a
+  n_review_b__merge --> n_review_b
+  n_review_d__merge --> n_review_d
+  n_review_m__merge --> n_review_m
+  n_final_review__merge --> n_final_review
+  classDef done fill:#e6f4ea,stroke:#1e8e3e,color:#0d3b1e
+  classDef running fill:#e8f0fe,stroke:#1a73e8,color:#0b2a5b
+  classDef ready fill:#fef7e0,stroke:#b06000,color:#4a3600
+  classDef failed fill:#fce8e6,stroke:#c5221f,color:#5f0d06
+  classDef cancelled fill:#f1f3f4,stroke:#80868b,color:#3c4043
+  class n_start,n_split,n_build_a,n_review_a,n_ok_a,n_build_b,n_review_b,n_ok_b,n_fix_b,n_build_d,n_review_d,n_ok_d,n_build_m,n_review_m,n_ok_m,n_review_a__merge,n_review_b__merge,n_review_d__merge,n_review_m__merge done
+  class n_join ready
