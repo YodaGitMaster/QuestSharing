@@ -40,7 +40,8 @@ cutpdf/
 └── tools/                                            # Local UI emulation utilities, never shipped in the addon
     ├── build_coldridge_fixture.py                    # Regenerate tests/data/coldridge_valley.lua (14 gnome-mage quests + NPCs/objects/items/XP) from a local Classic QuestieDB checkout
     ├── build_cooking_reference.py                    # Rebuild pinned factual Cooking subset with upstream MIT attribution
-    ├── build_dungeon_lore.py                         # TODO: purpose
+    ├── build_dungeon_lore.py                         # Generate bundled dungeon/boss descriptions and abilities from cached journal data and curated intros
+    ├── dungeon_intros.json                          # Curated Forever dungeon introductions used by the lore generator
     ├── build_skinning_data.py                        # Regenerate QuestSharing/SkinningData.lua (creature -> skinning item + chance) from a CMaNGOS classic-db SQL dump
     ├── coldridge-network.html                        # Static view: Coldridge Valley quests -> mobs/objects -> 100-yd camps (network, map, intersection matrix), data baked in from tests/data/coldridge_valley.lua
     ├── lua-optimization-prompt.md                    # Lua 5.1 speed optimization prompt that applies proven (>= 20 %, benchmarked) fixes

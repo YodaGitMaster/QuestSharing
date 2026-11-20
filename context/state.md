@@ -9,6 +9,7 @@ Last updated: 2026-11-20
 <!-- /bpmn:state -->
 
 ## Goal
+- 2026-11-20: User requests the usual push/release; prepare v0.4.29 from cutpdf/main `703ff0dbf578a86aef0276484de39ab6f565044d`, publish through QuestSharing, preserve README-only distribution main. All 68 suites / 2,870 checks and 66 Lua 5.1 compilations pass; ZIP build/publication pending. No cutpdf refs change. Earlier uncommitted/unreleased notes are historical.
 - Fix the regressions found in the 2026-11-17 audit (planner A1–A5, map-search typing B1–B4, dungeon menu C1), decouple the planner from SPF and keep map step numbers readable, then release v0.4.22 once the user approves.
 
 ## Status (2026-11-17/18)
@@ -20,6 +21,7 @@ Last updated: 2026-11-20
 - The tree also holds the uncommitted classic Style.lua restyle from another session (see the Active task entry below). VendorMap.lua mixes both changes: `ensureUI` uses `S.panel`/`S.inset`.
 
 ## Active tasks & blockers
+- 2026-11-20: v0.4.29 candidate verified: 68 suites / 2,870 checks; 66 Lua 5.1 compilations; unchanged release builder --bump/--check/build passes. ZIP 68 files / 477,749 bytes / SHA256 `9d83872d4496eaaaeb073122c265eafdcfb8f3fa94666475976488a5d43defa3`, CRC and source identity pass. Next: source tag + GitHub Release/asset, README-only main, download verification. Native WoW checks remain.
 - 2026-11-20: LORE INTROS: every dungeon now has an intro. Classic dungeons use Blizzard's journal description; the 9 Forever dungeons use hand-written intros in `tools/dungeon_intros.json` (sourced from Wowhead's Forever guides, the Shaper's Terrace intro is thin, no guide text). `tools/build_dungeon_lore.py` reads that file. Bosses: Blizzard's journal text stays; no Wowhead boss stories were found for the new Forever bosses, so they have none.
 - 2026-11-20: TANK AGGRO SIMPLIFIED (user: 'I don't think it works at all ... remove everything and just put a number'): `Aggro.lua` rewritten (~130 lines): in a fight, a plain white `73%` (`GameFontHighlight`) over each in-combat living enemy nameplate; no colours, flame, portrait, ring, Losing-aggro, distance, picks or auto nameplates. Switching it on prints `A.status()` (threat API yes/no, enemy nameplates on/off, nameplate count) to diagnose 'shows nothing' in game. One-time restore of the old `ns.db.aggroCVarSaved` at PLAYER_ENTERING_WORLD. Pushed earlier version = ab917e9 (on main, not in a release). test_aggro 8/8. Next: user turns it on in game and reports the status line if no numbers show.
 - 2026-11-20: BAG SORT ROWS DONE (direct, no BPMN): US-1 rows layout + view (game bags 4/row per bag | one big bag N columns), US-3 crafting kinds as row groups, US-5 join partial stacks first. Files: BagTools.lua (rowKeys/groupOf/targets/mergeMove in T.plan), Core.lua (defaults + /qs sort layout|view|columns|crafts|merge), Settings.lua (5 Bags rows), tests/test_bagtools.py (+8 tests, 98/98). NOT checked in game: verify the Classic bag window rows start at slot 1 (short row = highest slots) and that a stack drop merges. Uncommitted. Not built: US-2 bag per group, US-4 custom group order, US-6 gear by slot.

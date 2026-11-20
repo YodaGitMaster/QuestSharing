@@ -794,3 +794,10 @@ Not done (needs data): mob level per objective for kill XP (assumes your own lev
 - `sortMergeStacks` off = no extra merge step only; the game still joins stacks when a sort move drops one stack onto the same item.
 - Not built (offered): US-2 one bag per group (breaks in one-bag views), US-4 custom group order, US-6 gear by slot/item level.
 - 2026-11-20 tank aggro reduced to a plain number on the nameplate (user). Supersedes the colours, flame, portrait/ring alarm, 'Losing aggro', near/band picks and the automatic nameplate switch. Kept: Highlight's ns.getCVar/ns.setCVar export (used once to restore the old saved nameplate value).
+
+
+## 2026-11-20 — Script-driven v0.4.29
+- User authorizes the usual push/release: pull cutpdf/main `703ff0dbf578a86aef0276484de39ab6f565044d`; publish source tag/ZIP to YodaGitMaster/QuestSharing and update its README-only main. Do not push local main or change cutpdf refs.
+- Isolated worktrees: `/tmp/questsharing-release-0.4.29` and `/tmp/questsharing-distribution-0.4.29`; preserve original checkout deletion of bugs.txt and removed mistaken commit.
+- Preserve v0.4.28 and earlier changelog sections byte-for-byte; retain only new notes, align TOC to last release, then use unchanged build_release.py --bump/--check/build. Full script checks include FAIL output and completed coverage because some runners exit zero on failure.
+- Old origin/local tag conflicts were left untouched; fetch branch tips with --no-tags. No published release or existing tag is replaced. Native game validation remains unavailable.
