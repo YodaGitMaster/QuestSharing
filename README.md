@@ -2,7 +2,7 @@
 
 A World of Warcraft addon for playing quests together.
 
-[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.29)
+[Download the latest release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.30)
 
 ## Your first party, in four steps
 1. **Install it** (see [Install](#install)) and log in. A short welcome in chat tells you it is ready. Everything is
@@ -467,9 +467,13 @@ For a group leader who wants a healer (or a tank, or damage dealers) without scr
    so click again to search again. Invited players get a whisper: "Hi! I invited you to my group for The Deadmines
    as healer."
 
-Who is invited: per role only what is still open (1 healer, 1 tank, 3 damage), highest level first; a player
-listed for two roles takes whichever is open. Tick **Supercharge** to fill every free spot at once (open invites count as spots, as in the game): the first to accept gets the spot, and extra players who accept may need to be removed. A decline frees the
-spot at once. Item levels: the party finder shows none, so the addon remembers players you inspected nearby and
+Levels: only the suggested levels of your listed dungeon (as the game shows them, e.g. 18-23), so nobody is
+too low or so high that the dungeon is trivial for them (or set your own range). Who is invited: the party is at most 1 tank, 1 healer and 3 damage, you included (set **I am** in the picker;
+members with an unknown role count as damage); per role only what is still open, highest level first; a player
+listed for two roles takes whichever is open. Only people really in your party count: an invite nobody answers never blocks the next Find. Tick **Supercharge** to invite every match at once (up to 10 per Find): the first to accept gets the spot, and extra players who accept may need to be removed. A decline frees the
+spot at once. Anyone you invited (no answer, declined, joined or left) is not invited again for an hour
+(`/qs lfg history`, `/qs lfg forget`). **Who goes first**: level and nearness to the dungeon (the zone each player is in,
+from the party finder), or only level, or only nearness. Item levels: the party finder shows none, so the addon remembers players you inspected nearby and
 asks other Quest Sharing users; with a lowest item level set, unknown players are invited or skipped as you choose.
 All options: right click the spyglass, or **Settings > Party finder**.
 
@@ -762,6 +766,8 @@ and **Route** (the pickup route inside the page). **< Dungeons** goes back. All 
 Boss descriptions and abilities come from the Encounter Journal text shipped with the addon (classic dungeons only): the
 Bosses page shows a facts line, the description, up to four abilities with their spell icons (hover: the full text) and
 **Needed for**, the quests of the dungeon that ask you to kill that boss (click one to open it on the Quests tab).
+Bosses of Forever-only dungeons get their portraits from the game itself: the first time you open their Bosses page
+the addon asks the client for each boss's model (out of combat, one at a time) and remembers it; `/qs bossdump` lists the found IDs.
 
 **Instance drops and who drops them.** Opening the **Instance drops** tab inside a recognized dungeon selects that dungeon
 and brings its navigation row into view. This also works after the catalogue finishes loading. Old item/dungeon
@@ -800,7 +806,7 @@ If an unloaded AtlasLoot module cannot load during combat, it is retried after c
 Lua mocks and actual AtlasLoot source data; the GUI still needs an in-game check.
 
 ## Install
-**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.29), unzip `QuestSharing-<version>.zip` and drop the
+**Easiest:** download the [latest Quest Sharing release](https://github.com/YodaGitMaster/QuestSharing/releases/tag/v0.4.30), unzip `QuestSharing-<version>.zip` and drop the
 `QuestSharing` folder into `Interface\AddOns`. Or:
 1. Copy the folder `QuestSharing` (the one containing `QuestSharing.toc`, not this README's folder) into
    the game's `Interface\AddOns` folder, so you have `...\AddOns\QuestSharing\QuestSharing.toc`.
