@@ -609,3 +609,5 @@
 - 2026-11-20: Turning aggro numbers on prints A.status() (threat API, enemy nameplates CVar, visible plate count). Ask the user for that line first when they say aggro shows nothing in game.
 
 - 2026-11-21: WoW runs every addon file before SavedVariables load, so a per-file "skip if off" guard cannot work. Gate at dispatch instead (ns.on / ns.after tags + Core dispatcher). Reset the module tag at the top-level event, or the last loaded file's tag sticks to UI callbacks.
+
+- 2026-11-21 v0.4.30 verification: 72 suites / 3,034 checks pass after two stale test assertions were corrected (95 affected checks rerun); 69 Lua 5.1 compilations pass. Runtime matches a37c9d7 except version.

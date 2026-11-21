@@ -331,8 +331,10 @@ def test_full_report_has_one_setting_per_line_and_complete_messages(style):
     assert "full message in details" in box.text
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(win.selectAll)
     assert "x" * 300 + "\nlast message line" in box.text
-    setting_lines = [line for line in box.text.splitlines() if re.search(r"\[[A-Za-z]+=[^]]+\]$", line)]
-    assert len(setting_lines) == int(g.eval("(function() local n=0; for k in pairs(NS.defaults) do n=n+1 end; return n end)()"))
+    setting_lines = [line for line in box.text.splitlines() if re.search(r"\[[A-Za-z_][A-Za-z0-9_]*=[^]]+\]$", line)]
+    setting_keys = [re.search(r"\[([A-Za-z_][A-Za-z0-9_]*)=", line).group(1) for line in setting_lines]
+    assert set(setting_keys) == set(g.eval("NS.defaults").keys())
+    assert len(setting_keys) == len(set(setting_keys)), "every setting appears exactly once"
     assert all(line.count("[") == 1 for line in setting_lines)
 
 

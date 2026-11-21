@@ -58,7 +58,7 @@ def test_every_tab_has_a_short_intro_and_sections(style):
     g.eval("NS.settingsTab")("finder")
     assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Roles", "Invite whisper", "Level and item level filters", "Picker and key", "Classes to invite", "Item levels of other players"]
     g.eval("NS.settingsTab")("general")
-    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Start here", "Messages and sounds", "During a fight"]
+    assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Start here", "Tools", "Messages and sounds", "During a fight"]
     g.eval("NS.settingsTab")("support")
     assert [plain(r.text.text) for r in rows(W) if r.line.shown] == ["Is something wrong?", "Errors", "Logs", "Reset"]
     g.eval("NS.settingsTab")("guide")

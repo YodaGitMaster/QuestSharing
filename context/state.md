@@ -9,6 +9,7 @@ Last updated: 2026-11-21
 <!-- /bpmn:state -->
 
 ## Goal
+- 2026-11-21: User requests the usual push/release again; preparing v0.4.30 from cutpdf/main `a37c9d7be81602b026d5faa0242009f6c9aa6050`, through QuestSharing source tag/ZIP and README-only main. No cutpdf refs change; original checkout/deletion preserved. Checks in progress; earlier uncommitted/unreleased notes are historical.
 - Fix the regressions found in the 2026-11-17 audit (planner A1–A5, map-search typing B1–B4, dungeon menu C1), decouple the planner from SPF and keep map step numbers readable, then release v0.4.22 once the user approves.
 
 ## Status (2026-11-17/18)
@@ -20,6 +21,7 @@ Last updated: 2026-11-21
 - The tree also holds the uncommitted classic Style.lua restyle from another session (see the Active task entry below). VendorMap.lua mixes both changes: `ensureUI` uses `S.panel`/`S.inset`.
 
 ## Active tasks & blockers
+- 2026-11-21: v0.4.30 candidate verified: 72 suites / 3,034 checks (full run plus affected-suite reruns), 69 Lua 5.1 compilations. Two stale assertion fixes only; runtime unchanged except TOC version. Unchanged builder checks/build pass. ZIP 71 files / 504,977 bytes / SHA256 `292dd3513b6cce78aea8d7df4b406ddaf9f810e88c372d77512ed885e796ce64`, source bytes/CRC pass. Next: tag/publish, README-only main, download verification.
 - 2026-11-21: TOOLS AS MODULES DONE (direct, uncommitted, mock harness only, NOT checked in game): new `QuestSharing/Modules.lua` (14 modules, `ns.inModule` tag in every module file, core files tag nil), Core gates events/timers/slash, Settings > General > Tools switches + Reload. Tests `tests/test_modules.py` 10/10; full suite green. Decision D17. In-game check: switch Dungeon journal off -> /qs dungeons says off; /reload with Bags off -> no bag marks/tooltips.
 - 2026-11-21: FOREVER BOSS PORTRAITS DONE (run r-20261121-041134-dd71 forever-boss-portraits-finish, outcome "Forever portraits done"; reviews approved; uncommitted, mock harness + render only, NOT checked in game). New `QuestSharing/BossPortraitResolver.lua` (hidden PlayerModel `SetCreature` -> `GetDisplayInfo`, one at a time, paused in combat/loading, cached in `QuestSharingDB.bossDisplays`, `/qs bossdump`); `DungeonBossesUI.lua` asks it for bosses with no art and no displayID (skull until found, then repaint). Ezra Grimm = npc 11058; The Butcher and Infurnus still no npc (skull). Render `context/renders/bosses_forever.png`. Checklist: `context/dungeon-journal-contract.md` "Forever boss portraits". Decision D16. Tests: resolver 42/42, bosses 88/88, bosses_ui 34/34, boss_data 20/20, dungeon_quests 138/138.
 - 2026-11-20: BOSSES FIX (runs r-20261120-194708-fb95 + r-20261120-220008-0d88, finished in the run above; uncommitted): Bosses tab lists only the official `DungeonEncounter` bosses (build 1.60.1.70959) in fight order from generated `QuestSharing/DungeonBossData.lua` (`tools/build_boss_data.py`, 28 areas, 241 bosses); `Loot.lua` `officialRows` attaches drops. Report `BUGS/2026-11-20-dungeon-bosses-random-mobs.md`. Contract `context/dungeon-journal-contract.md` "Bosses fix".

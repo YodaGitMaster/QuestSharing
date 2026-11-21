@@ -823,3 +823,11 @@ Not done (needs data): mob level per objective for kill XP (assumes your own lev
 - `sortMergeStacks` off = no extra merge step only; the game still joins stacks when a sort move drops one stack onto the same item.
 - Not built (offered): US-2 one bag per group (breaks in one-bag views), US-4 custom group order, US-6 gear by slot/item level.
 - 2026-11-20 tank aggro reduced to a plain number on the nameplate (user). Supersedes the colours, flame, portrait/ring alarm, 'Losing aggro', near/band picks and the automatic nameplate switch. Kept: Highlight's ns.getCVar/ns.setCVar export (used once to restore the old saved nameplate value).
+
+
+## 2026-11-21 — Script-driven v0.4.30
+- User says "again" following the usual push/release: source cutpdf/main `a37c9d7be81602b026d5faa0242009f6c9aa6050`, destination QuestSharing source tag/ZIP and README-only main. No cutpdf refs changed.
+- Isolated `/tmp/questsharing-release-0.4.30` and `/tmp/questsharing-distribution-0.4.30`; preserve original local main, removed mistaken commit and user deletion. Fetch --no-tags to preserve historical conflicting tags.
+- Preserve all published changelog sections, take only seven new notes, align to 0.4.29 and run unchanged build_release.py --bump/--check/build. Validate every test script via exit status, FAIL output and completed coverage, then Lua 5.1 compilation and downloaded/source/CRC identity. Native game validation remains unavailable.
+- Release-note wording follows final LFGInvite.inviteMatches behavior: normal mode counts per-Find role invitations, Supercharge can invite multiple matches for a still-open role (up to 10 total), and only actual members fill role slots across Finds. Removed the conflicting earlier hard-cap claim from the new notes; no runtime edits.
+- Release verification reproduced four stale assertion failures, not runtime failures: all 113 diagnostic settings were already present and General correctly includes Tools. Update only test_log.py identifier parsing/exact keys and test_look.py expected headings. Both full affected suites now pass; all 3,034 checks across 72 suites pass in full-run plus affected-rerun evidence. Methodology: BUGS/2026-11-21-module-settings-stale-verification.md.

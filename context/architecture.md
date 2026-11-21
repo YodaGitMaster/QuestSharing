@@ -13,7 +13,8 @@ cutpdf/
 │   ├── algo-plan-2026-11-17.md                       # Planner algorithm tuning plan (streams E-opt/E-plan: stability, horizon, calibration, yards) with outcome
 │   ├── architecture.md                               # Live source map and runtime diagrams
 │   ├── bpmn/                                         # BPMN plugin run index + last run per process (process.json/.bpmn, diagram.mmd) (49 files, collapsed)
-│   ├── BUGS/                                         # Verified bug methodology and regressions (50 files, collapsed)
+│   ├── BUGS/                                         # Verified bug methodology and regressions (51 files, collapsed)
+│   │   └── 2026-11-21-module-settings-stale-verification.md # Module-key identifier and Tools-heading verification assumptions
 │   ├── decisions.md                                  # Choices and rationale
 │   ├── diagrams/                                     # Dated Mermaid snapshots captured during BPMN runs (flowcharts, sequence diagrams) (198 files, collapsed)
 │   ├── dungeon-journal-contract.md                   # Dungeon Journal look stream contract (2026-11-20): file owners, ns.journalTheme/journalItems/page-module APIs, integration follow-ups, in-game checklist
