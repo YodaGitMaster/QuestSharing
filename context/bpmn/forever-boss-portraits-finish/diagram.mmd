@@ -1,0 +1,40 @@
+flowchart LR
+  %% Forever boss portraits: review, integrate, render · 3 agents: 2 × bpmn:reviewer, 1 × bpmn:worker · up to 11 with loop rounds
+  subgraph n_lane_builder["🤖 Builder · bpmn:worker · ⏱ 90 min"]
+    n_start(("Resolver built, not reviewed"))
+    n_fix_r["⚙ Fix portrait resolver · ⏱ 45 min"]
+    n_integrate["⚙ Integrate and render"]
+    n_fix_final["⚙ Fix final portrait issues · ⏱ 45 min"]
+    n_review_r__merge{"✕"}
+    n_final_review__merge{"✕"}
+  end
+  subgraph n_lane_reviewer["🤖 Reviewer · bpmn:reviewer · ⏱ 45 min"]
+    n_review_r["⚙ Review portrait resolver"]
+    n_ok_r{"R approved?"}
+    n_final_review["⚙ Review Forever portraits"]
+    n_ok_final{"Final approved?"}
+    n_done((("Forever portraits done")))
+    n_open_issues((("Done with open issues")))
+    n_integrate__merge{"✕"}
+  end
+  n_start --> n_review_r__merge
+  n_review_r --> n_ok_r
+  n_ok_r -- "approved" --> n_integrate__merge
+  n_ok_r -- "3rd round" --> n_integrate__merge
+  n_ok_r -- "changes" --> n_fix_r
+  n_fix_r --> n_review_r__merge
+  n_integrate --> n_final_review__merge
+  n_final_review --> n_ok_final
+  n_ok_final -- "approved" --> n_done
+  n_ok_final -- "3rd round" --> n_open_issues
+  n_ok_final -- "changes" --> n_fix_final
+  n_fix_final --> n_final_review__merge
+  n_review_r__merge --> n_review_r
+  n_integrate__merge --> n_integrate
+  n_final_review__merge --> n_final_review
+  classDef done fill:#e6f4ea,stroke:#1e8e3e,color:#0d3b1e
+  classDef running fill:#e8f0fe,stroke:#1a73e8,color:#0b2a5b
+  classDef ready fill:#fef7e0,stroke:#b06000,color:#4a3600
+  classDef failed fill:#fce8e6,stroke:#c5221f,color:#5f0d06
+  classDef cancelled fill:#f1f3f4,stroke:#80868b,color:#3c4043
+  class n_start,n_review_r,n_ok_r,n_integrate,n_final_review,n_ok_final,n_done,n_review_r__merge,n_integrate__merge,n_final_review__merge done

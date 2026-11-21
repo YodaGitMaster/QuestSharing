@@ -1,5 +1,6 @@
 -- One explorer shared by quest rewards, dungeon drops and dungeon quests.
 local ADDON, ns = ...
+ns.inModule(nil)          -- core: always on (Modules.lua)
 local E, U, S = {}, ns.optionalUI, ns.style
 ns.equipmentUI = E
 local host, active, pages, tabs = nil, nil, {}, {}

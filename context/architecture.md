@@ -1,5 +1,5 @@
 # Architecture
-Last updated: 2026-11-20
+Last updated: 2026-11-21
 
 ## File tree
 <!-- bpmn:file-tree -->
@@ -12,10 +12,10 @@ cutpdf/
 ├── context/                                          # Session continuity and live architecture
 │   ├── algo-plan-2026-11-17.md                       # Planner algorithm tuning plan (streams E-opt/E-plan: stability, horizon, calibration, yards) with outcome
 │   ├── architecture.md                               # Live source map and runtime diagrams
-│   ├── bpmn/                                         # BPMN plugin run index + last run per process (process.json/.bpmn, diagram.mmd) (34 files, collapsed)
-│   ├── BUGS/                                         # Verified bug methodology and regressions (49 files, collapsed)
+│   ├── bpmn/                                         # BPMN plugin run index + last run per process (process.json/.bpmn, diagram.mmd) (49 files, collapsed)
+│   ├── BUGS/                                         # Verified bug methodology and regressions (50 files, collapsed)
 │   ├── decisions.md                                  # Choices and rationale
-│   ├── diagrams/                                     # Dated Mermaid snapshots captured during BPMN runs (flowcharts, sequence diagrams) (185 files, collapsed)
+│   ├── diagrams/                                     # Dated Mermaid snapshots captured during BPMN runs (flowcharts, sequence diagrams) (198 files, collapsed)
 │   ├── dungeon-journal-contract.md                   # Dungeon Journal look stream contract (2026-11-20): file owners, ns.journalTheme/journalItems/page-module APIs, integration follow-ups, in-game checklist
 │   ├── fix-plan-2026-11-17.md                        # Audit fix plan (streams A/B/C) with per-bug results of the fix-all run
 │   ├── insights.md                                   # Timestamped findings
@@ -24,7 +24,7 @@ cutpdf/
 │   ├── quest-narration-research.md                   # Separate local voice-acting addon proposals and verified source limits
 │   ├── quest-optimization-research.md                # Prior art and proposed quest graph/route optimizer design
 │   ├── quest-planner-routing-and-validation-plan.md  # SPF integration behavior, automated coverage and pending in-game checks
-│   ├── renders/                                      # Dungeon Journal PNG previews from tools/render_journal.py (home, home_search, quests, quests_class, quests_chain, bosses, map, route) + reference/ shots
+│   ├── renders/                                      # Dungeon Journal PNG previews from tools/render_journal.py (home, home_search, quests, quests_class, quests_chain, bosses, bosses_forever, map, route) + reference/ shots
 │   │   └── index.html                                # Gallery: each render next to the Dungeon Journal reference shot
 │   ├── schema.md                                     # Data structures and formats
 │   ├── shortest-path-source-study.md                 # External router implementation trace; no runtime dependency
@@ -34,15 +34,17 @@ cutpdf/
 │   ├── ux-review-verdicts-2026-11-19.json            # Verifier verdicts per UX id (confirmed/partly/refuted + fix notes) used by the ux-fix builders
 │   └── walkable-routing-research.md                  # Terrain-routing feasibility, provider sources and proposed integration (not implemented)
 ├── questidea.txt                                     # User-provided predictive quest optimizer design requirements
-├── QuestSharing/                                     # WoW addon runtime (52 files, collapsed; LFGInvite.lua = party finder (needs own listing) search + auto-invite by activity/role/class/level/item level, highest level first, LFGFinderUI.lua = spyglass picker window, ItemLevel.lua = inspect + remembered/shared item levels, BagTools.lua = bag bookmarks / sell grays / arrange (packed or a row per group, game-bag or one-bag rows, stack merge), ChatLock.lua = no chat box in combat, Aggro.lua = tank aggro % as a plain number over enemy nameplates in a fight) (61 files, collapsed; CampMap.lua = Quest guide shared camps on the world map + camps table; DungeonQuestData.lua = Wowhead per-dungeon quest lists (quest -> dungeon area) + names of the 9 new Forever dungeons; DungeonRoute.lua = 'get them all' route: walk/flight/boat/hearth graph, Dijkstra legs, precedence-aware stop order) (68 files, collapsed)
+├── QuestSharing/                                     # WoW addon runtime (52 files, collapsed; LFGInvite.lua = party finder (needs own listing) search + auto-invite by activity/role/class/level/item level, highest level first, LFGFinderUI.lua = spyglass picker window, ItemLevel.lua = inspect + remembered/shared item levels, BagTools.lua = bag bookmarks / sell grays / arrange (packed or a row per group, game-bag or one-bag rows, stack merge), ChatLock.lua = no chat box in combat, Aggro.lua = tank aggro % as a plain number over enemy nameplates in a fight) (61 files, collapsed; CampMap.lua = Quest guide shared camps on the world map + camps table; DungeonQuestData.lua = Wowhead per-dungeon quest lists (quest -> dungeon area) + names of the 9 new Forever dungeons; DungeonRoute.lua = 'get them all' route: walk/flight/boat/hearth graph, Dijkstra legs, precedence-aware stop order; DungeonBossData.lua = generated official boss list per dungeon (ns.dungeonBossData); BossPortraitResolver.lua = in-game boss display IDs via a hidden PlayerModel, cached in QuestSharingDB.bossDisplays, /qs bossdump; Modules.lua = tool modules registry: ns.inModule tag per file, ns.moduleOn gate, Settings > General > Tools) (71 files, collapsed)
 ├── README.md                                         # User documentation
-├── tests/                                            # Python tests and Lua API harness (collapsed; test_aggro.py = tank aggro marks, test_lfg_invite.py = party finder, test_item_level.py = item levels, test_coldridge_valley.py = optimizer reference case on real QuestieDB rows; test_camp_map.py = shared camps map + table; data/coldridge_valley.lua = its generated fixture) (63 files + data/, collapsed) (70 files, collapsed)
+├── tests/                                            # Python tests and Lua API harness (collapsed; test_aggro.py = tank aggro marks, test_lfg_invite.py = party finder, test_item_level.py = item levels, test_coldridge_valley.py = optimizer reference case on real QuestieDB rows; test_camp_map.py = shared camps map + table; data/coldridge_valley.lua = its generated fixture; test_dungeon_boss_data.py = generated boss list; test_boss_portrait_resolver.py = resolver queue/pauses/stale guard + Bosses page repaint; test_dungeon_journal_bosses_ui.py = Bosses page layout and portrait chain; test_modules.py = module switches gate events/timers/commands/settings) (63 files + data/, collapsed) (73 files, collapsed)
 └── tools/                                            # Local UI emulation utilities, never shipped in the addon
+    ├── build_boss_data.py                            # Regenerate QuestSharing/DungeonBossData.lua (official DungeonEncounter boss list per dungeon, npc/EJ art/display IDs; Wowhead classic pages + Forever search suggestions, cached in /tmp/bossdata; --offline byte-identical)
     ├── build_coldridge_fixture.py                    # Regenerate tests/data/coldridge_valley.lua (14 gnome-mage quests + NPCs/objects/items/XP) from a local Classic QuestieDB checkout
     ├── build_cooking_reference.py                    # Rebuild pinned factual Cooking subset with upstream MIT attribution
-    ├── build_dungeon_lore.py                         # TODO: purpose
+    ├── build_dungeon_lore.py                         # Regenerate QuestSharing/DungeonLore.lua (dungeon + boss descriptions, abilities) from wago.tools retail Journal DB2 CSVs (/tmp/ejdata) + tools/dungeon_intros.json
     ├── build_skinning_data.py                        # Regenerate QuestSharing/SkinningData.lua (creature -> skinning item + chance) from a CMaNGOS classic-db SQL dump
     ├── coldridge-network.html                        # Static view: Coldridge Valley quests -> mobs/objects -> 100-yd camps (network, map, intersection matrix), data baked in from tests/data/coldridge_valley.lua
+    ├── dungeon_intros.json                           # Hand-written intros of the 9 Forever dungeons (from Wowhead Forever guides), read by build_dungeon_lore.py
     ├── lua-optimization-prompt.md                    # Lua 5.1 speed optimization prompt that applies proven (>= 20 %, benchmarked) fixes
     ├── lua-performance-review-prompt.md              # Reusable Lua 5.1 speed review prompt (hot paths, dictionaries, fewer loops, no per-loop allocs)
     ├── lua-syntax-review-prompt.md                   # Reusable Lua 5.1 syntax/bug review prompt (parse, 5.2+ leaks, globals, nil traps)
@@ -76,6 +78,8 @@ flowchart LR
 flowchart TD
     TOC[QuestSharing.toc] --> Compat[Compat.lua: ns.compat]
     TOC --> Core[Core.lua: events, settings, timers]
+    Core --> Modules[Modules.lua: ns.MODULES, ns.moduleOn gate on ns.on / ns.after / slash / entry points]
+    Modules --> SettingsTools[Settings.lua General > Tools: module_<id> switches, Reload]
     Core --> Diagnostics[Diagnostics.lua: log / errors / doctor combined snapshot]
     Settings --> Diagnostics
     Diagnostics --> DiagnosticStore[QuestSharingLog and QuestSharingDB.errors: bounded saved records]
@@ -242,7 +246,11 @@ flowchart TD
     Items -->|click item a boss here drops: setOpener| DQ
     QuestsPage -->|Plan route| RoutePage
     QuestsPage -->|Share button: shareLine, repaint on GROUP_ROSTER_UPDATE / QUEST_LOG_UPDATE| Game[WoW quest share]
-    Bosses -->|L.bossesOf name, done, area| Loot[Loot.lua: AtlasLoot encounter tables, else QuestieDB scan in background + bossWaiters]
+    Bosses -->|L.bossesOf name, done, area| Loot[Loot.lua: AtlasLoot encounter tables, else QuestieDB scan in background + bossWaiters; officialRows: official list = only rows, drops attach items]
+    BossGen[tools/build_boss_data.py: DungeonEncounter 1.60.1.70959 + Wowhead classic pages / Forever suggestions, cached /tmp/bossdata] -->|generates offline| BossData[DungeonBossData.lua: ns.dungeonBossData B.bosses by area, B.list]
+    Loot --> BossData
+    Bosses -->|B.portrait: ejFile, by-name EJ art classic areas only, displayID, else R.displayFor / R.request, else skull| Resolver[BossPortraitResolver.lua: hidden PlayerModel SetCreature -> GetDisplayInfo, FIFO max 12, paused in combat / loading]
+    Resolver --> BossCache[(QuestSharingDB.bossDisplays npcID -> displayID; /qs bossdump)]
     MapPage --> CMap[C_Map map group + art layers, else WorldMap folder tiles; local CLASSIC table of 19 dungeons]
     RoutePage --> Route[DungeonRoute.lua]
 ```
@@ -407,6 +415,35 @@ sequenceDiagram
     D->>D: openDungeon(area,"quests"), select the quest on its page
     User->>D: Plan route (Quests page) -> D.openDungeon(area,"route")
     User->>D: < Dungeons -> D.home(): hide module, levelError cleared, home view again
+```
+
+### Forever boss portraits: in-game display resolver (2026-11-21, BossPortraitResolver.lua)
+```mermaid
+sequenceDiagram
+    participant UI as DungeonBossesUI.lua B.portrait
+    participant R as BossPortraitResolver.lua
+    participant M as hidden PlayerModel (1x1, alpha 0, UIParent, lazy)
+    participant DB as QuestSharingDB.bossDisplays
+    UI->>UI: no ejFile, no by-name EJ art (area < 16000 only), no boss.displayID
+    UI->>R: R.displayFor(npcID)
+    R->>DB: bossDisplays[npcID]
+    alt cached
+        R-->>UI: displayID -> staged display portrait
+    else unknown
+        UI->>R: ask(): R.request(npcID, done) once per page (view.asked), shows the muted skull
+        R->>R: FIFO queue (max 12), one lookup at a time; pump() skips while InCombatLockdown or loading
+        R->>M: c.before = GetDisplayInfo(); ClearModel(); SetCreature(npcID)
+        alt OnModelLoaded (c.loaded) or 0.2 s timer read, up to 5 tries
+            M-->>R: GetDisplayInfo() > 0 (equal to previous / before only after OnModelLoaded)
+            R->>DB: bossDisplays[npcID] = displayID
+            R-->>UI: done(displayID): same view.token -> repaintNpc(row + header)
+        else 5 tries without a value
+            R->>R: failed[npcID] = true (this session; skull stays)
+        end
+    end
+    Note over R,M: PLAYER_REGEN_DISABLED / PLAYER_LEAVING_WORLD: interrupt(), active lookup back to the queue front; PLAYER_REGEN_ENABLED / PLAYER_ENTERING_WORLD: pump()
+    Note over UI,R: B.show of another area and B.hide call R.clear() (queued lookups + callbacks dropped)
+    Note over R: /qs bossdump prints sorted npcID=displayID lines + session misses
 ```
 
 ```mermaid

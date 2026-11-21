@@ -24,6 +24,7 @@
 --            that links your quests of this area (you cannot know theirs)     {zone} the zone
 --   A message that starts with @invite invites your target to your party and whispers them the rest of the text.
 local ADDON, ns = ...
+ns.inModule("quick")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 
 BINDING_HEADER_QUESTSHARING = "Quest Sharing"

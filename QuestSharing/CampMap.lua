@@ -3,6 +3,7 @@
 -- (mobs, spawns and quests) and click (waypoint). Shared camps window: network, map and matrix (camps x objectives).
 -- Optional (Settings > Quest guide, off by default). Reads ns.questPlanner.campView(); draws addon-owned frames only.
 local ADDON, ns = ...
+ns.inModule("guide")          -- Modules.lua: Settings > General > Tools can switch this off
 local U, S = ns.optionalUI, ns.style
 local C = {}
 ns.campMap = C

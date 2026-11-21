@@ -1,5 +1,6 @@
 -- Cooperative guide/map database work: one small shared slice, and nothing polls when idle.
 local ADDON, ns = ...
+ns.inModule(nil)          -- core: always on (Modules.lua)
 local W, jobs, queue, timer, running = {}, {}, {}, nil, nil
 ns.dataWork = W
 local BUDGET_MS, MAX_STEPS, INTERVAL = 2, 80, 0.1

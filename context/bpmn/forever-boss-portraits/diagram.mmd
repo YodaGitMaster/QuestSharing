@@ -1,0 +1,63 @@
+flowchart LR
+  %% Forever boss portraits: in-game resolver and missing npc ids · 6 agents: 3 × bpmn:worker, 3 × bpmn:reviewer · up to 18 with loop rounds
+  subgraph n_lane_builder["🤖 Builder · bpmn:worker · ⏱ 60 min"]
+    n_start(("Forever bosses lack portraits"))
+    n_split{"+"}
+    n_build_r["⚙ Build portrait resolver"]
+    n_fix_r["⚙ Fix portrait resolver"]
+    n_build_g["⚙ Fill missing boss npc ids"]
+    n_fix_g["⚙ Fix npc id fill"]
+    n_integrate["⚙ Integrate and render · ⏱ 60 min"]
+    n_fix_final["⚙ Fix final portrait issues · ⏱ 40 min"]
+    n_review_r__merge{"✕"}
+    n_review_g__merge{"✕"}
+    n_final_review__merge{"✕"}
+  end
+  subgraph n_lane_reviewer["🤖 Reviewer · bpmn:reviewer · ⏱ 30 min"]
+    n_review_r["⚙ Review portrait resolver"]
+    n_ok_r{"R approved?"}
+    n_merge_r{"R settled"}
+    n_review_g["⚙ Review npc id fill"]
+    n_ok_g{"G approved?"}
+    n_merge_g{"G settled"}
+    n_join{"+"}
+    n_final_review["⚙ Review Forever portraits"]
+    n_ok_final{"Final approved?"}
+    n_done((("Forever portraits done")))
+    n_open_issues((("Done with open issues")))
+  end
+  n_start --> n_split
+  n_split --> n_build_r
+  n_split --> n_build_g
+  n_build_r --> n_review_r__merge
+  n_review_r --> n_ok_r
+  n_ok_r -- "approved" --> n_merge_r
+  n_ok_r -- "3rd round" --> n_merge_r
+  n_ok_r -- "changes" --> n_fix_r
+  n_fix_r --> n_review_r__merge
+  n_merge_r --> n_join
+  n_build_g --> n_review_g__merge
+  n_review_g --> n_ok_g
+  n_ok_g -- "approved" --> n_merge_g
+  n_ok_g -- "3rd round" --> n_merge_g
+  n_ok_g -- "changes" --> n_fix_g
+  n_fix_g --> n_review_g__merge
+  n_merge_g --> n_join
+  n_join --> n_integrate
+  n_integrate --> n_final_review__merge
+  n_final_review --> n_ok_final
+  n_ok_final -- "approved" --> n_done
+  n_ok_final -- "3rd round" --> n_open_issues
+  n_ok_final -- "changes" --> n_fix_final
+  n_fix_final --> n_final_review__merge
+  n_review_r__merge --> n_review_r
+  n_review_g__merge --> n_review_g
+  n_final_review__merge --> n_final_review
+  classDef done fill:#e6f4ea,stroke:#1e8e3e,color:#0d3b1e
+  classDef running fill:#e8f0fe,stroke:#1a73e8,color:#0b2a5b
+  classDef ready fill:#fef7e0,stroke:#b06000,color:#4a3600
+  classDef failed fill:#fce8e6,stroke:#c5221f,color:#5f0d06
+  classDef cancelled fill:#f1f3f4,stroke:#80868b,color:#3c4043
+  class n_start,n_split,n_build_g,n_review_g,n_ok_g,n_merge_g,n_review_g__merge done
+  class n_build_r failed
+  class n_join ready

@@ -2,6 +2,7 @@
 -- cards (client loading-screen art, title band, LV range, open/total quests, a tick when nothing is left).
 -- Contract: context/dungeon-journal-contract.md
 local ADDON, ns = ...
+ns.inModule("dungeons")          -- Modules.lua: Settings > General > Tools can switch this off
 local H = {}
 ns.dungeonHomeUI = H
 local T = ns.journalTheme

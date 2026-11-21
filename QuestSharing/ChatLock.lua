@@ -2,6 +2,7 @@
 -- when the fight starts. It works again as soon as the fight is over. Only the typing box is blocked: you still read chat,
 -- and the quick chat ring still sends its messages directly.
 local ADDON, ns = ...
+ns.inModule("combat")          -- Modules.lua: Settings > General > Tools can switch this off
 
 local L = {}
 ns.chatLock = L

@@ -2,6 +2,7 @@
 -- route times use their own pace. Watches only while the guide is open; no timers, nothing runs at login.
 -- Public: get(), reset(), killSeconds(), interactionSeconds(), describe().
 local ADDON, ns = ...
+ns.inModule("guide")          -- Modules.lua: Settings > General > Tools can switch this off
 
 local K = {}
 ns.questCalibration = K

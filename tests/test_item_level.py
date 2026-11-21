@@ -142,6 +142,9 @@ def test_character_level_range(style):
     g.slash("lfg level 24 30")
     g.eval("NS.lfgInvite.scan")()
     assert g.invited() == ["Lia"]
+    assert g.eval("NS.db.lfgLevelMode") == "manual"
+    g.slash("lfg level dungeon")
+    assert g.eval("NS.db.lfgLevelMode") == "dungeon"
 
 
 def test_forget_clears_the_numbers(style):

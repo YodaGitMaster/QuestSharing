@@ -7,6 +7,7 @@
 -- Using an item is a protected action: these are secure item buttons, prepared outside combat (in combat they keep
 -- what they had, and the tracker icons are put in place again when the fight is over).
 local ADDON, ns = ...
+ns.inModule("items")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 
 local MAX_ICONS = 8

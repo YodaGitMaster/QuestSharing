@@ -1,6 +1,7 @@
 -- Player-triggered quest invitations: a direct chat question, plus an optional role-play editor.
 -- Never sends chat itself, even when the other features use immediate sending.
 local ADDON, ns = ...
+ns.inModule("sharing")          -- Modules.lua: Settings > General > Tools can switch this off
 local A, C, U, S = {}, ns.compat, ns.optionalUI, ns.style
 ns.adventure = A
 local W, selected, wording = nil, nil, 1

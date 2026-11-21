@@ -7,6 +7,7 @@
 -- Every call into the game is wrapped, because the newest clients hide some values from addons in combat
 -- and in instances.
 local ADDON, ns = ...
+ns.inModule("markers")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 
 local TEXTURE = "Interface\\TargetingFrame\\PortraitQuestBadge"       -- the gold quest badge

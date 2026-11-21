@@ -2,6 +2,7 @@
 -- Interface\WorldMap tiles), floor buttons, mouse-wheel zoom 1-4x and drag to pan. Client textures only.
 -- Contract: context/dungeon-journal-contract.md
 local ADDON, ns = ...
+ns.inModule("dungeons")          -- Modules.lua: Settings > General > Tools can switch this off
 local M = {}
 ns.dungeonMapUI = M
 local U, E = ns.optionalUI, ns.equipmentUI

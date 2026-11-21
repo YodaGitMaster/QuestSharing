@@ -11,6 +11,7 @@
 --     joins partial stacks of the same item.
 -- Only the game's own bags are handled (bag replacement addons use their own buttons).
 local ADDON, ns = ...
+ns.inModule("bags")          -- Modules.lua: Settings > General > Tools can switch this off
 
 local T = {}
 ns.bagTools = T

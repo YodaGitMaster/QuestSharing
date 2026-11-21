@@ -750,7 +750,7 @@ def test_every_saved_option_has_a_row_in_the_window(style):
 
 def test_tunable_waits_are_settings_rows_and_change_behaviour(style):
     g = fresh(style)
-    for key, default in (("sortDelay", 3), ("chatLockNotice", 20), ("friendsReserve", 5), ("lfgReinvite", 5), ("ilvlKeepDays", 14)):
+    for key, default in (("sortDelay", 3), ("chatLockNotice", 20), ("friendsReserve", 5), ("lfgBlockMinutes", 60), ("ilvlKeepDays", 14)):
         assert g.eval(f"NS.db.{key}") == default, key
         assert idx(g, key), f"{key} has no Settings row"
         click(g, key)

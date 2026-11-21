@@ -87,16 +87,19 @@ ns.defaults = {
     lfgTank = false,    -- ... listed as tank
     lfgDps = false,     -- ... listed as damage
     lfgWatch = false,   -- (off) also invite from searches made in the game's own party finder window
+    lfgMyRole = "auto", -- party finder: my own role in the party ("auto", "tank", "healer" or "damage")
     lfgSupercharge = false, -- (off) party finder: invite every match at once, the first to accept gets the spot
     lfgWhisper = true,  -- party finder: whisper each invited player which dungeon the invite is for
     lfgWhisperText = "Hi! I invited you to my group for {dungeon} as {role}.", -- {dungeon} and {role} are filled in
+    lfgLevelMode = "dungeon", -- party finder levels: "dungeon" (the listed dungeon's suggested levels) or "manual"
     lfgMinLevel = 1,    -- party finder: lowest character level to invite
     lfgMaxLevel = 60,   -- ... highest character level to invite
     lfgMinIlvl = 0,     -- ... lowest average item level to invite (0 = any)
     lfgUnknown = "invite", -- ... when the item level is unknown: "invite" or "skip" (only with a minimum)
     lfgAskIlvl = true,  -- ... ask Quest Sharing users for their item level first (waits up to 2 s)
     ilvlKeepDays = 14,  -- days a remembered item level stays valid (1-60)
-    lfgReinvite = 5,    -- party finder: minutes before a player we invited (or skipped) is looked at again (1-30)
+    lfgBlockMinutes = 60, -- party finder: minutes before anyone we invited (answered, joined or left) is invited again
+    lfgOrder = "balanced", -- party finder order: "balanced" (level and nearness), "level" or "near" (to the dungeon)
     ilvlInspect = true, -- remember the item level of players I target or point at nearby (inspect)
     ilvlShare = true,   -- tell other Quest Sharing users my item level and the ones I remember
 }
@@ -243,7 +246,7 @@ ns.frame = frame
 
 function ns.after(delay, fn)
     -- from: the line that set it, kept raw (made readable only when an error needs it)
-    local t = { at = GetTime() + delay, fn = fn, from = debugstack and debugstack(2, 1, 0) or nil }
+    local t = { at = GetTime() + delay, fn = fn, from = debugstack and debugstack(2, 1, 0) or nil, mod = ns.currentModule }
     timers[#timers + 1] = t
     return t
 end
@@ -262,21 +265,26 @@ frame:SetScript("OnUpdate", function(_, dt)
         local t = timers[i]
         if t and now >= t.at then
             table.remove(timers, i)
-            local run = { from = t.from }
-            ns.running = run
-            local ok, err = xpcall(t.fn, withStack)
-            ns.running = nil
-            run.at, ns.lastRan = GetTime(), run
-            if not ok then logFailure("timer", err) end
+            if not ns.moduleOn or ns.moduleOn(t.mod) then       -- a switched-off module's timers are dropped
+                local run = { from = t.from }
+                ns.running = run
+                ns.currentModule = t.mod
+                local ok, err = xpcall(t.fn, withStack)
+                ns.currentModule = nil
+                ns.running = nil
+                run.at, ns.lastRan = GetTime(), run
+                if not ok then logFailure("timer", err) end
+            end
         end
     end
 end)
 
 -- Events -----------------------------------------------------------------------------------------
 local handlers = {}
+local eventDepth = 0
 function ns.on(event, fn)
     handlers[event] = handlers[event] or {}
-    table.insert(handlers[event], fn)
+    table.insert(handlers[event], { fn = fn, mod = ns.currentModule })     -- mod: Modules.lua, nil = core
     pcall(frame.RegisterEvent, frame, event)        -- an event this client does not know must not break us
 end
 
@@ -293,10 +301,18 @@ frame:SetScript("OnEvent", function(_, event, ...)
         ns.running = { event = event }
     end
     local n, args = select("#", ...), { ... }
-    for _, fn in ipairs(list) do
-        local ok, err = xpcall(function() return fn(event, unpack(args, 1, n)) end, withStack)
-        if not ok then logFailure(event, err) end
+    local outerMod = eventDepth > 0 and ns.currentModule or nil   -- at the top no stale tag from the last loaded file
+    eventDepth = eventDepth + 1
+    for _, h in ipairs(list) do
+        if not ns.moduleOn or ns.moduleOn(h.mod) then              -- a switched-off module hears nothing
+            ns.currentModule = h.mod
+            local fn = h.fn
+            local ok, err = xpcall(function() return fn(event, unpack(args, 1, n)) end, withStack)
+            if not ok then logFailure(event, err) end
+        end
     end
+    eventDepth = eventDepth - 1
+    ns.currentModule = outerMod
     if not BLOCK_EVENTS[event] then
         local run = ns.running
         ns.running = outer
@@ -314,6 +330,7 @@ ns.on("ADDON_LOADED", function(_, name)
     QuestSharingDB.dbVersion = ns.defaults.dbVersion
     QuestSharingDB.itemButton, QuestSharingDB.itemButtonPos = nil, nil     -- the on-screen item button was removed
     ns.db = QuestSharingDB
+    if ns.wrapModuleEntryPoints then ns.wrapModuleEntryPoints() end   -- every file is loaded now
     if ns.refreshSettings then ns.refreshSettings() end
 end)
 
@@ -425,6 +442,7 @@ function ns.setSetting(key, value)
         ns.setNear(value)                         -- saves / restores the tracker list itself
     else
         d[key] = value
+        if ns.moduleChanged and ns.moduleChanged(key, value) and ns.refreshSettings then ns.refreshSettings() end
         if key == "debug" and value and ns.logSession then ns.logSession("debug log on") end
         if PARTY_CHAT[key] and value and d.mode ~= "send" then ns.print(sendNote(key)) end
         if (key == "fishingMap" or key == "enabled") and ns.fishing then ns.fishing.refresh() end
@@ -502,6 +520,7 @@ end
 local help = {
     "/qs loot [search]    search instance drops and the boss or creature that drops each item",
     "/qs dungeons [search]  browse dungeon quests, pickup locations and prerequisites",
+    "/qs bossdump         boss portrait IDs the game found (npcID=displayID), to send to the author",
     "/qs lfg              party finder: search your listing's dungeon and invite (also: healer|tank|dps on|off, ilvl <n>, level <low> <high>, unknown invite|skip, watch on|off)",
     "/qs ilvl             your item level and how many players' item levels are remembered",
     "/qs adventure [quest ID or title]  open the Quest invitation window (any chat)",
@@ -588,6 +607,7 @@ SlashCmdList["QUESTSHARING"] = function(msg)
     local cmd, arg = string.match(msg or "", "^(%S*)%s*(.-)%s*$")
     cmd = string.lower(cmd or "")
     local d = ns.db
+    if ns.commandAllowed and not ns.commandAllowed(cmd) then return end
     if cmd == "share" then ns.shareClick()
     elseif cmd == "loot" then ns.loot.open(arg)
     elseif cmd == "dungeons" or cmd == "dungeonquests" then ns.dungeonQuests.open(arg)

@@ -1,5 +1,6 @@
 -- Status.lua: what to say about a quest you click in the tracker, and the hooks that notice the click.
 local ADDON, ns = ...
+ns.inModule("sharing")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 
 local ICON = "{rt1}"        -- the star raid icon; the only picture a chat message can carry

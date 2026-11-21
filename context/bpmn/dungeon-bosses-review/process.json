@@ -1,0 +1,145 @@
+{
+  "id": "dungeon-bosses-review",
+  "name": "Final review of the bosses fix",
+  "runTimeout": 180,
+  "context": {
+    "prompt": "Record the bosses fix: official boss list from Blizzard DungeonEncounter (Forever build 1.60.1) via tools/build_boss_data.py -> QuestSharing/DungeonBossData.lua, L.bossesOf listing only official bosses, the portrait chain, the calmer Bosses page layout, renders, and what is unverified in game. Write a context/BUGS report for 'random mobs listed as bosses' (root cause + method)."
+  },
+  "lanes": [
+    {
+      "id": "builder",
+      "name": "Builder",
+      "agent": "bpmn:worker",
+      "timeout": 40
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "agent": "bpmn:reviewer",
+      "timeout": 20
+    }
+  ],
+  "data": {
+    "integ": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "vF": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "fF": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "name": "Integration done"
+    },
+    {
+      "id": "final_review",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review the bosses fix",
+      "in": [
+        "integ",
+        "fF?"
+      ],
+      "out": "vF",
+      "prompt": "Final review of the bosses fix ({{integ.summary}}). Does it fix the user complaint: only real bosses (check several dungeons against /tmp/ejdata/f_DungeonEncounter.csv), every boss has a portrait icon, calm formatting (look at context/renders/bosses*.png vs /tmp/dj_images/dj3.png)? Full suite green (run it). Rules: nothing copied from /tmp/dj_addon, client textures only, data sources documented. Report {status, issues}.",
+      "timeout": 25
+    },
+    {
+      "id": "ok_final",
+      "type": "xor",
+      "name": "Final approved?"
+    },
+    {
+      "id": "fix_final",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix final bosses issues",
+      "in": [
+        "vF"
+      ],
+      "out": "fF",
+      "timeout": 40,
+      "prompt": "Fix these final review issues of the bosses fix (keep the full suite green, re-render if the look changed): {{vF.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "done",
+      "type": "end",
+      "name": "Bosses fixed"
+    },
+    {
+      "id": "open_issues",
+      "type": "end",
+      "name": "Done with open issues"
+    }
+  ],
+  "flows": [
+    {
+      "from": "start",
+      "to": "final_review"
+    },
+    {
+      "from": "final_review",
+      "to": "ok_final"
+    },
+    {
+      "from": "ok_final",
+      "to": "done",
+      "name": "approved",
+      "when": {
+        "path": "vF.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_final",
+      "to": "open_issues",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_final",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_final",
+      "to": "fix_final",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_final",
+      "to": "final_review"
+    }
+  ]
+}

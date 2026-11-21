@@ -3,6 +3,7 @@
 -- The number is our own frame placed over the nameplate; nothing is written onto the game's nameplate.
 -- Needs enemy nameplates (the V key, or Settings > Quest markers > Turn on enemy health bars).
 local ADDON, ns = ...
+ns.inModule("combat")          -- Modules.lua: Settings > General > Tools can switch this off
 
 local A = {}
 ns.aggro = A

@@ -1,5 +1,14 @@
 # Decisions
 
+## D17 2026-11-21 — Tools as modules: in-addon registry, not sub-addons
+- User picked the in-addon registry over LoadOnDemand sub-addons (one folder, less churn).
+- WoW cannot unload Lua; saved vars load after all files run, so no top-of-file guard. Instead each file calls `ns.inModule("<id>")`; `ns.on` / `ns.after` store the tag; Core's dispatcher skips handlers/timers of off modules (live).
+- Entry points (`open/toggle/command/show` loud, `refresh/settingChanged/applySettings/masterChanged` quiet) of each module's ns tables are wrapped at our ADDON_LOADED. `/qs` commands mapped per module (`ns.commandAllowed`).
+- Switch = plain `ns.db.module_<id>` (default true) so Settings rows, `/qs reset`, saved vars reuse existing code. Rows of off modules dim via `needsOff` (`ns.MODULE_TABS` / `ns.MODULE_KEYS`).
+- No new Settings tab: the window height fits exactly 15 tabs; switches live in General > Tools.
+- Blizzard hooks are installed from PLAYER_LOGIN/ADDON_LOADED handlers, so after /reload an off module hooks nothing; hooks made while on stay until /reload (the switch message says so).
+- Generated data files (SkinningData, CookingReference, DungeonQuestData, DungeonLore, DungeonBossData) carry no tag: they register no events.
+
 ## D13 2026-11-20 — Dungeon Journal look: inspiration only, client art only
 - Choice: rebuild the Dungeon quests page in the look of the Dungeon Journal addon (by Exehn). Use only sizes, palette and client texture paths. No code or media from it: it has no licence. Never use an `Interface\AddOns\ForeverDungeonJournal` path. No new image files.
 - Art comes from the client: loading screens (classic by path, checked with `GetFileIDFromPath` when the client has it; Forever by FileDataID), `LFGIcon-<Name>`, and EJ boss art with fallbacks (display ID portrait, then skull).
@@ -22,6 +31,13 @@
 - "Needed for" passes the page's area (`D.questsForNpc(npcID, view.area)`): `filters.dungeon` can be 0. `D.openQuest` resets the filters (All quests) when the quest is hidden, so a click always lands.
 - Task kind under objectives only when it adds information: guessed "Talk only" and generic "Complete quest objectives"/"Task unknown" moved to the tooltip only.
 
+## D16 2026-11-20/21 — Bosses: official DungeonEncounter list; Forever portraits resolved in game (runs r-20261120-194708-fb95, r-20261120-220008-0d88, r-20261121-041134-dd71)
+- Boss list = Blizzard `DungeonEncounter` of the Forever client build 1.60.1.70959, generated offline (`tools/build_boss_data.py` -> `QuestSharing/DungeonBossData.lua`, never edited by hand). It is the only source of rows when an area has one; AtlasLoot/QuestieDB drop sources only attach items (`Loot.lua` `officialRows`). Rejected: filtering drop sources by rank/elite (rares and helpers stay in). Bug report `BUGS/2026-11-20-dungeon-bosses-random-mobs.md`.
+- Hand exceptions only with one evidence line each: `LOOT_NPCS = {643: [642]}` (Sneed -> Sneed's Shredder), `NO_EJ = {"16544:Mana Devourer", "16611:The Butcher"}`. EJ art (`ejFile`) only for classic areas (`area < 16000`): Forever-only areas have same-named art of other creatures. Retail-look art accepted (Baron Rivendare, Gahz'rilla, Malor, Galford, Willey).
+- Wowhead: `/classic/npc=<id>` pages for display IDs, `/forever/search/suggestions-template?q=<name>` JSON for missing npc IDs (exact name, type 1; Forever areas prefer ids >= 200000). Never `/forever/npc=` database pages (WAF-blocked). No fuzzy guess: The Butcher (enc 3355, area 16611) and Infurnus (enc 3495, area 16919) have no exact match and stay without npcID (skull). Ezra Grimm = npc 11058, display 10475. Cache files are written only when the body is valid JSON (a WAF page with HTTP 200 is a failed try); `--offline` never deletes a cache file.
+- Forever-only bosses have no classic page, so their display IDs come from the client: `QuestSharing/BossPortraitResolver.lua` (hidden PlayerModel `SetCreature(npcID)` -> `GetDisplayInfo()`), one at a time, paused in combat and loading screens, saved in `ns.db.bossDisplays`. `/qs bossdump` prints the found `npcID=displayID` lines so they can be baked into the generator later. Rejected: many models in parallel (load spikes), lookups on login (no page open = no need).
+- A read equal to the previous creature's display (or the model's display before `SetCreature`) counts only after `OnModelLoaded` fired for this lookup: a wrong ID would stay in the saved cache for good.
+
 ## 2026-11-19 — Speed pass 1 (tools/lua-optimization-prompt.md)
 - Rule: apply only with a Lua 5.1 benchmark saving >= 20 %, identical behaviour, small local diff; else report only.
 - Applied: (1) `VendorMap.lua` matchesWords splits the query once per new query (one-entry cache), not once per item name. (2) `Questie.lua` questieModule keeps the found QuestieDB module while the same QuestieLoader table is installed; a failed/not-started lookup is not kept. (3) `DungeonQuests.lua` scan: prerequisite and breadcrumb loops unrolled, no `ipairs({a or {}, b or {}})` / `{number(x)}` tables per quest.
@@ -29,6 +45,19 @@
 
 ## 2026-11-18 — Party finder auto-invite
 - One search per click/key (C_LFGList.Search HasRestrictions in classic_era source), no timer scan; invite solo players (numMembers==1) by lfgRoles via C.invite; healers on by default, own-window watching (lfgWatch) off by default so browsing never invites by surprise. Rows live in the Party window tab (no 16th tab fits). Gear number not built: no ilvl in LFG data; only addon-message (Quest Sharing users) or inspect (nearby) possible, waiting on user.
+
+## 2026-11-21 — Levels from the listed dungeon
+- Upper bound = `maxLevelSuggestion`, Blizzard's own "trivial" line (Blizzard_LFGVanilla_Listing.lua colours an activity trivial when maxLevelSuggestion < player level). Chosen over the XP gray-level bound (warcraft.wiki.gg: 6-39 L-floor(L/10)-5, 40-60 L-floor(L/5)-1 in Classic; marked partly unconfirmed), which is higher and lets over-levelled players in. Players at or below maxLevelSuggestion always still get XP (e.g. 23 in Deadmines: gray 16).
+
+## 2026-11-21 — Invite history 1 h; nearness from the party finder zone (no /who)
+- User: track invited/joined/left, no re-invite for at least 1 h; prioritise distance from the dungeon. One block rule for every outcome (simpler, matches "at least 1 hour"), min 60 min; history saved in SavedVariables, 24 h. `lfgReinvite` (other session, 5 min) replaced by `lfgBlockMinutes`.
+- No /who: `LfgSearchResultPlayerInfo.areaName` already gives each listed player's zone; /who is throttled, may be click-restricted and opens UI. Default order "balanced" (level minus farness, 3 levels ~ one region, other continent 6) because the user asked for highest level first earlier and distance "as well"; pure level / pure nearness are choices.
+
+## 2026-11-20 — Party shape 1/1/3 includes me; unknown = damage
+- User: always max 3 damage, 1 tank, 1 healer. The leader was not counted before; now `L.myRole()` (picker "I am", default auto). Unknown members/me count as damage: damage is the most common role and it keeps the hard-to-fill tank/healer spots open; a wrong guess only costs a damage spot. GetLFGRoles is optional (pcall).
+
+## 2026-11-20 — Only real party members count (user; supersedes the next entry)
+- User: hanging invites and people who left made it say "party is full"; only members and their roles must count. freeSpots = 5 - members; roleTaken = members only; per-Find `used[role]` stops one Find from over-inviting a role; supercharge back to up to 10 per Find. Trade-off accepted: a second Find while an invite is still open invites another player for the same role. If the game itself says "Your party is full." a plain line explains it.
 
 ## 2026-11-19 — Supercharge limited to free spots (supersedes "more invites than spots")
 - The game counts open invites as party spots (ERR_GROUP_FULL "Your party is full." for extra invites), so supercharge now means "ignore the per-role need" but never more invites than members + open invites + players being asked leave free. PENDING 75 s (margin over the game's ~60 s invite).

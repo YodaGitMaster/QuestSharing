@@ -3,6 +3,7 @@
 --   Paladin and Priest, damage: only Rogue and Warrior ...). Lowest item level -/+ . Find = one search of your
 --   party finder listing and the invites (the game needs this click for every search).
 local ADDON, ns = ...
+ns.inModule("finder")          -- Modules.lua: Settings > General > Tools can switch this off
 local S = ns.style
 
 local F = {}
@@ -120,7 +121,7 @@ local function build()
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:SetText("Supercharge", 1, 0.82, 0)
             GameTooltip:AddLine("Off: per role only what is still open (1 healer, 1 tank, 3 damage), highest level first.", 1, 1, 1, true)
-            GameTooltip:AddLine("On: fills every free spot at once with players who fit (the game counts open invites as spots). The first to accept gets the spot; extra players who accept may need to be removed.", 1, 1, 1, true)
+            GameTooltip:AddLine("On: invites every player who fits at once (up to 10 per Find). The first to accept gets the spot; extra players who accept may need to be removed.", 1, 1, 1, true)
             GameTooltip:Show()
         end) end
     end)
@@ -129,9 +130,14 @@ local function build()
     W.whisper = check(f, 12, y, COL_W * 3 - 10, true, function() ns.setSetting("lfgWhisper", not ns.db.lfgWhisper) end)
     y = y - 24
 
-    W.find = S.button(f, "Find", 130, function() L.scan(); F.refresh() end,
+    W.find = S.button(f, "Find", 110, function() L.scan(); F.refresh() end,
         "Search your listing's dungeon and invite players for the open roles (1 healer, 1 tank, 3 damage), highest level first - or every match with Supercharge. Click again to search again.")
     W.find:SetPoint("TOPLEFT", f, "TOPLEFT", 12, y)
+    local ROLE_CYCLE = { auto = "tank", tank = "healer", healer = "damage", damage = "auto" }
+    W.me = S.button(f, "I am", 120, function()
+        ns.setSetting("lfgMyRole", ROLE_CYCLE[ns.db.lfgMyRole or "auto"] or "auto"); F.refresh()
+    end, "Your own role. The party is at most 1 tank, 1 healer and 3 damage, you included. Click to change.")
+    W.me:SetPoint("LEFT", W.find, "RIGHT", 8, 0)
     W.more = S.button(f, "Settings", 90, function() ns.toggleSettings(true, "finder") end, "Party finder settings: level range, unknown item level, whisper text and more")
     W.more:SetPoint("TOPRIGHT", f, "TOPRIGHT", -12, y)
     y = y - 26
@@ -171,10 +177,11 @@ function F.refresh()
     W.whisper.label:SetText((d.lfgWhisper and S.GOLD or S.GREY) .. "Whisper them which dungeon the invite is for|r")
     if d.lfgWhisper then W.whisper.tick:Show() else W.whisper.tick:Hide() end
     local spots = L.freeSpots()
-    local open = d.lfgSupercharge and "every match" or string.format("open: %d healer, %d tank, %d damage",
-        L.roleOpen("healer"), L.roleOpen("tank"), L.roleOpen("damage"))
-    W.info:SetText(string.format("%sLevels %d-%d, highest first. %d free spot%s, %s.|r", S.GREY, d.lfgMinLevel or 1,
-        d.lfgMaxLevel or 60, spots, spots == 1 and "" or "s", open))
+    local lo, hi, from = L.levelRange()
+    W.info:SetText(string.format("%sParty: %s. %d free spot%s. Levels %d-%d%s.|r", S.GREY, L.compositionText(),
+        spots, spots == 1 and "" or "s", lo, hi, from == "dungeon" and " (dungeon)" or ""))
+    local mine = d.lfgMyRole or "auto"
+    W.me:SetLabel("I am: " .. (mine == "auto" and ("auto (" .. L.myRole() .. ")") or mine))
     -- Find stays clickable (it says why it cannot search), but looks off while something is missing
     local blocker = L.blocker()
     W.find:SetLabel(blocker and (S.GREY .. "Find|r") or "Find")

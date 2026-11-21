@@ -1,5 +1,6 @@
 -- Read-only map information: own click-through labels, never Blizzard map pins or map navigation.
 local ADDON, ns = ...
+ns.inModule("maps")          -- Modules.lua: Settings > General > Tools can switch this off
 local Z,U,S = {},ns.optionalUI,ns.style
 ns.zoneLevels=Z
 local views,current,cache={},nil,{}

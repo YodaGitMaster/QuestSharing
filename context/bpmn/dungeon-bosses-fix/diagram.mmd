@@ -1,0 +1,97 @@
+flowchart LR
+  %% Dungeon bosses: official list, portraits, calm layout · 13 agents: 4 × general-purpose, 5 × bpmn:worker, 4 × bpmn:reviewer · up to 29 with loop rounds
+  subgraph n_lane_scout["🤖 Scout · general-purpose · ⏱ 15 min"]
+    n_start(("Bosses complaint"))
+    n_rsplit{"+"}
+    n_r_list["⚙ Build official boss list"]
+    n_r_portraits["⚙ Research boss portraits"]
+    n_r_layout["⚙ Diagnose bosses layout"]
+    n_r_cause["⚙ Find random-mob root cause"]
+    n_rjoin{"+"}
+  end
+  subgraph n_lane_builder["🤖 Builder · bpmn:worker · ⏱ 40 min"]
+    n_design["⚙ Write the bosses contract · ⏱ 15 min"]
+    n_split{"+"}
+    n_build_d["⚙ Build boss data"]
+    n_fix_d["⚙ Fix boss data"]
+    n_build_l["⚙ Build boss filter logic"]
+    n_fix_l["⚙ Fix boss filter logic"]
+    n_build_u["⚙ Build calm bosses layout"]
+    n_fix_u["⚙ Fix bosses layout"]
+    n_integrate["⚙ Integrate and render bosses · ⏱ 35 min"]
+    n_fix_final["⚙ Fix final bosses issues · ⏱ 25 min"]
+    n_review_d__merge{"✕"}
+    n_review_l__merge{"✕"}
+    n_review_u__merge{"✕"}
+    n_final_review__merge{"✕"}
+  end
+  subgraph n_lane_reviewer["🤖 Reviewer · bpmn:reviewer · ⏱ 12 min"]
+    n_review_d["⚙ Review boss data"]
+    n_ok_d{"D approved?"}
+    n_merge_d{"D settled"}
+    n_review_l["⚙ Review boss filter logic"]
+    n_ok_l{"L approved?"}
+    n_merge_l{"L settled"}
+    n_review_u["⚙ Review bosses layout"]
+    n_ok_u{"U approved?"}
+    n_merge_u{"U settled"}
+    n_join{"+"}
+    n_final_review["⚙ Review the bosses fix"]
+    n_ok_final{"Final approved?"}
+    n_done((("Bosses fixed")))
+    n_open_issues((("Done with open issues")))
+  end
+  n_start --> n_rsplit
+  n_rsplit --> n_r_list
+  n_rsplit --> n_r_portraits
+  n_rsplit --> n_r_layout
+  n_rsplit --> n_r_cause
+  n_r_list --> n_rjoin
+  n_r_portraits --> n_rjoin
+  n_r_layout --> n_rjoin
+  n_r_cause --> n_rjoin
+  n_rjoin --> n_design
+  n_design --> n_split
+  n_split --> n_build_d
+  n_split --> n_build_l
+  n_split --> n_build_u
+  n_build_d --> n_review_d__merge
+  n_review_d --> n_ok_d
+  n_ok_d -- "approved" --> n_merge_d
+  n_ok_d -- "3rd round" --> n_merge_d
+  n_ok_d -- "changes" --> n_fix_d
+  n_fix_d --> n_review_d__merge
+  n_merge_d --> n_join
+  n_build_l --> n_review_l__merge
+  n_review_l --> n_ok_l
+  n_ok_l -- "approved" --> n_merge_l
+  n_ok_l -- "3rd round" --> n_merge_l
+  n_ok_l -- "changes" --> n_fix_l
+  n_fix_l --> n_review_l__merge
+  n_merge_l --> n_join
+  n_build_u --> n_review_u__merge
+  n_review_u --> n_ok_u
+  n_ok_u -- "approved" --> n_merge_u
+  n_ok_u -- "3rd round" --> n_merge_u
+  n_ok_u -- "changes" --> n_fix_u
+  n_fix_u --> n_review_u__merge
+  n_merge_u --> n_join
+  n_join --> n_integrate
+  n_integrate --> n_final_review__merge
+  n_final_review --> n_ok_final
+  n_ok_final -- "approved" --> n_done
+  n_ok_final -- "3rd round" --> n_open_issues
+  n_ok_final -- "changes" --> n_fix_final
+  n_fix_final --> n_final_review__merge
+  n_review_d__merge --> n_review_d
+  n_review_l__merge --> n_review_l
+  n_review_u__merge --> n_review_u
+  n_final_review__merge --> n_final_review
+  classDef done fill:#e6f4ea,stroke:#1e8e3e,color:#0d3b1e
+  classDef running fill:#e8f0fe,stroke:#1a73e8,color:#0b2a5b
+  classDef ready fill:#fef7e0,stroke:#b06000,color:#4a3600
+  classDef failed fill:#fce8e6,stroke:#c5221f,color:#5f0d06
+  classDef cancelled fill:#f1f3f4,stroke:#80868b,color:#3c4043
+  class n_start,n_rsplit,n_r_list,n_r_portraits,n_r_layout,n_r_cause,n_rjoin,n_design,n_split,n_build_d,n_review_d,n_ok_d,n_merge_d,n_build_l,n_review_l,n_ok_l,n_merge_l,n_build_u,n_review_d__merge,n_review_l__merge,n_review_u__merge done
+  class n_review_u failed
+  class n_join ready

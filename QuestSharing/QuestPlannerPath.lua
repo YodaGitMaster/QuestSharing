@@ -1,6 +1,7 @@
 -- Optional bridge to Shortest Path Forever, used only for the Follow arrow. The quest guide plans with
 -- straight-line travel and never asks SPF for walking estimates, so it behaves the same with or without SPF.
 local ADDON, ns = ...
+ns.inModule("guide")          -- Modules.lua: Settings > General > Tools can switch this off
 local Path = {}
 ns.questPlannerPath = Path
 

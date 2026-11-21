@@ -7,6 +7,7 @@
 --     of the classic and of the modern client; if a client's quest log looks different, the markers
 --     are skipped and /qs probe says so)
 local ADDON, ns = ...
+ns.inModule("sharing")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 local key = ns.memberKey
 

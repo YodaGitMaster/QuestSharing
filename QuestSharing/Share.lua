@@ -1,6 +1,7 @@
 -- Share.lua: notice a new party, push the quests of the area one by one, read the game's replies
 -- (accepted / declined / already on it / ...) and tell the party which quests we have in common.
 local ADDON, ns = ...
+ns.inModule("sharing")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 
 ns.known = {}             -- ns.known[questID][lowercased member name] = "has" | "accepted" | "declined" | "done" | ...

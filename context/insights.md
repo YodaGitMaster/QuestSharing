@@ -1,5 +1,11 @@
 # Insights
 
+## 2026-11-21 — Bosses fix + Forever boss portraits (runs r-20261120-194708-fb95, r-20261121-041134-dd71)
+- A "drop source" is not a "boss": building a boss list from loot tables lists trash, chests and helpers. Use an authoritative list (client `DungeonEncounter`) and let drop sources only attach items.
+- Wowhead `/forever/npc=` database pages are WAF-blocked; `/forever/search/suggestions-template?q=<name>` (JSON, `type` 1 = npc) works and gives Forever npc IDs. A WAF challenge can come back with HTTP 200: validate the body (JSON) before caching it.
+- Forever-only areas have Encounter Journal art files named like their bosses that show other creatures (Mana Devourer, The Butcher): EJ art by name only in classic areas.
+- `PlayerModel:GetDisplayInfo()` right after `SetCreature` can still return the previous creature's display (another addon guards this too): accept such a value only after `OnModelLoaded`, or a wrong ID gets saved for good.
+
 ## 2026-11-20 — Dungeon Journal round 3 (run r-20261120-114959-1c34)
 - WoW Forever (build 1.60.1) has no Encounter Journal DB2 tables; retail tables on wago.tools are the only source. Retail descriptions describe the current (Cataclysm-era or later) version: e.g. Shadowfang Keep's text names Lord Godfrey, who is not in the classic dungeon. Review dungeon descriptions for such mismatches before an in-game look.
 - Matching journal instances by name alone picks wrong entries (two Blackrock Depths, reworked Uldaman/UBRS). Break ties by boss overlap with a known classic boss list.
@@ -601,3 +607,5 @@
 - 2026-11-20: A believable offline preview of WoW frames is possible: patch the lupa mock (record every SetPoint anchor, SetAllPoints, SetScrollChild, SetColorTexture, SetAlpha), resolve absolute rects in Lua, and paint with PIL. Real Blizzard textures and the UI fonts (fonts/frizqt__.ttf 615960, fonts/morpheus.ttf 615962) download as BLP/TTF from `https://wago.tools/api/casc/<FileDataID>?download`; the FileDataID comes from the community listfile. PIL reads BLP2. macOS system python3 lacks SSL certs, so fetch through `curl`. Preview art stays in /tmp and is never shipped.
 - 2026-11-20: Blizzard EJ boss portraits are not named consistently: older files use spaces (`ui-ej-boss-mutanus the devourer`), newer ones do not (`ui-ej-boss-edwinvancleef`). Look up both spellings.
 - 2026-11-20: Turning aggro numbers on prints A.status() (threat API, enemy nameplates CVar, visible plate count). Ask the user for that line first when they say aggro shows nothing in game.
+
+- 2026-11-21: WoW runs every addon file before SavedVariables load, so a per-file "skip if off" guard cannot work. Gate at dispatch instead (ns.on / ns.after tags + Core dispatcher). Reset the module tag at the top-level event, or the last loaded file's tag sticks to UI callbacks.

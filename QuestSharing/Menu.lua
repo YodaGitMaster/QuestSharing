@@ -10,6 +10,7 @@
 -- A line that cannot be used right now is grey and says why. Our own small frame (not the game's dropdown menus,
 -- which are known to cause "action blocked" problems for addons). Esc, a choice, or moving away closes it.
 local ADDON, ns = ...
+ns.inModule("sharing")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 local S = ns.style
 

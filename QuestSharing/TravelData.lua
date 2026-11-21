@@ -2,6 +2,7 @@
 -- towns with a flight master. Coordinates are percentages (0..100) on the zone map `map` (UiMapID), read from memory of
 -- the Classic Era world, so treat them as approximate pointers (about 1-3 % off), not survey data.
 local ADDON, ns = ...
+ns.inModule(nil)          -- core: always on (Modules.lua)
 local D = {}
 ns.travelData = D
 

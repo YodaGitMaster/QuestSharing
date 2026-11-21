@@ -1,6 +1,7 @@
 -- Predictive, bounded search over one zone's atomic actions. Coordinates and costs describe
 -- player instructions only; the simulator never updates the real quest log or inventory.
 local _, ns = ...
+ns.inModule("guide")          -- Modules.lua: Settings > General > Tools can switch this off
 local O = {}
 ns.questOptimizer = O
 

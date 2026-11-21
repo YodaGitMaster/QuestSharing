@@ -1,6 +1,7 @@
 -- A local, on-demand catalogue of quest reward equipment. QuestieDB owns reward links and quest restrictions;
 -- the game supplies equipment slots, stats and comparison tooltips. No database scan happens at login.
 local ADDON, ns = ...
+ns.inModule("rewards")          -- Modules.lua: Settings > General > Tools can switch this off
 local R, U, S, E = {}, ns.optionalUI, ns.style, ns.equipmentUI
 ns.rewards = R
 local index, results, quests, window = {}, {}, {}, nil

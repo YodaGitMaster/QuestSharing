@@ -1,6 +1,7 @@
 -- Dungeon Journal look: palette and small builders. Client textures only (paths or FileDataIDs), no bundled media.
 -- Contract: context/dungeon-journal-contract.md
 local ADDON, ns = ...
+ns.inModule(nil)          -- core: always on (Modules.lua)
 local T = {}
 ns.journalTheme = T
 local S = ns.style
@@ -221,23 +222,40 @@ function T.crest(parent, faction, size)
     return t
 end
 
--- dark round disc, the minimap tracking ring around it, the level number on top
-function T.badge(parent, level, size)
+-- dark round disc, the minimap tracking ring around it, the level number on top.
+-- opts.flat: a calm badge instead: a 1 px gold disc (size+2) behind the dark disc, a white number (Friz opts.font or 11).
+function T.badge(parent, level, size, opts)
     size = size or 28
     local f = CreateFrame("Frame", nil, parent)
     f:SetWidth(size); f:SetHeight(size)
-    f.disc = f:CreateTexture(nil, "BACKGROUND")
-    f.disc:SetTexture(MASK); f.disc:SetAllPoints(f)
-    try(f.disc, "SetVertexColor", .07, .05, .03, 1)
-    f.ring = f:CreateTexture(nil, "OVERLAY")
-    f.ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-    -- the ring's hole sits at the top left of the art: 53 px art around a 20 px icon at 7,-5
-    local k = size / 20
-    f.ring:SetWidth(53 * k); f.ring:SetHeight(53 * k)
-    f.ring:SetPoint("TOPLEFT", f, "TOPLEFT", -7 * k, 5 * k)
-    f.text = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    f.text:SetPoint("CENTER", f, "CENTER", 0, 0)
-    T.textColor(f.text, T.C.title)
+    if opts and opts.flat then
+        f.flat = true
+        f.ring = f:CreateTexture(nil, "BACKGROUND")
+        f.ring:SetTexture(MASK); f.ring:SetWidth(size + 2); f.ring:SetHeight(size + 2)
+        f.ring:SetPoint("CENTER", f, "CENTER", 0, 0)
+        try(f.ring, "SetVertexColor", .80, .57, .21, 1)
+        f.disc = f:CreateTexture(nil, "BORDER")
+        f.disc:SetTexture(MASK); f.disc:SetWidth(size); f.disc:SetHeight(size)
+        f.disc:SetPoint("CENTER", f, "CENTER", 0, 0)
+        try(f.disc, "SetVertexColor", .055, .047, .04, 1)
+        f.text = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        f.text:SetPoint("CENTER", f, "CENTER", 0, 0)
+        T.font(f.text, opts.font or 11, { 1, 1, 1 }); T.shadow(f.text)
+        try(f.text, "SetJustifyH", "CENTER")
+    else
+        f.disc = f:CreateTexture(nil, "BACKGROUND")
+        f.disc:SetTexture(MASK); f.disc:SetAllPoints(f)
+        try(f.disc, "SetVertexColor", .07, .05, .03, 1)
+        f.ring = f:CreateTexture(nil, "OVERLAY")
+        f.ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+        -- the ring's hole sits at the top left of the art: 53 px art around a 20 px icon at 7,-5
+        local k = size / 20
+        f.ring:SetWidth(53 * k); f.ring:SetHeight(53 * k)
+        f.ring:SetPoint("TOPLEFT", f, "TOPLEFT", -7 * k, 5 * k)
+        f.text = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        f.text:SetPoint("CENTER", f, "CENTER", 0, 0)
+        T.textColor(f.text, T.C.title)
+    end
     function f:SetLevel(n) self.level = n; self.text:SetText(n and tostring(n) or "") end
     f:SetLevel(level)
     return f
@@ -250,8 +268,8 @@ function T.tick(parent, size)
     return t
 end
 
--- masks a texture round and puts a gold ring over it
-function T.round(texture, parent, size)
+-- masks a texture round and puts a gold ring over it (opts.ring == false: the mask only, no ring)
+function T.round(texture, parent, size, opts)
     parent = parent or try(texture, "GetParent") or texture.parent
     if size then texture:SetWidth(size); texture:SetHeight(size) end
     local masked = false
@@ -267,7 +285,7 @@ function T.round(texture, parent, size)
     end
     if not masked and texture.SetMask then masked = pcall(texture.SetMask, texture, MASK) end
     texture.rounded = masked
-    if parent then
+    if parent and not (opts and opts.ring == false) then
         local ring = parent:CreateTexture(nil, "OVERLAY")
         ring:SetTexture("Interface\\Common\\GoldRing")
         ring:SetPoint("TOPLEFT", texture, "TOPLEFT", -2, 2)

@@ -4,6 +4,7 @@
 --   * a map pin where a teammate says they found the items of a quest I still work on
 -- (There is no raid star over your head any more: the game refuses raid marks set by an addon, even outside combat.)
 local ADDON, ns = ...
+ns.inModule("sharing")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 local key = ns.memberKey
 

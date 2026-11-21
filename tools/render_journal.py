@@ -3,7 +3,9 @@
 Loads the real addon in the lupa test harness, records every frame's anchors, size, colour, texture and text,
 computes absolute rectangles and paints them with PIL (system python3 has PIL; the test venv has lupa).
 Scenes (whole window, 1032 x 715): home, home_search (search text, clear button), quests (normal quest), quests_class (class-only quest), quests_chain (a done
-chain quest), bosses (Encounter Journal portraits, journal description, abilities, Needed for), map (the client's Deadmines tiles), route.
+chain quest), bosses (the official Deadmines list from DungeonBossData.lua: Encounter Journal art by FileDataID, a staged
+display portrait, journal description, abilities, Needed for), bosses_forever (The Hall of Thanes, a Forever-only dungeon
+without AtlasLoot: the AtlasLoot hint, portraits from a simulated in-game resolver answer, Infurnus keeps the skull), map (the client's Deadmines tiles), route.
 Client art and fonts come from the client listfile (/tmp/listfile/lf.csv) and wago.tools CASC downloads cached in
 /tmp/journal_render (preview only, never shipped); GetFileIDFromPath in the render answers from the same listfile.
 Font strings without a width are sized with the real Friz Quadrata / Morpheus advance widths. Scroll frames and
@@ -46,6 +48,14 @@ local function patch(o)
   o.SetBackdropBorderColor=function(self,r,g,b,a) self.bdborder={r,g,b,a or 1} end
   o.SetAlpha=function(self,a) self.alpha=a end
   o.SetClipsChildren=function(self,v) self.clips=v end
+  -- SetParent moves the object to its new parent's children (staged boss portraits move from W.stage to a row)
+  local spar=o.SetParent
+  o.SetParent=function(self,p)
+    local old=self.parent
+    if type(old)=="table" and old.children then for i=#old.children,1,-1 do if old.children[i]==self then table.remove(old.children,i) end end end
+    if spar then spar(self,p) else self.parent=p end
+    if type(p)=="table" then p.children=p.children or {}; p.children[#p.children+1]=self end
+  end
   o.SetTextInsets=function(self,l,r,t,b) self.insets={l or 0,r or 0} end
   local sbm=o.SetBlendMode
   o.SetBlendMode=function(self,m) self.blend=m; if sbm then return sbm(self,m) end end
@@ -143,7 +153,7 @@ function DUMP(root,W,H)
     local tex=o.texture
     out[#out+1]={x=r[1],y=r[2],w=r[3],h=r[4],kind=kind,texture=tex and tostring(tex) or nil,color=o.color,vertex=o.vertex,
       text=(kind=="text" and o.text) or nil,tcolor=o.tcolor,fsize=o.fsize,tmpl=type(o.tmpl)=="string" and o.tmpl or nil,layer=o.layer,bdcolor=o.bdcolor,
-      bdborder=o.bdborder,backdrop=o.backdrop and true or nil,blend=o.blend,measured=o.measured,alpha=o.alpha,round=o.jRing and true or nil,anchor=o.pts and o.pts[1] and o.pts[1][1] or nil,name=type(o.name)=="string" and o.name or nil,coords=o.coords,clip=clip,
+      bdborder=o.bdborder,backdrop=o.backdrop and true or nil,blend=o.blend,measured=o.measured,alpha=o.alpha,round=(o.jRing or o.rounded) and true or nil,anchor=o.pts and o.pts[1] and o.pts[1][1] or nil,name=type(o.name)=="string" and o.name or nil,coords=o.coords,clip=clip,
       wrap=nil}
     if kind=="text" then out[#out].wrap=o.wordWrap end -- false must survive (an and/or would turn it into nil)
     local kids={}
@@ -264,6 +274,8 @@ GetItemInfo=function(id)
 end
 GetItemIcon=function(id) local r=REWARD_ITEMS[id];return r and r.icon end
 GetFileIDFromPath=function(p) return FILE_IDS[string.lower(string.gsub(p,"\\","/"))] end
+-- a creature display portrait (no model renderer here): the paint step draws a labelled round stand-in
+SetPortraitTextureFromCreatureDisplayID=function(t,id) t:SetTexture("display:"..tostring(id)) end
 """
 
 
@@ -299,6 +311,25 @@ NS.dungeonQuests.routePlan=function(area,assumeAll,cb)
 end
 """
 
+
+# The game client's PlayerModel as the resolver sees it (render only, the display IDs are made up): SetCreature(npc),
+# then GetDisplayInfo() answers the npc's display 0.1 s later (0 before, like a model still loading).
+FOREVER_MODEL = r"""
+local FAKE_DISPLAYS={[261306]=90001,[261311]=90002,[261319]=90003}
+local cf2=CreateFrame
+CreateFrame=function(kind,name,parent,...)
+  local f=cf2(kind,name,parent,...)
+  if kind=="PlayerModel" then
+    function f:SetCreature(id) self.creature,self.setAt=id,NOW end
+    function f:ClearModel() self.creature=nil end
+    function f:GetDisplayInfo()
+      if self.creature and NOW-self.setAt>=0.1 then return FAKE_DISPLAYS[self.creature] or 0 end
+      return 0
+    end
+  end
+  return f
+end
+"""
 
 FONT = "/tmp/journal_render/art/615960.ttf"   # Friz Quadrata (fonts/frizqt__.ttf), preview only
 SERIF = "/tmp/journal_render/art/615962.ttf"  # Morpheus (fonts/morpheus.ttf), preview only
@@ -379,10 +410,21 @@ def collect():
     print("bosses: description", bool(bw.desc.shown), "abilities", sum(1 for r in bw.abilities.values() if r.shown),
           "needed for", sum(1 for r in bw.quests.values() if r.shown))
     dump(g, root, 1032, 715, "bosses")
+    print("bosses: rows", [r.name.text for r in bw.rows.values() if r.shown],
+          "portraits", [r.portrait.source for r in bw.rows.values() if r.shown])
     g.eval("NS.dungeonQuests.openDungeon")(1581, "map"); g.advance(2)
     dump(g, root, 1032, 715, "map")
     g.eval("NS.dungeonQuests.openDungeon")(1581, "route"); g.advance(2)
     dump(g, root, 1032, 715, "route")
+    # bosses_forever: a Forever-only dungeon (no journal art, no baked display IDs), no AtlasLoot: the official list,
+    # the AtlasLoot hint, and the in-game resolver (BossPortraitResolver.lua) answering from a simulated client model;
+    # Infurnus has no npc ID, so it keeps the muted skull
+    g = shell("AtlasLoot=nil" + FOREVER_MODEL)
+    g.eval("NS.dungeonQuests.openDungeon")(16919, "bosses"); g.advance(40)
+    bw = g.eval("NS.dungeonBossesUI._window()")
+    print("bosses_forever: rows", [r.name.text for r in bw.rows.values() if r.shown],
+          "portraits", [r.portrait.source for r in bw.rows.values() if r.shown], "note", bw.note.text)
+    dump(g, root, 1032, 715, "bosses_forever")
 
 
 # ---------------------------------------------------------------------------------------------------- painting
@@ -483,6 +525,14 @@ def paint():
 
     def stand_in(d, img, box, tex, item):
         t = tex.lower()
+        if "tempportraitalphamask" in t and item.get("vertex"):  # the round mask used as a tinted disc (portrait back, badge)
+            c = rgba(item["vertex"], item.get("alpha") or 1.0)
+            m = Image.new("RGBA", img.size, (0, 0, 0, 0)); ImageDraw.Draw(m).ellipse(box, fill=c)
+            img.alpha_composite(m); return
+        if t.startswith("display:"):  # a staged creature display portrait (stand-in: the client renders the model)
+            d.ellipse(box, fill=(78, 62, 44, 255), outline=(40, 30, 20, 255))
+            d.text(((box[0] + box[2]) / 2, (box[1] + box[3]) / 2), "model\n" + tex[8:], fill=(235, 215, 175, 255),
+                   font=font(max(8, (box[3] - box[1]) * 0.2)), anchor="mm", align="center"); return
         if "tempportraitalphamask" in t or "tooltip-border" in t or "highlight" in t: return
         if "white8x8" in t:
             fillbox(img, box, rgba(item.get("vertex")) or (255, 255, 255, 255)); return

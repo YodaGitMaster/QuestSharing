@@ -1,6 +1,7 @@
 -- Settings.lua: plain-language settings grouped by the thing the player wants to change.
 -- Sidebar categories, visible explanations, direct choices, and explicit number controls.
 local ADDON, ns = ...
+ns.inModule(nil)          -- core: always on (Modules.lua)
 local C = ns.compat
 local S = ns.style
 
@@ -263,8 +264,11 @@ ns.settingRows = {
       desc = "Invite solo players signed up as healer." },
     { tab = "finder", kind = "bool", key = "lfgTank", label = "Invite tanks", desc = "Invite solo players signed up as tank." },
     { tab = "finder", kind = "bool", key = "lfgDps", label = "Invite damage dealers", desc = "Invite solo players signed up as damage dealer." },
+    { tab = "finder", kind = "choice", key = "lfgMyRole", label = "My role in the party", values = { "auto", "tank", "healer", "damage" },
+      names = { auto = "Automatic", tank = "Tank", healer = "Healer", damage = "Damage" },
+      desc = "The party is at most 1 tank, 1 healer and 3 damage, you included. Automatic: the game's role, your one party finder role or your class, else damage." },
     { tab = "finder", kind = "bool", key = "lfgSupercharge", label = "Invite every match at once (supercharge)",
-      desc = "Turn on to fill every free spot at once with players who fit, not only as many as each role still needs. The game counts open invites as spots. The first to accept get the spots." },
+      desc = "Turn on to invite every player who fits at once (up to 10 per Find), not only as many as each role still needs. The first to accept get the spots." },
     { tab = "finder", kind = "bool", key = "lfgWatch", label = "Also invite from my own party finder searches",
       desc = "Turn on to invite matches whenever the game's party finder window shows new results while your group is listed." },
     { tab = "finder", kind = "header", label = "Invite whisper" },
@@ -273,6 +277,9 @@ ns.settingRows = {
     { tab = "finder", kind = "text", key = "lfgWhisperText", needs = "lfgWhisper", label = "Invite whisper", maxLetters = 200,
       desc = "{dungeon} becomes your listed dungeon, {role} healer, tank or damage dealer. Empty = the standard text." },
     { tab = "finder", kind = "header", label = "Level and item level filters" },
+    { tab = "finder", kind = "choice", key = "lfgLevelMode", label = "Levels to invite", values = { "dungeon", "manual" },
+      names = { dungeon = "From the dungeon", manual = "Manual" },
+      desc = "From the dungeon: its suggested levels, as the game's party finder shows them (e.g. 18-23); above them the game calls it trivial and the mobs soon give no experience. Manual: the two rows below." },
     { tab = "finder", kind = "number", key = "lfgMinLevel", label = "Lowest character level to invite", min = 1, max = function() return ns.db.lfgMaxLevel or 60 end,
       desc = "Players below this level are not invited. Shift-click changes it by 5." },
     { tab = "finder", kind = "number", key = "lfgMaxLevel", label = "Highest character level to invite", min = function() return ns.db.lfgMinLevel or 1 end,
@@ -283,8 +290,13 @@ ns.settingRows = {
       names = { invite = "Invite anyway", skip = "Skip them" }, desc = "Used only with a lowest item level above 0." },
     { tab = "finder", kind = "bool", key = "lfgAskIlvl", inactive = function(d) return (tonumber(d.lfgMinIlvl) or 0) == 0 end, label = "Ask Quest Sharing users for their item level first",
       desc = "Waits up to 2 seconds for an answer before inviting. Used only with a lowest item level above 0." },
-    { tab = "finder", kind = "number", key = "lfgReinvite", label = "Minutes before inviting the same player again", min = 1, max = 30,
-      desc = "Choose how long a player you invited, or one the filters skipped, is left alone before the finder looks at them again." },
+    { tab = "finder", kind = "number", key = "lfgBlockMinutes", label = "Minutes before inviting the same player again", min = 60, max = 1440, step = 15,
+      desc = "Anyone you invited - who did not answer, declined, joined or left - waits this long. /qs lfg history lists them." },
+    { tab = "finder", kind = "choice", key = "lfgOrder", label = "Who goes first", values = { "balanced", "level", "near" },
+      names = { balanced = "Level and nearness", level = "Highest level", near = "Nearest to the dungeon" },
+      desc = "Nearness: the zone they are in (from the party finder) compared with the dungeon entrance." },
+    { tab = "finder", kind = "action", label = "Forget the invite history", button = "Forget",
+      desc = "Everyone may be invited again at once.", action = function() ns.lfgInvite.forgetHistory(); ns.print("party finder history cleared") end },
     { tab = "finder", kind = "header", label = "Picker and key" },
     { tab = "finder", kind = "action", label = "Open the party finder picker", button = "Open",
       desc = "Choose roles and classes, then Find. The key in Key Bindings > Quest Sharing searches at once.", action = function() ns.lfgFinder.toggle(true) end },
@@ -503,6 +515,21 @@ do
         end
         for k, row in ipairs(add) do table.insert(ns.settingRows, at + k, row) end
     end
+end
+
+-- General > Tools: one switch per module (Modules.lua), right after "Start here"
+do
+    local at
+    for i, row in ipairs(ns.settingRows) do if row.key == "minimap" then at = i end end
+    local add = { { tab = "general", kind = "header", label = "Tools" } }
+    for _, m in ipairs(ns.MODULES or {}) do
+        add[#add + 1] = { tab = "general", kind = "bool", key = m.key, keywords = "module tool load unload " .. m.id,
+            label = m.title, desc = m.desc .. " Turn off to switch the whole tool off; /reload applies it fully." }
+    end
+    add[#add + 1] = { tab = "general", kind = "action", label = "Apply tool changes", button = "Reload",
+        keywords = "module reload", desc = "Reloads the interface so tools you switched off are fully gone and tools you switched on start.",
+        action = function() if ReloadUI then ReloadUI() end end }
+    for k, row in ipairs(add) do table.insert(ns.settingRows, (at or 0) + k, row) end
 end
 
 for _, row in ipairs(ns.settingRows) do
@@ -962,6 +989,10 @@ end
 -- tabs and rows ---------------------------------------------------------------------------------------------------------
 -- the switch a row depends on (row.needs = a setting key): its label, and whether it is off now
 local function needsOff(row)
+    local mod = (row.key and ns.MODULE_KEYS and ns.MODULE_KEYS[row.key]) or (ns.MODULE_TABS and ns.MODULE_TABS[row.tab])
+    if mod and ns.moduleOn and not ns.moduleOn(mod) and not (row.key and string.sub(row.key, 1, 7) == "module_") then
+        return ns.moduleById[mod].title
+    end
     if not row.needs or ns.db[row.needs] then return nil end
     for _, r in ipairs(ns.settingRows) do if r.key == row.needs and r.kind == "bool" then return r.label end end
     return nil

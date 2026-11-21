@@ -5,6 +5,7 @@
 -- Three shortcut buttons sit beside it (Quest guide, Dungeon quests, Party finder) so nobody has to search the menus; they move
 -- with it and are hidden with it.
 local ADDON, ns = ...
+ns.inModule(nil)          -- core: always on (Modules.lua)
 
 local button
 local shortcuts = {}

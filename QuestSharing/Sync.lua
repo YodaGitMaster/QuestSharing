@@ -12,6 +12,7 @@
 --   S|questID|map|x|y|what  where I found the items of a quest (sent with a right-click question): a map pin for you
 -- objectives = comma separated  have/need  (counted)  or  f / u  (finished / unfinished, not counted)
 local ADDON, ns = ...
+ns.inModule("sharing")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 
 local PREFIX, VERSION = "QSHARE", 1

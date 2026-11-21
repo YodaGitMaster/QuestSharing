@@ -6,6 +6,7 @@
 -- client cannot add them, and random dungeon-finder groups; never fills the last 5 friend slots on its own;
 -- one add every 1.5 seconds. The game answers each add with a system message, which is read here.
 local ADDON, ns = ...
+ns.inModule("sharing")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 local key = ns.memberKey
 

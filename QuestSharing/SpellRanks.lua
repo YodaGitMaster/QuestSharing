@@ -1,5 +1,6 @@
 -- Upgrade placed player spells to learned ranks; never use the player's occupied cursor.
 local ADDON, ns = ...
+ns.inModule("professions")          -- Modules.lua: Settings > General > Tools can switch this off
 local R = {}
 ns.spellRanks = R
 local queued, running, waiting, serial = false, false, false, 0

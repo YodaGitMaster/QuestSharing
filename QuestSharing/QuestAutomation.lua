@@ -1,5 +1,6 @@
 -- Optional quest dialog actions. Calls happen only in response to the game's own quest events.
 local ADDON, ns = ...
+ns.inModule("automation")          -- Modules.lua: Settings > General > Tools can switch this off
 
 local function enabled(key, feature)
     return ns.db and ns.db.enabled and ns.db[key] and not ns.isBlocked(feature)

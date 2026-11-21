@@ -1,5 +1,6 @@
 -- Optional QuestieDB vendor lookup on Blizzard's existing world map. Only reads QuestieDB and draws addon-owned pins.
 local ADDON, ns = ...
+ns.inModule("maps")          -- Modules.lua: Settings > General > Tools can switch this off
 local Q, U, S, Work = ns.questie, ns.optionalUI, ns.style, ns.dataWork
 local V = {}
 ns.vendorMap = V

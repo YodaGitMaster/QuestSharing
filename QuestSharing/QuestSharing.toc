@@ -8,6 +8,7 @@
 
 Compat.lua
 Core.lua
+Modules.lua
 DataWork.lua
 Style.lua
 Share.lua
@@ -54,6 +55,8 @@ Rewards.lua
 Loot.lua
 DungeonQuestData.lua
 DungeonLore.lua
+DungeonBossData.lua
+BossPortraitResolver.lua
 DungeonRoute.lua
 DungeonQuests.lua
 DungeonHomeUI.lua

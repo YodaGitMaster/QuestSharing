@@ -15,6 +15,7 @@
 --     "nearest" is: your target if it is a quest creature, then the creature the game soft-targets in front of you, then
 --     your mouseover, then one within about 28 yards, then any quest creature in sight.
 local ADDON, ns = ...
+ns.inModule("markers")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 
 local BUTTON = "QuestSharingPingButton"

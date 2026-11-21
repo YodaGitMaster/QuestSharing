@@ -3,6 +3,7 @@
 -- Never for a quest somebody shared with you (they know), never twice, and several quests picked up at one quest giver
 -- go into one message. It also counts against the budget of automatic messages (Core.lua: at most 4 a minute).
 local ADDON, ns = ...
+ns.inModule("sharing")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 
 local LINES = { "Picked up %s - %s %s %s too. Want to do %s together?",

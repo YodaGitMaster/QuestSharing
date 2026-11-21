@@ -1,6 +1,6 @@
 # 2026-11-19 — Party finder: "Your party is full." while inviting
 
-**Status**: solved in source (cause inferred, not reproduced in game; mock tests)
+**Status**: solved in source again after the 2026-11-20 addendum (mock tests; not checked in game)
 **Severity**: medium
 **Tags**: LFGInvite.lua, ERR_GROUP_FULL, "Your party is full.", supercharge, SUPER_MAX, freeSpots, pending invites, PENDING, relisted duplicate
 
@@ -30,3 +30,10 @@
 
 ## If it shows up again
 - Ask whether Supercharge was on and get `/qs log` lines `lfg:` around it. If it appears in normal mode, check whether the game's invite timeout is longer than PENDING (75 s) on Forever.
+
+---
+## Addendum 2026-11-20 — fix failed: the addon itself said "party is full"
+- What happened: user: when people do not accept (invite hangs) or someone leaves, it still counts them and says "party is full".
+- Why the previous fix did not hold: it made open invites (held 75 s) and players being asked count as party spots in every mode, so the addon's own `freeSpots()` reached 5 with hanging invites. The first diagnosis assumed the game's ERR_GROUP_FULL; the user's wording points to the addon's line.
+- New approach: count only real members (and their roles) for spots and role needs; one Find never invites more of a role than the members leave open (`used[role]`); open invites are remembered only for decline lines and for the role on joining. Tests: hanging invite never blocks, leaver frees spot and role, per-Find healer limit.
+- Result / new status: solved in source; full suite green.

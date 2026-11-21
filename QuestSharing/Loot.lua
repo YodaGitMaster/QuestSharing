@@ -1,6 +1,7 @@
 -- On-demand instance loot search. AtlasLoot supplies encounter tables; QuestieDB is a labelled partial fallback.
 -- Provider tables are never edited here. Names are requested from the game in small batches while this window is open.
 local ADDON, ns = ...
+ns.inModule("dungeons")          -- Modules.lua: Settings > General > Tools can switch this off
 local L, U, S, Q, E = {}, ns.optionalUI, ns.style, ns.questie, ns.equipmentUI
 ns.loot = L
 local W, index, results, instances, items = nil, {}, {}, {}, {}
@@ -12,12 +13,13 @@ local deferredAtlas = false
 local unresolved, selectedKey = 0, nil
 local focusTarget
 -- L.bossesOf: a scan it started keeps running while the loot window is hidden; its callers wait in bossWaiters.
-local background, bossWaiters, flushBosses = false, {}, nil
+-- finish(area, list, src, reason, keep): the one exit of every bossesOf answer (official list applied, defined below).
+local background, bossWaiters, flushBosses, finish = false, {}, nil, nil
 -- a cancelled background scan (L.purge, or a new L.scan generation) answers its waiting bossesOf callers now
 local function cancelBosses(reason)
     background = false
     local list = bossWaiters; bossWaiters = {}
-    for _, w in ipairs(list) do pcall(w.done, {}, nil, reason) end
+    for _, w in ipairs(list) do pcall(w.done, finish(w.area, {}, nil, reason, true)) end
 end
 -- Memory: the loot catalogue is read once and kept for the session. Hiding the window pauses a half-read scan or item
 -- detail load; resumeLoot continues it on reopen. Purge (ns.dataWork.purge) frees it all.
@@ -646,6 +648,20 @@ local function firstNumber(v)
     while type(v) == "table" do v = v[1] end
     return positive(v) and v or nil
 end
+local function maxn(t) return table.maxn and table.maxn(t) or #t end
+-- every positive number in v (a number or nested tables, e.g. AtlasLoot npcID={3865,3864}), in order, unique
+local function allNumbers(v, out, seen, depth)
+    if type(v) == "table" then
+        if depth < 4 then for i = 1, maxn(v) do allNumbers(v[i], out, seen, depth + 1) end end
+    elseif positive(v) and not seen[v] then
+        seen[v] = true; out[#out + 1] = v
+    end
+    return out
+end
+local function npcList(v)
+    local out = allNumbers(v, {}, {}, 0)
+    return out[1] and out or nil
+end
 
 local function atlasBosses(dungeonName, area)
     local a = atlas()
@@ -661,7 +677,9 @@ local function atlasBosses(dungeonName, area)
                     local map = tonumber(content.MapID or content.AreaID)
                     if (want ~= "" and plainName(name) == want) or (area and map and (map == area or L.dungeonOf(map) == area)) then
                         local list = {}
-                        for bossID, boss in ipairs(content.items) do
+                        -- numeric walk to maxn: AtlasLoot's `isForever and {...} or nil` entries leave nil holes that stop ipairs
+                        for bossID = 1, maxn(content.items) do
+                            local boss = content.items[bossID]
                             if type(boss) == "table" and not boss.IgnoreAsSource and not boss.ExtraList then
                                 local who = clean(boss.name) or clean(U.call(content.GetNameForItemTable, content, bossID, true))
                                     or (positive(boss.npcID) and clean(field("npc", boss.npcID, "name"))) or ("Encounter " .. bossID)
@@ -684,7 +702,7 @@ local function atlasBosses(dungeonName, area)
                                     end
                                 end
                                 local npcID = firstNumber(boss.npcID)
-                                if #ids > 0 or npcID then list[#list + 1] = { name = who, npcID = npcID,
+                                if #ids > 0 or npcID then list[#list + 1] = { name = who, npcID = npcID, npcIDs = npcList(boss.npcID),
                                     displayID = firstNumber(boss.DisplayIDs) or firstNumber(boss.displayID),
                                     level = bossLevel(boss.Level) or (npcID and bossLevel(field("npc", npcID, "maxLevel"))),
                                     items = ids } end
@@ -706,7 +724,8 @@ local function questieBosses(dungeonName, area)
             local boss = byNpc[r.sourceID]
             if not boss then
                 local npcID = tonumber((string.match(tostring(r.sourceID), "^npc:(%d+)$")))
-                boss = { name = r.who, npcID = npcID, level = npcID and bossLevel(field("npc", npcID, "maxLevel")), items = {}, seen = {} }
+                boss = { name = r.who, npcID = npcID, npcIDs = npcID and { npcID } or nil,
+                    level = npcID and bossLevel(field("npc", npcID, "maxLevel")), items = {}, seen = {} }
                 byNpc[r.sourceID] = boss; list[#list + 1] = boss
             end
             if not boss.seen[r.itemID] then boss.seen[r.itemID] = true; boss.items[#boss.items + 1] = r.itemID end
@@ -721,13 +740,98 @@ local function questieBosses(dungeonName, area)
     return list
 end
 
+-- The official list (ns.dungeonBossData, R4 rule): when the area has one it is the only source of rows, in its order;
+-- the drop sources only attach items. nil when the area has no official list.
+local function officialList(area)
+    local B = area and ns.dungeonBossData
+    if type(B) ~= "table" or type(B.list) ~= "function" then return nil end
+    local ok, list = pcall(B.list, area)
+    return ok and type(list) == "table" and type(list[1]) == "table" and list or nil
+end
+local function copy(v)
+    if type(v) ~= "table" then return v end
+    local t = {}
+    for k, x in pairs(v) do t[k] = x end
+    return t
+end
+-- raw: drop rows (AtlasLoot or QuestieDB). Each raw row joins at most one boss: the first (by order) sharing an npc id
+-- (npcIDs, altNpcIDs, lootNpcIDs), else the first with the same plain name (name, npcName, members). Unmatched rows are dropped.
+local function officialRows(official, raw, sortItems)
+    local rows, ids, names, seen, sources = {}, {}, {}, {}, {}
+    for i, boss in ipairs(official) do
+        local row = {}
+        for k, v in pairs(boss) do row[k] = copy(v) end
+        row.official, row.items = true, {}
+        rows[i], seen[i], sources[i] = row, {}, {}
+        local set, nameSet = {}, {}
+        -- set[id] = "loot" for lootNpcIDs, "boss" for the boss's own ids (boss wins)
+        for _, key in ipairs({ "lootNpcIDs", "npcIDs", "altNpcIDs" }) do
+            for _, id in ipairs(type(boss[key]) == "table" and boss[key] or {}) do
+                if positive(id) then set[id] = key == "lootNpcIDs" and "loot" or "boss" end
+            end
+        end
+        if positive(boss.npcID) then set[boss.npcID] = "boss" end
+        for _, n in ipairs({ boss.name, boss.npcName }) do if plainName(n) ~= "" then nameSet[plainName(n)] = true end end
+        for _, n in ipairs(type(boss.members) == "table" and boss.members or {}) do
+            if plainName(n) ~= "" then nameSet[plainName(n)] = true end
+        end
+        ids[i], names[i] = set, nameSet
+    end
+    for _, r in ipairs(type(raw) == "table" and raw or {}) do
+        if type(r) == "table" then
+            local at, lootOnly
+            local rawIDs = type(r.npcIDs) == "table" and r.npcIDs or { r.npcID }
+            for i = 1, #rows do
+                for _, id in ipairs(rawIDs) do
+                    local kind = ids[i][id]
+                    if kind == "boss" then at, lootOnly = i, false; break end
+                    if kind then at, lootOnly = i, true end
+                end
+                if at then break end
+            end
+            if not at then
+                local n = plainName(r.name)
+                if n ~= "" then for i = 1, #rows do if names[i][n] then at = i; break end end end
+            end
+            if at then
+                local row, got = rows[at], seen[at]
+                for _, id in ipairs(type(r.items) == "table" and r.items or {}) do
+                    if not got[id] then got[id] = true; row.items[#row.items + 1] = id end
+                end
+                -- a row matched only by lootNpcIDs (Sneed's Shredder) gives items, never its level or model
+                if not lootOnly then local src = sources[at]; src[#src + 1] = r end
+            end
+        end
+    end
+    for i, row in ipairs(rows) do
+        if sortItems then table.sort(row.items) end
+        local display, level
+        for _, r in ipairs(sources[i]) do
+            display = display or r.displayID
+            level = level or r.level
+        end
+        row.displayID = row.displayID or display
+        row.level = level or (positive(row.npcID) and bossLevel(field("npc", row.npcID, "maxLevel"))) or nil
+    end
+    return rows
+end
+-- keep: a cancel / no-source / no-table reason stays even when official rows exist (the page shows it).
+finish = function(area, list, src, reason, keep)
+    local official = officialList(tonumber(area))
+    if not official then return list, src, reason end
+    local rows = officialRows(official, list or {}, src == "QuestieDB")
+    if #rows > 0 and not keep then reason = nil end
+    return rows, src, reason
+end
+
 flushBosses = function()
     background = false
     local list = bossWaiters; bossWaiters = {}
     for _, w in ipairs(list) do
         local bosses = source == "QuestieDB" and questieBosses(w.name, w.area)
             or source == "AtlasLoot" and atlasBosses(w.name, w.area) or {}
-        local ok, err = pcall(w.done, bosses, source, #bosses == 0 and "No drops known for " .. tostring(w.name) .. "." or nil)
+        local ok, err = pcall(w.done, finish(w.area, bosses, source,
+            #bosses == 0 and "No drops known for " .. tostring(w.name) .. "." or nil))
         if not ok and ns.logging and ns.logging() then ns.print("bosses: " .. tostring(err)) end
     end
 end
@@ -736,14 +840,15 @@ end
 -- area (optional) also matches AtlasLoot's MapID. Returns list, source, reason now, or nil, nil, "loading".
 function L.bossesOf(dungeonName, done, area)
     area = tonumber(area)
-    local function reply(list, src, reason)
+    local function reply(list, src, reason, keep)
+        list, src, reason = finish(area, list, src, reason, keep)
         if done then pcall(done, list, src, reason) end
         return list, src, reason
     end
     if atlas() then
         local list = atlasBosses(dungeonName, area)
         if list == nil then loadAtlas(); list = atlasBosses(dungeonName, area) end
-        if list == false then return reply({}, "AtlasLoot", "AtlasLoot has no table for " .. tostring(dungeonName) .. ".") end
+        if list == false then return reply({}, "AtlasLoot", "AtlasLoot has no table for " .. tostring(dungeonName) .. ".", true) end
         if list then return reply(list, "AtlasLoot", #list == 0 and "AtlasLoot lists no encounters here." or nil) end
     end
     if ready and source == "QuestieDB" then
@@ -763,8 +868,9 @@ function L.bossesOf(dungeonName, done, area)
         return nil, nil, "loading"
     end
     if not L.scan() then
-        cancelBosses(note)
-        return {}, nil, note
+        cancelBosses(note) -- answers our waiter through finish (official rows, the scan note kept)
+        if got then return got[1], got[2], got[3] end
+        return finish(area, {}, nil, note, true)
     end
     if got then return got[1], got[2], got[3] end
     return nil, nil, "loading" -- done is called by flushBosses when the scan finishes

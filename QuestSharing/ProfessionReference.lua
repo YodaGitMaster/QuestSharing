@@ -1,6 +1,7 @@
 -- Static Cooking/fishing reference. Guide facts checked 2026-11-17; no network at runtime.
 -- These guides flag higher-level content as beta-derived; validate with the live trainer.
 local _, ns = ...
+ns.inModule(nil)          -- core: always on (Modules.lua)
 local D = { date = "2026-11-17", fish = {}, vendorPlaces = {}, cookingSources = {} }
 ns.professionReference = D
 -- Practical example waters, not exhaustive fish distributions or guaranteed catches.

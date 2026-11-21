@@ -7,6 +7,7 @@
 -- Off by default. While it is on it manages the whole tracker list; turning it off puts your old
 -- list back. It never fights you: if you change the tracker yourself it steps aside for 10 seconds (a setting).
 local ADDON, ns = ...
+ns.inModule("tracker")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 
 local INTERVAL = 2          -- seconds between two looks

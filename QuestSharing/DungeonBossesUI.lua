@@ -2,20 +2,30 @@
 -- Left: boss rows (round portrait + level badge). Right: the selected boss and its loot rows (ns.journalItems).
 -- Contract: context/dungeon-journal-contract.md
 local ADDON, ns = ...
+ns.inModule("dungeons")          -- Modules.lua: Settings > General > Tools can switch this off
 local B = {}
 ns.dungeonBossesUI = B
 local S = ns.style
 
 local EJ = "Interface\\EncounterJournal\\UI-EJ-BOSS-"
 local SKULL = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
-local LEFT_W, ROW_W, ROW_H, ROW_GAP = 340, 315, 55, 6
-local LOOT_W, LOOT_H, LOOT_GAP = 388, 52, 6
+local MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+local HIGHLIGHT = "Interface\\QuestFrame\\UI-QuestTitleHighlight"
+local LEFT_W, ROW_W, ROW_H, ROW_GAP = 340, 314, 52, 8 -- calm list: pitch 60, 8 rows at 560
+local LOOT_W, LOOT_H, LOOT_GAP = 384, 50, 9          -- pitch 59
+local FOREVER_AREA = 16000                           -- our Forever-only area IDs start here: no journal art by name
+local PORTRAIT_WAIT, MAX_LIVE = 3, 24                -- staged display portraits: render wait (s), live textures at most
+-- the calm palette (one accent gold)
+local SLOT, SLOT_TOP, SLOT_BOTTOM = { .145, .094, .043, 1 }, { .35, .24, .11, .6 }, { 0, 0, 0, .5 }
+local SEL_FILL, SEL_EDGE = { .34, .23, .11, 1 }, { .80, .57, .21, .8 }
+local NAME_C, NAME_SEL, CREAM = { .82, .75, .60 }, { .95, .75, .32 }, { .93, .84, .66 }
+local DARK, SKULL_TINT, SKULL_ALPHA = { .055, .047, .04, 1 }, { .55, .50, .45 }, .6
 local LOOT_TOP = 102                         -- first loot row when the boss has no journal description
 local DESC_Y, DESC_LINES, LINE_H = 96, 5, 14 -- the description under the boss name: at most 5 lines
-local SIDE_X, ABIL_H, QUEST_H, MAX_QUESTS = LOOT_W + 32, 44, 16, 5
+local SIDE_X, ABIL_H, QUEST_H, MAX_QUESTS = 420, 44, 16, 5 -- side column x kept where it was
 local QUESTION = "Interface\\Icons\\INV_Misc_QuestionMark"
 local W -- the built page
-local view = { token = 0, bosses = {}, selected = 1, offset = 0, lootOffset = 0 }
+local view = { token = 0, bosses = {}, selected = 1, offset = 0, lootOffset = 0, asked = {} }
 
 local function T() return ns.journalTheme end
 local function color(fs, role)
@@ -46,35 +56,282 @@ function B.journalNames(name)
     return list
 end
 
--- Portrait source chain: Blizzard's Encounter Journal art by boss name, then the creature's display ID, then the skull.
-function B.portrait(texture, boss)
+local function setAlpha(t, a)
+    t.jAlpha = a -- kept for tests (the mock has no GetAlpha)
+    if t.SetAlpha then pcall(t.SetAlpha, t, a) end
+end
+local function tint(t, r, g, b, a)
+    if t.SetVertexColor then t:SetVertexColor(r, g, b, 1) end
+    setAlpha(t, a or 1)
+end
+
+-- Staged display portraits. SetPortraitTextureFromCreatureDisplayID draws black until the model is loaded, so it
+-- renders into a texture on an off-screen holding frame (W.stage); after PORTRAIT_WAIT the texture moves onto the
+-- host (the row or header portrait), whose own texture hides meanwhile. Entries: { tex, id, host, ready, attached,
+-- tok, last }; at most MAX_LIVE, cached by display ID, least-recently-used reuse of ones not on a shown row.
+local live, tick = {}, 0
+
+local function park(e) -- back on the stage, out of sight; the render stays in the texture
+    local t = e.tex
+    t:SetParent(W.stage); t:ClearAllPoints(); t:SetPoint("TOPLEFT", W.stage, "TOPLEFT", 0, 0)
+    t:SetWidth(64); t:SetHeight(64)
+    t:Hide()
+    e.attached = false
+end
+
+local function detach(e)
+    local host = e.host
+    if e.attached then park(e) end
+    if host then
+        if host.jLive == e then host.jLive = nil end
+        host.staged = nil
+        host:Show()
+    end
+    e.host = nil
+end
+
+local function attach(e)
+    local host, t = e.host, e.tex
+    t:SetParent((host.GetParent and host:GetParent()) or host.parent)
+    t:ClearAllPoints()
+    local n = (host.GetNumPoints and host:GetNumPoints()) or 1
+    for i = 1, n do
+        local p, rel, rp, x, y = host:GetPoint(i)
+        if p then t:SetPoint(p, rel, rp, x, y) end
+    end
+    t:SetWidth(host:GetWidth()); t:SetHeight(host:GetHeight())
+    if host.GetDrawLayer and t.SetDrawLayer then
+        local ok, layer, sub = pcall(host.GetDrawLayer, host)
+        if ok and layer then pcall(t.SetDrawLayer, t, layer, sub or 0) end
+    end
+    t:SetTexCoord(0, 1, 0, 1) -- the host's display-portrait look, not its placeholder tint
+    tint(t, 1, 1, 1, 1)
+    t:Show(); host:Hide()
+    e.attached, host.staged = true, t
+end
+
+local function release(e)
+    e.tok = (e.tok or 0) + 1 -- its timer, if any, is stale now
+    detach(e)
+    e.tex:SetTexture(nil)
+    e.id, e.ready = nil, false
+end
+
+-- every live portrait is emptied (page hidden, another dungeon, loading screen); the texture objects are reused
+function B.releasePortraits()
+    for _, e in ipairs(live) do release(e) end
+end
+function B._portraits() return live end
+
+local function onShownRow(e)
+    local host = e.host
+    if not (host and host.jLive == e) then return false end
+    local parent = (host.GetParent and host:GetParent()) or host.parent
+    return (W.frame:IsShown() and (not parent or not parent.IsShown or parent:IsShown())) and true or false
+end
+
+local function acquire()
+    for _, e in ipairs(live) do
+        if not e.id and not e.host then return e end
+    end
+    if #live < MAX_LIVE then
+        local e = { tex = W.stage:CreateTexture(nil, "ARTWORK"), tok = 0 }
+        live[#live + 1] = e
+        park(e)
+        return e
+    end
+    local best
+    for _, e in ipairs(live) do
+        if not onShownRow(e) and (not best or (e.last or 0) < (best.last or 0)) then best = e end
+    end
+    if best then release(best) end
+    return best
+end
+
+local function stage(host, id)
+    tick = tick + 1
+    local cur = host.jLive
+    if cur and cur.id == id then -- already there, or still on its way
+        cur.last = tick
+        if cur.ready and not cur.attached then attach(cur) end
+        return true
+    end
+    if cur then detach(cur) end
+    for _, e in ipairs(live) do
+        if e.id == id and not e.host then -- cached: rendered before (or still rendering) for another host
+            e.host, e.last = host, tick
+            host.jLive = e
+            if e.ready then attach(e) end
+            return true
+        end
+    end
+    local e = acquire()
+    if not e then return false end
+    park(e); e.tex:Show()
+    if not pcall(SetPortraitTextureFromCreatureDisplayID, e.tex, id) then
+        e.tex:SetTexture(nil); e.tex:Hide()
+        return false
+    end
+    e.id, e.host, e.last, e.ready = id, host, tick, false
+    host.jLive = e
+    e.tok = e.tok + 1
+    local tok = e.tok
+    ns.after(PORTRAIT_WAIT, function()
+        if e.tok ~= tok then return end -- released or reused meanwhile
+        e.ready = true
+        local h = e.host
+        if h and h.jLive == e and h.jWant == id and W.frame:IsShown() then attach(e) end
+    end)
+    return true
+end
+
+local function drop(texture)
+    if texture.jLive then detach(texture.jLive) end
+end
+
+-- the muted placeholder: the skull, dimmed, on the dark disc (portrait.back)
+local function placeholder(texture)
+    texture:SetTexture(SKULL)
+    texture:SetTexCoord(0, 1, 0, 1)
+    tint(texture, SKULL_TINT[1], SKULL_TINT[2], SKULL_TINT[3], SKULL_ALPHA)
+end
+
+-- In-game display IDs (ns.bossPortraitResolver) for bosses with no journal art and no baked displayID
+local function npcOf(boss)
+    local id = tonumber(boss.npcID)
+    if not id and type(boss.npcIDs) == "table" then id = tonumber(boss.npcIDs[1]) end
+    return id
+end
+local function resolver() return ns.bossPortraitResolver end
+local function resolved(npc)
+    local R = resolver()
+    if not (R and type(R.displayFor) == "function") then return nil end
+    local ok, d = pcall(R.displayFor, npc)
+    return ok and tonumber(d) or nil
+end
+
+local showPortrait
+local painting = false
+-- a lookup came back: repaint the rows and the header of that npc (the staged display path takes it from there)
+local function repaintNpc(npc)
+    if painting or not (W and W.frame:IsShown()) or view.loading then return end
+    for _, row in ipairs(W.rows) do
+        if row.boss and row:IsShown() and npcOf(row.boss) == npc then showPortrait(row.portrait, row.badge, row.boss) end
+    end
+    local boss = view.bosses[view.selected]
+    if boss and npcOf(boss) == npc then showPortrait(W.portrait, W.badge, boss) end
+end
+
+-- ask the resolver once per page for a boss of the dungeon being shown (it keeps at most 12 queued)
+local function ask(npc, area)
+    local R = resolver()
+    if not (R and type(R.request) == "function" and W and W.stage and W.frame:IsShown()) then return end
+    if type(SetPortraitTextureFromCreatureDisplayID) ~= "function" then return end -- nothing could draw it
+    if view.loading or area ~= tonumber(view.area) or view.asked[npc] then return end
+    local token = view.token
+    local ok, queued = pcall(R.request, npc, function()
+        if token ~= view.token then return end -- another dungeon, or the page was hidden / shown again
+        repaintNpc(npc)
+    end)
+    if ok and queued then view.asked[npc] = true end -- not queued (full): asked again on a later paint
+end
+
+-- Portrait source chain (returns the source):
+-- 1. "journal": the boss's Encounter Journal art: boss.ejFile (FileDataID), else by name (classic areas only;
+--    Forever-only areas have same-named art of other creatures);
+-- 2. "display": the creature's display portrait, staged off-screen (see stage): boss.displayID, else the one the
+--    client told the resolver (ns.bossPortraitResolver; asked for when unknown, the row repaints when it arrives);
+-- 3. "skull": the muted placeholder.
+function B.portrait(texture, boss, area)
     boss = boss or {}
-    if type(boss.name) == "string" and type(GetFileIDFromPath) == "function" then
-        for _, path in ipairs(B.journalNames(boss.name)) do
-            local ok, id = pcall(GetFileIDFromPath, path)
-            if ok and id then
-                texture:SetTexture(path)
-                texture:SetTexCoord(.25, .75, 0, 1) -- the 128x64 art, centre square for the round mask
-                texture.journalPath = path
-                return "journal"
+    area = tonumber(area or view.area)
+    texture.journalPath, texture.ejFile = nil, nil
+    local ej = tonumber(boss.ejFile)
+    if ej then
+        drop(texture)
+        texture:SetTexture(ej)
+        texture:SetTexCoord(.25, .75, 0, 1) -- the 128x64 art, centre square for the round mask
+        tint(texture, 1, 1, 1, 1)
+        texture.ejFile, texture.jWant, texture.displayID = ej, nil, nil
+        return "journal"
+    end
+    if area and area < FOREVER_AREA and type(GetFileIDFromPath) == "function" then
+        local names = {}
+        if type(boss.name) == "string" then names[#names + 1] = boss.name end
+        if type(boss.npcName) == "string" and boss.npcName ~= boss.name then names[#names + 1] = boss.npcName end
+        for _, n in ipairs(names) do
+            for _, path in ipairs(B.journalNames(n)) do
+                local ok, id = pcall(GetFileIDFromPath, path)
+                if ok and id then
+                    drop(texture)
+                    texture:SetTexture(path)
+                    texture:SetTexCoord(.25, .75, 0, 1)
+                    tint(texture, 1, 1, 1, 1)
+                    texture.journalPath, texture.jWant, texture.displayID = path, nil, nil
+                    return "journal"
+                end
             end
         end
     end
-    if boss.displayID and type(SetPortraitTextureFromCreatureDisplayID) == "function"
-        and pcall(SetPortraitTextureFromCreatureDisplayID, texture, boss.displayID) then
-        texture:SetTexCoord(0, 1, 0, 1)
-        return "display"
+    local display = tonumber(boss.displayID)
+    texture.resolved = nil
+    local npc = not display and npcOf(boss) or nil
+    if npc then
+        display = resolved(npc)
+        if not display then ask(npc, area); display = resolved(npc) end -- a cached creature may answer at once
+        texture.resolved = display and true or nil
     end
-    texture:SetTexture(SKULL)
-    texture:SetTexCoord(0, 1, 0, 1)
+    if display and W and W.stage and type(SetPortraitTextureFromCreatureDisplayID) == "function" then
+        placeholder(texture) -- shown until the staged portrait arrives
+        texture.jWant, texture.displayID = display, display
+        if stage(texture, display) then return "display" end
+    end
+    drop(texture)
+    texture.jWant, texture.displayID = nil, nil
+    placeholder(texture)
     return "skull"
 end
 
+-- a round portrait (mask only, no ring) on a dark disc (texture.back)
 local function roundPortrait(parent, size)
+    local back = parent:CreateTexture(nil, "ARTWORK", nil, -2)
+    back:SetTexture(MASK); back:SetWidth(size); back:SetHeight(size)
+    if back.SetVertexColor then back:SetVertexColor(DARK[1], DARK[2], DARK[3], DARK[4]) end
     local t = parent:CreateTexture(nil, "ARTWORK")
     t:SetWidth(size); t:SetHeight(size)
-    if T() and T().round then T().round(t, parent, size) end
+    if T() and T().round then T().round(t, parent, size, { ring = false }) end
+    back:SetPoint("CENTER", t, "CENTER", 0, 0)
+    t.back = back
     return t
+end
+
+-- the flat slot of boss and loot rows: fill, a faint 1px top line, a dark 1px bottom line (no edge, no parchment)
+local function slotLines(b)
+    local th = T()
+    b.top = th.fill(b, "BORDER", SLOT_TOP)
+    b.top:SetHeight(1); b.top:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0); b.top:SetPoint("TOPRIGHT", b, "TOPRIGHT", 0, 0)
+    b.bottom = th.fill(b, "BORDER", SLOT_BOTTOM)
+    b.bottom:SetHeight(1); b.bottom:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", 0, 0); b.bottom:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 0, 0)
+end
+
+-- selected: a lighter fill (b.sel) and a 1px gold outline (b.selEdges), shown together
+local function selectable(b)
+    local th = T()
+    b.sel = th.fill(b, "BACKGROUND", SEL_FILL, nil, 1); b.sel:SetAllPoints(b)
+    b.selEdges = {}
+    for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+        local t = th.fill(b, "OVERLAY", SEL_EDGE)
+        if side == "TOP" or side == "BOTTOM" then
+            t:SetHeight(1); t:SetPoint(side .. "LEFT", b, side .. "LEFT", 0, 0); t:SetPoint(side .. "RIGHT", b, side .. "RIGHT", 0, 0)
+        else
+            t:SetWidth(1); t:SetPoint("TOP" .. side, b, "TOP" .. side, 0, 0); t:SetPoint("BOTTOM" .. side, b, "BOTTOM" .. side, 0, 0)
+        end
+        b.selEdges[#b.selEdges + 1] = t
+    end
+end
+local function setSelected(b, on)
+    if on then b.sel:Show() else b.sel:Hide() end
+    for _, t in ipairs(b.selEdges) do if on then t:Show() else t:Hide() end end
 end
 
 local function subtitle(id)
@@ -156,9 +413,16 @@ end
 -- quests of this dungeon that ask to kill this boss: ns.dungeonQuests.questsForNpc (nil-guarded), as titles
 function B.neededFor(boss)
     local D = ns.dungeonQuests
-    if not (boss and boss.npcID and D and type(D.questsForNpc) == "function") then return {} end
-    local ok, list = pcall(D.questsForNpc, boss.npcID, view.area) -- the page's dungeon, also when the filter is 0
-    if not ok or type(list) ~= "table" then return {} end
+    if not (boss and D and type(D.questsForNpc) == "function") then return {} end
+    local ids, seenID = {}, {}
+    local function addID(v) v = tonumber(v); if v and not seenID[v] then seenID[v] = true; ids[#ids + 1] = v end end
+    addID(boss.npcID)
+    if type(boss.npcIDs) == "table" then for _, v in ipairs(boss.npcIDs) do addID(v) end end
+    local list = {}
+    for _, npc in ipairs(ids) do
+        local ok, got = pcall(D.questsForNpc, npc, view.area) -- the page's dungeon, also when the filter is 0
+        if ok and type(got) == "table" then for _, q in ipairs(got) do list[#list + 1] = q end end
+    end
     local out, byID, seen = {}, {}, {}
     for _, q in ipairs(list) do
         local id, title
@@ -190,21 +454,26 @@ function B.neededFor(boss)
 end
 
 local RANKS = { [1] = "Elite", [2] = "Rare Elite", [3] = "Boss", [4] = "Rare" }
--- the facts line: level, rank (QuestieDB npc rank, when known) and the number of drops
+-- the facts line: level, rank (QuestieDB npc rank, when known; not for official bosses: QuestieDB ranks are
+-- unreliable there, e.g. "Rare Elite" on VanCleef) and the number of drops; " (optional)" for optional encounters
 function B.facts(boss)
     if not boss then return "" end
     local parts = {}
     if boss.level then parts[#parts + 1] = "Level " .. boss.level end
-    local rank = boss.rank
-    if rank == nil and boss.npcID and ns.questie and ns.questie.get then
-        local ok, v = pcall(ns.questie.get, "npc", boss.npcID, "rank")
-        if ok then rank = v end
+    if not boss.official then
+        local rank = boss.rank
+        if rank == nil and boss.npcID and ns.questie and ns.questie.get then
+            local ok, v = pcall(ns.questie.get, "npc", boss.npcID, "rank")
+            if ok then rank = v end
+        end
+        if boss.rare then rank = rank == 1 and 2 or (rank or 4) end
+        if RANKS[tonumber(rank)] then parts[#parts + 1] = RANKS[tonumber(rank)] end
     end
-    if boss.rare then rank = rank == 1 and 2 or (rank or 4) end
-    if RANKS[tonumber(rank)] then parts[#parts + 1] = RANKS[tonumber(rank)] end
     local n = #(boss.items or {})
     parts[#parts + 1] = n == 1 and "1 drop" or (n .. " drops")
-    return table.concat(parts, " · ")
+    local line = table.concat(parts, " · ")
+    if boss.optional then line = line .. " (optional)" end
+    return line
 end
 
 local paint
@@ -214,31 +483,54 @@ local function wheel(frame, fn)
     frame:SetScript("OnMouseWheel", function(_, delta) fn(delta > 0 and -1 or 1) end)
 end
 
+local function groupTip(self)
+    local boss = self.boss
+    if not (boss and boss.group and type(boss.members) == "table" and #boss.members > 0 and GameTooltip) then return end
+    pcall(function()
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(boss.name)
+        for _, m in ipairs(boss.members) do GameTooltip:AddLine(m, 1, 1, 1) end
+        GameTooltip:Show()
+    end)
+end
+
 local function bossRow(parent, i)
     local b = CreateFrame("Button", nil, parent)
     b:SetWidth(ROW_W); b:SetHeight(ROW_H)
-    b:SetPoint("TOPLEFT", parent, "TOPLEFT", 12, -(44 + (i - 1) * (ROW_H + ROW_GAP)))
-    T().panel(b, "row")
-    local c = T().C.rowSelected
-    b.sel = S.fill(b, "BORDER", c[1], c[2], c[3], c[4] or 1); b.sel:SetAllPoints(b); b.sel:Hide()
-    if b.SetHighlightTexture then b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD") end
-    b.portrait = roundPortrait(b, 44); b.portrait:SetPoint("LEFT", b, "LEFT", 6, 0)
-    b.badge = T().badge(b, nil, 22); b.badge:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", 2, 1)
+    b:SetPoint("TOPLEFT", parent, "TOPLEFT", 10, -(44 + (i - 1) * (ROW_H + ROW_GAP)))
+    b.bg = T().fill(b, "BACKGROUND", SLOT); b.bg:SetAllPoints(b)
+    slotLines(b)
+    selectable(b); setSelected(b, false)
+    b.hl = b:CreateTexture(nil, "HIGHLIGHT")
+    b.hl:SetTexture(HIGHLIGHT); b.hl:SetAllPoints(b)
+    if b.hl.SetBlendMode then b.hl:SetBlendMode("ADD") end
+    setAlpha(b.hl, .35)
+    if b.SetHighlightTexture then pcall(b.SetHighlightTexture, b, b.hl, "ADD") end
+    b.portrait = roundPortrait(b, 44); b.portrait:SetPoint("LEFT", b, "LEFT", 5, 0)
+    b.badge = T().badge(b, nil, 24, { flat = true, font = 11 })
+    b.badge:SetPoint("CENTER", b.portrait, "BOTTOMLEFT", 9, 3) -- hangs ~6px below the row, inside the 8px gap
     b.name = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     b.name:SetPoint("LEFT", b, "LEFT", 62, 0); b.name:SetWidth(ROW_W - 72)
+    T().font(b.name, 12, NAME_C)
     if b.name.SetJustifyH then b.name:SetJustifyH("LEFT") end
+    if b.name.SetWordWrap then b.name:SetWordWrap(false) end
     b:SetScript("OnClick", function(self)
         if not self.index then return end
         view.selected, view.lootOffset = self.index, 0
         paint()
     end)
+    b:SetScript("OnEnter", groupTip)
+    b:SetScript("OnLeave", untip)
     wheel(b, function(d) B.scroll(d) end)
     return b
 end
 
 local function lootRow(parent, i)
     local b = ns.journalItems.button(parent, LOOT_W, LOOT_H)
-    T().panel(b, "lootRow")
+    -- the boss rows' flat slot: recolour the button's own fill, hide its edge lines
+    if b.bg then T().color(b.bg, SLOT) else b.bg = T().fill(b, "BACKGROUND", SLOT); b.bg:SetAllPoints(b) end
+    for _, t in ipairs(b.edges or {}) do t:Hide() end
+    slotLines(b)
     b:SetPoint("TOPLEFT", parent, "TOPLEFT", 16, -(LOOT_TOP + (i - 1) * (LOOT_H + LOOT_GAP)))
     if not hasScript(b, "OnEnter") then fallbackHover(b) end
     wheel(b, function(d) B.scrollLoot(d) end)
@@ -288,20 +580,25 @@ function B.build(parent, width, height)
     W.left = CreateFrame("Frame", nil, f)
     W.left:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0); W.left:SetWidth(LEFT_W); W.left:SetHeight(height)
     T().panel(W.left, "left")
+    if W.left.jPage then W.left.jPage:Hide() end -- calm: no parchment behind the list
     W.title = text(W.left, "GameFontNormalLarge", 14, 14, LEFT_W - 28); W.title:SetText("Bosses"); color(W.title, "title")
     W.rowCount = math.max(1, math.floor((height - 50) / (ROW_H + ROW_GAP)))
     for i = 1, W.rowCount do W.rows[i] = bossRow(W.left, i) end
     W.leftStatus = text(W.left, "GameFontHighlightSmall", 14, height - 24, LEFT_W - 28); color(W.leftStatus, "muted")
+    W.leftStatus:Hide()
     wheel(W.left, function(d) B.scroll(d) end)
 
     W.right = CreateFrame("Frame", nil, f)
     W.right:SetPoint("TOPLEFT", f, "TOPLEFT", LEFT_W + 16, 0); W.right:SetWidth(width - LEFT_W - 16); W.right:SetHeight(height)
     T().panel(W.right, "right")
+    if W.right.jPage then W.right.jPage:Hide() end
     W.portrait = roundPortrait(W.right, 68); W.portrait:SetPoint("TOPLEFT", W.right, "TOPLEFT", 16, -14)
-    W.badge = T().badge(W.right, nil, 28); W.badge:SetPoint("TOPLEFT", W.right, "TOPLEFT", 10, -58)
-    W.name = text(W.right, "GameFontNormalHuge", 96, 34, width - LEFT_W - 130); color(W.name, "title")
+    W.badge = T().badge(W.right, nil, 30, { flat = true, font = 13 })
+    W.badge:SetPoint("CENTER", W.portrait, "BOTTOMLEFT", 7, 3)
     local rightW = width - LEFT_W - 16
-    W.facts = text(W.right, "GameFontHighlightSmall", 96, 64, rightW - 110); color(W.facts, "muted")
+    W.name = text(W.right, "GameFontNormalHuge", 100, 30, rightW - 116); T().font(W.name, 16, CREAM)
+    if W.name.SetWordWrap then W.name:SetWordWrap(false) end
+    W.facts = text(W.right, "GameFontHighlightSmall", 100, 54, rightW - 116); T().font(W.facts, 10, T().C.muted)
     W.descW = rightW - 32
     W.desc = text(W.right, "GameFontHighlight", 16, DESC_Y, W.descW); color(W.desc, "text")
     if W.desc.SetWordWrap then W.desc:SetWordWrap(true) end
@@ -326,8 +623,15 @@ function B.build(parent, width, height)
     W.lootMax = math.max(1, math.floor((height - LOOT_TOP - 38) / (LOOT_H + LOOT_GAP)))
     W.lootCount = W.lootMax -- rows that fit under the description; paint sets it
     for i = 1, W.lootMax do W.loot[i] = lootRow(W.right, i) end
-    W.note = text(W.right, "GameFontHighlightSmall", 16, height - 26, width - LEFT_W - 50); color(W.note, "muted")
+    -- under the drops: the drop counter (only on overflow) and, on its own line, the AtlasLoot hint (W.note)
+    W.count = text(W.right, "GameFontHighlightSmall", 16, height - 34, LOOT_W); color(W.count, "muted")
+    W.note = text(W.right, "GameFontHighlightSmall", 16, height - 20, LOOT_W); color(W.note, "muted")
     wheel(W.right, function(d) B.scrollLoot(d) end)
+    -- staged display portraits render off-screen first (see stage)
+    W.stage = CreateFrame("Frame", nil, UIParent)
+    W.stage:SetPoint("TOPLEFT", UIParent, "TOPRIGHT", 10000, 0); W.stage:SetWidth(64); W.stage:SetHeight(64)
+    W.stage:Show()
+    ns.on("PLAYER_LEAVING_WORLD", function() B.releasePortraits() end)
     ns.on("GET_ITEM_INFO_RECEIVED", function(_, id)
         local boss = W.frame:IsShown() and view.bosses[view.selected]
         if not boss or view.pending then return end
@@ -343,9 +647,10 @@ function B.build(parent, width, height)
     return f
 end
 
-local function showPortrait(texture, badge, boss)
-    texture.source = B.portrait(texture, boss)
-    texture:Show()
+showPortrait = function(texture, badge, boss)
+    texture.source = B.portrait(texture, boss, view.area)
+    texture.back:Show()
+    if not texture.staged then texture:Show() end -- a staged display portrait stands in for it
     badge:SetLevel(boss.level)
     if boss.level then badge:Show() else badge:Hide() end
 end
@@ -410,8 +715,7 @@ function B.paintLore(boss)
     return top
 end
 
-paint = function()
-    if not W then return end
+local function paintAll()
     local bosses = view.bosses
     view.offset = math.max(0, math.min(view.offset, math.max(0, #bosses - W.rowCount)))
     for i, row in ipairs(W.rows) do
@@ -420,21 +724,25 @@ paint = function()
         row.index, row.boss = boss and index or nil, boss
         if boss then
             row.name:SetText(boss.name)
-            color(row.name, index == view.selected and "title" or "text")
+            local c = index == view.selected and NAME_SEL or NAME_C
+            if row.name.SetTextColor then row.name:SetTextColor(c[1], c[2], c[3]) end
             showPortrait(row.portrait, row.badge, boss)
-            if index == view.selected then row.sel:Show() else row.sel:Hide() end
+            setSelected(row, index == view.selected)
             row:Show()
         else row:Hide() end
     end
-    W.leftStatus:SetText(#bosses > W.rowCount
-        and ((view.offset + 1) .. "-" .. math.min(#bosses, view.offset + W.rowCount) .. " of " .. #bosses .. " (mouse wheel)") or "")
+    if #bosses > W.rowCount then -- the footer only when the list overflows (BRD, Stratholme, Dire Maul)
+        W.leftStatus:SetText((view.offset + 1) .. "-" .. math.min(#bosses, view.offset + W.rowCount) .. " of " .. #bosses)
+        W.leftStatus:Show()
+    else
+        W.leftStatus:SetText(""); W.leftStatus:Hide()
+    end
 
     local boss = bosses[view.selected]
     local status
     if view.loading then status = "Loading drops…"
     elseif not boss then
         status = view.reason or "No bosses known for this dungeon."
-        if view.source ~= "AtlasLoot" then status = status .. "\n\nInstall AtlasLoot for full drops." end
     elseif #(boss.items or {}) == 0 then status = "No drops listed for " .. boss.name .. "." end
     local current = boss and not view.loading and boss or nil
     if current then
@@ -442,7 +750,8 @@ paint = function()
         W.name:SetText(boss.name); W.name:Show()
         W.facts:SetText(B.facts(boss)); W.facts:Show()
     else
-        W.portrait:Hide(); W.badge:Hide(); W.name:SetText(""); W.name:Hide()
+        drop(W.portrait)
+        W.portrait:Hide(); W.portrait.back:Hide(); W.badge:Hide(); W.name:SetText(""); W.name:Hide()
         W.facts:SetText(""); W.facts:Hide()
     end
     local top = B.paintLore(current)
@@ -458,12 +767,24 @@ paint = function()
         b:ClearAllPoints(); b:SetPoint("TOPLEFT", W.right, "TOPLEFT", 16, -(top + (i - 1) * (LOOT_H + LOOT_GAP)))
         if id then b:SetItem(id, subtitle(id)); b:Show() else b:Hide() end
     end
-    local note = {}
+    local hint = not view.loading and view.source ~= "AtlasLoot"
+    W.note:SetText(hint and "Install AtlasLoot for full drops." or "")
+    if hint then W.note:Show() else W.note:Hide() end
     if #items > W.lootCount then
-        note[#note + 1] = (view.lootOffset + 1) .. "-" .. math.min(#items, view.lootOffset + W.lootCount) .. " of " .. #items .. " drops (mouse wheel)"
+        W.count:ClearAllPoints(); W.count:SetPoint("TOPLEFT", W.right, "TOPLEFT", 16, -(W.height - (hint and 34 or 20)))
+        W.count:SetText((view.lootOffset + 1) .. "-" .. math.min(#items, view.lootOffset + W.lootCount) .. " of " .. #items .. " drops")
+        W.count:Show()
+    else
+        W.count:SetText(""); W.count:Hide()
     end
-    if boss and not view.loading and view.source ~= "AtlasLoot" then note[#note + 1] = "Partial QuestieDB drops. Install AtlasLoot for full drops." end
-    W.note:SetText(table.concat(note, " · "))
+end
+
+paint = function()
+    if not W then return end
+    painting = true -- a lookup answered during this paint is picked up by it (no nested repaint)
+    local ok, err = pcall(paintAll)
+    painting = false
+    if not ok then error(err, 0) end
 end
 
 function B.scroll(delta)
@@ -487,6 +808,12 @@ function B.show(area, name)
     if not W then return false end
     view.token = view.token + 1
     local token = view.token
+    if view.area ~= area then -- another dungeon: free every live portrait, drop the old dungeon's lookups
+        B.releasePortraits()
+        local R = resolver()
+        if R and type(R.clear) == "function" then pcall(R.clear) end
+    end
+    view.asked = {}
     if view.area ~= area or view.name ~= name then view.selected, view.offset, view.lootOffset = 1, 0, 0 end
     view.area, view.name, view.bosses, view.loading, view.source, view.reason = area, name, {}, true, nil, nil
     W.frame:Show()
@@ -535,7 +862,9 @@ end
 
 function B.hide()
     view.token = view.token + 1
-    if W then W.frame:Hide() end
+    if W then W.frame:Hide(); B.releasePortraits() end
+    local R = resolver()
+    if R and type(R.clear) == "function" then pcall(R.clear) end
 end
 
 function B.refresh() if W and W.frame:IsShown() then paint() end end

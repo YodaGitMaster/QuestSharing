@@ -2,6 +2,7 @@
 -- (click = map pin), the flight-path check box and Refresh. The planning itself stays in DungeonQuests.lua
 -- (D.routePlan) and DungeonRoute.lua. Contract: context/dungeon-journal-contract.md
 local ADDON, ns = ...
+ns.inModule("dungeons")          -- Modules.lua: Settings > General > Tools can switch this off
 local R = {}
 ns.dungeonRouteUI = R
 local U, E = ns.optionalUI, ns.equipmentUI

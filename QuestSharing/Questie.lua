@@ -9,6 +9,7 @@
 --   * Questie 11 and older: QuestieLoader:ImportModule("QuestieDB").QueryQuestSingle(id, key) (only once Questie started)
 -- Spawns are { [areaId] = { {x, y}, ... } } with x, y from 0 to 100; {-1, -1} means inside a dungeon.
 local ADDON, ns = ...
+ns.inModule(nil)          -- core: always on (Modules.lua)
 local C = ns.compat
 
 local Q = {}

@@ -4,6 +4,7 @@
 --   2. other Quest Sharing users: they answer "what is your item level?" and share the numbers they remember.
 --   Numbers are remembered for 14 days (QuestSharingDB.ilvlSeen[name] = { i = level, at = time() }).
 local ADDON, ns = ...
+ns.inModule("finder")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 
 local I = {}

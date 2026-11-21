@@ -388,6 +388,22 @@ def test_home_hides_the_quest_filters_and_status_line_and_keeps_refresh_and_hide
     assert not g.eval("NS.db.errors")
 
 
+def test_no_matching_quests_shows_only_on_the_quests_tab(style):
+    # a dungeon with no quest results: the Quests tab says so, the Bosses, Map and Route pages keep a calm top
+    g = opened(style); w = g.eval("NS.dungeonQuests._window()")
+    from test_dungeon_quests import edit
+    D(g, "openDungeon")(1581)
+    edit(w.search, "zzqqxx no such quest"); g.advance(.3)
+    assert len(list(D(g, "_results")().values())) == 0
+    assert w.status.shown, "the Quests tab says there are no matching quests"
+    for tab in ("bosses", "map", "route"):
+        click(w.tabs[tab]); g.advance(.1)
+        assert not w.status.shown, tab
+    click(w.tabs.quests); g.advance(.1)
+    assert w.status.shown, "back on the Quests tab the line returns"
+    assert not g.eval("NS.db.errors")
+
+
 def test_home_keeps_the_status_line_while_it_says_why_there_are_no_cards(style):
     g = game(style, HOVER_DATA, open_tab=False)
     g.run(SPIES)

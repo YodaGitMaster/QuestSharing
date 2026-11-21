@@ -1,6 +1,7 @@
 -- Style.lua: one classic WoW menu look for every window of the addon (settings, Party quests, reports).
 -- Only plain frames and textures that every client has, so it looks the same on the classic and the modern client.
 local ADDON, ns = ...
+ns.inModule(nil)          -- core: always on (Modules.lua)
 
 local S = {}
 ns.style = S

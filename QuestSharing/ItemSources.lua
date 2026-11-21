@@ -1,5 +1,6 @@
 -- Small, optional QuestieDB hints on item tooltips: vendor categories and known mining nodes.
 local ADDON, ns = ...
+ns.inModule("items")          -- Modules.lua: Settings > General > Tools can switch this off
 local Q, U = ns.questie, ns.optionalUI
 local I = {}
 ns.itemSources = I

@@ -1,6 +1,7 @@
 -- Embedded Forever profession views. Own frames are children of Blizzard's existing window;
 -- known recipes still use CraftingPage:SelectRecipe and its native crafting controls.
 local _,ns=...
+ns.inModule("professions")          -- Modules.lua: Settings > General > Tools can switch this off
 local V,P,U,S={},ns.professions,ns.optionalUI,ns.style
 ns.professionUI=V
 local w,selected=nil,nil

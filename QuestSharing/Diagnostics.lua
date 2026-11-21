@@ -1,5 +1,6 @@
 -- Diagnostics.lua: /qs log, /qs errors and /qs doctor open one complete copyable diagnostic snapshot.
 local ADDON, ns = ...
+ns.inModule(nil)          -- core: always on (Modules.lua)
 local C = ns.compat
 
 local MAX_ERRORS = 30

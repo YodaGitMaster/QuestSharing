@@ -4,6 +4,7 @@
 -- improved with or-opt and 2-opt moves (the idea of QuestOptimizer.improve, on a much smaller model).
 -- All times are estimates in seconds; TravelData coordinates are approximate.
 local ADDON, ns = ...
+ns.inModule("dungeons")          -- Modules.lua: Settings > General > Tools can switch this off
 local R = {}
 ns.dungeonRoute = R
 

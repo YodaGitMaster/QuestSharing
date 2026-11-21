@@ -1,5 +1,6 @@
 -- Small shared controls for the optional tools; no dependency on client-specific dropdown templates.
 local ADDON, ns = ...
+ns.inModule(nil)          -- core: always on (Modules.lua)
 local U, S = {}, ns.style
 ns.optionalUI = U
 

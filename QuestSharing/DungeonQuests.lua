@@ -1,5 +1,6 @@
 -- Explicit-open quest catalogue. Dungeon association follows quest locations, not reward equipment or pickup zone.
 local ADDON, ns = ...
+ns.inModule("dungeons")          -- Modules.lua: Settings > General > Tools can switch this off
 local D, Q, E, U, S, C = {}, ns.questie, ns.equipmentUI, ns.optionalUI, ns.style, ns.compat
 ns.dungeonQuests = D
 local window, filters, records, results, places = nil, nil, {}, {}, {}
@@ -1377,7 +1378,8 @@ local function applyView()
     if area==0 then window.filterBar:Hide() else window.filterBar:Show() end
     -- The status line only speaks when something needs saying (loading, an error, nothing found); the page range lives
     -- in the list heading, as in a journal, so the dungeon page has no legend line.
-    if window.levelError or filterError or loading or not ready or (area~=0 and #results==0) then window.status:Show() else window.status:Hide() end
+    -- "No matching quests" is about the Quests tab only; the Bosses, Map and Route pages keep a calm top
+    if window.levelError or filterError or loading or not ready or (area~=0 and #results==0 and window.tab=="quests") then window.status:Show() else window.status:Hide() end
     if area==0 then
         window.dungeonView:Hide();window.homeView:Show();window.title:SetText("All dungeons")
         hideModule(window.shownTab);window.shownTab,window.shownArea=nil,nil

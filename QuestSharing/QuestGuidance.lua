@@ -1,5 +1,6 @@
 -- Read-only guidance for the current quest-plan step; no database reads or terrain search.
 local ADDON, ns = ...
+ns.inModule("guide")          -- Modules.lua: Settings > General > Tools can switch this off
 local G, C, U, S = {}, ns.compat, ns.optionalUI, ns.style
 ns.questGuidance = G
 local route, selected, owner, choose, targetWorld, mapSize

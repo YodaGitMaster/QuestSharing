@@ -1,5 +1,6 @@
 -- QuestPlanner.lua: a prerequisite-aware, zone-local quest plan. Questie supplies facts; the player chooses the stops.
 local ADDON, ns = ...
+ns.inModule("guide")          -- Modules.lua: Settings > General > Tools can switch this off
 local P, U, S = {}, ns.optionalUI, ns.style
 local Path = ns.questPlannerPath
 local Work = ns.dataWork

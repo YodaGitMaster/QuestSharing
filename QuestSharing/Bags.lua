@@ -6,6 +6,7 @@
 -- The game's own bags and the bank's main slots. Our own frames laid over the slots (never fields written onto the
 -- game's buttons), clicks go through to the item. Bag replacement addons use their own buttons and are not marked.
 local ADDON, ns = ...
+ns.inModule("bags")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 
 local TICK = 0.4

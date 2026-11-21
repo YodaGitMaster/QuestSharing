@@ -6,6 +6,11 @@ Graphs: `<process-id>/diagram.mmd` (Mermaid) and `<process-id>/process.bpmn` (op
 <!-- bpmn:index -->
 | Run | Process | Outcome | Duration | Agents | Rounds | Context | Graph |
 |---|---|---|---|---|---|---|---|
+| r-20261121-041134-dd71 | forever-boss-portraits-finish | Forever portraits done | 2h 16m | 3 | 1 | failed | [diagram](forever-boss-portraits-finish/diagram.mmd) · [bpmn](forever-boss-portraits-finish/process.bpmn) |
+| r-20261121-011426-0839 | forever-boss-portraits | failed: "Build portrait resolver" failed: time limit (60 min, effor… | 2h 27m | 3 | 1 | skipped | [diagram](forever-boss-portraits/diagram.mmd) · [bpmn](forever-boss-portraits/process.bpmn) |
+| r-20261121-004322-66d1 | dungeon-bosses-review | cancelled: cancelled by the user | 27m 43s | 1 | 1 | skipped | [diagram](dungeon-bosses-review/diagram.mmd) · [bpmn](dungeon-bosses-review/process.bpmn) |
+| r-20261120-220008-0d88 | dungeon-bosses-finish | failed: "Integrate and render bosses" failed: time limit (45 min, e… | 2h 02m | 1 | 1 | skipped | [diagram](dungeon-bosses-finish/diagram.mmd) · [bpmn](dungeon-bosses-finish/process.bpmn) |
+| r-20261120-194708-fb95 | dungeon-bosses-fix | failed: "Review bosses layout" failed: time limit (12 min, effort h… | 1h 21m | 11 | 1 | skipped | [diagram](dungeon-bosses-fix/diagram.mmd) · [bpmn](dungeon-bosses-fix/process.bpmn) |
 | r-20261120-114959-1c34 | dungeon-journal-r3 | Round 3 done | 1h 05m | 12 | 3 | done | [diagram](dungeon-journal-r3/diagram.mmd) · [bpmn](dungeon-journal-r3/process.bpmn) |
 | r-20261120-111056-9c21 | dungeon-journal-r2 | Round 2 done | 38m 49s | 6 | 1 | done | [diagram](dungeon-journal-r2/diagram.mmd) · [bpmn](dungeon-journal-r2/process.bpmn) |
 | r-20261120-102551-f86e | dungeon-journal-finish | Look rebuilt | 22m 23s | 2 | 1 | done | [diagram](dungeon-journal-finish/diagram.mmd) · [bpmn](dungeon-journal-finish/process.bpmn) |

@@ -1,5 +1,6 @@
 -- On-demand bag cleanup. Absence from the quest log is a review candidate, never proof an item is useless.
 local ADDON, ns = ...
+ns.inModule("items")          -- Modules.lua: Settings > General > Tools can switch this off
 local C, U, S = ns.compat, ns.optionalUI, ns.style
 local R = {}
 ns.questCleanup = R

@@ -12,7 +12,8 @@ STYLES = ("modern", "classic")
 LFG = """
 LISTED, SEARCHES, SEARCH_ACTS = {}, {}, {}
 LISTING = { 101 }                      -- my listing: The Deadmines (nil = not listed)
-ACTIVITIES = { [101] = { fullName = "The Deadmines", categoryID = 2 }, [202] = { fullName = "Wailing Caverns", categoryID = 2 } }
+ACTIVITIES = { [101] = { fullName = "The Deadmines", categoryID = 2, minLevelSuggestion = 15, maxLevelSuggestion = 30 },
+               [202] = { fullName = "Wailing Caverns", categoryID = 2, minLevelSuggestion = 15, maxLevelSuggestion = 30 } }
 local function solo(name, level, class, roles, act)
     return { numMembers = 1, leaderName = name, activityIDs = { act or 101 },
              player = { name = name, level = level, className = class, classFilename = string.upper(class), lfgRoles = roles } }
@@ -179,23 +180,22 @@ def test_the_picker_toggles_roles_and_classes_and_find_searches(style):
     assert "invited Lia" in W.status.text
 
 
-def test_a_player_who_joins_no_longer_holds_an_extra_spot(style):
+def test_only_real_members_count_for_free_spots(style):
     g = game(style)
     g.join_party(["A", "B"])                                     # 3 in the party: two spots
     g.eval("NS.lfgInvite.scan")()
-    assert g.invited() == ["Lia"] and g.eval("NS.lfgInvite.freeSpots()") == 1
-    g.join_party(["A", "B", "Lia"])                              # Lia accepted: 4 in the party, still one spot
-    assert g.eval("NS.lfgInvite.freeSpots()") == 1
+    assert g.invited() == ["Lia"] and g.eval("(NS.lfgInvite.freeSpots())") == 2, "an open invite holds no spot"
+    g.join_party(["A", "B", "Lia"])                              # Lia accepted: 4 members, one spot
+    assert g.eval("(NS.lfgInvite.freeSpots())") == 1
 
 
-def test_a_declined_invite_frees_its_spot_at_once(style):
+def test_a_declined_invite_says_so(style):
     g = game(style)
-    g.join_party(["A", "B", "C"])                                # one spot
+    g.join_party(["A", "B", "C"])
     g.eval("NS.lfgInvite.scan")()
-    assert g.eval("(NS.lfgInvite.freeSpots())") == 0
     g.reply("Lia declines your group invitation.")
-    assert g.eval("NS.lfgInvite.freeSpots()") == 1
-    assert any("Lia declined, the spot is free again" in p for p in g.printed())
+    assert any("Lia declined" in p for p in g.printed())
+    assert g.eval("(NS.lfgInvite.freeSpots())") == 1
 
 
 def test_a_search_the_game_never_answered_does_not_block_forever(style):
@@ -217,9 +217,10 @@ def test_the_picker_says_why_find_cannot_work_and_keeps_the_last_invite(style):
     g.run("LISTING = { 101 }")
     g.fire("LFG_LIST_ACTIVE_ENTRY_UPDATE")
     assert W.status.text == "Ready: click Find."
-    g.join_party(["A", "B", "C"])
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(W.find)
-    assert "invited Lia" in W.status.text and "party is full" in W.status.text
+    assert "invited Lia" in W.status.text
+    g.join_party(["A", "B", "C", "Lia"])
+    assert "invited Lia" in W.status.text and "party is full" in W.status.text, "full only with 5 real members"
     assert "0 free spots" in W.info.text
 
 
@@ -272,16 +273,16 @@ end
 """
 
 
-def test_normal_mode_invites_one_healer_even_with_many_listed(style):
+def test_normal_mode_invites_one_healer_per_find(style):
     g = game(style)
     g.run(HEALERS)
     g.eval("NS.lfgInvite.scan")()
     assert g.invited() == ["Lia"], "1 healer needed: only the highest level (Lia 24)"
     g.eval("NS.lfgInvite.scan")()
-    assert g.invited() == ["Lia"], "the healer spot is taken by the open invite"
-    g.reply("Lia declines your group invitation.")
+    assert g.invited() == ["Lia", "Hec"], "Lia has not joined: the next Find tries the next healer"
+    g.join_party(["Lia"])
     g.eval("NS.lfgInvite.scan")()
-    assert g.invited() == ["Lia", "Hec"], "declined: the next healer by level"
+    assert g.invited() == ["Lia", "Hec"], "a healer is in the party: no more healers"
 
 
 def test_supercharge_invites_every_matching_healer_at_once(style):
@@ -292,7 +293,7 @@ def test_supercharge_invites_every_matching_healer_at_once(style):
     g.eval("NS.lfgInvite.scan")()
     assert g.invited() == ["Lia", "Hec", "Heb", "Hea"], "all four, highest level first"
     assert all(m.endswith("First to accept gets the spot.") for m, _ in whispers(g))
-    assert g.eval("(NS.lfgInvite.freeSpots())") == 0, "4 open invites fill the 4 spots (the game counts them too)"
+    assert g.eval("(NS.lfgInvite.freeSpots())") == 4, "open invites hold no spot"
 
 
 def test_a_joined_healer_fills_the_healer_role(style):
@@ -303,16 +304,16 @@ def test_a_joined_healer_fills_the_healer_role(style):
     g.advance(70)                                                # long after the invite expired
     g.eval("NS.lfgInvite.scan")()
     assert g.invited() == ["Lia"], "Lia joined as healer: no second healer"
-    assert g.eval("NS.lfgInvite.roleOpen('healer')") == 0 and g.eval("NS.lfgInvite.roleOpen('damage')") == 3
+    assert g.eval("NS.lfgInvite.roleOpen('healer')") == 0 and g.eval("NS.lfgInvite.roleOpen('damage')") == 2, "me (damage by default) + Lia (healer)"
 
 
 def test_the_picker_supercharge_box_and_open_roles_line(style):
     g = game(style)
     g.eval("NS.lfgFinder.toggle")(True)
     W = g.eval("NS.lfgFinder._window()")
-    assert "open: 1 healer, 1 tank, 3 damage" in W.info.text
+    assert "Party: tank 0/1, healer 0/1, damage 1/3" in W.info.text
     g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(W.super)
-    assert g.eval("NS.db.lfgSupercharge") is True and "every match" in W.info.text
+    assert g.eval("NS.db.lfgSupercharge") is True
 
 
 DRUID = "LISTED[40] = { numMembers = 1, leaderName = 'Dru', activityIDs = { 101 }, player = { name = 'Dru', level = 30, className = 'Druid', classFilename = 'DRUID', lfgRoles = { healer = true, dps = true } } }"
@@ -390,25 +391,21 @@ def test_settings_links_open_the_party_finder_page(style):
     assert g.eval("NS._settingsWindow()").tab == "finder", "the picker's Settings button"
 
 
-def test_supercharge_never_sends_more_invites_than_free_spots(style):
+def test_supercharge_skips_nobody_for_open_invites(style):
     g = game(style)
     g.run(HEALERS + "; NS.setSetting('lfgSupercharge', true)")
-    g.join_party(["A", "B"])                                     # 3 in the party: 2 spots
+    g.join_party(["A", "B"])                                     # 3 members
     g.eval("NS.lfgInvite.scan")()
-    assert g.invited() == ["Lia", "Hec"], "only 2 invites: a 3rd would get 'Your party is full.'"
-    g.reply("Lia declines your group invitation.")
-    g.eval("NS.lfgInvite.scan")()
-    assert g.invited() == ["Lia", "Hec", "Heb"], "a decline frees one spot for one more"
+    assert g.invited() == ["Lia", "Hec", "Heb", "Hea"], "every listed healer at once; first to accept wins"
 
 
-def test_supercharge_counts_players_still_being_asked_for_their_item_level(style):
+def test_supercharge_with_item_level_asks_then_invites_all(style):
     g = game(style)
     g.run(HEALERS + "; NS.setSetting('lfgSupercharge', true); NS.setSetting('lfgMinIlvl', 30)")
-    g.join_party(["A", "B", "C"])                                # 1 spot
     g.eval("NS.lfgInvite.scan")()
-    assert g.invited() == [] and g.eval("(NS.lfgInvite.freeSpots())") == 0, "one player asked: the spot is held"
+    assert g.invited() == []
     g.advance(3)
-    assert g.invited() == ["Lia"], "after the wait, one invite only"
+    assert sorted(g.invited()) == ["Hea", "Heb", "Hec", "Lia"]
 
 
 def test_a_player_listed_twice_gets_one_invite(style):
@@ -419,21 +416,179 @@ def test_a_player_listed_twice_gets_one_invite(style):
     assert g.invited().count("Lia") == 1
 
 
-def test_an_open_invite_holds_its_spot_past_one_minute(style):
+def test_an_invite_nobody_answers_never_blocks_the_next_find(style):
     g = game(style)
+    g.run(HEALERS)
     g.join_party(["A", "B", "C"])                                # 1 spot
+    g.eval("NS.lfgInvite.scan")()                                # Lia invited, she just hangs
+    assert g.eval("NS.lfgInvite.blocker()") is None, "no 'party is full' while she does not answer"
     g.eval("NS.lfgInvite.scan")()
-    g.advance(65)                                                # the game may still show her the invite
-    assert g.eval("(NS.lfgInvite.freeSpots())") == 0
-    g.advance(15)
-    assert g.eval("(NS.lfgInvite.freeSpots())") == 1
+    assert g.invited() == ["Lia", "Hec"], "the next Find invites the next healer"
+
+
+def test_someone_who_leaves_frees_the_spot_and_the_role(style):
+    g = game(style)
+    g.run(HEALERS)
+    g.eval("NS.lfgInvite.scan")()
+    g.join_party(["Lia", "A", "B", "C"])                         # full: Lia (healer) + 3
+    assert g.eval("(NS.lfgInvite.freeSpots())") == 0 and g.eval("NS.lfgInvite.roleOpen('healer')") == 0
+    g.join_party(["A", "B", "C"])                                # Lia left
+    assert g.eval("(NS.lfgInvite.freeSpots())") == 1 and g.eval("NS.lfgInvite.roleOpen('healer')") == 1
+    g.run("INVITED = {}")
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == ["Hec"]
 
 
 def test_the_games_party_full_error_gets_a_plain_explanation(style):
     g = game(style)
     g.eval("NS.lfgInvite.scan")()
     g.reply("Your party is full.")
-    assert any("open invites count as spots" in p for p in g.printed())
+    assert any("the game says the party is full" in p for p in g.printed())
+
+
+def test_my_own_role_counts(style):
+    g = game(style)
+    g.run("NS.setSetting('lfgMyRole', 'healer')")
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == [], "I am the healer: no second healer"
+    g.run("NS.setSetting('lfgMyRole', 'tank'); NS.setSetting('lfgTank', true)")
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == ["Lia"], "I am the tank: Bram (tank) is not invited, Lia (healer) is"
+
+
+def test_party_is_never_more_than_three_damage(style):
+    g = game(style)
+    g.run("NS.setSetting('lfgHealer', false); NS.setSetting('lfgDps', true); NS.setSetting('lfgSupercharge', true)")
+    g.join_party(["A", "B"])                                     # me + 2 unknown = 3 damage
+    assert g.eval("NS.lfgInvite.compositionText()") == "tank 0/1, healer 0/1, damage 3/3"
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == [], "3 damage already: even supercharge invites no more damage"
+
+
+def test_unknown_members_count_as_damage_but_a_known_role_wins(style):
+    g = game(style)
+    g.run("UnitGroupRolesAssigned = function(u) if u == 'party1' then return 'HEALER' end return 'NONE' end")
+    g.join_party(["Pri", "B"])
+    assert g.eval("NS.lfgInvite.compositionText()") == "tank 0/1, healer 1/1, damage 2/3"
+
+
+def test_the_picker_i_am_button_cycles_my_role(style):
+    g = game(style)
+    g.eval("NS.lfgFinder.toggle")(True)
+    W = g.eval("NS.lfgFinder._window()")
+    assert W.me.text == "I am: auto (damage)"
+    g.eval("function(b) b.scripts.OnClick(b, 'LeftButton') end")(W.me)
+    assert g.eval("NS.db.lfgMyRole") == "tank" and W.me.text == "I am: tank"
+    assert "tank 1/1" in W.info.text
+
+
+def test_anyone_invited_is_not_invited_again_for_an_hour(style):
+    g = game(style)
+    g.eval("NS.lfgInvite.scan")()
+    g.reply("Lia declines your group invitation.")
+    g.run("INVITED = {}")
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == [], "declined 0 min ago: blocked"
+    g.run("NOW = NOW + 61 * 60")                                  # an hour later
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == ["Lia"], "after 60 min she may be invited again"
+
+
+def test_who_joined_and_who_left_is_remembered_and_blocked(style):
+    g = game(style)
+    g.run(HEALERS)
+    g.eval("NS.lfgInvite.scan")()
+    g.join_party(["Lia"])
+    g.join_party([])                                             # she left
+    h = g.eval("NS.db.lfgHistory.Lia")
+    assert h.invited and h.joined and h.left
+    g.run("NS.db.lfgHistory.Lia.invited = 1")                   # invited long ago ...
+    g.run("INVITED = {}")
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == ["Hec"], "... but she left just now: still blocked, the next healer instead"
+    g.slash("lfg history")
+    assert any("Lia: invited" in p and "joined" in p and "left" in p and "blocked" in p for p in g.printed())
+    g.slash("lfg forget")
+    assert g.eval("NS.lfgInvite.blockedFor('Lia')") is None
+
+
+MAPS = r"""
+Enum = Enum or {}; Enum.UIMapType = { World = 1, Continent = 2, Zone = 3 }
+ZONES = { [1436] = { "Westfall", 1415, 0.40, 0.70 }, [1433] = { "Redridge Mountains", 1415, 0.60, 0.60 },
+          [1413] = { "The Barrens", 1414, 0.50, 0.50 } }
+C_Map.GetMapInfo = function(id)
+    if id == 1414 or id == 1415 then return { name = "Continent", parentMapID = 947, mapType = 2 } end
+    local z = ZONES[id]; if z then return { name = z[1], parentMapID = z[2], mapType = 3 } end
+end
+C_Map.GetMapRectOnMap = function(id, parent)
+    local z = ZONES[id]; if z and z[2] == parent then return z[3] - 0.05, z[3] + 0.05, z[4] - 0.05, z[4] + 0.05 end
+end
+C_Map.GetMapChildrenInfo = function(root)
+    local out = {}
+    for id, z in pairs(ZONES) do if z[2] == root then out[#out + 1] = { mapID = id, name = z[1], mapType = 3 } end end
+    return out
+end
+"""
+
+
+def far_world(g):
+    g.run("LISTED[11].player.areaName = 'Westfall'")                                   # Lia 24, at the dungeon
+    g.run("LISTED[60] = { numMembers = 1, leaderName = 'Far', activityIDs = { 101 }, player = { name = 'Far', level = 27, "
+          "className = 'Priest', classFilename = 'PRIEST', areaName = 'The Barrens', lfgRoles = { healer = true } } }")
+
+
+def test_nearness_to_the_dungeon_counts_with_level(style):
+    g = Game(style, LFG + MAPS)
+    g.start()
+    far_world(g)
+    assert g.eval("NS.lfgInvite.farness({ activity = 101, area = 'Westfall' })") == 0
+    assert g.eval("NS.lfgInvite.farness({ activity = 101, area = 'The Barrens' })") == 6
+    assert 0 < g.eval("NS.lfgInvite.farness({ activity = 101, area = 'Redridge Mountains' })") < 6
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == ["Lia"], "balanced: Lia 24 in Westfall beats Far 27 on another continent"
+    assert any("in Westfall" in p for p in g.printed())
+
+
+def test_order_choice_highest_level_or_nearest(style):
+    g = Game(style, LFG + MAPS)
+    g.start()
+    far_world(g)
+    g.run("NS.setSetting('lfgOrder', 'level')")
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == ["Far"], "highest level first"
+    g = Game(style, LFG + MAPS)
+    g.start()
+    far_world(g)
+    g.run("NS.setSetting('lfgOrder', 'near'); LISTED[11].player.level = 18")
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == ["Lia"], "nearest first, whatever the level"
+
+
+def test_levels_come_from_the_listed_dungeon(style):
+    g = game(style)
+    g.run("ACTIVITIES[101].minLevelSuggestion, ACTIVITIES[101].maxLevelSuggestion = 18, 23")
+    assert list(g.eval("{ NS.lfgInvite.levelRange() }").values()) == [18, 23, "dungeon"]
+    g.run(HEALERS)                                               # Hea 21, Heb 22, Hec 23; Lia 24 is too high
+    g.eval("NS.lfgInvite.scan")()
+    assert g.invited() == ["Hec"], "Lia 24 is above the dungeon's 23: Hec 23 is invited"
+
+
+def test_without_game_levels_the_bundled_dungeon_range_is_used(style):
+    g = game(style)
+    g.run("ACTIVITIES[101].minLevelSuggestion, ACTIVITIES[101].maxLevelSuggestion = 0, 0")
+    assert list(g.eval("{ NS.lfgInvite.levelRange() }").values()) == [18, 23, "dungeon"], "TravelData: The Deadmines 18-23"
+    g.run("ACTIVITIES[101].fullName = 'A brand new dungeon'")
+    lo, hi, src = g.eval("{ NS.lfgInvite.levelRange() }").values()
+    assert src == "manual" and (lo, hi) == (1, 60), "unknown dungeon: your own range"
+
+
+def test_several_listed_dungeons_span_their_levels_and_manual_mode_wins(style):
+    g = game(style)
+    g.run("LISTING = { 101, 202 }; ACTIVITIES[101].minLevelSuggestion, ACTIVITIES[101].maxLevelSuggestion = 18, 23")
+    g.run("ACTIVITIES[202].minLevelSuggestion, ACTIVITIES[202].maxLevelSuggestion = 17, 24")
+    assert list(g.eval("{ NS.lfgInvite.levelRange() }").values())[:2] == [17, 24]
+    g.run("NS.setSetting('lfgLevelMode', 'manual'); NS.setSetting('lfgMinLevel', 40)")
+    assert list(g.eval("{ NS.lfgInvite.levelRange() }").values()) == [40, 60, "manual"]
 
 
 if __name__ == "__main__":

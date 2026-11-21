@@ -3,6 +3,7 @@
 -- "Best" = fits your level and faction, then the most items per visit (known spawns x chance) of one creature or node in
 -- one zone; one zone is listed once. Each tooltip line: name · zone · chance. The map pins add level and spawn count.
 local ADDON, ns = ...
+ns.inModule("items")          -- Modules.lua: Settings > General > Tools can switch this off
 local Q, U, S, V, W = ns.questie, ns.optionalUI, ns.style, ns.vendorMap, ns.dataWork
 local G = {}
 ns.gatherSources = G

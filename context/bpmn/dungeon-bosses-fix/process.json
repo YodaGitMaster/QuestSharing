@@ -1,0 +1,694 @@
+{
+  "id": "dungeon-bosses-fix",
+  "name": "Dungeon bosses: official list, portraits, calm layout",
+  "runTimeout": 240,
+  "context": {
+    "prompt": "Record the bosses fix: official boss list from Blizzard DungeonEncounter (Forever build 1.60.1) via tools/build_boss_data.py -> QuestSharing/DungeonBossData.lua, L.bossesOf listing only official bosses, the portrait chain, the calmer Bosses page layout, renders, and what is unverified in game. Write a context/BUGS report for 'random mobs listed as bosses' (root cause + method)."
+  },
+  "lanes": [
+    {
+      "id": "scout",
+      "name": "Scout",
+      "agent": "general-purpose",
+      "timeout": 15
+    },
+    {
+      "id": "builder",
+      "name": "Builder",
+      "agent": "bpmn:worker",
+      "timeout": 40
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "agent": "bpmn:reviewer",
+      "timeout": 12
+    }
+  ],
+  "data": {
+    "r1": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "summary",
+          "facts"
+        ]
+      }
+    },
+    "r2": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "summary",
+          "facts"
+        ]
+      }
+    },
+    "r3": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "summary",
+          "facts"
+        ]
+      }
+    },
+    "r4": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "summary",
+          "facts"
+        ]
+      }
+    },
+    "contract": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "summary",
+          "files"
+        ]
+      }
+    },
+    "wD": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "wL": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "wU": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "vD": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "vL": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "vU": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "fD": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    },
+    "fL": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    },
+    "fU": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    },
+    "integ": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary",
+          "tests"
+        ]
+      }
+    },
+    "vF": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "status",
+          "issues"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "approved",
+              "changes"
+            ]
+          }
+        }
+      }
+    },
+    "fF": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "files",
+          "summary"
+        ]
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "name": "Bosses complaint"
+    },
+    {
+      "id": "rsplit",
+      "type": "and",
+      "join": "rjoin"
+    },
+    {
+      "id": "r_list",
+      "type": "agent",
+      "lane": "scout",
+      "name": "Build official boss list",
+      "out": "r1",
+      "prompt": "Project: WoW addon Quest Sharing in /Users/cozzolif/Desktop/cutpdf (read context/architecture.md). User complaint: 'bosses are not good many random mobs are bosses, the formatting is weird give me nausea, bosses should have an icon - check the other repo how they did it'. TASK (read-only except /tmp/bossdata): build the OFFICIAL boss list for each of our 28 dungeons (area id -> name in QuestSharing/DungeonQuestData.lua D.names). Source: Blizzard DungeonEncounter from the Forever client, cached at /tmp/ejdata/f_DungeonEncounter.csv (Name_lang,ID,MapID,DifficultyID,OrderIndex). Map MapID to our areas: curl -sSL -A Mozilla/5.0 'https://wago.tools/db2/Map/csv?build=1.60.1.70959' -o /tmp/bossdata/Map.csv (system python3 lacks SSL certs; always curl) and match by AreaTableID or name (multi-map/wing dungeons: Scarlet Monastery, Dire Maul, Blackrock Spire, Stratholme). Dedupe difficulties, keep OrderIndex order, drop 'No Longer in Use', keep group encounters (The Lost Dwarves, Ring of Law, Atal'ai Defenders) as one entry. Find each boss npc id in QuestieDB (/tmp/qdbrepo/QuestieDB-master data/Forever/foreverNpcDB.lua positional rows, src/corrections/Forever/generated/foreverBaseNpc.lua keyed blocks) by exact name, preferring the npc spawning in that dungeon area. Write /tmp/bossdata/bosses.json = {area: [{name, order, encounterID, npcIDs:[...]}]}. Report coverage per dungeon. Return {summary, facts, files, risks}."
+    },
+    {
+      "id": "r_portraits",
+      "type": "agent",
+      "lane": "scout",
+      "name": "Research boss portraits",
+      "out": "r2",
+      "prompt": "Project: WoW addon Quest Sharing in /Users/cozzolif/Desktop/cutpdf. User wants every dungeon boss to have a portrait icon, like Dungeon Journal (by Exehn, /tmp/dj_addon/ForeverDungeonJournal) - INSPIRATION ONLY, never copy its code or media. TASK (read-only except /tmp/bossdata): (a) read Systems/PortraitPool.lua, Systems/BakedPortraits.lua, Data/Bosses.lua and Core/Journal.lua lines ~3600-3700 and ~5040-5070 there, and report the METHOD (how display IDs become round portraits, pool/caps, why) without code. (b) Find display IDs for bosses from public data: Wowhead npc pages, curl -sSL -A Mozilla/5.0 'https://www.wowhead.com/forever/npc=N' and parse the model display id (look for displayId / ModelViewer data); test on Edwin VanCleef 639, Rhahk'Zor 644 and 3 Forever bosses found via 'https://www.wowhead.com/forever/search/suggestions-template?q=Faldrim%20Anvilmar' (JSON). Write a tested helper approach to /tmp/bossdata/ (scripts allowed there). (c) Check whether Interface\\EncounterJournal\\UI-EJ-BOSS-* files exist in the Forever client: listfile /tmp/listfile/lf.csv plus whether wago serves them for build 1.60.1.70959 (try 'https://wago.tools/api/casc/<fdid>?download&build=1.60.1.70959'). (d) Confirm SetPortraitTextureFromCreatureDisplayID exists in the Classic Era/Forever client API. Recommend the portrait chain with evidence. Return {summary, facts, files, risks}."
+    },
+    {
+      "id": "r_layout",
+      "type": "agent",
+      "lane": "scout",
+      "name": "Diagnose bosses layout",
+      "out": "r3",
+      "prompt": "Project: WoW addon Quest Sharing in /Users/cozzolif/Desktop/cutpdf. User: 'the formatting is weird give me nausea'. TASK (read-only except /tmp/bossdata): read QuestSharing/DungeonBossesUI.lua and QuestSharing/JournalTheme.lua (T.round, T.badge, T.panel), look at context/renders/bosses.png and the reference /tmp/dj_images/dj3.png (Dungeon Journal bosses tab; inspiration only). Reproduce what a player WITHOUT AtlasLoot sees: a temporary script under /tmp/bossdata (not in the repo) that loads the game through the test harness (see tests/test_dungeon_journal_bosses.py: loot_game, QUESTIE fixture, page()) and lists the boss rows and their sizes; render a copy with tools/render_journal.py if useful (/tmp/qs-test-env/bin/python, then python3 ... paint, output copy under /tmp/bossdata). List every concrete visual problem with measured numbers (ring vs portrait size, badge overlap, row height/spacing, fonts, colours, alignment, too many rows, empty portraits, text clutter) and write a calm target spec close to dj3 (sizes, spacing, ring thickness, badge size/position, fonts). Return {summary, facts, files, risks}."
+    },
+    {
+      "id": "r_cause",
+      "type": "agent",
+      "lane": "scout",
+      "name": "Find random-mob root cause",
+      "out": "r4",
+      "prompt": "Project: WoW addon Quest Sharing in /Users/cozzolif/Desktop/cutpdf. User: 'many random mobs are bosses'. TASK (read-only): explain exactly why. Read L.bossesOf and helpers in QuestSharing/Loot.lua (AtlasLoot path and QuestieDB fallback) and QuestSharing/DungeonBossesUI.lua. Identify every path that lists a non-boss (AtlasLoot trash or rare tables, Questie npcs with drops, objects/chests) and which one a typical player hits (with or without AtlasLoot). Propose the minimal logic so only official bosses from an authoritative per-dungeon list are listed, drops attached from AtlasLoot (by npc id, then normalised name) and from QuestieDB npcDrops for the boss npc ids, order from the list. Return {summary, facts (with file:line), files, risks}."
+    },
+    {
+      "id": "rjoin",
+      "type": "and"
+    },
+    {
+      "id": "design",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Write the bosses contract",
+      "in": [
+        "r1",
+        "r2",
+        "r3",
+        "r4"
+      ],
+      "out": "contract",
+      "timeout": 15,
+      "prompt": "Write ONE implementation contract for the bosses fix, appended to /Users/cozzolif/Desktop/cutpdf/context/dungeon-journal-contract.md as a new section '## Bosses fix (2026-11-20)' (do not edit other sections, edit no other file). Research: R1 boss list {{r1.summary}} facts {{r1.facts}}; R2 portraits {{r2.summary}} facts {{r2.facts}}; R3 layout {{r3.summary}} facts {{r3.facts}}; R4 root cause {{r4.summary}} facts {{r4.facts}}. Define three builder streams with DISJOINT files: D (data) owns tools/build_boss_data.py (new), QuestSharing/DungeonBossData.lua (stub exists: B.list(area) -> {{name, order, npcID, npcIDs, displayID, encounterID}} in fight order) and tests/test_dungeon_boss_data.py; L (logic) owns QuestSharing/Loot.lua (only L.bossesOf and its helpers) and NEW test functions appended to tests/test_dungeon_journal_bosses.py (no edits to existing UI tests there); U (ui) owns QuestSharing/DungeonBossesUI.lua, T.round/T.badge in QuestSharing/JournalTheme.lua and tests/test_dungeon_journal_bosses_ui.py. Give exact functions, fields, px sizes from R3's calm spec, the portrait chain from R2, the boss filter rule from R4, and what each stream must not touch. Hard rules to restate: Dungeon Journal is inspiration only (no code/media copied), client textures only, Lua 5.1, curl for downloads, tests are plain scripts run with /tmp/qs-test-env/bin/python. Return {summary, files}."
+    },
+    {
+      "id": "split",
+      "type": "and",
+      "join": "join"
+    },
+    {
+      "id": "build_d",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Build boss data",
+      "in": [
+        "contract"
+      ],
+      "out": "wD",
+      "prompt": "Builder for stream D of the bosses fix. Read section '## Bosses fix (2026-11-20)' in /Users/cozzolif/Desktop/cutpdf/context/dungeon-journal-contract.md and follow it exactly. Edit ONLY stream D files (tools/build_boss_data.py, QuestSharing/DungeonBossData.lua, tests/test_dungeon_boss_data.py). Inputs: /tmp/bossdata/* from research. Generator must be offline-safe after the first fetch. Run your tests plus tests/test_dungeon_journal_bosses.py and tests/test_dungeon_quests.py. Report {files, summary, tests, notes} with coverage numbers (bosses and display IDs per dungeon)."
+    },
+    {
+      "id": "review_d",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review boss data",
+      "in": [
+        "wD",
+        "fD?"
+      ],
+      "out": "vD",
+      "prompt": "Adversarial review of stream D ({{wD.summary}}) against the contract section '## Bosses fix (2026-11-20)'. Spot-check 10 bosses across classic and Forever dungeons against /tmp/ejdata/f_DungeonEncounter.csv (official list, order) and their npc/display IDs; check no trash/rares are listed, group encounters handled, generator reproducible and offline-safe, nothing from /tmp/dj_addon copied (compare names list origin), tests green (run them), no edits outside stream D files. Report {status, issues}."
+    },
+    {
+      "id": "ok_d",
+      "type": "xor",
+      "name": "D approved?"
+    },
+    {
+      "id": "fix_d",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix boss data",
+      "in": [
+        "vD"
+      ],
+      "out": "fD",
+      "prompt": "Fix these review issues in stream D (own only stream D files): {{vD.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "merge_d",
+      "type": "xor",
+      "name": "D settled"
+    },
+    {
+      "id": "build_l",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Build boss filter logic",
+      "in": [
+        "contract"
+      ],
+      "out": "wL",
+      "prompt": "Builder for stream L of the bosses fix. Read section '## Bosses fix (2026-11-20)' in /Users/cozzolif/Desktop/cutpdf/context/dungeon-journal-contract.md and follow it exactly. Edit ONLY QuestSharing/Loot.lua (L.bossesOf and helpers) and append NEW test functions to tests/test_dungeon_journal_bosses.py. Use ns.dungeonBossData.list(area) (stub exists; stream D fills it) with nil guards; tests may fill B.bosses in the fixture. Only official bosses are listed, in list order, drops attached from AtlasLoot and QuestieDB npcDrops. Run tests/test_dungeon_journal_bosses.py, tests/test_loot.py, tests/test_dungeon_quests.py. Report {files, summary, tests, notes}."
+    },
+    {
+      "id": "review_l",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review boss filter logic",
+      "in": [
+        "wL",
+        "fL?"
+      ],
+      "out": "vL",
+      "prompt": "Adversarial review of stream L ({{wL.summary}}) against the contract section '## Bosses fix (2026-11-20)': no non-boss can be listed on any path (AtlasLoot trash/rare tables, Questie npcs, objects), drops still attached, order from the list, behaviour without AtlasLoot and without the boss list both sane, existing loot browser behaviour unchanged (tests/test_loot.py, tests/test_equipment_grouping.py), no weakened assertions, tests green (run them), no edits outside stream L files. Report {status, issues}."
+    },
+    {
+      "id": "ok_l",
+      "type": "xor",
+      "name": "L approved?"
+    },
+    {
+      "id": "fix_l",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix boss filter logic",
+      "in": [
+        "vL"
+      ],
+      "out": "fL",
+      "prompt": "Fix these review issues in stream L (own only stream L files): {{vL.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "merge_l",
+      "type": "xor",
+      "name": "L settled"
+    },
+    {
+      "id": "build_u",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Build calm bosses layout",
+      "in": [
+        "contract"
+      ],
+      "out": "wU",
+      "prompt": "Builder for stream U of the bosses fix. Read section '## Bosses fix (2026-11-20)' in /Users/cozzolif/Desktop/cutpdf/context/dungeon-journal-contract.md and follow it exactly; look at /tmp/dj_images/dj3.png (inspiration only) and context/renders/bosses.png. Edit ONLY QuestSharing/DungeonBossesUI.lua, T.round/T.badge in QuestSharing/JournalTheme.lua and tests/test_dungeon_journal_bosses_ui.py. Every boss row gets a portrait icon per the contract chain; calm layout per the spec. Run your tests plus tests/test_dungeon_journal_bosses.py, tests/test_dungeon_journal_home.py, tests/test_classic_style.py. Report {files, summary, tests, notes}."
+    },
+    {
+      "id": "review_u",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review bosses layout",
+      "in": [
+        "wU",
+        "fU?"
+      ],
+      "out": "vU",
+      "prompt": "Adversarial review of stream U ({{wU.summary}}) against the contract section '## Bosses fix (2026-11-20)': the calm spec met (measure sizes in code/tests), every row has a portrait or a deliberate fallback, no overlaps, text not cluttered, client textures only, nothing copied from /tmp/dj_addon, no weakened assertions, tests green (run them), no edits outside stream U files. Report {status, issues}."
+    },
+    {
+      "id": "ok_u",
+      "type": "xor",
+      "name": "U approved?"
+    },
+    {
+      "id": "fix_u",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix bosses layout",
+      "in": [
+        "vU"
+      ],
+      "out": "fU",
+      "prompt": "Fix these review issues in stream U (own only stream U files): {{vU.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "merge_u",
+      "type": "xor",
+      "name": "U settled"
+    },
+    {
+      "id": "join",
+      "type": "and"
+    },
+    {
+      "id": "integrate",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Integrate and render bosses",
+      "in": [
+        "wD",
+        "wL",
+        "wU"
+      ],
+      "out": "integ",
+      "timeout": 35,
+      "prompt": "Integrate the bosses fix (D {{wD.summary}} / L {{wL.summary}} / U {{wU.summary}}). Read the contract section '## Bosses fix (2026-11-20)'. Fix seams with small diffs. Run the FULL suite (loop over tests/test_*.py with /tmp/qs-test-env/bin/python) until green; all QuestSharing/*.lua compile under Lua 5.1 (lupa.lua51 loadstring). Update tools/render_journal.py: bosses scene from the real DungeonBossData list for The Deadmines, plus a new scene 'bosses_forever' (The Hall of Thanes, no AtlasLoot); re-render, repaint, update context/renders/index.html. One CHANGELOG Unreleased line. Report {files, summary, tests}."
+    },
+    {
+      "id": "final_review",
+      "type": "agent",
+      "lane": "reviewer",
+      "name": "Review the bosses fix",
+      "in": [
+        "integ",
+        "fF?"
+      ],
+      "out": "vF",
+      "prompt": "Final review of the bosses fix ({{integ.summary}}). Does it fix the user complaint: only real bosses (check several dungeons against /tmp/ejdata/f_DungeonEncounter.csv), every boss has a portrait icon, calm formatting (look at context/renders/bosses*.png vs /tmp/dj_images/dj3.png)? Full suite green (run it). Rules: nothing copied from /tmp/dj_addon, client textures only, data sources documented. Report {status, issues}."
+    },
+    {
+      "id": "ok_final",
+      "type": "xor",
+      "name": "Final approved?"
+    },
+    {
+      "id": "fix_final",
+      "type": "agent",
+      "lane": "builder",
+      "name": "Fix final bosses issues",
+      "in": [
+        "vF"
+      ],
+      "out": "fF",
+      "timeout": 25,
+      "prompt": "Fix these final review issues of the bosses fix (keep the full suite green, re-render if the look changed): {{vF.issues}}. Report {files, summary}."
+    },
+    {
+      "id": "done",
+      "type": "end",
+      "name": "Bosses fixed"
+    },
+    {
+      "id": "open_issues",
+      "type": "end",
+      "name": "Done with open issues"
+    }
+  ],
+  "flows": [
+    {
+      "from": "start",
+      "to": "rsplit"
+    },
+    {
+      "from": "rsplit",
+      "to": "r_list"
+    },
+    {
+      "from": "rsplit",
+      "to": "r_portraits"
+    },
+    {
+      "from": "rsplit",
+      "to": "r_layout"
+    },
+    {
+      "from": "rsplit",
+      "to": "r_cause"
+    },
+    {
+      "from": "r_list",
+      "to": "rjoin"
+    },
+    {
+      "from": "r_portraits",
+      "to": "rjoin"
+    },
+    {
+      "from": "r_layout",
+      "to": "rjoin"
+    },
+    {
+      "from": "r_cause",
+      "to": "rjoin"
+    },
+    {
+      "from": "rjoin",
+      "to": "design"
+    },
+    {
+      "from": "design",
+      "to": "split"
+    },
+    {
+      "from": "split",
+      "to": "build_d"
+    },
+    {
+      "from": "split",
+      "to": "build_l"
+    },
+    {
+      "from": "split",
+      "to": "build_u"
+    },
+    {
+      "from": "build_d",
+      "to": "review_d"
+    },
+    {
+      "from": "review_d",
+      "to": "ok_d"
+    },
+    {
+      "from": "ok_d",
+      "to": "merge_d",
+      "name": "approved",
+      "when": {
+        "path": "vD.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_d",
+      "to": "merge_d",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_d",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_d",
+      "to": "fix_d",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_d",
+      "to": "review_d"
+    },
+    {
+      "from": "merge_d",
+      "to": "join"
+    },
+    {
+      "from": "build_l",
+      "to": "review_l"
+    },
+    {
+      "from": "review_l",
+      "to": "ok_l"
+    },
+    {
+      "from": "ok_l",
+      "to": "merge_l",
+      "name": "approved",
+      "when": {
+        "path": "vL.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_l",
+      "to": "merge_l",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_l",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_l",
+      "to": "fix_l",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_l",
+      "to": "review_l"
+    },
+    {
+      "from": "merge_l",
+      "to": "join"
+    },
+    {
+      "from": "build_u",
+      "to": "review_u"
+    },
+    {
+      "from": "review_u",
+      "to": "ok_u"
+    },
+    {
+      "from": "ok_u",
+      "to": "merge_u",
+      "name": "approved",
+      "when": {
+        "path": "vU.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_u",
+      "to": "merge_u",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_u",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_u",
+      "to": "fix_u",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_u",
+      "to": "review_u"
+    },
+    {
+      "from": "merge_u",
+      "to": "join"
+    },
+    {
+      "from": "join",
+      "to": "integrate"
+    },
+    {
+      "from": "integrate",
+      "to": "final_review"
+    },
+    {
+      "from": "final_review",
+      "to": "ok_final"
+    },
+    {
+      "from": "ok_final",
+      "to": "done",
+      "name": "approved",
+      "when": {
+        "path": "vF.status",
+        "eq": "approved"
+      }
+    },
+    {
+      "from": "ok_final",
+      "to": "open_issues",
+      "name": "3rd round",
+      "when": {
+        "path": "$loop.ok_final",
+        "gte": 3
+      }
+    },
+    {
+      "from": "ok_final",
+      "to": "fix_final",
+      "name": "changes",
+      "default": true
+    },
+    {
+      "from": "fix_final",
+      "to": "final_review"
+    }
+  ]
+}

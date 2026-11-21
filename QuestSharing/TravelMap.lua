@@ -2,6 +2,7 @@
 -- Hover a transport pin to see where it goes; hover a dungeon to see the nearest town each faction can use.
 -- Reads only addon data (TravelData.lua) and draws addon-owned frames over Blizzard's map canvas.
 local ADDON, ns = ...
+ns.inModule("maps")          -- Modules.lua: Settings > General > Tools can switch this off
 local U, S, D, V = ns.optionalUI, ns.style, ns.travelData, ns.vendorMap
 local T = {}
 ns.travelMap = T

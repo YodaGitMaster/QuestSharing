@@ -1,0 +1,50 @@
+{
+  "id": "forever-boss-portraits-finish",
+  "name": "Forever boss portraits: review, integrate, render",
+  "runTimeout": 300,
+  "context": { "prompt": "Record the Forever boss portrait work: QuestSharing/BossPortraitResolver.lua (hidden PlayerModel SetCreature -> GetDisplayInfo, one at a time, paused in combat and loading screens, cached in ns.db.bossDisplays, /qs bossdump), how DungeonBossesUI uses it, Ezra Grimm npc 11058 from Wowhead search suggestions, The Butcher and Infurnus still without npc id (no exact Wowhead match; they keep the skull), and the earlier bosses fix (official DungeonEncounter list, build 1.60.1.70959, classic-only ejFile rule, NO_EJ and LOOT_NPCS exceptions, Wowhead /forever/ pages blocked). Add the ns.dungeonBossData and ns.bossPortraitResolver / ns.db.bossDisplays schema to context/schema.md, fix the architecture.md file tree lines for tools/build_boss_data.py, QuestSharing/DungeonBossData.lua, QuestSharing/BossPortraitResolver.lua and their tests, add a sequence diagram of the resolver flow, and a decisions entry. Write context/BUGS/2026-11-20-dungeon-bosses-random-mobs.md (root cause: L.bossesOf listed every drop source; fix: official list; method). Add to the in-game checklist in context/dungeon-journal-contract.md: open a Forever dungeon Bosses page, wait a few seconds, portraits replace skulls; run /qs bossdump and send the lines so they can be baked." },
+  "lanes": [
+    { "id": "builder", "name": "Builder", "agent": "bpmn:worker", "timeout": 90 },
+    { "id": "reviewer", "name": "Reviewer", "agent": "bpmn:reviewer", "timeout": 45 }
+  ],
+  "data": {
+    "wR": { "schema": { "type": "object", "required": ["files", "summary", "tests"] } },
+    "wG": { "schema": { "type": "object", "required": ["files", "summary", "tests"] } },
+    "vR": { "schema": { "type": "object", "required": ["status", "issues"], "properties": { "status": { "enum": ["approved", "changes"] } } } },
+    "fR": { "schema": { "type": "object", "required": ["files", "summary"] } },
+    "integ": { "schema": { "type": "object", "required": ["files", "summary", "tests"] } },
+    "vF": { "schema": { "type": "object", "required": ["status", "issues"], "properties": { "status": { "enum": ["approved", "changes"] } } } },
+    "fF": { "schema": { "type": "object", "required": ["files", "summary"] } }
+  },
+  "nodes": [
+    { "id": "start", "type": "start", "name": "Resolver built, not reviewed" },
+    { "id": "review_r", "type": "agent", "lane": "reviewer", "name": "Review portrait resolver", "in": ["wR", "fR?"], "out": "vR",
+      "prompt": "Adversarial review of the boss portrait resolver in /Users/cozzolif/Desktop/cutpdf ({{wR.summary}}). Read QuestSharing/BossPortraitResolver.lua, the git diff of QuestSharing/DungeonBossesUI.lua and tests/test_boss_portrait_resolver.py. Check: one lookup at a time, never in combat or during loading screens, gives up cleanly, caches in ns.db only (QuestSharingDB is already the saved variable), the staged display path is reused (no portrait drawn straight on a visible texture), stale pages ignored, request cap respected, no global leaks, the /qs bossdump wrap keeps every other /qs command working, a 1x1 alpha-0 PlayerModel still loads models in the 1.15-based Forever client (flag as a risk to check in game if unsure, not a blocker), Lua 5.1 only, nothing copied from /tmp/dj_addon, tests honest and green (run them with /tmp/qs-test-env/bin/python). Report {status, issues}. Be focused: at most 25 minutes." },
+    { "id": "ok_r", "type": "xor", "name": "R approved?" },
+    { "id": "fix_r", "type": "agent", "lane": "builder", "name": "Fix portrait resolver", "in": ["vR"], "out": "fR", "timeout": 45,
+      "prompt": "Fix these review issues in the boss portrait resolver (own only QuestSharing/BossPortraitResolver.lua, QuestSharing/DungeonBossesUI.lua, tests/test_boss_portrait_resolver.py; keep their tests and tests/test_dungeon_journal_bosses*.py green): {{vR.issues}}. Report {files, summary}. Small diffs, at most 30 minutes." },
+    { "id": "integrate", "type": "agent", "lane": "builder", "name": "Integrate and render", "in": ["wR", "wG", "vR"], "out": "integ",
+      "prompt": "Integrate the Forever boss portraits in /Users/cozzolif/Desktop/cutpdf with small diffs; the code is already in the tree, do not redo it. R: {{wR.summary}}. G: {{wG.summary}}. (1) In tools/build_boss_data.py apply the two low review notes of G (offline never deletes a cache file, only warns; validate before writing the cache) and keep --offline byte-identical. (2) Full suite green: loop over tests/test_*.py with /tmp/qs-test-env/bin/python; all QuestSharing/*.lua compile under Lua 5.1 (lupa.lua51 loadstring). (3) In tools/render_journal.py make the bosses_forever scene simulate the resolver answering (mock PlayerModel GetDisplayInfo returning a display id) so the Hall of Thanes bosses show the 'model <id>' stand-in after the resolve (Infurnus, with no npc id, keeps the skull); re-render bosses_forever.png and bosses.png, update the context/renders/index.html caption (portraits come from the game client at runtime). (4) One CHANGELOG Unreleased line and one README sentence (Forever boss portraits come from the game, /qs bossdump). Report {files, summary, tests}." },
+    { "id": "final_review", "type": "agent", "lane": "reviewer", "name": "Review Forever portraits", "in": ["integ", "fF?"], "out": "vF",
+      "prompt": "Final review of the Forever boss portraits in /Users/cozzolif/Desktop/cutpdf ({{integ.summary}}): every official boss either has art/display data or is queued for the in-game resolver (except bosses with no npc id: The Butcher, Infurnus); the resolver is safe (combat, loading screens, one at a time, caps) and the staged path avoids black squares; the Bosses page has no stray quest status line; context/renders/bosses_forever.png shows the resolved stand-ins; build_boss_data.py --offline byte-identical; full suite green (run it); nothing copied from /tmp/dj_addon. Report {status, issues}. Be focused: at most 25 minutes." },
+    { "id": "ok_final", "type": "xor", "name": "Final approved?" },
+    { "id": "fix_final", "type": "agent", "lane": "builder", "name": "Fix final portrait issues", "in": ["vF"], "out": "fF", "timeout": 45,
+      "prompt": "Fix these final review issues of the Forever boss portraits (keep the full suite green, re-render if the look changed): {{vF.issues}}. Report {files, summary}." },
+    { "id": "done", "type": "end", "name": "Forever portraits done" },
+    { "id": "open_issues", "type": "end", "name": "Done with open issues" }
+  ],
+  "flows": [
+    { "from": "start", "to": "review_r" },
+    { "from": "review_r", "to": "ok_r" },
+    { "from": "ok_r", "to": "integrate", "name": "approved", "when": { "path": "vR.status", "eq": "approved" } },
+    { "from": "ok_r", "to": "integrate", "name": "3rd round", "when": { "path": "$loop.ok_r", "gte": 3 } },
+    { "from": "ok_r", "to": "fix_r", "name": "changes", "default": true },
+    { "from": "fix_r", "to": "review_r" },
+    { "from": "integrate", "to": "final_review" },
+    { "from": "final_review", "to": "ok_final" },
+    { "from": "ok_final", "to": "done", "name": "approved", "when": { "path": "vF.status", "eq": "approved" } },
+    { "from": "ok_final", "to": "open_issues", "name": "3rd round", "when": { "path": "$loop.ok_final", "gte": 3 } },
+    { "from": "ok_final", "to": "fix_final", "name": "changes", "default": true },
+    { "from": "fix_final", "to": "final_review" }
+  ]
+}

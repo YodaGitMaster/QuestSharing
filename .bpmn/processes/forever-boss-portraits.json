@@ -1,0 +1,74 @@
+{
+  "id": "forever-boss-portraits",
+  "name": "Forever boss portraits: in-game resolver and missing npc ids",
+  "runTimeout": 200,
+  "context": { "prompt": "Record the Forever boss portrait work: QuestSharing/BossPortraitResolver.lua (hidden PlayerModel SetCreature -> GetDisplayInfo, one at a time, cached in ns.db), how DungeonBossesUI uses it, the missing npc ids filled from Wowhead search suggestions, and the earlier bosses fix (official DungeonEncounter list, build 1.60.1.70959, classic-only ejFile rule, NO_EJ and LOOT_NPCS exceptions, Wowhead /forever/ pages blocked). Add the ns.dungeonBossData and resolver schema to context/schema.md, fix the architecture.md file tree lines for tools/build_boss_data.py, QuestSharing/DungeonBossData.lua, QuestSharing/BossPortraitResolver.lua and their tests, and add a decisions entry. Write context/BUGS/2026-11-20-dungeon-bosses-random-mobs.md (root cause: L.bossesOf listed every drop source; fix: official list; method)." },
+  "lanes": [
+    { "id": "builder", "name": "Builder", "agent": "bpmn:worker", "timeout": 60 },
+    { "id": "reviewer", "name": "Reviewer", "agent": "bpmn:reviewer", "timeout": 30 }
+  ],
+  "data": {
+    "wR": { "schema": { "type": "object", "required": ["files", "summary", "tests"] } },
+    "wG": { "schema": { "type": "object", "required": ["files", "summary", "tests"] } },
+    "vR": { "schema": { "type": "object", "required": ["status", "issues"], "properties": { "status": { "enum": ["approved", "changes"] } } } },
+    "vG": { "schema": { "type": "object", "required": ["status", "issues"], "properties": { "status": { "enum": ["approved", "changes"] } } } },
+    "fR": { "schema": { "type": "object", "required": ["files", "summary"] } },
+    "fG": { "schema": { "type": "object", "required": ["files", "summary"] } },
+    "integ": { "schema": { "type": "object", "required": ["files", "summary", "tests"] } },
+    "vF": { "schema": { "type": "object", "required": ["status", "issues"], "properties": { "status": { "enum": ["approved", "changes"] } } } },
+    "fF": { "schema": { "type": "object", "required": ["files", "summary"] } }
+  },
+  "nodes": [
+    { "id": "start", "type": "start", "name": "Forever bosses lack portraits" },
+    { "id": "split", "type": "and", "join": "join" },
+
+    { "id": "build_r", "type": "agent", "lane": "builder", "name": "Build portrait resolver", "out": "wR",
+      "prompt": "Project: WoW addon Quest Sharing in /Users/cozzolif/Desktop/cutpdf (read context/architecture.md and the section '## Bosses fix (2026-11-20)' of context/dungeon-journal-contract.md; Dungeon Journal at /tmp/dj_addon is INSPIRATION ONLY, never copy its code, data or media; Lua 5.1; tests are plain scripts run with /tmp/qs-test-env/bin/python). Problem: 59 official bosses (all of the 9 WoW Forever dungeons plus Ezra Grimm) have neither ejFile nor displayID in QuestSharing/DungeonBossData.lua, so the Bosses page shows a muted skull. Their display IDs are not public (Wowhead /forever/ pages are blocked), but the client knows them. You own ONLY QuestSharing/BossPortraitResolver.lua (stub exists: R.displayFor(npcID), R.request(npcID, done)), QuestSharing/DungeonBossesUI.lua and the new tests/test_boss_portrait_resolver.py. Build: one hidden PlayerModel (1x1, alpha 0, parented to UIParent, created lazily), a FIFO queue, one lookup at a time: SetCreature(npcID), then read GetDisplayInfo() on OnModelLoaded or after a short timer (0.2 s, up to 5 tries, then give up for this session), never in combat (InCombatLockdown) or during a loading screen (pause on PLAYER_LEAVING_WORLD, resume on PLAYER_ENTERING_WORLD). A display ID of 0 or nil means not known. Cache results in ns.db.bossDisplays[npcID] (create the table in ns.db lazily; QuestSharingDB is the saved variable) and in a session table for failures. In DungeonBossesUI.lua B.portrait: when a boss has no ejFile/by-name art and no displayID, use R.displayFor(npcID); if nil, show the muted skull now and call R.request(npcID, done) so done repaints that row/header through the existing staged display path (respect the page token: ignore when the page changed or is hidden). Request only for bosses of the dungeon being shown, at most 12 queued at a time. Add '/qs bossdump' that prints the cached ids as 'npcID=displayID' lines (for baking later). Mock tests: queue order, one at a time, combat/loading pause, OnModelLoaded and timer paths, give-up after 5 tries, cache in ns.db, repaint on success, stale page ignored, no lookups when every boss has art. Run your test file plus tests/test_dungeon_journal_bosses.py, tests/test_dungeon_journal_bosses_ui.py, tests/test_dungeon_quests.py. Report {files, summary, tests, notes}." },
+    { "id": "review_r", "type": "agent", "lane": "reviewer", "name": "Review portrait resolver", "in": ["wR", "fR?"], "out": "vR",
+      "prompt": "Adversarial review of the boss portrait resolver ({{wR.summary}}). Check: one lookup at a time, never in combat or during loading screens, gives up cleanly, caches in ns.db only (no new SavedVariables needed in the toc), the staged display path is reused (no portrait drawn straight on a visible texture), stale pages ignored, request cap respected, no global leaks, Lua 5.1 only, nothing copied from /tmp/dj_addon (its PortraitPool/resolver code), tests honest and green (run them), no edits outside QuestSharing/BossPortraitResolver.lua, QuestSharing/DungeonBossesUI.lua, tests/test_boss_portrait_resolver.py. Report {status, issues}." },
+    { "id": "ok_r", "type": "xor", "name": "R approved?" },
+    { "id": "fix_r", "type": "agent", "lane": "builder", "name": "Fix portrait resolver", "in": ["vR"], "out": "fR", "prompt": "Fix these review issues in the boss portrait resolver (own only QuestSharing/BossPortraitResolver.lua, QuestSharing/DungeonBossesUI.lua, tests/test_boss_portrait_resolver.py): {{vR.issues}}. Report {files, summary}." },
+    { "id": "merge_r", "type": "xor", "name": "R settled" },
+
+    { "id": "build_g", "type": "agent", "lane": "builder", "name": "Fill missing boss npc ids", "out": "wG",
+      "prompt": "Project: WoW addon Quest Sharing in /Users/cozzolif/Desktop/cutpdf (read the section '## Bosses fix (2026-11-20)' of context/dungeon-journal-contract.md). Three official bosses have no npc id in QuestSharing/DungeonBossData.lua: Ezra Grimm (Stratholme), The Butcher (Ruins of Lordaeron), Infurnus (The Hall of Thanes). You own ONLY tools/build_boss_data.py, QuestSharing/DungeonBossData.lua and tests/test_dungeon_boss_data.py. Add a documented, cached lookup to the generator for bosses without an npc id: Wowhead search suggestions JSON (curl -sSL -A Mozilla/5.0 'https://www.wowhead.com/forever/search/suggestions-template?q=<name>'; results with type 1 are npcs; system python3 lacks SSL certs, always curl; cache raw answers under /tmp/bossdata/suggest/) and pick the npc whose name matches exactly (prefer ids >= 200000 for Forever dungeons). Also, for every Forever-dungeon boss, compare the QuestieDB npc id with the suggestions id and report mismatches (do not change ids silently). Regenerate; --offline must stay byte-identical on re-run. Tests: the three get npcIDs, offline reproducibility. Report {files, summary, tests, notes}." },
+    { "id": "review_g", "type": "agent", "lane": "reviewer", "name": "Review npc id fill", "in": ["wG", "fG?"], "out": "vG",
+      "prompt": "Adversarial review of the missing npc id fill ({{wG.summary}}): the three bosses get the right npc (check the cached suggestion answers), no other id changed unexpectedly (diff the generated file), --offline byte-identical, tests green (run them), no edits outside tools/build_boss_data.py, QuestSharing/DungeonBossData.lua, tests/test_dungeon_boss_data.py. Report {status, issues}." },
+    { "id": "ok_g", "type": "xor", "name": "G approved?" },
+    { "id": "fix_g", "type": "agent", "lane": "builder", "name": "Fix npc id fill", "in": ["vG"], "out": "fG", "prompt": "Fix these review issues in the npc id fill (own only tools/build_boss_data.py, QuestSharing/DungeonBossData.lua, tests/test_dungeon_boss_data.py): {{vG.issues}}. Report {files, summary}." },
+    { "id": "merge_g", "type": "xor", "name": "G settled" },
+
+    { "id": "join", "type": "and" },
+    { "id": "integrate", "type": "agent", "lane": "builder", "name": "Integrate and render", "in": ["wR", "wG"], "out": "integ", "timeout": 60,
+      "prompt": "Integrate the Forever boss portraits (R {{wR.summary}} / G {{wG.summary}}) with small diffs. Run the full suite (loop over tests/test_*.py with /tmp/qs-test-env/bin/python) until green; all QuestSharing/*.lua compile under Lua 5.1 (lupa.lua51 loadstring). In tools/render_journal.py make the bosses_forever scene simulate the resolver answering (a mock PlayerModel returning a display id) so the Hall of Thanes bosses show the 'model <id>' stand-in instead of skulls after the resolve; re-render, repaint, update the index.html caption (say the portraits come from the game client at runtime). One CHANGELOG Unreleased line. Report {files, summary, tests}. Keep it short: do not redo work that is already in the tree." },
+    { "id": "final_review", "type": "agent", "lane": "reviewer", "name": "Review Forever portraits", "in": ["integ", "fF?"], "out": "vF",
+      "prompt": "Final review of the Forever boss portraits ({{integ.summary}}): every official boss either has art/display data or is queued for the in-game resolver; the resolver is safe (combat, loading screens, one at a time, caps) and the staged path avoids black squares; the Bosses page has no stray quest status line; context/renders/bosses_forever.png shows the resolved stand-ins; full suite green (run it); nothing copied from /tmp/dj_addon. Report {status, issues}. Be quick and focused: at most 20 minutes." },
+    { "id": "ok_final", "type": "xor", "name": "Final approved?" },
+    { "id": "fix_final", "type": "agent", "lane": "builder", "name": "Fix final portrait issues", "in": ["vF"], "out": "fF", "timeout": 40,
+      "prompt": "Fix these final review issues of the Forever boss portraits (keep the full suite green): {{vF.issues}}. Report {files, summary}." },
+    { "id": "done", "type": "end", "name": "Forever portraits done" },
+    { "id": "open_issues", "type": "end", "name": "Done with open issues" }
+  ],
+  "flows": [
+    { "from": "start", "to": "split" },
+    { "from": "split", "to": "build_r" }, { "from": "split", "to": "build_g" },
+    { "from": "build_r", "to": "review_r" }, { "from": "review_r", "to": "ok_r" },
+    { "from": "ok_r", "to": "merge_r", "name": "approved", "when": { "path": "vR.status", "eq": "approved" } },
+    { "from": "ok_r", "to": "merge_r", "name": "3rd round", "when": { "path": "$loop.ok_r", "gte": 3 } },
+    { "from": "ok_r", "to": "fix_r", "name": "changes", "default": true },
+    { "from": "fix_r", "to": "review_r" },
+    { "from": "merge_r", "to": "join" },
+    { "from": "build_g", "to": "review_g" }, { "from": "review_g", "to": "ok_g" },
+    { "from": "ok_g", "to": "merge_g", "name": "approved", "when": { "path": "vG.status", "eq": "approved" } },
+    { "from": "ok_g", "to": "merge_g", "name": "3rd round", "when": { "path": "$loop.ok_g", "gte": 3 } },
+    { "from": "ok_g", "to": "fix_g", "name": "changes", "default": true },
+    { "from": "fix_g", "to": "review_g" },
+    { "from": "merge_g", "to": "join" },
+    { "from": "join", "to": "integrate" },
+    { "from": "integrate", "to": "final_review" }, { "from": "final_review", "to": "ok_final" },
+    { "from": "ok_final", "to": "done", "name": "approved", "when": { "path": "vF.status", "eq": "approved" } },
+    { "from": "ok_final", "to": "open_issues", "name": "3rd round", "when": { "path": "$loop.ok_final", "gte": 3 } },
+    { "from": "ok_final", "to": "fix_final", "name": "changes", "default": true },
+    { "from": "fix_final", "to": "final_review" }
+  ]
+}

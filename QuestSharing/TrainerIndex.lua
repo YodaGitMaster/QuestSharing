@@ -2,6 +2,7 @@
 -- zone or continent map is open) and says which of them are yours: your class, your professions, your faction.
 -- TravelMap.lua draws the result. Needs QuestieDB's NPC list; without it nothing is indexed and nothing is drawn.
 local ADDON, ns = ...
+ns.inModule("maps")          -- Modules.lua: Settings > General > Tools can switch this off
 local Q, Work = ns.questie, ns.dataWork
 local I = {}
 ns.trainerIndex = I

@@ -81,7 +81,11 @@ def test_atlas_boss_fields_items_npc_display_and_level(style):
 
 def test_atlas_matches_by_area_and_reports_unknown_dungeons(style):
     g = loot_game(style, ATLAS)
+    g.run("NS.dungeonBossData.bosses[718]=nil")  # no official list: the AtlasLoot rows as they are
     assert names(g.eval("NS.loot.bossesOf")("Some other name", None, 718)[0]) == ["Lord Cobrahn"]
+    g.run("NS.dungeonBossData.bosses[718]={{name='Lady Anacondra',order=1},{name='Lord Cobrahn',order=2,npcID=3669,npcIDs={3669}}}")
+    bosses = g.eval("NS.loot.bossesOf")("Some other name", None, 718)[0]  # an official list: its rows, drops attached
+    assert names(bosses) == ["Lady Anacondra", "Lord Cobrahn"] and items(bosses[2]) == [10002] and items(bosses[1]) == []
     bosses, source, reason = g.eval("NS.loot.bossesOf")("Nowhere Keep")
     assert len(bosses) == 0 and source == "AtlasLoot" and "no table" in reason
 
@@ -148,46 +152,80 @@ def test_no_loot_source_returns_empty_with_reason(style):
     assert len(got) == 1 and got[0][2] == reason
 
 
+# The Bosses page shows the shipped official list (DungeonBossData.lua): The Deadmines in fight order. The AtlasLoot
+# mock knows Edwin VanCleef (10001) and Cookie (10003); its Chest and Trash rows are not bosses and are dropped.
+DM = ["Rhahk'Zor", "Sneed", "Miner Johnson", "Gilnid", "Captain Greenskin", "Mr. Smite", "Cookie", "Edwin VanCleef"]
+RHAHK, MINER, COOKIE, EDWIN = 0, 2, 6, 7  # row indices
+EJ_EDWIN = "Interface\\EncounterJournal\\UI-EJ-BOSS-Edwin VanCleef"
+SKULL = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
+# QuestieDB: Edwin VanCleef (639) also drops item 951, so the official list gets QuestieDB drops; the mock's
+# "Dungeon captain" (900) is not an official boss and is dropped.
+QDM = r'''
+QUESTIE_NPCS[639]={name="Edwin VanCleef",spawns={[1581]={{-1,-1}}}}
+QUESTIE_ITEMS[951].npcDrops={900,639}
+'''
+
+
+def click(row):
+    row.scripts.OnClick(row, "LeftButton")
+
+
 def test_page_rows_portrait_chain_and_badges(style):
     g = loot_game(style, ATLAS)
     B, w = page(g)
     rows = shown_rows(w)
-    assert [r.name.text for r in rows] == ["Edwin VanCleef", "Cookie", "Chest"]
-    assert rows[0].width == 315 and rows[0].height == 55 and rows[0].portrait.width == 44
-    assert [r.portrait.source for r in rows] == ["journal", "display", "skull"]
-    assert rows[0].portrait.texture == "Interface\\EncounterJournal\\UI-EJ-BOSS-Edwin VanCleef"
-    assert rows[1].portrait.displayID == 1305
-    assert rows[2].portrait.texture == "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
-    assert rows[0].badge.shown and rows[0].boss.level == 21 and not rows[2].badge.shown
+    assert [r.name.text for r in rows] == DM  # the official list in fight order; Chest is gone
+    assert rows[0].width == 314 and rows[0].height == 52 and rows[0].portrait.width == 44
+    # shipped data: Encounter Journal art (ejFile) for 7, Miner Johnson has none: his display portrait
+    assert [r.portrait.source for r in rows] == ["journal"] * 2 + ["display"] + ["journal"] * 5
+    assert rows[RHAHK].portrait.ejFile == 5875511 and rows[RHAHK].portrait.texture == 5875511
+    assert rows[MINER].portrait.displayID == 556 and rows[MINER].portrait.ejFile is None
+    assert rows[EDWIN].badge.shown and rows[EDWIN].boss.level == 21 and not rows[RHAHK].badge.shown
     assert rows[0].sel.shown and not rows[1].sel.shown
-    assert w.portrait.width == 68 and w.portrait.source == "journal" and w.name.text == "Edwin VanCleef"
+    assert w.portrait.width == 68 and w.portrait.source == "journal" and w.name.text == "Rhahk'Zor"
+    # the rest of the chain: art by name (no ejFile), then the display portrait, then the skull
+    g.run("local d=NS.dungeonBossData.bosses[1581]; d[1].ejFile=nil; d[1].displayID=nil; d[7].ejFile=nil; d[8].ejFile=nil")
+    B.show(1581, "The Deadmines")
+    rows = shown_rows(w)
+    assert [rows[i].portrait.source for i in (RHAHK, COOKIE, EDWIN)] == ["skull", "display", "journal"]
+    assert rows[EDWIN].portrait.texture == EJ_EDWIN and rows[EDWIN].portrait.journalPath == EJ_EDWIN
+    assert rows[COOKIE].portrait.displayID == 1305
+    assert rows[RHAHK].portrait.texture == SKULL
     assert not g.eval("NS.db.errors")
 
 
 def test_portrait_without_journal_art_api_uses_display_then_skull(style):
+    no_edwin_art = "NS.dungeonBossData.bosses[1581][8].ejFile=nil"
     g = loot_game(style, ATLAS + "GetFileIDFromPath=nil")
+    g.run(no_edwin_art)
     B, w = page(g)
-    assert [r.portrait.source for r in shown_rows(w)] == ["display", "display", "skull"]
+    # ejFile needs no lookup API; without the API Edwin's art by name cannot be found: his display portrait
+    assert [r.portrait.source for r in shown_rows(w)] == ["journal"] * 2 + ["display"] + ["journal"] * 4 + ["display"]
     g = loot_game(style, ATLAS + "GetFileIDFromPath=nil; SetPortraitTextureFromCreatureDisplayID=nil")
+    g.run(no_edwin_art)
     B, w = page(g)
-    assert [r.portrait.source for r in shown_rows(w)] == ["skull", "skull", "skull"]
+    assert [r.portrait.source for r in shown_rows(w)] == ["journal"] * 2 + ["skull"] + ["journal"] * 4 + ["skull"]
 
 
 def test_loot_rows_follow_the_selected_boss(style):
     g = loot_game(style, ATLAS)
     B, w = page(g)
+    assert not shown_loot(w) and w.status.text == "No drops listed for Rhahk'Zor."  # a boss with no drops stays listed
+    click(shown_rows(w)[EDWIN])
     loot = shown_loot(w)
-    assert len(loot) == 1 and loot[0].bossItemID == 10001 and loot[0].width == 388 and loot[0].height == 52
-    cookie = shown_rows(w)[1]
-    cookie.scripts.OnClick(cookie, "LeftButton")
+    assert len(loot) == 1 and loot[0].bossItemID == 10001 and loot[0].width == 384 and loot[0].height == 50
+    assert not w.status.shown
+    cookie = shown_rows(w)[COOKIE]
+    click(cookie)
     loot = shown_loot(w)
     assert [b.bossItemID for b in loot] == [10003] and w.name.text == "Cookie"
-    assert cookie.sel.shown and not shown_rows(w)[0].sel.shown
+    assert cookie.sel.shown and not shown_rows(w)[EDWIN].sel.shown and not shown_rows(w)[0].sel.shown
 
 
 def test_loot_hover_shows_item_tooltip_and_shift_compare(style):
     g = loot_game(style, ATLAS)
     B, w = page(g)
+    click(shown_rows(w)[EDWIN])
     b = shown_loot(w)[0]
     b.scripts.OnEnter(b)
     assert g.eval("HYPERLINK") == "item:10001" and g.eval("TOOLTIP.shown")
@@ -199,33 +237,40 @@ def test_loot_hover_shows_item_tooltip_and_shift_compare(style):
 
 
 def test_loading_then_questie_drops_with_install_hint(style):
-    g = quest_game(style, SLOW, open_tab=False)
+    g = quest_game(style, SLOW + QDM, open_tab=False)
     B, w = page(g)
     assert w.status.text == "Loading drops…" and w.status.shown and not shown_rows(w) and not shown_loot(w)
+    assert not w.note.shown  # no hint while loading
     g.advance(30)
-    assert [r.name.text for r in shown_rows(w)] == ["Dungeon captain"]
+    assert [r.name.text for r in shown_rows(w)] == DM  # "Dungeon captain" is not an official boss
+    assert not shown_loot(w) and w.status.text == "No drops listed for Rhahk'Zor."
+    assert B.select("Edwin VanCleef") is True
     assert [b.bossItemID for b in shown_loot(w)] == [951]
-    assert "Install AtlasLoot for full drops" in w.note.text
+    assert w.note.shown and w.note.text == "Install AtlasLoot for full drops."  # its own line, once
+    assert not w.count.shown
     assert not g.eval("NS.db.errors")
 
 
 def test_empty_states(style):
+    # no loot source at all: the official bosses still show, without drops, and the AtlasLoot hint
     g = quest_game(style, "AtlasLoot=nil; ItemDB.GetAllIds=nil; LibQuestieDB.Item=nil", open_tab=False)
     B, w = page(g)
-    assert not shown_rows(w) and not shown_loot(w) and "Install AtlasLoot for full drops" in w.status.text
+    assert [r.name.text for r in shown_rows(w)] == DM and not shown_loot(w)
+    assert w.status.text == "No drops listed for Rhahk'Zor." and w.note.text == "Install AtlasLoot for full drops."
+    # no official list and no AtlasLoot table: no rows, only the reason
     g = loot_game(style, ATLAS)
     B, w = page(g, 0, "Nowhere Keep")
     assert not shown_rows(w) and "no table" in w.status.text and not w.name.shown
 
 
 def test_stale_result_after_switching_dungeon_is_ignored(style):
-    g = quest_game(style, SLOW, open_tab=False)
+    g = quest_game(style, SLOW + QDM, open_tab=False)
     B, w = page(g)
     B.hide()
     g.advance(30)
     assert not w.frame.shown and not shown_rows(w)  # the hidden page was not repainted by the late answer
     B.show(1581, "The Deadmines")
-    assert [r.name.text for r in shown_rows(w)] == ["Dungeon captain"]
+    assert [r.name.text for r in shown_rows(w)] == DM
 
 
 def test_journal_portrait_tries_names_with_and_without_spaces(style):
@@ -234,12 +279,16 @@ def test_journal_portrait_tries_names_with_and_without_spaces(style):
         "Interface\\EncounterJournal\\UI-EJ-BOSS-Mutanus the Devourer", "Interface\\EncounterJournal\\UI-EJ-BOSS-MutanustheDevourer"]
     assert list(g.eval("NS.dungeonBossesUI.journalNames('Mr. Smite')").values())[-1] == "Interface\\EncounterJournal\\UI-EJ-BOSS-MrSmite"
     assert len(list(g.eval("NS.dungeonBossesUI.journalNames('Cookie')").values())) == 1
+    g.run("NS.dungeonBossData.bosses[1581][8].ejFile=nil")  # no ejFile: the art by name
     B, w = page(g)
-    edwin = shown_rows(w)[0]
+    edwin = shown_rows(w)[EDWIN]
     assert edwin.portrait.source == "journal" and edwin.portrait.texture == "Interface\\EncounterJournal\\UI-EJ-BOSS-EdwinVanCleef"
     g2 = loot_game(style, ATLAS.replace("UI-EJ-BOSS-Edwin VanCleef", "UI-EJ-BOSS-Cookie"))
+    g2.run("local d=NS.dungeonBossData.bosses[1581]; d[7].ejFile=nil; d[8].ejFile=nil")
     B2, w2 = page(g2)
-    assert [r.portrait.source for r in shown_rows(w2)] == ["display", "journal", "skull"]  # spaced name used as is
+    rows = shown_rows(w2)
+    assert [rows[i].portrait.source for i in (MINER, COOKIE, EDWIN)] == ["display", "journal", "display"]
+    assert rows[COOKIE].portrait.journalPath == "Interface\\EncounterJournal\\UI-EJ-BOSS-Cookie"  # spaced name used as is
 
 
 def test_select_by_name_opens_that_boss(style):
@@ -247,18 +296,20 @@ def test_select_by_name_opens_that_boss(style):
     B, w = page(g)
     assert B.select("cookie") is True                     # case does not matter
     assert w.name.text == "Cookie" and [b.bossItemID for b in shown_loot(w)] == [10003]
-    assert shown_rows(w)[1].sel.shown and not shown_rows(w)[0].sel.shown
+    assert shown_rows(w)[COOKIE].sel.shown and not shown_rows(w)[0].sel.shown
     assert B.select("Nobody") is False and w.name.text == "Cookie"
+    assert B.select("Chest") is False and w.name.text == "Cookie"  # an AtlasLoot row that is not a boss
     assert B.select(None) is False and B.select("") is False
     assert not g.eval("NS.db.errors")
 
 
 def test_select_while_loading_lands_when_the_bosses_arrive(style):
-    g = quest_game(style, SLOW, open_tab=False)
+    g = quest_game(style, SLOW + QDM, open_tab=False)
     B, w = page(g)
-    assert B.select("Dungeon captain") is True            # still loading: kept for later
+    assert B.select("Edwin VanCleef") is True             # still loading: kept for later
     g.advance(30)
-    assert w.name.text == "Dungeon captain" and g.eval("NS.dungeonBossesUI._view().want") is None
+    assert w.name.text == "Edwin VanCleef" and g.eval("NS.dungeonBossesUI._view().want") is None
+    assert [b.bossItemID for b in shown_loot(w)] == [951]
 
 
 def test_select_before_the_page_is_built_or_shown(style):
@@ -268,34 +319,34 @@ def test_select_before_the_page_is_built_or_shown(style):
     B2, w = page(g)
     assert w.name.text == "Cookie" and g.eval("NS.dungeonBossesUI._view().want") is None
     B.show(0, "Nowhere Keep")
-    assert B.select("Chest") is False                     # not in this list: kept for the next show
+    assert B.select("Edwin VanCleef") is False            # not in this list: kept for the next show
     B.show(1581, "The Deadmines")
-    assert w.name.text == "Chest"
+    assert w.name.text == "Edwin VanCleef"
 
 
 def test_a_wanted_boss_not_in_the_loaded_list_is_dropped(style):
     g = loot_game(style, ATLAS)
     B = g.eval("NS.dungeonBossesUI")
-    assert B.select("Chest") is False                     # not built yet: remembered
+    assert B.select("Edwin VanCleef") is False            # not built yet: remembered
     B2, w = page(g, 0, "Nowhere Keep")                    # loads a list without that boss
     assert g.eval("NS.dungeonBossesUI._view().want") is None, "no stale selection carried into another dungeon"
     B.show(1581, "The Deadmines")
-    assert w.name.text != "Chest"
+    assert w.name.text == "Rhahk'Zor"
     assert not g.eval("NS.db.errors")
 
 
 def test_select_scrolls_the_boss_into_view(style):
-    many = ATLAS + r'''
-local dm=AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids.Deadmines.items
-for i=1,12 do table.insert(dm, {name="Boss "..i, npcID=9000+i, [1]={{1,10100+i}}}) end
-'''
-    g = loot_game(style, many)
-    B, w = page(g)
+    g = loot_game(style, ATLAS)                           # Blackrock Depths: 21 official bosses, 8 rows
+    B, w = page(g, 1584, "Blackrock Depths")
     bosses = g.eval("NS.dungeonBossesUI._view().bosses")
-    last = bosses[len(list(bosses.values()))].name
+    count = len(list(bosses.values()))
+    assert count == 21 and len(shown_rows(w)) == 8
+    assert w.leftStatus.shown and w.leftStatus.text == "1-8 of 21"  # the footer only on overflow
+    last = bosses[count].name
     assert last not in [r.name.text for r in shown_rows(w)]
     assert B.select(last) is True
     assert last in [r.name.text for r in shown_rows(w)] and w.name.text == last
+    assert w.leftStatus.text == "14-21 of 21"
 
 
 # Round 3 (stream L): the journal text on the right panel.
@@ -323,7 +374,9 @@ def lore_page(style, extra=""):
     g.run(SPELL_MOCK)
     if extra:
         g.run(extra)
-    return page(g) + (g,)
+    B, w = page(g)
+    assert B.select("Edwin VanCleef") is True  # the official list starts with Rhahk'Zor
+    return B, w, g
 
 
 def test_description_under_the_boss_name_and_drops_below_it(style):
@@ -383,8 +436,7 @@ def test_needed_for_lists_the_quests_that_kill_this_boss(style):
     assert g.eval("TOOLTIP.shown") and g.eval("TOOLTIP.text") == titles[0]
     last = [r for r in w.abilities.values() if r.shown][-1]
     assert y(w.questHead) < y(last)                    # after the abilities
-    cookie = shown_rows(w)[1]
-    cookie.scripts.OnClick(cookie, "LeftButton")
+    click(shown_rows(w)[COOKIE])
     assert g.eval("QUESTS_ASKED") == 645 and not w.questHead.shown
 
 
@@ -431,29 +483,245 @@ local get=NS.questie.get
 NS.questie.get=function(kind,id,key) if kind=="npc" and key=="rank" and id==639 then return 1 end return get(kind,id,key) end
 ''')
     B.refresh()
-    assert w.facts.shown and w.facts.text == "Level 21 · Elite · 1 drop"
+    # an official boss: no QuestieDB rank (it is unreliable there, e.g. "Rare Elite" on VanCleef)
+    assert w.facts.shown and w.facts.text == "Level 21 · 1 drop"
     F = g.eval("NS.dungeonBossesUI.facts")
+    assert F(g.eval("{level=21,npcID=639,items={1}}")) == "Level 21 · Elite · 1 drop"  # legacy rows keep the rank
     assert F(g.eval("{level=30,rare=true,items={1,2,3}}")) == "Level 30 · Rare · 3 drops"
     assert F(g.eval("{items={}}")) == "0 drops"
+    assert F(g.eval("{official=true,optional=true,level=40,npcID=639,items={}}")) == "Level 40 · 0 drops (optional)"
 
 
 def test_without_a_journal_entry_no_empty_headings(style):
     B, w, g = lore_page(style, NEEDED)
-    chest = shown_rows(w)[2]
-    chest.scripts.OnClick(chest, "LeftButton")
-    assert w.name.text == "Chest" and w.facts.shown and "1 drop" in w.facts.text
+    miner = shown_rows(w)[MINER]                                       # Miner Johnson: no journal entry, no quests
+    click(miner)
+    assert w.name.text == "Miner Johnson" and w.facts.shown and w.facts.text == "0 drops"
+    assert w.status.text == "No drops listed for Miner Johnson."
     assert not w.desc.shown and not w.abilityHead.shown and not w.questHead.shown and not w.side.shown
     assert not [r for r in w.abilities.values() if r.shown]
-    assert y(shown_loot(w)[0]) == -102                                # the drops keep their old place
+    assert y(w.loot[1]) == -102 and y(w.status) == -110                # the drops keep their old place
     # a boss with quests but no journal text: only the quests heading, at the top of the column
     g.run("NS.dungeonLore.bosses['edwin vancleef']=nil")
-    edwin = shown_rows(w)[0]
-    edwin.scripts.OnClick(edwin, "LeftButton")
+    click(shown_rows(w)[EDWIN])
     assert not w.desc.shown and not w.abilityHead.shown and w.questHead.shown and y(w.questHead) == 0
+    assert y(shown_loot(w)[0]) == -102
     g.run("NS.dungeonLore=nil")
     B.refresh()
     assert w.name.text == "Edwin VanCleef" and not w.desc.shown and w.questHead.shown
     assert not g.eval("NS.db.errors")
+
+
+# ---- Official boss list (ns.dungeonBossData, R4 rule): the only source of rows when the area has one ----
+OFFICIAL_DM = (
+    "NS.dungeonBossData.bosses[1581]={"
+    "{name='Rhahk\\'Zor',order=1,npcID=644,npcIDs={644}},"
+    "{name='Sneed',order=2,npcID=643,npcIDs={643},lootNpcIDs={642}},"
+    "{name='Cookie',order=3,npcID=645,npcIDs={645}},"
+    "{name='Edwin VanCleef',order=4,npcID=639,npcIDs={639}}}"
+)
+DM_ITEMS = "AtlasLoot.ItemDB.Storage.AtlasLootClassic_DungeonsAndRaids.Deadmines.items"
+
+
+def official_game(style, extra="", official=OFFICIAL_DM):
+    g = loot_game(style, ATLAS + extra)
+    g.run(official)
+    return g
+
+
+def lua_list(t):
+    return list(t.values()) if t is not None else None
+
+
+def test_official_order_wins_over_atlasloot_order(style):
+    g = official_game(style)
+    got = []
+    bosses, source, reason = g.eval("NS.loot.bossesOf")("The Deadmines", lambda *a: got.append(a), 1581)
+    assert names(bosses) == ["Rhahk'Zor", "Sneed", "Cookie", "Edwin VanCleef"], names(bosses)
+    assert source == "AtlasLoot" and reason is None
+    assert all(b.official for b in bosses.values())
+    edwin = bosses[4]
+    assert items(edwin) == [10001] and edwin.displayID == 2029 and edwin.level == 21 and edwin.order == 4
+    assert lua_list(edwin.npcIDs) == [639] and edwin.npcID == 639
+    assert items(bosses[3]) == [10003] and bosses[3].displayID == 1305
+    assert len(got) == 1 and names(got[0][0]) == names(bosses) and got[0][1] == source and got[0][2] == reason
+    assert not g.eval("NS.db.errors")
+
+
+def test_official_drops_trash_extra_chest_and_unknown_rows(style):
+    g = official_game(style, "table.insert(%s,{name='Defias Pirate',npcID=657,[1]={{1,20001}}})" % DM_ITEMS)
+    bosses = g.eval("NS.loot.bossesOf")("The Deadmines", None, 1581)[0]
+    assert names(bosses) == ["Rhahk'Zor", "Sneed", "Cookie", "Edwin VanCleef"]
+    every = [i for b in bosses.values() for i in items(b)]
+    assert sorted(every) == [10001, 10003], every  # Trash (ExtraList), Chest, the quest reward and the pirate are gone
+
+
+def test_official_boss_without_drops_is_kept_with_empty_items(style):
+    g = official_game(style)
+    bosses = g.eval("NS.loot.bossesOf")("The Deadmines", None, 1581)[0]
+    rhahk = bosses[1]
+    assert rhahk.name == "Rhahk'Zor" and items(rhahk) == [] and rhahk.official and rhahk.displayID is None
+
+
+def test_official_loot_npc_ids_move_the_shredder_drops_to_sneed(style):
+    g = official_game(style, "table.insert(%s,2,{name=\"Sneed's Shredder\",npcID=642,[1]={{1,20002},{2,20003}}})" % DM_ITEMS)
+    bosses = g.eval("NS.loot.bossesOf")("The Deadmines", None, 1581)[0]
+    assert names(bosses) == ["Rhahk'Zor", "Sneed", "Cookie", "Edwin VanCleef"]
+    assert items(bosses[2]) == [20002, 20003] and lua_list(bosses[2].lootNpcIDs) == [642]
+
+
+def test_official_loot_npc_rows_give_items_but_never_level_or_model(style):
+    shredder = "table.insert(%s,2,{name=\"Sneed's Shredder\",npcID=642,Level=19,DisplayIDs={{9999}},[1]={{1,20002}}})" % DM_ITEMS
+    max_level = ("local get=NS.questie.get; NS.questie.get=function(kind,id,key)"
+                 " if kind=='npc' and id==643 and key=='maxLevel' then return 20 end return get(kind,id,key) end")
+    g = official_game(style, shredder)
+    g.run(max_level)
+    sneed = g.eval("NS.loot.bossesOf")("The Deadmines", None, 1581)[0][2]
+    assert items(sneed) == [20002]
+    assert sneed.displayID is None and sneed.level == 20, (sneed.displayID, sneed.level)  # Sneed's own npc level
+    # Sneed's own row (matched by npcIDs) gives its level and model, even after the Shredder's row
+    g = official_game(style, shredder + "; table.insert(%s,3,{name='Sneed',npcID=643,Level=18,DisplayIDs={{7125}},[1]={{1,20004}}})" % DM_ITEMS)
+    sneed = g.eval("NS.loot.bossesOf")("The Deadmines", None, 1581)[0][2]
+    assert items(sneed) == [20002, 20004] and sneed.displayID == 7125 and sneed.level == 18
+    # the shipped data: Sneed keeps his own display ID and gets no level from the Shredder
+    g = loot_game(style, ATLAS + shredder)
+    sneed = g.eval("NS.loot.bossesOf")("The Deadmines", None, 1581)[0][2]
+    assert sneed.name == "Sneed" and sneed.displayID == 7125 and sneed.level != 19 and items(sneed) == [20002]
+
+
+def test_official_match_by_npc_name_and_group_members(style):
+    official = ("NS.dungeonBossData.bosses[1581]={"
+                "{name='The Lost Dwarves',order=1,group=true,members={'Baelog','Olaf','Eric \"The Swift\"'},npcID=6906,npcIDs={6906}},"
+                "{name='Old Serra\\'kis',order=2,npcName='Gelihast',npcID=7000,npcIDs={7000}}}")
+    extra = ("local t=%s; for i=#t,1,-1 do t[i]=nil end "
+             "t[1]={name='Olaf',npcID=6908,[1]={{1,20012},{2,20011}}} "
+             "t[2]={name='Baelog',npcID=6906,[1]={{1,20011}}} "
+             "t[3]={name='Eric The Swift',npcID=6907,[1]={{1,20013}}} "
+             "t[4]={name='Gelihast',npcID=6243,[1]={{1,20014}}}") % DM_ITEMS
+    g = official_game(style, extra, official)
+    bosses = g.eval("NS.loot.bossesOf")("The Deadmines", None, 1581)[0]
+    assert names(bosses) == ["The Lost Dwarves", "Old Serra'kis"]
+    dwarves = bosses[1]
+    assert dwarves.group and lua_list(dwarves.members)[:2] == ["Baelog", "Olaf"]
+    assert items(dwarves) == [20012, 20011, 20013], items(dwarves)  # unique, first-seen (AtlasLoot) order
+    assert items(bosses[2]) == [20014] and bosses[2].npcName == "Gelihast"
+
+
+def test_official_a_raw_row_joins_only_one_boss(style):
+    official = ("NS.dungeonBossData.bosses[1581]={"
+                "{name='Edwin VanCleef',order=1,npcID=7001,npcIDs={7001}},"
+                "{name='Cookie',order=2,npcID=645,npcIDs={645}},"
+                "{name='Cookie Twin',order=3,npcID=7002,npcIDs={7002},altNpcIDs={645}}}")
+    g = official_game(style, "", official)
+    bosses = g.eval("NS.loot.bossesOf")("The Deadmines", None, 1581)[0]
+    assert names(bosses) == ["Edwin VanCleef", "Cookie", "Cookie Twin"]
+    assert items(bosses[2]) == [10003] and items(bosses[3]) == [], "the first boss by order wins"
+    assert items(bosses[1]) == [10001], "no id match: the plain name joins it"
+    official = ("NS.dungeonBossData.bosses[1581]={"
+                "{name='Cookie',order=1,npcID=7003,npcIDs={7003}},"
+                "{name='Captain',order=2,npcID=645,npcIDs={645}}}")
+    g = official_game(style, "", official)
+    bosses = g.eval("NS.loot.bossesOf")("The Deadmines", None, 1581)[0]
+    assert items(bosses[2]) == [10003] and items(bosses[1]) == [], "an npc id match beats a name match"
+
+
+def test_official_atlas_npc_id_table_matches_by_the_second_id(style):
+    g = official_game(style, "table.insert(%s,{name='Twin Lord',npcID={3865,3864},[1]={{1,20020}}})" % DM_ITEMS,
+                      "NS.dungeonBossData.bosses[1581]={{name='Official Lord',order=1,npcID=3864,npcIDs={3864}}}")
+    bosses = g.eval("NS.loot.bossesOf")("The Deadmines", None, 1581)[0]
+    assert names(bosses) == ["Official Lord"] and items(bosses[1]) == [20020]
+    legacy = g.eval("NS.loot.bossesOf")("The Deadmines")[0]  # the raw row keeps every npc id
+    twin = next(b for b in legacy.values() if b.name == "Twin Lord")
+    assert twin.npcID == 3865 and lua_list(twin.npcIDs) == [3865, 3864]
+
+
+QUESTIE_OFFICIAL = QUESTIE + r'''
+QUESTIE_NPCS[400]={name="Defias trash",spawns={[1581]={{-1,-1}}}}
+QUESTIE_ITEMS[953]={name="Trash cloth",npcDrops={400}}
+QUESTIE_ITEMS[954]={name="Captain spare",npcDrops={900}}
+local moreIds=ItemDB.GetAllIds
+ItemDB.GetAllIds=function() local ids=moreIds(); ids[#ids+1]=953; ids[#ids+1]=954; return ids end
+'''
+OFFICIAL_Q = ("NS.dungeonBossData.bosses[1581]={{name='Rhahk\\'Zor',order=1,npcID=644,npcIDs={644}},"
+              "{name='The Captain',order=2,npcID=900,npcIDs={900}}}")
+
+
+def test_official_questie_path_attaches_drops_and_drops_other_npcs(style):
+    g = quest_game(style, QUESTIE_OFFICIAL, open_tab=False)
+    g.run(OFFICIAL_Q)
+    got = []
+    g.eval("NS.loot.bossesOf")("The Deadmines", lambda *a: got.append(a), 1581)
+    g.advance(30)
+    assert len(got) == 1, got
+    bosses, source, reason = got[0]
+    assert source == "QuestieDB" and reason is None and names(bosses) == ["Rhahk'Zor", "The Captain"]
+    assert items(bosses[2]) == [951, 954] and items(bosses[1]) == [] and bosses[2].official
+    legacy = g.eval("NS.loot.bossesOf")("The Deadmines")[0]  # no area: today's rows, trash npc included
+    assert sorted(names(legacy)) == ["Defias trash", "Dungeon captain"] and not legacy[1].official
+    again = g.eval("NS.loot.bossesOf")("The Deadmines", None, 1581)  # ready index: answered at once
+    assert again[1] == "QuestieDB" and names(again[0]) == ["Rhahk'Zor", "The Captain"]
+    assert not g.eval("NS.db.errors")
+
+
+def test_official_no_table_and_no_source_keep_rows_and_reason(style):
+    g = official_game(style, "", "NS.dungeonBossData.bosses[2100]={{name='Lord Official',order=1,npcID=7100,npcIDs={7100}}}")
+    got = []
+    bosses, source, reason = g.eval("NS.loot.bossesOf")("Nowhere Keep", lambda *a: got.append(a), 2100)
+    assert names(bosses) == ["Lord Official"] and items(bosses[1]) == [] and bosses[1].official
+    assert source == "AtlasLoot" and reason == "AtlasLoot has no table for Nowhere Keep."
+    assert len(got) == 1 and got[0][2] == reason and names(got[0][0]) == ["Lord Official"]
+    g = quest_game(style, "AtlasLoot=nil; ItemDB.GetAllIds=nil; LibQuestieDB.Item=nil", open_tab=False)
+    g.run(OFFICIAL_Q)
+    got = []
+    bosses, source, reason = g.eval("NS.loot.bossesOf")("The Deadmines", lambda *a: got.append(a), 1581)
+    assert names(bosses) == ["Rhahk'Zor", "The Captain"] and all(items(b) == [] for b in bosses.values())
+    assert source is None and reason and "AtlasLoot" in reason
+    assert len(got) == 1 and got[0][1] is None and got[0][2] == reason and names(got[0][0]) == names(bosses)
+
+
+def test_official_a_cancelled_scan_answers_official_rows_with_its_reason(style):
+    g = quest_game(style, SLOW, open_tab=False)
+    g.run(OFFICIAL_Q)
+    got = []
+    assert g.eval("NS.loot.bossesOf")("The Deadmines", lambda *a: got.append(a), 1581)[2] == "loading"
+    g.run("NS.loot.purge()")
+    assert len(got) == 1 and names(got[0][0]) == ["Rhahk'Zor", "The Captain"] and got[0][1] is None
+    assert "cleared" in got[0][2]
+    g.advance(30)
+    assert len(got) == 1, "done is called exactly once"
+
+
+def test_official_name_only_and_unlisted_area_give_the_legacy_answer(style):
+    g = official_game(style)
+    bosses = g.eval("NS.loot.bossesOf")("The Deadmines")[0]
+    assert names(bosses) == ["Edwin VanCleef", "Cookie", "Chest"] and not bosses[1].official
+    g.run("NS.dungeonBossData.bosses[718]=nil")
+    bosses = g.eval("NS.loot.bossesOf")("Wailing Caverns", None, 718)[0]
+    assert names(bosses) == ["Lord Cobrahn"] and not bosses[1].official
+    g.run("NS.dungeonBossData.bosses[1581]={}")  # an empty official list counts as none
+    assert names(g.eval("NS.loot.bossesOf")("The Deadmines", None, 1581)[0]) == ["Edwin VanCleef", "Cookie", "Chest"]
+
+
+def test_official_nil_hole_in_atlas_items_no_longer_cuts_the_list(style):
+    g = official_game(style, "%s[2]=nil" % DM_ITEMS)  # Cookie gone: a hole like `isForever and {...} or nil`
+    assert names(g.eval("NS.loot.bossesOf")("The Deadmines")[0]) == ["Edwin VanCleef", "Chest"]
+    g = official_game(style, "%s[3]=nil; %s[7]={name='Rhahk\\'Zor',npcID=644,[1]={{1,20030}}}" % (DM_ITEMS, DM_ITEMS))
+    bosses = g.eval("NS.loot.bossesOf")("The Deadmines", None, 1581)[0]
+    assert items(bosses[1]) == [20030], "a boss after the hole still gets its drops"
+
+
+def test_official_drops_index_maps_an_item_to_the_official_boss_name(style):
+    from test_dungeon_quests import filters
+    g = quest_game(style, QUESTIE_OFFICIAL)
+    g.run(OFFICIAL_Q + "; NS.dungeonBossesUI.select=function() end")
+    filters(g, dungeon=1581)
+    source = g.eval("NS.dungeonQuests.dropSource")
+    first = source(951)
+    g.advance(30)
+    assert (first or source(951)) == "The Captain"
+    assert source(953) is None, "a trash drop has no official boss"
+    assert not g.eval("NS.db.errors")
+
 
 if __name__ == "__main__":
     failed = total = 0

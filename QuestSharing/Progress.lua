@@ -1,6 +1,7 @@
 -- Progress.lua: notices when the objectives of one of your quests are all done, tells the party
 -- when that quest is shared, and keeps synced players up to date about changes in your quest log.
 local ADDON, ns = ...
+ns.inModule("sharing")          -- Modules.lua: Settings > General > Tools can switch this off
 local C = ns.compat
 
 local ICON = "{rt1}"

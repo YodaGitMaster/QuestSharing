@@ -1,5 +1,6 @@
 -- Recipe/farming data and guarded native Cooking reads; presentation lives inside ProfessionUI.lua.
 local _, ns = ...
+ns.inModule("professions")          -- Modules.lua: Settings > General > Tools can switch this off
 local P, U, Q, D, C = {}, ns.optionalUI, ns.questie, ns.professionReference, ns.cookingReference
 ns.professions = P
 local learned, liveInfo, scanToken, eventToken = {}, {}, 0, 0

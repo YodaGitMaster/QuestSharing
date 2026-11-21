@@ -1,6 +1,7 @@
 -- Water-specific notes belong to the user. AnglerAtlas is read at runtime for a separate zone overview;
 -- its zone catch lists must never be presented as the verified catch list of every lake in that zone.
 local ADDON, ns = ...
+ns.inModule("professions")          -- Modules.lua: Settings > General > Tools can switch this off
 local F, U, S = {}, ns.optionalUI, ns.style
 ns.fishing = F
 local pins, editor, overview, selected = {}, nil, nil, nil

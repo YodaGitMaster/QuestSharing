@@ -2,6 +2,7 @@
 -- Shift-click links in chat, Ctrl-click opens the dressing room. Client textures only.
 -- Contract: context/dungeon-journal-contract.md
 local ADDON, ns = ...
+ns.inModule(nil)          -- core: always on (Modules.lua)
 local I = {}
 ns.journalItems = I
 local S = ns.style
